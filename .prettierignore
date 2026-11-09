@@ -1,0 +1,12 @@
+node_modules
+.next
+dist
+coverage
+playwright-report
+test-results
+package-lock.json
+requirements
+docs/design
+.claude
+.qodo
+*.md
