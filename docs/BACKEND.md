@@ -53,7 +53,7 @@ export const contactRoutes: ModuleRoutes = (r) => {
 // service.ts
 export async function create(ctx: RequestCtx, input: ContactCreate): Promise<Contact> {
   const phoneKey = input.phone ? toPhoneKey(input.phone) : null;          // pure helper
-  return ctx.tx(async (db) => {
+  return ctx.runInAccountTransaction(async (db) => {
     if (phoneKey && (await repo.findByPhoneKey(db, phoneKey))) throw conflict('CONTACT_EXISTS', 'A contact already has this phone number.');
     const contact = await repo.insert(db, { ...input, phoneKey, lifecycleStage: 'new', createdBy: ctx.actor });
     await ctx.audit(db, 'contact.created', { contactId: contact.id });
@@ -76,7 +76,7 @@ Every authenticated request gets `req.ctx: RequestCtx`:
 | `accountId` | The signed-in person's **current business**, from the session. Never from the URL, body or query. |
 | `user` | id, name, role in this business (`manager`, `staff`, `staff_own`), team ids |
 | `actor` | Who is acting, stamped on every change: `{ kind: 'user' \| 'agent' \| 'assistant' \| 'import' \| 'system' \| 'workflow', id }` |
-| `tx(fn)` | Runs `fn` in a transaction **fenced to the account** (RLS: `SET ROLE app_user`, `app.account_id`) |
+| `runInAccountTransaction(fn)` | Runs `fn` in a transaction **fenced to the account** (RLS: `SET ROLE app_user`, `app.account_id`) |
 | `audit(db, kind, data)` | Writes the activity log in the same transaction |
 | `publish(db, event, payload)` | Writes the outbox event in the same transaction |
 | `modules` | The active modules for this business (cached per request) |

@@ -21,9 +21,9 @@ describe('schema rules', () => {
       where n.nspname = 'app' and c.relkind = 'r'
         and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'account_id' and not a.attisdropped)`);
     expect(rows.length).toBeGreaterThan(0);
-    for (const r of rows) {
-      expect(r, `${r.table} must have RLS enabled, forced and a policy`).toMatchObject({ rls: true, forced: true });
-      expect(r.policies, `${r.table} needs a tenant policy`).toBeGreaterThan(0);
+    for (const tableRow of rows) {
+      expect(tableRow, `${tableRow.table} must have RLS enabled, forced and a policy`).toMatchObject({ rls: true, forced: true });
+      expect(tableRow.policies, `${tableRow.table} needs a tenant policy`).toBeGreaterThan(0);
     }
   });
 
@@ -32,15 +32,15 @@ describe('schema rules', () => {
       select c.relname as "table" from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'app' and c.relkind = 'r'
         and not exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'account_id' and not a.attisdropped)`);
-    const unexpected = rows.map((r) => r.table).filter((t) => !GLOBAL_TABLES.has(t));
-    expect(unexpected, 'add the table to GLOBAL_TABLES with a reason, or give it an account_id').toEqual([]);
+    const unexpectedTables = rows.map((tableRow) => tableRow.table).filter((tableName) => !GLOBAL_TABLES.has(tableName));
+    expect(unexpectedTables, 'add the table to GLOBAL_TABLES with a reason, or give it an account_id').toEqual([]);
   });
 
   it('the app role can add to the activity log but never change or delete it', async () => {
     const { rows } = await database.pool.query<{ priv: string; ok: boolean }>(`
-      select p as priv, has_table_privilege('app_user', 'app.activity_log', p) as ok
-      from unnest(array['SELECT','INSERT','UPDATE','DELETE']) as p`);
-    expect(Object.fromEntries(rows.map((r) => [r.priv, r.ok]))).toEqual({ SELECT: true, INSERT: true, UPDATE: false, DELETE: false });
+      select privilege as priv, has_table_privilege('app_user', 'app.activity_log', privilege) as ok
+      from unnest(array['SELECT','INSERT','UPDATE','DELETE']) as privilege`);
+    expect(Object.fromEntries(rows.map((privilegeRow) => [privilegeRow.priv, privilegeRow.ok]))).toEqual({ SELECT: true, INSERT: true, UPDATE: false, DELETE: false });
   });
 
   it('records each migration once, with a checksum', async () => {

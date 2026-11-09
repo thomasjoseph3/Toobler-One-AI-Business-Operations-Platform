@@ -7,9 +7,9 @@ export default async function setup() {
   const pool = createPool(testDatabaseConfig());
   try {
     await pool.query('select 1');
-  } catch (e) {
+  } catch (error) {
     await pool.end();
-    throw new Error(`The test database isn't reachable (${(e as Error).message}). Start it with: npm run db:up`);
+    throw new Error(`The test database isn't reachable (${(error as Error).message}). Start it with: npm run db:up`);
   }
   await pool.query('drop schema if exists app cascade');
   await migrate(pool, migrationsDir);

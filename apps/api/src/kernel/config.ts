@@ -5,15 +5,16 @@ import { z } from 'zod';
 // The only file that reads process.env (lint-enforced). Everything is checked at start-up; production refuses to start
 // on a bad setting rather than run half-open.
 
-const repoRoot = path.resolve(import.meta.dirname, '../../../..');
+const repositoryRootDirectory = path.resolve(import.meta.dirname, '../../../..');
 
 /** Loads the repo's .env into process.env (without overriding variables already set). Never in tests. */
-export function loadEnvFile(file = path.join(repoRoot, '.env')): void {
-  if (process.env.NODE_ENV === 'test' || !existsSync(file)) return;
-  process.loadEnvFile(file);
+export function loadEnvFile(environmentFilePath = path.join(repositoryRootDirectory, '.env')): void {
+  if (process.env.NODE_ENV === 'test' || !existsSync(environmentFilePath)) return;
+  process.loadEnvFile(environmentFilePath);
 }
 
-const Env = z.object({
+/** The environment variables the app understands, with their allowed values and defaults. */
+const EnvironmentVariablesSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   HOST: z.string().min(1).default('127.0.0.1'),
@@ -43,36 +44,46 @@ export interface Config {
 
 export class ConfigError extends Error {}
 
-function parseTrustProxy(value: string): boolean | string | string[] {
-  const v = value.trim();
-  if (v === 'none' || v === 'false' || v === '') return false;
-  if (v === 'true') throw new ConfigError('TRUST_PROXY=true trusts anyone who sends X-Forwarded-For. Use loopback or a list of proxy IPs.');
-  return v.includes(',') ? v.split(',').map((x) => x.trim()) : v;
+/** Turns the TRUST_PROXY setting into what Fastify expects: false, a single address, or a list of addresses. */
+function parseTrustProxy(rawValue: string): boolean | string | string[] {
+  const trimmedValue = rawValue.trim();
+  if (trimmedValue === 'none' || trimmedValue === 'false' || trimmedValue === '') return false;
+  if (trimmedValue === 'true') throw new ConfigError('TRUST_PROXY=true trusts anyone who sends X-Forwarded-For. Use loopback or a list of proxy IPs.');
+  return trimmedValue.includes(',') ? trimmedValue.split(',').map((address) => address.trim()) : trimmedValue;
 }
 
-export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
-  const parsed = Env.safeParse(env);
-  if (!parsed.success) {
-    const lines = parsed.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`);
-    throw new ConfigError(`Bad configuration:\n${lines.join('\n')}`);
+/**
+ * Checks the environment variables and returns the app's settings. Throws a ConfigError listing every problem, so the
+ * app refuses to start on a bad setting instead of running half-configured.
+ */
+export function loadConfig(environmentVariables: Record<string, string | undefined> = process.env): Config {
+  const parseResult = EnvironmentVariablesSchema.safeParse(environmentVariables);
+  if (!parseResult.success) {
+    const problemLines = parseResult.error.issues.map((issue) => `  ${issue.path.join('.')}: ${issue.message}`);
+    throw new ConfigError(`Bad configuration:\n${problemLines.join('\n')}`);
   }
-  const e = parsed.data;
+  const validEnvironment = parseResult.data;
   const config: Config = {
-    env: e.NODE_ENV,
-    port: e.PORT,
-    host: e.HOST,
-    logLevel: e.LOG_LEVEL,
-    db: { url: e.DATABASE_URL, ssl: e.DATABASE_SSL, caFile: e.DATABASE_CA_FILE, poolSize: e.DATABASE_POOL_SIZE },
-    trustProxy: parseTrustProxy(e.TRUST_PROXY),
-    webUrl: e.WEB_URL.replace(/\/$/, ''),
-    publicBaseUrl: e.PUBLIC_BASE_URL.replace(/\/$/, ''),
+    env: validEnvironment.NODE_ENV,
+    port: validEnvironment.PORT,
+    host: validEnvironment.HOST,
+    logLevel: validEnvironment.LOG_LEVEL,
+    db: {
+      url: validEnvironment.DATABASE_URL,
+      ssl: validEnvironment.DATABASE_SSL,
+      caFile: validEnvironment.DATABASE_CA_FILE,
+      poolSize: validEnvironment.DATABASE_POOL_SIZE,
+    },
+    trustProxy: parseTrustProxy(validEnvironment.TRUST_PROXY),
+    webUrl: validEnvironment.WEB_URL.replace(/\/$/, ''),
+    publicBaseUrl: validEnvironment.PUBLIC_BASE_URL.replace(/\/$/, ''),
   };
   if (config.env === 'production') {
-    const problems: string[] = [];
-    if (config.db.ssl === 'off') problems.push('DATABASE_SSL must be require or verify in production');
-    if (!config.publicBaseUrl.startsWith('https://')) problems.push('PUBLIC_BASE_URL must be https in production');
-    if (!config.webUrl.startsWith('https://')) problems.push('WEB_URL must be https in production');
-    if (problems.length) throw new ConfigError(`Unsafe production configuration:\n  ${problems.join('\n  ')}`);
+    const unsafeSettings: string[] = [];
+    if (config.db.ssl === 'off') unsafeSettings.push('DATABASE_SSL must be require or verify in production');
+    if (!config.publicBaseUrl.startsWith('https://')) unsafeSettings.push('PUBLIC_BASE_URL must be https in production');
+    if (!config.webUrl.startsWith('https://')) unsafeSettings.push('WEB_URL must be https in production');
+    if (unsafeSettings.length) throw new ConfigError(`Unsafe production configuration:\n  ${unsafeSettings.join('\n  ')}`);
   }
   return config;
 }

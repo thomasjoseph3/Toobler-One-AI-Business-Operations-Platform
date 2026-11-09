@@ -6,14 +6,14 @@ import { createPool } from '../apps/api/src/kernel/db';
 import { migrate } from '../apps/api/src/kernel/db/migrate';
 import { testDatabaseConfig } from '../apps/api/test/support/database';
 
-const test = process.argv.includes('--test');
-if (!test) loadEnvFile();
-const dbConfig = test ? testDatabaseConfig() : loadConfig().db;
-const target = new URL(dbConfig.url);
-console.log(`Migrating ${target.hostname}${target.pathname} ...`);
-const pool = createPool(dbConfig);
+const useTestDatabase = process.argv.includes('--test');
+if (!useTestDatabase) loadEnvFile();
+const databaseConfig = useTestDatabase ? testDatabaseConfig() : loadConfig().db;
+const databaseAddress = new URL(databaseConfig.url);
+console.log(`Migrating ${databaseAddress.hostname}${databaseAddress.pathname} ...`);
+const pool = createPool(databaseConfig);
 try {
-  const { applied, skipped } = await migrate(pool, path.resolve(import.meta.dirname, '../db/migrations'), (l) => console.log(' ', l));
+  const { applied, skipped } = await migrate(pool, path.resolve(import.meta.dirname, '../db/migrations'), (line) => console.log(' ', line));
   console.log(`Done: ${applied.length} applied, ${skipped.length} already up to date.`);
 } finally {
   await pool.end();
