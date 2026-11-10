@@ -116,13 +116,14 @@ these **reuse existing tokens** only. The owner decided (9 Nov 2026) to keep the
 
 ## 5. Contrast findings on the designer's v1.0 values
 
-Computed with WCAG 2.2 formulas (9 Nov 2026). **Decision (owner): the designer's values are used unchanged.** The F00 contrast test asserts every token pair we use and keeps this table as its explicit known-exceptions list: a new failing pair fails the build, these four do not. We do not darken colours ourselves. Where practical we avoid them: timestamps use `color-text-secondary` at 12 px and above when they matter, and the dark primary button follows the designer's spec.
+Computed with WCAG 2.2 formulas (9 Nov 2026). **Decision (owner): the designer's values are used unchanged.** The F00 contrast test asserts every token pair we use and keeps this table as its explicit known-exceptions list: a new failing pair fails the build, these five do not. We do not darken colours ourselves. Where practical we avoid them: timestamps use `color-text-secondary` at 12 px and above when they matter, and the dark primary button follows the designer's spec.
 
 | Pair | Ratio | Need | Where it matters |
 | --- | ---: | ---: | --- |
 | `color-text-muted` #7C837F on canvas / white / muted surface | 3.58 / 3.88 / 3.52 | 4.5 | Timestamps and metadata at 12–13 px |
 | Dark theme: white text on `color-action` #43A77A | 2.98 | 4.5 | Primary buttons in dark mode (dark text on it is 5.91) |
 | `color-action` #078453 on `color-action-subtle` | 4.19 | 4.5 | Selected navigation item text at 13 px |
+| Dark theme: `color-action` #43A77A on `color-action-subtle` #263D32 | 3.92 | 4.5 | Selected navigation item text (found by the token test on 10 Nov 2026; same cause as the light-theme row above) |
 | `color-focus-ring` #58A987 on white | 2.82 | 3.0 | Keyboard focus indicator |
 | `color-text-disabled` on white | 2.37 | exempt | Disabled controls (WCAG exempts them) |
 

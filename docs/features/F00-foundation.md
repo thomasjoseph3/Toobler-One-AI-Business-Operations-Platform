@@ -53,7 +53,7 @@ The migration runner itself creates the schema and `app.schema_migrations` (with
 - A query run without an account in the fence returns nothing; with account A it never returns account B's rows.
 - The server refuses to start in production with a missing or weak secret.
 - Logs never contain the fields in the redaction list.
-- Every token pair we use is checked for contrast; the four known designer exceptions are listed, anything new fails.
+- Every token pair we use is checked for contrast; the five known designer exceptions are listed, anything new fails.
 
 ## Tests
 - Unit: config parsing and production checks, error mapping, redaction, module registry (active/inactive, `requires`),

@@ -5,7 +5,13 @@ export default defineConfig({
   test: {
     projects: [
       'apps/api',
-      { test: { name: 'tooling', include: ['tools/**/*.test.ts', 'scripts/**/*.test.ts'], environment: 'node' } },
+      {
+        test: {
+          name: 'tooling',
+          include: ['tools/**/*.test.ts', 'scripts/**/*.test.ts', 'packages/**/*.test.ts'],
+          environment: 'node',
+        },
+      },
     ],
   },
 });
