@@ -1,0 +1,52 @@
+import { buildApp } from './app';
+import { loadConfig, loadEnvFile } from './kernel/config';
+import { createContextFactory } from './kernel/context';
+import { createDatabase } from './kernel/database';
+import { createEventDispatcher } from './kernel/events/dispatcher';
+import { createJobRunner } from './kernel/jobs/job-runner';
+import { coreOnlyGate, createRegistry } from './kernel/module-system/registry';
+import { modules } from './modules';
+
+// Start-up, in order: read settings, connect to the database and prove it works, build the web server, start listening.
+loadEnvFile();
+const config = loadConfig();
+const database = createDatabase(config.db);
+await database.ping();
+await database.verifyRoles();
+
+const registry = createRegistry(modules);
+const gate = coreOnlyGate(registry); // replaced by the real per-business switches in F03
+const contextFor = createContextFactory(database);
+
+// Background work: events are delivered to the modules that listen for them, and scheduled/queued jobs run.
+// Both report to /health. The web server is built last so it can list them.
+const app = await buildApp({ config, database, registry, gate, healthChecks: [] });
+const eventDispatcher = createEventDispatcher({ database, registry, gate, contextFor, logger: app.log });
+const jobRunner = createJobRunner({ config, registry, gate, contextFor, logger: app.log });
+app.kernel.healthChecks.push(eventDispatcher.healthCheck, jobRunner.healthCheck);
+await jobRunner.start();
+eventDispatcher.start();
+
+// Shuts down once, cleanly: stop taking requests, close database connections, then exit.
+let isShuttingDown = false;
+const shutDownGracefully = async (signalName: string) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  app.log.info({ signal: signalName }, 'shutting down');
+  await app.close(); // stop taking requests first
+  await eventDispatcher.stop(); // then let the delivery in progress finish
+  await jobRunner.stop();
+  await database.close();
+  process.exit(0);
+};
+for (const signalName of ['SIGINT', 'SIGTERM']) process.on(signalName, () => void shutDownGracefully(signalName));
+
+// A crash is logged with its reason before the process ends (the process manager starts it again)
+for (const crashEventName of ['uncaughtException', 'unhandledRejection'] as const) {
+  process.on(crashEventName, (error) => {
+    app.log.fatal({ err: error }, crashEventName);
+    process.exit(1);
+  });
+}
+
+await app.listen({ port: config.port, host: config.host });

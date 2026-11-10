@@ -8,6 +8,10 @@ description: The one-feature-at-a-time workflow for this project. Use to start t
 The process is in `docs/DEVELOPMENT.md`; the plan in `docs/plan/PHASE-1.md`; status in `docs/plan/STATUS.md`. This
 skill makes sure every step is done and **the gate is never skipped**.
 
+## Slices (owner rule)
+Build a feature in slices of **at most 2 API routes**. After each slice explain every folder and file added or changed,
+give the Postman and browser test steps, and stop until the owner has verified it. See docs/DEVELOPMENT.md "Slices".
+
 ## status
 Read `docs/plan/STATUS.md`. Report the current feature, its state, and what the owner is waiting on (if anything).
 

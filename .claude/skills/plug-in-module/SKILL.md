@@ -13,10 +13,10 @@ Architecture: `docs/ARCHITECTURE.md` (§1 modules, §2 conversation engine, §4 
 apps/api/src/modules/<core|engines|channels|features>/<name>/
   module.ts      defineModule({...}): the only thing the kernel reads
   index.ts       public API for modules that list this one in `requires`
-  routes.ts  service.ts  repository.ts  schemas.ts
+  routes/<feature>.routes.ts   services/<feature>.service.ts   repositories/<table>.repository.ts   helpers/
   adapter.ts     channels only (ChannelAdapter)
-  tools.ts       agent/assistant tools, if any
-  *.test.ts  *.api.test.ts
+  (request/response shapes live in packages/shared; tests in apps/api/test, helper tests beside the helper)
+  apps/api/test/module-structure.test.ts fails if a module breaks this shape
 apps/web/src/features/<name>/      pages, nav items, slot components, registered in index.ts
 ```
 
@@ -29,9 +29,11 @@ Add the module to the module list (`apps/api/src/modules/index.ts`) and, for the
 - [ ] Routes are declared in the manifest (the kernel adds the "module active" guard); pages call
       a `<RequireModule id="<id>">` wrapper on their routes (a switched-off module shows the not-found page).
 - [ ] Tables: own migration, `account_id`, RLS; tables are named for the module's things (`quotes`, not `sales_data`).
-- [ ] Reacts to other modules only through `events` (idempotent handlers); publishes its own events via `ctx.publish`
+- [ ] Reacts to other modules only through `events` (idempotent handlers); publishes its own events via `accountContext.publish`
       in the same transaction as the change. Document new events in ARCHITECTURE.md §4.
-- [ ] Agent tools: zod input, `effect`, `module` set; identity from `ToolContext`; offered only while active.
+- [ ] Agent tools live in `apps/api/src/agents/tools/` (not in the module), as thin wrappers over this module's `index.ts`:
+      zod input, `effect`, `module` set to this module's id; identity from `ToolContext`; offered only while active.
+      Modules never import `agents/`; agents import a module only through its `index.ts`.
 - [ ] Conversation types / outcomes / playbooks it adds are declared in the manifest, with a fallback when it's off.
 - [ ] UI: nav items and slot components registered; nothing edited in another module's pages.
 - [ ] Settings: zod schema stored in `account_modules.settings`.

@@ -6,15 +6,27 @@ The single source of truth for what is being built. Rules ([DEVELOPMENT.md](../D
 
 Statuses: `planned`, `in_progress`, `in_review`, `approved`, `deferred`.
 
+**Build order (changed 10 Nov 2026, see R28):** the rows are in build order, not number order. The first working lead
+engine comes first (the rows from F01 down to F31), then the rest of the CRM core, the workspace and the other
+channels. Feature numbers stay as they were, so the briefs and links do not change.
+
 | ID | Feature | Status | Brief | Approved on |
 | --- | --- | --- | --- | --- |
-| F00 | Foundation and design system | in_progress | [brief](../features/F00-foundation.md) | |
-| F01 | Sign-up, sign-in and sessions | planned | | |
-| F02 | Team, roles, teams and the activity log | planned | | |
+| F00 | Foundation and design system | approved | [brief](../features/F00-foundation.md) | 2026-11-10 |
+| F01 | Sign-up, sign-in and sessions | in_progress | [brief](../features/F01-sign-up-and-sign-in.md) | |
 | F03 | Modules: plug and play | planned | | |
 | F04 | Contacts | planned | | |
-| F05 | Companies | planned | | |
 | F06 | Pipeline and leads board | planned | | |
+| F14 | Tickets | planned | | |
+| F16 | Business profile, business questions and situations | planned | | |
+| F17 | Offerings and offers | planned | | |
+| F18 | Documents, FAQs, knowledge search and unanswered questions | planned | | |
+| F15 | Conversation types and the router | planned | | |
+| F19 | The AI agent (text) and Test the agent | planned | | |
+| F20 | Website chat | planned | | |
+| F31 | Setup wizard and fill from website | planned | | |
+| F02 | Team, roles, teams and the activity log | planned | | |
+| F05 | Companies | planned | | |
 | F07 | Timeline and notes | planned | | |
 | F08 | Tasks and reminders | planned | | |
 | F09 | Custom fields | planned | | |
@@ -22,13 +34,6 @@ Statuses: `planned`, `in_progress`, `in_review`, `approved`, `deferred`.
 | F11 | Views, filters, search and lists | planned | | |
 | F12 | Import and export | planned | | |
 | F13 | Duplicates and merging | planned | | |
-| F14 | Tickets | planned | | |
-| F15 | Conversation types and the router | planned | | |
-| F16 | Business profile, business questions and situations | planned | | |
-| F17 | Offerings and offers | planned | | |
-| F18 | Documents, FAQs, knowledge search and unanswered questions | planned | | |
-| F19 | The AI agent (text) and Test the agent | planned | | |
-| F20 | Website chat | planned | | |
 | F21 | Inbox, staff takeover and live updates | planned | | |
 | F22 | Today page | planned | | |
 | F23 | Staff alerts and the morning summary | planned | | |
@@ -39,7 +44,6 @@ Statuses: `planned`, `in_progress`, `in_review`, `approved`, `deferred`.
 | F28 | Reports | planned | | |
 | F29 | Phone calls (voice) | planned | | |
 | F30 | Staff assistant and MCP | planned | | |
-| F31 | Setup wizard and fill from website | planned | | |
 | F32 | Free "what you're missing" check | planned | | |
 | F33 | Competitor report | planned | | |
 | F34 | Subscription billing | planned | | |

@@ -183,8 +183,9 @@ Phase 1 tools (from the requirements, with the conversation-types change):
 ## 4. Events: how modules react to each other
 
 A **transactional outbox**: a service writes its change and the event in the same database transaction
-(`domain_events` table), and the job runner delivers each event to its subscribers at least once. Handlers are
-idempotent (keyed by event id).
+(`domain_events` table), and the event dispatcher (`kernel/events/`, a polling loop with leases, separate from the
+pg-boss job runner) delivers each event to its subscribers at least once. Handlers are idempotent (keyed by event id).
+Details and the retry rules are in [BACKEND.md](BACKEND.md) §4.
 
 Phase 1 events (names are the contract, payloads are ids, not personal data):
 
@@ -235,12 +236,12 @@ The same recipe works for service (tickets pipeline, portal), marketing (consent
   API runs business work inside `forAccount(accountId, fn)`, on connections that `SET ROLE app_user` and set the
   account. A query that forgets its `WHERE account_id` still sees only that business. (Same design as the hotel
   agent's `remi_app` fence.)
-- **Global tables** (no `account_id`, no RLS, reached only from named repository functions): `users`, `sessions`,
-  `auth_codes`, `accounts` (RLS by `id`), `platform_*`, `domain_events` delivery state, and the cross-business
+- **Global tables** (no `account_id`, no RLS, reached only from named repository functions): `user_credentials`,
+  `sessions`, `auth_codes`, `login_attempts`, `accounts` (RLS by `id`; `users` itself is fenced: one business per person for now), `platform_*`, `domain_events` delivery state, and the cross-business
   lookups for webhooks (`phone_numbers`, `connections` lookup by provider id).
 - **Migrations**: `db/migrations/NNN_<module>_<what>.sql`, numbered, forward-only, one per change, each enabling RLS
   on the tables it creates.
-- **Extensions**: `pgcrypto` (UUIDs), `pg_trgm` (search), `citext` (emails), `unaccent`, `vector` (knowledge search).
+- **Extensions**: `pgcrypto` (UUIDs), `pg_trgm` (search), `citext` (emails), `unaccent`, `vector` (optional, only if evals show keyword search is not enough).
 - **Jobs**: `pg-boss` (a job queue stored in Postgres), so there is no Redis to run in Phase 1.
 - **Files**: S3-compatible storage (Supabase Storage), private buckets, short-lived signed links.
 
@@ -253,7 +254,7 @@ The same recipe works for service (tickets pipeline, portal), marketing (consent
 │   │   └── src/
 │   │       ├── kernel/           registry, module guard, event bus, jobs, config, db, errors, http plumbing
 │   │       ├── modules/
-│   │       │   ├── core/<name>/  routes.ts · service.ts · repository.ts · schemas.ts · module.ts · index.ts · *.test.ts
+│   │       │   ├── core/<name>/  routes/ · services/ · repositories/ · helpers/ · module.ts · index.ts (same shape for every module)
 │   │       │   ├── engines/<name>/
 │   │       │   ├── channels/<name>/   + adapter.ts
 │   │       │   └── features/<name>/

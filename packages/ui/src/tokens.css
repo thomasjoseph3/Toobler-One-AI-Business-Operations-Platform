@@ -1,0 +1,208 @@
+/*
+ * Toobler One design tokens: the designer's Design System v1.0 (docs/design/TooblerOne_Design_System_v1.0.md), values
+ * exactly as delivered. Names follow section 8 of that file.
+ *
+ * How this file works with Tailwind 4:
+ *  - `@theme static` defines the tokens (and makes Tailwind print them even if unused), so classes such as
+ *    `bg-canvas`, `text-text-primary` and `border-border` exist and read these variables.
+ *  - The light theme is the default. The dark theme redefines the SAME variables in two places (the system setting, and
+ *    the manual switch `data-theme="dark"`), because CSS cannot put one block under both conditions. The test
+ *    tokens.test.ts checks the two dark blocks are identical.
+ *  - Tailwind's own default colours are switched off (`--color-*: initial`), so only designer colours can be used.
+ */
+
+@theme static {
+  --color-*: initial;
+
+  /* Brand scale */
+  --color-emerald-950: #064b35;
+  --color-emerald-900: #075c40;
+  --color-emerald-800: #06734a;
+  --color-emerald-700: #078453;
+  --color-emerald-600: #14966a;
+  --color-emerald-400: #58a987;
+  --color-emerald-300: #83c4aa;
+  --color-emerald-200: #c6e5d8;
+  --color-emerald-100: #e7f4ee;
+  --color-emerald-50: #f3faf6;
+
+  /* Neutral scale */
+  --color-neutral-950: #171a18;
+  --color-neutral-900: #252a27;
+  --color-neutral-700: #454c48;
+  --color-neutral-600: #626965;
+  --color-neutral-500: #7c837f;
+  --color-neutral-400: #a4aaa6;
+  --color-neutral-300: #d5d9d7;
+  --color-neutral-200: #e5e7e6;
+  --color-neutral-100: #f3f4f3;
+  --color-neutral-50: #f8f9f8;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentcolor;
+
+  /* Semantic colours (light theme; the dark theme redefines these below) */
+  --color-canvas: #f5f6f5;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff; /* the designer defines a raised surface for dark mode only; in light it is white */
+  --color-surface-muted: #f3f4f3;
+  --color-surface-hover: #f8f9f8;
+  --color-border: #e5e7e6;
+  --color-border-strong: #d5d9d7;
+  --color-text-primary: #171a18;
+  --color-text-secondary: #626965;
+  --color-text-muted: #7c837f;
+  --color-text-disabled: #a4aaa6;
+  --color-action: #078453;
+  --color-action-hover: #06734a;
+  --color-action-pressed: #064b35;
+  --color-action-subtle: #e7f4ee;
+  --color-focus-ring: #58a987;
+  --color-scrim: rgba(23, 26, 24, 0.48);
+  --color-tooltip: #171a18;
+  --color-tooltip-text: #ffffff;
+
+  /* Feedback colours: foreground for text and icons, background for badges and banners, border for outlines */
+  --color-success: #176345;
+  --color-success-bg: #e7f4ee;
+  --color-success-border: #b8ddca;
+  --color-warning: #805a12;
+  --color-warning-bg: #fff3d6;
+  --color-warning-border: #e8d39f;
+  --color-error: #a13f3a;
+  --color-error-bg: #fceae8;
+  --color-error-border: #e8b9b4;
+  --color-info: #315f76;
+  --color-info-bg: #e8f2f7;
+  --color-info-border: #b9d3e0;
+
+  /* Typography: Manrope for headings and buttons, Inter for everything else. The Noto fonts are only a fallback for
+     customer text in Malayalam or Devanagari (docs/FRONTEND.md section 2). */
+  --font-heading: 'Manrope Variable', Manrope, 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui, sans-serif;
+  --font-body: 'Inter Variable', Inter, 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui, sans-serif;
+
+  /* Spacing (a 4 px base; the same values Tailwind's spacing classes give) */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+  --spacing-20: 80px;
+  --spacing-24: 96px;
+
+  /* Radius */
+  --rounded-sm: 4px;
+  --rounded-md: 8px;
+  --rounded-lg: 12px;
+  --rounded-xl: 16px;
+  --rounded-2xl: 20px;
+  --rounded-full: 9999px;
+
+  /* Elevation: a border is preferred; never stack shadows */
+  --shadow-xs: 0 1px 2px rgba(23, 26, 24, 0.05);
+  --shadow-sm: 0 2px 6px rgba(23, 26, 24, 0.06);
+  --shadow-md: 0 8px 24px rgba(23, 26, 24, 0.1);
+
+  /* Breakpoints */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1440px;
+
+  /* Motion: 120 to 180 ms, ease-out in and ease-in out */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* Tailwind reads radii from `--radius-*`; point them at the designer's `--rounded-*` names. */
+@theme inline {
+  --radius-sm: var(--rounded-sm);
+  --radius-md: var(--rounded-md);
+  --radius-lg: var(--rounded-lg);
+  --radius-xl: var(--rounded-xl);
+  --radius-2xl: var(--rounded-2xl);
+  --radius-full: var(--rounded-full);
+}
+
+/* Dark theme, chosen by the person (the switch in the top bar sets data-theme on <html>) */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-canvas: #151a17;
+  --color-surface: #1e2521;
+  --color-surface-raised: #28312c;
+  --color-surface-muted: #242b27;
+  --color-surface-hover: #2a342e;
+  --color-border: #38423c;
+  --color-border-strong: #4a554e;
+  --color-text-primary: #f0f3f1;
+  --color-text-secondary: #aeb8b1;
+  --color-text-muted: #89948c;
+  --color-text-disabled: #727d75;
+  --color-action: #43a77a;
+  --color-action-hover: #59b58b;
+  --color-action-pressed: #83c4aa;
+  --color-action-subtle: #263d32;
+  --color-focus-ring: #83c4aa;
+  --color-success: #a7d8be;
+  --color-success-bg: #263d32;
+  --color-success-border: #4a554e; /* the designer gives no dark borders for feedback: we reuse the strong border */
+  --color-warning: #e8c77f;
+  --color-warning-bg: #473b29;
+  --color-warning-border: #4a554e;
+  --color-error: #e5a29b;
+  --color-error-bg: #472d2b;
+  --color-error-border: #4a554e;
+  --color-info: #9cc9dc;
+  --color-info-bg: #243743;
+  --color-info-border: #4a554e;
+  /* In dark mode surfaces and borders carry the depth, not black shadows */
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow-md: none;
+}
+
+/* Dark theme, when the system is dark and the person has not chosen light. MUST match the block above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    color-scheme: dark;
+    --color-canvas: #151a17;
+    --color-surface: #1e2521;
+    --color-surface-raised: #28312c;
+    --color-surface-muted: #242b27;
+    --color-surface-hover: #2a342e;
+    --color-border: #38423c;
+    --color-border-strong: #4a554e;
+    --color-text-primary: #f0f3f1;
+    --color-text-secondary: #aeb8b1;
+    --color-text-muted: #89948c;
+    --color-text-disabled: #727d75;
+    --color-action: #43a77a;
+    --color-action-hover: #59b58b;
+    --color-action-pressed: #83c4aa;
+    --color-action-subtle: #263d32;
+    --color-focus-ring: #83c4aa;
+    --color-success: #a7d8be;
+    --color-success-bg: #263d32;
+    --color-success-border: #4a554e;
+    --color-warning: #e8c77f;
+    --color-warning-bg: #473b29;
+    --color-warning-border: #4a554e;
+    --color-error: #e5a29b;
+    --color-error-bg: #472d2b;
+    --color-error-border: #4a554e;
+    --color-info: #9cc9dc;
+    --color-info-bg: #243743;
+    --color-info-border: #4a554e;
+    --shadow-xs: none;
+    --shadow-sm: none;
+    --shadow-md: none;
+  }
+}

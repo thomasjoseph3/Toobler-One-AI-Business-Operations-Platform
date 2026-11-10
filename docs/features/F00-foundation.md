@@ -1,7 +1,7 @@
 # F00: Foundation and design system
 
 **Requirements:** `1-foundation/01-project-setup.md`; docs/ARCHITECTURE.md, BACKEND.md, FRONTEND.md, SECURITY.md, DEPENDENCIES.md; designer's Design System v1.0
-**Depends on:** nothing      **Module:** `core.kernel` (infrastructure, not a business feature)
+**Depends on:** nothing      **Module:** `core.health` (infrastructure, not a business feature)
 
 ## Scope
 - In: monorepo and tooling; API kernel (config, logging, errors, database with the account fence, module registry and
@@ -53,7 +53,7 @@ The migration runner itself creates the schema and `app.schema_migrations` (with
 - A query run without an account in the fence returns nothing; with account A it never returns account B's rows.
 - The server refuses to start in production with a missing or weak secret.
 - Logs never contain the fields in the redaction list.
-- Every token pair we use is checked for contrast; the four known designer exceptions are listed, anything new fails.
+- Every token pair we use is checked for contrast; the five known designer exceptions are listed, anything new fails.
 
 ## Tests
 - Unit: config parsing and production checks, error mapping, redaction, module registry (active/inactive, `requires`),
@@ -66,27 +66,67 @@ The migration runner itself creates the schema and `app.schema_migrations` (with
 - E2E (Playwright, phone and desktop): shell renders, navigation works, theme switch changes tokens, no console errors.
 
 ## Manual test script
-1. `nvm use` (Node 26.13), `npm run setup`, `npm run dev`.
-2. Open http://localhost:3000 at desktop width: rail on the left, Today page with an empty state. Click each menu item.
-3. Narrow the window below 768 px: bottom bar with Today, Leads, Inbox, Tasks, More. Open More.
-4. Switch Light / Dark / System in the top bar; open `/dev/ui` in both.
-5. `curl http://localhost:4000/api/v1/health` → `{"ok":true,...}`. Stop the test database and it returns 503.
-6. Add `import './repository'` to any `routes.ts` and run `npm run lint`: it fails with the layering message. Remove it.
-7. `npm run verify` is green.
+
+Your development servers can keep running: the web app on http://localhost:3000 and the API on http://localhost:4000.
+
+1. **Setup (safe to repeat):** `nvm use` then `npm run setup`. It checks Node, `.env`, packages, and the Docker test database.
+2. **Desktop look:** open http://localhost:3000 with the window wide. You should see the side menu on the left and the page
+   "Good morning" (or afternoon/evening) with today's date. Click **Set up channels**: you land on Channels.
+3. **Every page:** click each of the 11 menu items. Each has its own title, its own empty state and a "What you will see
+   here" panel. The current item is highlighted.
+4. **Window sizes:** narrow the window below 768 px: the bottom bar appears (Today, Leads, Inbox, Tasks, More) and there is
+   no sideways scrolling. Open **More**, choose Reports: the sheet closes. Between 768 and 1279 px the menu folds to icons.
+5. **Theme:** press the round button at the top right. It cycles System, Light, Dark. While in Dark, reload the page: it
+   must not flash white first. Open http://localhost:3000/dev/ui in each theme (a gallery of every component).
+6. **Keyboard:** reload and press Tab once: a "Skip to content" link appears. Press Enter: focus moves to the page.
+7. **API:** `curl -i http://localhost:4000/api/v1/health` returns `{"ok":true}` with an `x-request-id` header and security
+   headers. `curl http://localhost:4000/api/v1/nothing` returns the standard error shape `{"error":{"code":"NOT_FOUND",...}}`.
+8. **A rule being enforced:** add the line `import './repository';` to the end of
+   `apps/api/src/modules/core/health/routes.ts` and run `npm run lint`. It fails with "Routes call the service". Undo with
+   `git checkout apps/api/src/modules/core/health/routes.ts`.
+9. **The one-feature gate:** `npm run gate` says F00 is in review. Change F01 to `in_progress` in `docs/plan/STATUS.md`
+   and run it again: it fails because F00 is not approved. Undo with `git checkout docs/plan/STATUS.md`.
+10. **Everything:** `npm run verify` finishes green (gate, formatting, lint, types, 117 unit and API tests, 94 browser tests).
+
+Not manually testable against your cloud database, and covered by automatic tests instead: `/health` returning 503 when
+the database is down, and one business never seeing another's rows.
 
 ## Security checklist
-- [ ] Every new table has account_id, RLS enabled + forced, and the schema test passes (n/a for global tables, listed)
-- [ ] Every new route: guarded; tests (health is public by design, in public-routes.ts)
-- [ ] No business id taken from body, query, params or tool arguments (no business routes yet)
-- [ ] All input validated with zod
-- [ ] Public route listed in public-routes.ts with a reason, rate-limited
-- [ ] Nothing logged that is personal data or a secret (redaction test)
-- [ ] Secrets only in env, validated at start-up; `.env` ignored by git
-- [ ] Dependencies vetted (`npm run vet`), exact, no install scripts, `npm audit` clean
-- [ ] `npm run verify` passes
+- [x] Every new table has account_id, RLS enabled + forced, and the schema test passes (`domain_events`, `activity_log`;
+      `schema_migrations` is the one global table, on the test's allow-list)
+- [x] Every new route: guarded; tests. The only route is `/health`, public by design, listed in `public-routes.ts`. The
+      guard refuses to start the app if any route lacks an access declaration (tested), and 401/403/404 rules are tested with probe routes.
+- [x] No business id taken from body, query, params or tool arguments (there are no business routes yet; the account fence
+      takes the id only from the context)
+- [x] All input validated with zod (settings at start-up; routes validate with the zod type provider; `/health` takes no input)
+- [x] Public route listed in public-routes.ts with a reason, rate-limited (300 a minute per address)
+- [x] Nothing logged that is personal data or a secret (redaction list and a test that scans the log output; the query
+      string is never logged; only the short error message is kept on failed events)
+- [x] Secrets only in env, validated at start-up; `.env` is ignored by git (checked: only `.env.example` is tracked);
+      production refuses to start on a missing HTTPS or SSL setting (tested)
+- [x] Dependencies vetted (`npm run vet`), exact versions (no `^` or `~` anywhere), `npm audit --audit-level=high` clean,
+      signatures verified. One package (`esbuild`) declares an install script; `ignore-scripts=true` stops it running and
+      everything builds without it.
+- [x] `npm run verify` passes
 
 ## Decisions and differences from the requirements
-- Node 26 LTS, TypeScript, Fastify 5, Kysely on `pg` (typed queries; SQL stays visible in repositories), pg-boss for
-  scheduled and retried jobs, plain polling with an advisory lock for the event dispatcher.
+- Node 26 LTS, TypeScript 6.0.3 (not 7: typescript-eslint supports below 6.1 only), Fastify 5, Kysely on `pg` (typed
+  queries; SQL stays visible in repositories), pg-boss for scheduled and retried jobs, plain polling for the event dispatcher,
+  with a per-event lease (`FOR UPDATE SKIP LOCKED` + `locked_until`) instead of an advisory lock, because a session lock does
+  not survive a transaction pooler such as Supabase's.
 - The dev app talks to the Supabase database from `.env` (owner confirmed dev only); tests use the Docker database.
-- Contrast: designer's values used unchanged (owner decision).
+- Contrast: the designer's values are used unchanged (owner decision). The token test found a fifth exception that the
+  first analysis missed (dark selected-menu text, 3.92:1); it is listed in FRONTEND.md section 5.
+- Fonts are installed from vetted npm packages and bundled (nothing is loaded from Google).
+- Owner's design review (10 Nov 2026): one theme button that cycles System, Light, Dark; each page has its own empty state,
+  a preview panel and a real next action. Colours, radii and type are still the designer's.
+- Lint also enforces readable names (CLAUDE.md): `ctx`, `tx`, `e` and one-letter names fail the build.
+
+## Known limits and things deferred
+- Delivered events are never deleted yet; a nightly clean-up and an alert for events or jobs that give up belong to F35.
+- The job heartbeat that feeds `/health` assumes one app instance. Revisit when we run more than one.
+- If `DATABASE_URL` is Supabase's transaction pooler (port 6543), pg-boss may complain; the session pooler or a direct
+  connection works. (Your current setup works.)
+- Hosting is undecided (R14). Design decision recorded: serve the staff app and the API from one address.
+- The menu is a fixed list. It becomes data from `GET /me` with the module switches in F03.
+- Browser tests run in Chromium only.

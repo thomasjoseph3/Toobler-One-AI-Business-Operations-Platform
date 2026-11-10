@@ -9,7 +9,7 @@ Every business is a separate customer: no request, job or tool may ever read or 
 design in `docs/SECURITY.md`; this is the working checklist. (Adapted from the hotel agent's `api-security` skill.)
 
 ## 1. Keep businesses apart
-- Business work runs in `ctx.tx(...)` (fenced: `SET ROLE app_user`, `app.account_id`). Never use the owner pool for
+- Business work runs in `accountContext.runInAccountTransaction(...)` (fenced: `SET ROLE app_user`, `app.account_id`). Never use the owner pool for
   business data.
 - The account comes from the session (staff), the widget key (webchat), the provider-id lookup (webhooks) or the job
   payload. **Never** from body, query, params or tool arguments.
@@ -17,12 +17,13 @@ design in `docs/SECURITY.md`; this is the working checklist. (Adapted from the h
   schema test fails otherwise.
 - Repository functions still filter `account_id` explicitly where they insert, and filter by id **and** account on
   update/delete (defence in depth).
-- Cross-business lookups only in `kernel/db/across-accounts.ts`, each with a comment saying why.
+- Cross-business lookups only in `kernel/database/across-accounts.ts`, each with a comment saying why.
 - Another business's record → 404 (never 403).
 
 ## 2. Sessions and sign-in
-- Sessions are opaque random tokens, stored hashed, in an httpOnly, SameSite cookie that the API sets. Never in browser JS,
-  `localStorage` or URLs.
+- Sign-in is a short-lived access token (JWT, 15 min) plus a rotating refresh token stored hashed, both in httpOnly,
+  SameSite cookies that the API sets. Never in browser JS, `localStorage` or URLs. Every request checks the session is live.
+  A replaced refresh token used again ends the session.
 - Changing password, role or removing a person ends their sessions.
 - Codes and passwords: hashed, limited tries, lockouts, same response whether the account exists or not.
 

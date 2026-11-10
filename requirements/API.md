@@ -1,5 +1,7 @@
 # API list
 
+> **Note (10 Nov 2026):** the API is built feature by feature following `docs/BACKEND.md` and `docs/plan/PHASE-1.md`. This list stays the product's intent; the built routes and any differences are recorded in each feature's brief (`docs/features/`).
+
 Every API we build, phase by phase and feature by feature, in the same order as the feature files.
 
 ## In plain words
@@ -366,6 +368,7 @@ No endpoints of its own; it acts through the agent tools listed at the end.
 | PATCH | `/setup` | Mark a step done or skipped | Manager |
 | POST | `/setup/chat` | Send the owner's reply to the setup chat; returns the next question, its options and any pre-filled answer (streamed) | Manager |
 | GET | `/industries` | Industries and their presets | Public |
+| POST | `/industries` | Add an industry (platform admins only; added in F01) | Platform admin |
 | POST | `/setup/apply-preset` | Apply an industry's stages, fields and wording | Manager |
 | POST | `/setup/go-live` | Start answering real customers | Manager |
 

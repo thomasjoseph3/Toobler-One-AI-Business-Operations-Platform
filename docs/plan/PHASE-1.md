@@ -11,6 +11,25 @@ Requirement links are relative to `requirements/phase-1-lead-engine/`. "Every ro
 version that prints what it would send, plus Mailpit for email, so features can be built and tested before accounts
 and approvals exist. The real provider is switched on by settings in the feature that needs it.
 
+## Build order (changed 10 Nov 2026)
+
+The numbers F00 to F36 name the features; the order they are built in is the order of the rows in
+[STATUS.md](STATUS.md). The first goal is **a working lead engine from end to end**: a business signs up, fills in its
+knowledge, a customer chats on its website, the AI answers from that knowledge, and a lead or ticket appears.
+
+1. **Slice 1, the first working lead engine:** F01 sign-up and sign-in, F03 module switches (kept thin), F04 contacts,
+   F06 leads (basic list and detail), F14 tickets (the router and the "ask for a person" tool need them), F16 business
+   profile and questions (this is also the form version of onboarding), F17 offerings, F18 FAQs and knowledge search,
+   F15 conversation types, F19 the AI agent and Test the agent, F20 website chat, then F31 the AI setup chat and fill from website
+   (it needs the agent runtime from F19, so it comes after it).
+2. **Then the rest of the CRM core:** F02 team and roles, F05 companies, F07 timeline, F08 tasks, F09 custom fields, F10
+   scoring, F11 views and search, F12 import and export, F13 duplicates.
+3. **Then the workspace and the other channels:** F21 to F30, then F32 to F36.
+
+Until a later feature exists, the slice uses the simple version: leads carry an "unscored" temperature (F10), a promised
+callback is kept on the conversation record (F08 turns it into a task), the owner is the only team member (F02), and
+documents are not uploaded yet (F18 starts with FAQs and the structured facts).
+
 ## Port from the hotel agent (read just in time)
 
 Paths are under `../hotel agent/`. At each feature, read only its row, before the brief. `backend/src/` is shortened to `src/`.
@@ -53,14 +72,14 @@ Paths are under `../hotel agent/`. At each feature, read only its row, before th
 - **Req:** `5-onboarding-and-launch/02-sign-up-and-sign-in.md`, security
 - **Backend:** `accounts`, `users`, `memberships`, `sessions`, `auth_codes`, `login_attempts`; signup (business +
   owner as manager, industry choice → general preset only for now), verify email, login, lockout, forgot/reset
-  password, WhatsApp code send/verify (console provider until F25), logout, `/me`, `PATCH /me`, switch business. Audit
-  entries for sign-ins.
-- **Front end:** sign-up (name, business, email, mobile, industry), verify email and mobile, sign-in (password or code),
-  forgot/reset, profile, business switcher. Session cookie set by the API.
+  password, logout, `/me`, `PATCH /me`, refresh tokens. Email only for now: mobile verification and WhatsApp-code sign-in
+  move to F25; one email manages one business (no switching). Audit entries for sign-ins.
+- **Front end:** sign-up (name, business, email, mobile, industry), verify email, sign-in (password),
+  forgot/reset, profile, Session cookies set by the API.
 - **Tests:** lockout after 5, same answer for unknown email, session expiry and rotation, code expiry and tries,
-  second business from inside the account, `/me` isolation.
-- **Manual:** sign up a business; open the verify link from Mailpit; read the code from the API log; sign in both ways;
-  wrong password ×5 → "try again in 15 minutes"; create a second business and switch.
+  `/me` isolation, refresh rotation and reuse detection.
+- **Manual:** sign up a business; open the verify link from the email; sign in;
+  wrong password ×5 → "try again in 15 minutes"; sign up again with the same email → refused.
 
 ### F02 Team, roles, teams and the activity log
 - **Req:** `1-foundation/02-users-roles-and-teams.md`, `1-foundation/04-security-privacy-and-audit.md` (activity log part)
@@ -219,7 +238,7 @@ Paths are under `../hotel agent/`. At each feature, read only its row, before th
 ### F18 Documents, FAQs, knowledge search and unanswered questions
 - **Req:** `08-knowledge-base.md`
 - **Backend:** uploads (PDF, Word, photo; 20 MB / 50 files, review item R11), text extraction and image reading jobs,
-  summaries, `knowledge_chunks` with pgvector + keyword search, `faqs`, `unanswered_questions` (grouped nightly),
+  summaries, `knowledge_chunks` searched with Postgres full-text and trigram search (pgvector only if the evals show it misses questions; the search sits behind one function so it can be added later), `faqs`, `unanswered_questions` (grouped nightly),
   `knowledge_conflicts` (price mismatch), trust order, re-read website (with F31's reader; until then upload only).
 - **Front end:** Documents (upload, summary, Use this / Don't use), FAQs, Unanswered (Answer → FAQ, Ignore),
   "These don't match" warnings.
@@ -242,12 +261,20 @@ Paths are under `../hotel agent/`. At each feature, read only its row, before th
 - **Backend:** the `ChannelAdapter` contract and conversation engine; `channel.webchat` (widget key, allowed
   websites, visitor session tokens, streaming replies, idle end → finalise).
 - **Front end:** Channels → Website chat (code to copy, colour, greeting, position, allowed sites, live preview);
-  the widget in `apps/site` (iframe loader).
+  the widget in `apps/site`: a tiny plain JavaScript + CSS loader (no React) that shows the launcher buttons (Chat,
+  Call, WhatsApp) and opens the chat window, which is React in an iframe. Which buttons show, their order, colour,
+  greeting, position, phone number and WhatsApp number + prefilled message are business settings that the loader
+  fetches by widget key, so changing them never needs a re-paste. A button shows only if its channel is on for the
+  business. Setup screen: the one-line snippet, short per-platform steps (HTML, PHP, WordPress, Shopify, Wix/Squarespace/
+  Webflow, React/Next, Google Tag Manager), the exact CSP entries for strict sites, and a **Check installation** button
+  ("last seen on <website> today"). Fallback for sites that cannot run scripts: a plain HTML snippet with `tel:` and
+  `wa.me` links (no AI chat).
 - **Tests:** origin checks, rate limits, a chat giving a phone → contact + lead + task + timeline + summary; a
   complaint chat → ticket, no lead.
 - **Manual:** paste the code into a local test page, chat as a customer (an enquiry, then a complaint), see the lead,
   the ticket and the tasks appear.
-- **Note:** the web call button arrives with F29 (voice).
+- **Note:** the browser-call button (microphone, iframe `allow="microphone"`, HTTPS) arrives with F29 (voice); `tel:` and
+  `wa.me` buttons work from F20 on. Use a neutral script file name (ad blockers block "chat").
 
 ## Stage D: Staff workspace (requirements step 5)
 

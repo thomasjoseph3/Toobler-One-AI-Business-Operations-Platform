@@ -31,6 +31,10 @@ engine and the CRM core**.
 4. If something in the requirements is missing, conflicting or could be better: **ask before building it differently**,
    then record the decision in the brief and in REQUIREMENTS-REVIEW.md.
 5. Use the `feature` skill for every step of this process.
+6. **Small slices (owner rule, 10 Nov 2026): never build more than 2 API routes at a time.** A feature is built as a
+   series of slices of at most 2 routes (with the screen that uses them). After each slice: explain, folder by folder and
+   file by file, what was added or changed and why; give the owner the exact steps to test it in Postman and in the
+   browser; then **stop** until the owner has verified it and says to continue. Never batch slices together.
 
 ## Dependencies rule
 
@@ -52,17 +56,31 @@ The whole app and every **text** channel (web chat, WhatsApp, email, setup chat,
   active for the business (entitled + enabled + ready). Off = 404 and hidden; data is kept.
 - **Channels** only translate provider ⇄ normalised messages (`ChannelAdapter`). All conversation logic is in the
   conversation engine, the same for every channel.
-- **Repository pattern.** `routes.ts → service.ts → repository.ts → kernel/db`. Only repositories touch the database.
+- **Repository pattern.** `routes/ → services/ → repositories/ → kernel/database`, in folders of those names in every module (checked by `module-structure.test.ts`). Only repositories touch the database.
   Routes never import repositories. Pure logic (scoring, router, maths) in its own file without I/O.
 - **The AI states facts; code decides.** Lead temperature, conversation outcomes, prices, totals, due times and report
   numbers are computed in code. The AI never does maths.
 - **Industries change words and presets, never code paths.**
 - **Build only what this phase and this feature need.** No tables or screens for later phases.
 
+## Readability rules (the owner is learning TypeScript and must be able to read every line)
+
+- **Names show the true purpose.** Every function, variable, parameter, type and file is named for exactly what it does
+  or holds, in full words. Never shorten to save space: `transaction` not `tx`/`trx`, `error` not `e`/`err`,
+  `module` not `m`, `accountId` not `acc`, `getContactsForAccount` not `getContacts2`. The only accepted
+  abbreviations are ones everyone knows (`id`, `url`, `uuid`, `http`, `api`, `db` in a type name like `Db`).
+- A longer, clear name always beats a short, clever one. No single-letter names, except a loop counter or a tiny
+  inline arrow such as `(contact) => contact.id` (and even there, name it for what it is).
+- Every function gets a one-line comment saying what it is for and what it returns, in plain English; non-obvious
+  lines say *why*, not just what.
+- When touching existing code, rename unclear names in the lines you change. Do not rewrite untouched files unless the
+  owner asks.
+- Prefer simple, explicit code over compact tricks (no clever one-liners, nested ternaries or dense chains).
+
 ## Data and security rules
 
 - Every business table: `account_id`, RLS enabled and forced. Business work runs inside the account fence
-  (`ctx.tx`). The account comes from the session / widget key / provider lookup / job, never from input.
+  (`accountContext.runInAccountTransaction`). The account comes from the session / widget key / provider lookup / job, never from input.
 - Another business's id → 404. Wrong role → 403. Every route tested for works / 401 / 403 / 404 / 400.
 - Money in paise (integers). Times in UTC (`timestamptz`), shown in the business's time zone. Phones as E.164 +
   `phone_key`. IDs are UUIDs.

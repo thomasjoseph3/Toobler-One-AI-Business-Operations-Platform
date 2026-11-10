@@ -47,9 +47,13 @@ None so far.
 | Area | Packages |
 | --- | --- |
 | API | fastify 5.12.7, fastify-type-provider-zod 7.0.0, @fastify/helmet 13.2.0, @fastify/rate-limit 11.2.1, @fastify/sensible 6.0.7, pino 10.4.0, zod 4.6.7 |
+| Sign-in (F01, vetted 10 Nov 2026) | jose 6.2.13 (signs and checks the access tokens; MIT, no dependencies), @fastify/cookie 11.1.5 (reads and sets cookies; Fastify's own, MIT) |
+| Email (F01 slice 4, vetted 10 Nov 2026) | nodemailer 10.2.1 (sends email over SMTP; MIT-0, no dependencies, 36M downloads a week) and @types/nodemailer 8.0.2 (its types, dev only) |
+| Passwords (F01, vetted 10 Nov 2026) | @node-rs/argon2 2.2.2: argon2id password hashing, a prebuilt binary with no install script (the other `argon2` package runs one, so it was rejected) |
 | Database and jobs | pg 8.23.1, kysely 0.29.7, pg-boss 12.38.0 |
 | Web (React + Vite, no Next.js) | vite 8.3.5, @vitejs/plugin-react 6.1.2, react-router 8.5.0, react / react-dom 19.3.1, tailwindcss and @tailwindcss/vite 4.3.3, lucide-react 1.61.0, clsx 2.1.1 |
 | Tooling | **typescript 6.0.3** (not 7.x: typescript-eslint 8.72 supports TypeScript below 6.1 only), tsx 4.23.15, vitest 5.0.5, @playwright/test 1.64.1, @axe-core/playwright 4.14.0 (MPL-2.0, dev only), eslint 10.13.0, @eslint/js 10.0.1, typescript-eslint 8.72.0, eslint-plugin-react-hooks 7.1.1, globals 17.13.0, prettier 3.9.10, concurrently 10.0.6 |
+| Fonts (self-hosted, vetted 10 Nov 2026) | @fontsource-variable/manrope 5.3.0, @fontsource-variable/inter 5.3.0, @fontsource/noto-sans-malayalam 5.3.0, @fontsource/noto-sans-devanagari 5.3.0 (all OFL-1.1, same publisher, no install scripts) |
 | Types | @types/node 26.6.5, @types/pg 8.23.1, @types/react and @types/react-dom 19.3.0 |
 
-All MIT, ISC or Apache-2.0 (one dev-only MPL-2.0), none with install scripts, all published by their official projects.
+All MIT, ISC, Apache-2.0 or OFL-1.1 (fonts; one dev-only MPL-2.0), all published by their official projects. One dependency of the tooling, `esbuild`, declares an install script; `ignore-scripts=true` stops it from running and builds work without it.

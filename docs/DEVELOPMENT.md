@@ -17,6 +17,16 @@ planned ──start──► in_progress ──verify──► in_review ──o
   `deferred`).
 - `npm run gate` checks both rules and runs as part of `npm run verify`.
 
+## Slices: at most 2 API routes at a time
+
+The owner must be able to follow and control the code base (10 Nov 2026), so a feature is built in **slices**:
+
+1. A slice is **at most 2 API routes**, plus the table changes, service and repository code, tests and screen they need.
+2. When a slice is done, the explanation lists **every folder and every file added or changed**, in plain words (what it
+   is for, and why it had to change), and gives the Postman and browser steps to test exactly those routes.
+3. The owner tests and says to continue. Nothing from the next slice is started or prepared before that.
+4. The brief lists the slices in order; the hand-off at the end of the feature covers the whole feature as before.
+
 ## The steps for each feature
 
 ### 0. Reuse check (before the brief)
