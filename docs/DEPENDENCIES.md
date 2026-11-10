@@ -47,6 +47,7 @@ None so far.
 | Area | Packages |
 | --- | --- |
 | API | fastify 5.12.7, fastify-type-provider-zod 7.0.0, @fastify/helmet 13.2.0, @fastify/rate-limit 11.2.1, @fastify/sensible 6.0.7, pino 10.4.0, zod 4.6.7 |
+| Sign-in and email (vetted 10 Nov 2026) | @node-rs/argon2 2.2.2 (argon2id, prebuilt binary, no install script), jose 6.2.13 (access tokens), nodemailer 10.2.1 + @types/nodemailer 8.0.2 (email), @fastify/cookie 11.1.5 |
 | Database and jobs | pg 8.23.1, kysely 0.29.7, pg-boss 12.38.0 |
 | Web (React + Vite, no Next.js) | vite 8.3.5, @vitejs/plugin-react 6.1.2, react-router 8.5.0, react / react-dom 19.3.1, tailwindcss and @tailwindcss/vite 4.3.3, lucide-react 1.61.0, clsx 2.1.1 |
 | Tooling | **typescript 6.0.3** (not 7.x: typescript-eslint 8.72 supports TypeScript below 6.1 only), tsx 4.23.15, vitest 5.0.5, @playwright/test 1.64.1, @axe-core/playwright 4.14.0 (MPL-2.0, dev only), eslint 10.13.0, @eslint/js 10.0.1, typescript-eslint 8.72.0, eslint-plugin-react-hooks 7.1.1, globals 17.13.0, prettier 3.9.10, concurrently 10.0.6 |

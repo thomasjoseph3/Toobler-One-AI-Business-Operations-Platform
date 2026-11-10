@@ -9,19 +9,24 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.5",
     "@fastify/helmet": "13.2.0",
     "@fastify/rate-limit": "11.2.1",
     "@fastify/sensible": "6.0.7",
+    "@node-rs/argon2": "2.2.2",
     "@toobler-one/shared": "*",
     "fastify": "5.12.7",
     "fastify-type-provider-zod": "7.0.0",
+    "jose": "6.2.13",
     "kysely": "0.29.7",
+    "nodemailer": "10.2.1",
     "pg": "8.23.1",
     "pg-boss": "12.38.0",
     "pino": "10.4.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@types/nodemailer": "8.0.2",
     "@types/pg": "8.23.1"
   }
 }
