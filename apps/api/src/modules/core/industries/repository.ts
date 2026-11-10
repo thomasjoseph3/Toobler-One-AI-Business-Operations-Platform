@@ -20,6 +20,17 @@ export async function findActiveIndustries(db: Db): Promise<IndustryRow[]> {
     .execute();
 }
 
+/** Adds an industry. It starts switched on. The database refuses an id that already exists. */
+export async function insertIndustry(
+  db: Db,
+  industry: { id: string; label: string; sortOrder: number },
+): Promise<void> {
+  await db
+    .insertInto('industries')
+    .values({ id: industry.id, label: industry.label, sort_order: industry.sortOrder })
+    .execute();
+}
+
 /** Whether an industry with this id exists and is switched on. */
 export async function isActiveIndustryId(db: Db, industryId: string): Promise<boolean> {
   const row = await db

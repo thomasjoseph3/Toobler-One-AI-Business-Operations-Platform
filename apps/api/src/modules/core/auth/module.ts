@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { createSessionAuthenticator } from './sessions/authenticator';
 import { sessionsRoutes } from './sessions/routes';
 import { signUpRoutes } from './sign-up/routes';
 
@@ -11,6 +12,8 @@ export default defineModule({
   kind: 'core',
   // Sign-up checks the chosen industry against the industries module (through its index.ts only)
   requires: ['core.industries'],
+  // The kernel uses this to know who is signed in on every request that needs a signed-in person
+  authenticator: createSessionAuthenticator,
   routes: (app) => {
     signUpRoutes(app);
     sessionsRoutes(app);

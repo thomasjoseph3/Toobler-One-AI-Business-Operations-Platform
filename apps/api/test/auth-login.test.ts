@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
 import { hashSecret, verifyAccessToken } from '../src/modules/core/auth/sessions/tokens';
-import { buildTestApp, captureLogs, testConfig } from './support/app';
+import { buildTestApp, captureLogs, testConfig, unsafeRequestHeaders } from './support/app';
 import { openTestDatabase } from './support/harness';
 
 let database: Database;
@@ -26,6 +26,7 @@ async function signUpPerson(testApp: FastifyInstance = app) {
   const response = await testApp.inject({
     method: 'POST',
     url: '/api/v1/auth/signup',
+    headers: unsafeRequestHeaders,
     payload: {
       name: 'Anita Nair',
       businessName: `Nair Stays ${randomUUID().slice(0, 6)}`,
@@ -40,7 +41,12 @@ async function signUpPerson(testApp: FastifyInstance = app) {
 }
 
 const postLogin = (payload: unknown, headers: Record<string, string> = {}, testApp: FastifyInstance = app) =>
-  testApp.inject({ method: 'POST', url: '/api/v1/auth/login', payload: payload as object, headers });
+  testApp.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    payload: payload as object,
+    headers: { ...unsafeRequestHeaders, ...headers },
+  });
 
 describe('POST /api/v1/auth/login', () => {
   it('signs a person in: answers with the profile and sets the two cookies', async () => {

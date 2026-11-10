@@ -67,6 +67,8 @@ export interface UsersTable {
   mobile_key: string | null;
   role: 'manager' | 'staff' | 'staff_own';
   status: Generated<'active' | 'disabled'>;
+  /** Unlocks platform-only actions (adding industries). Set only by someone with database access; false for everyone else. */
+  is_platform_admin: Generated<boolean>;
   last_login_at: Date | null;
   created_by: Json | null;
   updated_by: Json | null;

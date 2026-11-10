@@ -3,19 +3,25 @@ import { forbidden, notFound, unauthorized } from '../errors';
 import type { ModuleGate } from '../module-system/registry';
 import type { PublicRoute } from './public-routes';
 
-export type Access = 'public' | 'staff' | 'manager';
+/**
+ * Who may call a route: anyone (`public`), any signed-in person (`staff`), a business manager (`manager`), or a platform
+ * admin from the Toobler team (`platform`: for now only adding industries).
+ */
+export type Access = 'public' | 'staff' | 'manager' | 'platform';
 
-/** Who is signed in. Sessions arrive in F01; until then nobody is. */
+/** Who is signed in: the person, their business and role, the session they are using, and whether they are a platform admin. */
 export interface Principal {
   accountId: string;
   userId: string;
   role: 'manager' | 'staff' | 'staff_own';
+  sessionId: string;
+  isPlatformAdmin: boolean;
 }
 
-/** Turns the request's credentials into a Principal, or throws 401. Replaced by the real session check in F01. */
+/** Turns the request's credentials into a Principal, or throws 401. The real one comes from the `core.auth` module. */
 export type Authenticator = (request: FastifyRequest) => Promise<Principal>;
 
-/** The stand-in authenticator until sessions exist (F01): every request is refused with 401. */
+/** Used when no module provides an authenticator (the kernel alone): every signed-in route is refused with 401. */
 export const rejectEveryone: Authenticator = async () => {
   throw unauthorized();
 };
@@ -36,7 +42,7 @@ declare module 'fastify' {
  * Makes the security rules impossible to forget:
  *  - a route without `config.access` stops the app from starting;
  *  - a `public` route must be listed in public-routes.ts;
- *  - `staff` and `manager` routes are authenticated and role-checked before the handler;
+ *  - `staff`, `manager` and `platform` routes are authenticated and role-checked before the handler;
  *  - a module's routes answer 404 for a business that doesn't have the module on.
  */
 export function registerGuard(
@@ -53,7 +59,7 @@ export function registerGuard(
     const routeAccess = route.config?.access;
     if (!routeAccess) {
       throw new Error(
-        `Route ${httpMethods.join('|')} ${route.url} has no config.access. Declare who may call it: 'public', 'staff' or 'manager'.`,
+        `Route ${httpMethods.join('|')} ${route.url} has no config.access. Declare who may call it: 'public', 'staff', 'manager' or 'platform'.`,
       );
     }
     if (routeAccess === 'public') {
@@ -74,6 +80,7 @@ export function registerGuard(
       const principal = await options.authenticate(request);
       request.principal = principal;
       if (requiredAccess === 'manager' && principal.role !== 'manager') throw forbidden();
+      if (requiredAccess === 'platform' && !principal.isPlatformAdmin) throw forbidden();
       if (moduleId && !(await options.gate.isActive(principal.accountId, moduleId))) throw notFound();
     };
     const existingPreHandlers = route.preHandler ? [route.preHandler].flat() : [];

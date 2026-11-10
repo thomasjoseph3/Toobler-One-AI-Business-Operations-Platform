@@ -1,4 +1,4 @@
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Config } from '../../../../kernel/config';
 
 // The two sign-in cookies. Both are httpOnly (browser scripts cannot read them) and SameSite=Lax; in production they are
@@ -31,3 +31,7 @@ export function setAuthCookies(
     maxAge: config.auth.sessionMaxDays * 24 * 60 * 60,
   });
 }
+
+/** The access token the browser sent, if any. */
+export const readAccessCookie = (request: FastifyRequest, config: Config): string | undefined =>
+  request.cookies[cookieNames(config.env).access];

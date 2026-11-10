@@ -191,6 +191,9 @@ once and repeat the request.
   F01 uses those names. Other leftovers there (`APP_NAME`, `GUEST_CHANNELS`) are ignored.
 - The password list of common passwords starts small (a few hundred entries kept in the repo); a larger list can replace
   it later without code changes.
+- Owner decision (10 Nov 2026): a **platform admin** can only **add industries** for now (`POST /api/v1/industries`). The
+  flag is a column set by SQL, never by an API, and the app role cannot set it (column-level grants). Every request that
+  changes something now needs our `Origin` and `X-Requested-With: toobler-web` headers (CSRF), including sign-up and login.
 - Mailpit joins the Docker setup now for automated tests (the F00 brief said it would arrive with F01); your own
   development sends through your real SMTP settings.
 - docs/SECURITY.md §2.2, the `api-security` skill and docs/FRONTEND.md §8 are updated to describe the access/refresh setup.

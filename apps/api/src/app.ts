@@ -8,6 +8,7 @@ import type { Config } from './kernel/config';
 import { createContextFactory, type ContextFactory } from './kernel/context';
 import type { Database } from './kernel/database';
 import type { HealthCheck } from './kernel/health';
+import { registerCsrfProtection } from './kernel/http/csrf';
 import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
@@ -39,6 +40,7 @@ export interface AppDeps {
   database: Database;
   registry: Registry;
   gate?: ModuleGate;
+  /** Overrides the authenticator a module provides. Tests use this to act as a signed-in person without cookies. */
   authenticate?: Authenticator;
   publicRoutes?: readonly PublicRoute[];
   healthChecks?: HealthCheck[];
@@ -81,12 +83,17 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     healthChecks: dependencies.healthChecks ?? [],
   });
 
+  // The authenticator comes from the module that provides one (core.auth). With none, every signed-in route answers 401.
+  const authenticatorFactory = registry.modules.find((moduleManifest) => moduleManifest.authenticator)?.authenticator;
+  const authenticate = dependencies.authenticate ?? authenticatorFactory?.({ config, database }) ?? rejectEveryone;
+
   registerErrorHandling(app);
-  await app.register(cookie); // lets routes set cookies (the sign-in cookies)
+  registerCsrfProtection(app, { allowedOrigin: config.webUrl }); // changes need our Origin and header
+  await app.register(cookie); // lets routes set and read cookies (the sign-in cookies)
   await app.register(helmet);
   await app.register(rateLimit, { global: true, ...(dependencies.rateLimit ?? { max: 300, timeWindow: '1 minute' }) });
   registerGuard(app, {
-    authenticate: dependencies.authenticate ?? rejectEveryone,
+    authenticate,
     gate,
     publicRoutes: dependencies.publicRoutes ?? PUBLIC_ROUTES,
   });

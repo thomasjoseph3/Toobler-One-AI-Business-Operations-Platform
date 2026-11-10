@@ -47,6 +47,15 @@ describe('createRegistry', () => {
       ]),
     ).toThrow(/both/);
   });
+  it('allows only one module to provide the authenticator', () => {
+    const neverSignsIn = () => async () => {
+      throw new Error('not used in this test');
+    };
+    const providerOne = defineModule({ id: 'core.auth', kind: 'core', authenticator: neverSignsIn });
+    const providerTwo = defineModule({ id: 'core.other_auth', kind: 'core', authenticator: neverSignsIn });
+    expect(() => createRegistry([providerOne])).not.toThrow();
+    expect(() => createRegistry([providerOne, providerTwo])).toThrow(/Only one module may provide the authenticator/);
+  });
   it('never lets core depend on an engine, channel or feature', () => {
     expect(() =>
       createRegistry([

@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
-import { buildTestApp } from './support/app';
+import { buildTestApp, unsafeRequestHeaders } from './support/app';
 import { openTestDatabase } from './support/harness';
 
 let database: Database;
@@ -32,7 +32,12 @@ function validSignUp(overrides: Record<string, unknown> = {}) {
 }
 
 const postSignUp = (payload: unknown) =>
-  app.inject({ method: 'POST', url: '/api/v1/auth/signup', payload: payload as object });
+  app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/signup',
+    headers: unsafeRequestHeaders,
+    payload: payload as object,
+  });
 
 describe('POST /api/v1/auth/signup', () => {
   it('creates the business and its owner, and answers with the profile', async () => {
