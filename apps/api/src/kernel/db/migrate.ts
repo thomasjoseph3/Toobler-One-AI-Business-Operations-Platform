@@ -55,7 +55,7 @@ export async function migrate(
         await client.query('commit');
       } catch (error) {
         await client.query('rollback').catch(() => {});
-        throw new Error(`Migration ${fileName} failed: ${(error as Error).message}`);
+        throw new Error(`Migration ${fileName} failed: ${(error as Error).message}`, { cause: error });
       }
       logLine(`applied ${fileName}`);
       result.applied.push(fileName);

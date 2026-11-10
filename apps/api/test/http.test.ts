@@ -56,8 +56,8 @@ describe('errors', () => {
     const echoModule = defineModule({
       id: 'core.echo',
       kind: 'core',
-      routes: (app) => {
-        app.post('/echo', { config: { access: 'public' }, schema: { body: z.object({ name: z.string().min(2).max(20) }) } }, async (request) => request.body);
+      routes: (moduleApp) => {
+        moduleApp.post('/echo', { config: { access: 'public' }, schema: { body: z.object({ name: z.string().min(2).max(20) }) } }, async (request) => request.body);
       },
     });
     const app = await buildTestApp(database, [echoModule], { publicRoutes: [{ method: 'POST', path: '/api/v1/echo', reason: 'test' }, { method: 'GET', path: '/api/v1/health', reason: 'test' }] });
@@ -76,8 +76,8 @@ describe('errors', () => {
     const boomModule = defineModule({
       id: 'core.boom',
       kind: 'core',
-      routes: (app) => {
-        app.get('/boom', { config: { access: 'public' } }, async () => {
+      routes: (moduleApp) => {
+        moduleApp.get('/boom', { config: { access: 'public' } }, async () => {
           throw new Error('secret internal detail');
         });
       },
@@ -115,8 +115,8 @@ describe('route rules', () => {
     const staffOnlyModule = defineModule({
       id: 'core.secret',
       kind: 'core',
-      routes: (app) => {
-        app.get('/staff-only', { config: { access: 'staff' } }, async () => 'ok');
+      routes: (moduleApp) => {
+        moduleApp.get('/staff-only', { config: { access: 'staff' } }, async () => 'ok');
       },
     });
     const app = await buildTestApp(database, [staffOnlyModule]);
@@ -131,9 +131,9 @@ describe('route rules', () => {
     const rolesModule = defineModule({
       id: 'core.roles',
       kind: 'core',
-      routes: (app) => {
-        app.get('/for-staff', { config: { access: 'staff' } }, async (request) => ({ role: request.principal?.role }));
-        app.get('/for-managers', { config: { access: 'manager' } }, async () => 'ok');
+      routes: (moduleApp) => {
+        moduleApp.get('/for-staff', { config: { access: 'staff' } }, async (request) => ({ role: request.principal?.role }));
+        moduleApp.get('/for-managers', { config: { access: 'manager' } }, async () => 'ok');
       },
     });
     const authenticateAs = (role: Principal['role']) => async () => ({ accountId, userId: newAccountId(), role });
@@ -173,8 +173,8 @@ describe('logs', () => {
     const echoModule = defineModule({
       id: 'core.echo2',
       kind: 'core',
-      routes: (app) => {
-        app.post('/echo2', { config: { access: 'public' }, schema: { body: z.object({ phone: z.string() }) } }, async () => 'ok');
+      routes: (moduleApp) => {
+        moduleApp.post('/echo2', { config: { access: 'public' }, schema: { body: z.object({ phone: z.string() }) } }, async () => 'ok');
       },
     });
     const app = await buildTestApp(database, [echoModule], { logger, publicRoutes: [{ method: 'POST', path: '/api/v1/echo2', reason: 'test' }, { method: 'GET', path: '/api/v1/health', reason: 'test' }] });
