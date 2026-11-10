@@ -37,6 +37,14 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   },
   {
     method: 'POST',
+    path: '/api/v1/auth/refresh',
+    reason:
+      'The access token has usually run out by the time the app refreshes, so the refresh cookie is the proof (it is only ' +
+      'sent to this address). Each refresh replaces the token; a replaced token used again ends the whole session. Rate ' +
+      'limits arrive in a later F01 slice (6).',
+  },
+  {
+    method: 'POST',
     path: '/api/v1/auth/signup',
     reason:
       'A new owner has no account yet. The password is checked and stored only as an argon2id hash. ' +

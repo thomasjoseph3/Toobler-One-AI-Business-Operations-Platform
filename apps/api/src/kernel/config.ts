@@ -34,6 +34,8 @@ const EnvironmentVariablesSchema = z.object({
   // How long an access token works before the app must refresh it (minutes), and how long a session lasts at most (days)
   ACCESS_TOKEN_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
   SESSION_MAX_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+  // A session nobody has refreshed for this many days ends, even before its maximum age
+  SESSION_IDLE_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   // Email. `smtp` sends through a real mail server; `console` prints the email in the API's terminal (development only).
   // Left empty it is `smtp` when SMTP_HOST is set, otherwise `console`.
   MAIL_PROVIDER: z.enum(['smtp', 'console']).optional(),
@@ -58,7 +60,7 @@ export interface Config {
   trustProxy: boolean | string | string[];
   webUrl: string;
   publicBaseUrl: string;
-  auth: { jwtSecret: string; accessTokenMinutes: number; sessionMaxDays: number };
+  auth: { jwtSecret: string; accessTokenMinutes: number; sessionMaxDays: number; sessionIdleDays: number };
   mail: {
     provider: 'smtp' | 'console';
     from: string;
@@ -108,6 +110,7 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
       jwtSecret: validEnvironment.JWT_SECRET,
       accessTokenMinutes: validEnvironment.ACCESS_TOKEN_MINUTES,
       sessionMaxDays: validEnvironment.SESSION_MAX_DAYS,
+      sessionIdleDays: validEnvironment.SESSION_IDLE_DAYS,
     },
     mail: {
       provider: validEnvironment.MAIL_PROVIDER ?? (validEnvironment.SMTP_HOST ? 'smtp' : 'console'),

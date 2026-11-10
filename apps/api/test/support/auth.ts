@@ -12,6 +12,8 @@ export interface SignedInPerson {
   email: string;
   /** The value to send in the `cookie` header: their access cookie, as a browser would send it. */
   cookieHeader: string;
+  /** The refresh token from sign-in (the browser would keep it in the refresh cookie). */
+  refreshToken: string;
   profile: { user: { id: string; emailVerified: boolean }; business: { id: string } };
 }
 
@@ -67,5 +69,11 @@ export async function createSignedInPerson(
   expect(login.statusCode, login.body).toBe(200);
   const accessCookie = login.cookies.find((cookie) => cookie.name === 'toobler_access');
   // The profile is the one sign-in gave, so it shows the person's current state (verified or not)
-  return { email, cookieHeader: `toobler_access=${accessCookie!.value}`, profile: login.json() };
+  const refreshCookie = login.cookies.find((cookie) => cookie.name === 'toobler_refresh');
+  return {
+    email,
+    cookieHeader: `toobler_access=${accessCookie!.value}`,
+    refreshToken: refreshCookie!.value,
+    profile: login.json(),
+  };
 }

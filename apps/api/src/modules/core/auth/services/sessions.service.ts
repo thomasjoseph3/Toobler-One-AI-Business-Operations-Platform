@@ -10,6 +10,7 @@ import * as credentialsRepository from '../repositories/credentials.repository';
 import * as sessionsRepository from '../repositories/sessions.repository';
 import * as usersRepository from '../repositories/users.repository';
 import { NO_SUCH_USER_HASH, passwordMatches } from '../helpers/passwords';
+import { createProfileService } from './profile.service';
 import { generateSecret, hashSecret, signAccessToken } from '../helpers/tokens';
 
 /** The browser or app signing in, kept with the session ("who signed in from where"). */
@@ -24,12 +25,81 @@ export interface SignInResult {
   profile: ProfileResponse;
 }
 
+/** What a refresh gives the route: a new access token, a new refresh token (only when this request did the swap), and the profile. */
+export interface RefreshResult {
+  accessToken: string;
+  /** Null when another request swapped the refresh token a moment earlier; the browser then already holds the new one. */
+  refreshToken: string | null;
+  profile: ProfileResponse;
+}
+
+/** How long a just-replaced refresh token still counts as a harmless race (two tabs refreshing together), in seconds. */
+const REFRESH_GRACE_SECONDS = 60;
+
+/** The one answer for every refresh that cannot go ahead, so nothing reveals which rule failed. */
+export const sessionEnded = () => new ApiError(401, 'SESSION_ENDED', 'Your session has ended. Please sign in again.');
+
 /**
  * Everything about signing in and out. The route calls this.
  * Repositories used: accounts, users, credentials, sessions (all in ../repositories).
  */
 export function createSessionsService({ config, database }: { config: Config; database: Database }) {
+  const profileService = createProfileService({ database });
   return {
+    /**
+     * Trades a refresh token for a new access token and a NEW refresh token (the old one stops working). A token that was
+     * replaced only moments ago is a harmless race and just gets a new access token. A replaced token used after that
+     * means it was copied: the whole session is ended. Anything else that is wrong (unknown, ended, idle, too old, person
+     * disabled) gets the same 401 SESSION_ENDED.
+     */
+    async refresh(refreshToken: string, client: ClientInfo): Promise<RefreshResult> {
+      const oldHash = hashSecret(refreshToken);
+      const session = await sessionsRepository.findSessionByRefreshHash(database.system, oldHash, {
+        idleDays: config.auth.sessionIdleDays,
+        graceSeconds: REFRESH_GRACE_SECONDS,
+      });
+      if (!session || !session.isLive) throw sessionEnded();
+
+      let newRefreshToken: string | null = null;
+      if (session.matchedPrevious) {
+        if (!session.withinGrace) {
+          // The replaced token is back after the grace window: someone copied it. End the session (and commit that
+          // before answering, so the answer's error does not undo it).
+          await database.runInSystemTransaction(async (transaction) => {
+            await sessionsRepository.revokeSession(transaction, session.sessionId, 'refresh token reused');
+            await writeActivityLog(transaction, {
+              accountId: session.accountId,
+              actor: { kind: 'user', id: session.userId },
+              kind: 'auth.refresh_token_reused',
+              details: {
+                recordType: 'user',
+                recordId: session.userId,
+                ...(client.ip ? { ip: client.ip } : {}),
+                ...(client.userAgent ? { userAgent: client.userAgent } : {}),
+              },
+            });
+          });
+          throw sessionEnded();
+        }
+      } else {
+        const candidate = generateSecret();
+        const swapped = await sessionsRepository.rotateRefreshToken(database.system, {
+          sessionId: session.sessionId,
+          oldRefreshTokenHash: oldHash,
+          newRefreshTokenHash: hashSecret(candidate),
+        });
+        // If another request swapped first, this one behaves like the grace case: new access token only
+        if (swapped) newRefreshToken = candidate;
+      }
+
+      const accessToken = await signAccessToken(
+        { userId: session.userId, sessionId: session.sessionId },
+        { secret: config.auth.jwtSecret, minutes: config.auth.accessTokenMinutes },
+      );
+      const profile = await profileService.getProfile({ accountId: session.accountId, userId: session.userId });
+      return { accessToken, refreshToken: newRefreshToken, profile };
+    },
+
     /**
      * Ends the session the person is using, so its tokens stop working at once (the authenticator checks the session on
      * every request). The person's other sessions, on other devices, are not touched. Writes an activity-log line.

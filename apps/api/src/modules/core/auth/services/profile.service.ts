@@ -15,7 +15,7 @@ export function createProfileService({ database }: { database: Database }) {
      * The signed-in person and their business. It reads inside that business's fence, so it could not see anyone else's
      * data even if a query forgot its own filter.
      */
-    async getProfile(principal: Principal): Promise<ProfileResponse> {
+    async getProfile(principal: Pick<Principal, 'accountId' | 'userId'>): Promise<ProfileResponse> {
       const { person, business } = await database.runInAccountTransaction(principal.accountId, async (transaction) => ({
         person: await usersRepository.findPersonProfileById(transaction, principal.userId),
         business: await accountsRepository.findAccountById(transaction, principal.accountId),

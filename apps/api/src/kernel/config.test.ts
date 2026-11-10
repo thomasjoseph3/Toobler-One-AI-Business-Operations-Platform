@@ -15,7 +15,7 @@ describe('loadConfig', () => {
       host: '127.0.0.1',
       db: { ssl: 'off', poolSize: 6 },
       trustProxy: 'loopback',
-      auth: { accessTokenMinutes: 15, sessionMaxDays: 30 },
+      auth: { accessTokenMinutes: 15, sessionMaxDays: 30, sessionIdleDays: 7 },
     });
   });
   it('needs a database address', () => {

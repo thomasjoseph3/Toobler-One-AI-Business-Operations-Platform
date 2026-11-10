@@ -2,8 +2,14 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { okResponseSchema, profileResponseSchema, signInRequestSchema } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
-import { clearAuthCookies, setAuthCookies } from '../helpers/cookies';
-import { createSessionsService, type ClientInfo } from '../services/sessions.service';
+import {
+  clearAuthCookies,
+  readRefreshCookie,
+  setAccessCookie,
+  setAuthCookies,
+  setRefreshCookie,
+} from '../helpers/cookies';
+import { createSessionsService, sessionEnded, type ClientInfo } from '../services/sessions.service';
 
 /** Who is making the request, for the session record and the activity log. */
 const clientOf = (request: FastifyRequest): ClientInfo => ({
@@ -11,7 +17,7 @@ const clientOf = (request: FastifyRequest): ClientInfo => ({
   ip: request.ip,
 });
 
-/** Registers the sign-in and sign-out routes: POST /api/v1/auth/login and POST /api/v1/auth/logout. */
+/** Registers the session routes: POST /api/v1/auth/login, /auth/logout and /auth/refresh. */
 export function sessionsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const { config, database } = app.kernel;
@@ -49,6 +55,22 @@ export function sessionsRoutes(app: FastifyInstance) {
       await sessionsService.signOut(request.principal, clientOf(request));
       clearAuthCookies(reply, config);
       return { ok: true as const };
+    },
+  );
+
+  // Open to anyone: the access token has usually run out by now, so the refresh cookie is the proof. The browser sends that
+  // cookie only to this address. Needs our CSRF headers like every change. Listed in kernel/http/public-routes.ts.
+  // The answer is the profile; the new tokens travel only in cookies.
+  typedApp.post(
+    '/auth/refresh',
+    { config: { access: 'public' }, schema: { response: { 200: profileResponseSchema } } },
+    async (request, reply) => {
+      const refreshToken = readRefreshCookie(request, config);
+      if (!refreshToken) throw sessionEnded();
+      const result = await sessionsService.refresh(refreshToken, clientOf(request));
+      setAccessCookie(reply, config, result.accessToken);
+      if (result.refreshToken) setRefreshCookie(reply, config, result.refreshToken);
+      return result.profile;
     },
   );
 }
