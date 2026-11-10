@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Database } from '../src/kernel/db';
+import type { Database } from '../src/kernel/database';
 import { openTestDatabase } from './support/harness';
 
 let database: Database;

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { pino } from 'pino';
 import { createContextFactory, type AccountContext } from '../src/kernel/context';
-import type { Database } from '../src/kernel/db';
+import type { Database } from '../src/kernel/database';
 import { createEventDispatcher, type EventDispatcherOptions } from '../src/kernel/events/dispatcher';
 import type { DomainEvent } from '../src/kernel/events/events';
 import { claimDueEvents } from '../src/kernel/events/outbox-repository';

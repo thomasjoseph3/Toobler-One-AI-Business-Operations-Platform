@@ -1,4 +1,4 @@
-import type { Db } from './db';
+import type { Db } from './database';
 import type { Actor } from './context';
 import { uuidv7 } from './ids';
 

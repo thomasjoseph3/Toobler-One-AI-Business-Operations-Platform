@@ -2,7 +2,7 @@ import { Writable } from 'node:stream';
 import { pino } from 'pino';
 import { buildApp, type AppDeps } from '../../src/app';
 import { loadConfig } from '../../src/kernel/config';
-import type { Database } from '../../src/kernel/db';
+import type { Database } from '../../src/kernel/database';
 import { PUBLIC_ROUTES } from '../../src/kernel/http/public-routes';
 import { loggerOptions } from '../../src/kernel/logger';
 import { createRegistry } from '../../src/kernel/module-system/registry';

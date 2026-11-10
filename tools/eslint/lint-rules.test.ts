@@ -64,7 +64,7 @@ describe('module boundary rule', () => {
 
   it('lets a module use its own files and the kernel', () => {
     expect(lintImport('core/contacts/service.ts', "import { find } from './repository';")).toEqual([]);
-    expect(lintImport('core/contacts/service.ts', "import { find } from '../../../kernel/db';")).toEqual([]);
+    expect(lintImport('core/contacts/service.ts', "import { find } from '../../../kernel/database';")).toEqual([]);
   });
 
   it('lets a module use another module through its index when it lists it in requires', () => {
@@ -136,7 +136,7 @@ describe('project lint configuration', () => {
     expect(
       await problemsIn(
         serviceFile,
-        "import { createPool } from '../../../kernel/db';\nexport const use = createPool;\n",
+        "import { createPool } from '../../../kernel/database';\nexport const use = createPool;\n",
       ),
     ).toEqual([expect.stringContaining('Only repository.ts talks to the database')]);
     expect(await problemsIn(serviceFile, "import { sql } from 'kysely';\nexport const use = sql;\n")).toEqual([
@@ -148,13 +148,13 @@ describe('project lint configuration', () => {
     expect(
       await problemsIn(
         'apps/api/src/modules/core/contacts/service.ts',
-        "import type { Db } from '../../../kernel/db';\nexport type Use = Db;\n",
+        "import type { Db } from '../../../kernel/database';\nexport type Use = Db;\n",
       ),
     ).toEqual([]);
     expect(
       await problemsIn(
         'apps/api/src/modules/core/contacts/repository.ts',
-        "import { sql } from 'kysely';\nimport { createPool } from '../../../kernel/db';\nexport const use = [sql, createPool];\n",
+        "import { sql } from 'kysely';\nimport { createPool } from '../../../kernel/database';\nexport const use = [sql, createPool];\n",
       ),
     ).toEqual([]);
   });

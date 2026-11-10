@@ -1,4 +1,4 @@
-import type { Db, Database } from './db';
+import type { Db, Database } from './database';
 import { writeActivityLog, type ActivityDetails } from './activity-log';
 import { publishEvent } from './events/publish';
 

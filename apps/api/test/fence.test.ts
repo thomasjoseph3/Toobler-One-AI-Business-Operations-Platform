@@ -1,6 +1,6 @@
 import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Database } from '../src/kernel/db';
+import type { Database } from '../src/kernel/database';
 import { uuidv7 } from '../src/kernel/ids';
 import { newAccountId, openTestDatabase } from './support/harness';
 

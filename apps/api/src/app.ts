@@ -5,7 +5,7 @@ import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { Config } from './kernel/config';
 import { createContextFactory, type ContextFactory } from './kernel/context';
-import type { Database } from './kernel/db';
+import type { Database } from './kernel/database';
 import type { HealthCheck } from './kernel/health';
 import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';

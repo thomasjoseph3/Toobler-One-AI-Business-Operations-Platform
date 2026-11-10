@@ -15,12 +15,12 @@ service.ts      Business rules, orchestration, transactions, events, audit. The 
 repository.ts   Database reads and writes, private to its module. Functions named for intentions
    │            (`findByPhoneKey`, `moveToStage`, `claimHold`), returning plain typed records.
    ▼
-kernel/db       Kysely + pg, the account fence, transactions.
+kernel/database       Kysely + pg, the account fence, transactions.
 ```
 
 | Rule | Enforced by |
 | --- | --- |
-| Only `repository.ts` (and `kernel/db`) imports the database | ESLint `no-restricted-imports` |
+| Only `repository.ts` (and `kernel/database`) imports the database | ESLint `no-restricted-imports` |
 | `routes.ts` never imports `./repository` | ESLint |
 | No module imports another module's `repository`, `service` or internals; only its `index.ts`, and only if `requires` lists it | ESLint boundaries rule + a registry test |
 | Core never imports engines, channels or features | ESLint boundaries rule |

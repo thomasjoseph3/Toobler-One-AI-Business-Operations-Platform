@@ -17,7 +17,7 @@ design in `docs/SECURITY.md`; this is the working checklist. (Adapted from the h
   schema test fails otherwise.
 - Repository functions still filter `account_id` explicitly where they insert, and filter by id **and** account on
   update/delete (defence in depth).
-- Cross-business lookups only in `kernel/db/across-accounts.ts`, each with a comment saying why.
+- Cross-business lookups only in `kernel/database/across-accounts.ts`, each with a comment saying why.
 - Another business's record → 404 (never 403).
 
 ## 2. Sessions and sign-in

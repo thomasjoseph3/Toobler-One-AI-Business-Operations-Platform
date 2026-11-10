@@ -1,6 +1,6 @@
 import type { ProfileResponse, SignUpRequest } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../kernel/activity-log';
-import type { Database } from '../../../kernel/db';
+import type { Database } from '../../../kernel/database';
 import { ApiError, conflict } from '../../../kernel/errors';
 import { uuidv7 } from '../../../kernel/ids';
 import { findPasswordProblem, hashPassword } from './passwords';

@@ -1,4 +1,4 @@
-import type { Db } from '../db';
+import type { Db } from '../database';
 import { uuidv7 } from '../ids';
 import { EVENT_NAME_PATTERN } from './events';
 import { insertOutboxEvent } from './outbox-repository';

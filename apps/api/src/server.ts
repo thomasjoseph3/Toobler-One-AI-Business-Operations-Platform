@@ -1,7 +1,7 @@
 import { buildApp } from './app';
 import { loadConfig, loadEnvFile } from './kernel/config';
 import { createContextFactory } from './kernel/context';
-import { createDatabase } from './kernel/db';
+import { createDatabase } from './kernel/database';
 import { createEventDispatcher } from './kernel/events/dispatcher';
 import { createJobRunner } from './kernel/jobs/job-runner';
 import { coreOnlyGate, createRegistry } from './kernel/module-system/registry';

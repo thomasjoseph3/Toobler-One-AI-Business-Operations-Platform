@@ -2,7 +2,7 @@ import { verify } from '@node-rs/argon2';
 import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { Database } from '../src/kernel/db';
+import type { Database } from '../src/kernel/database';
 import { buildTestApp } from './support/app';
 import { openTestDatabase } from './support/harness';
 

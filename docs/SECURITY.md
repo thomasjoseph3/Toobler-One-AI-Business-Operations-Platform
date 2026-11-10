@@ -27,7 +27,7 @@ the hotel agent's `api-security` rules, OWASP ASVS level 2 and India's DPDP Act 
   platform jobs run as the owner role.
 - The account comes **only** from the session (staff), the signed widget key (webchat), the provider id lookup
   (webhooks) or the job payload (jobs). Never from a body, query or tool argument.
-- Cross-business lookups are named functions in a single file `kernel/db/across-accounts.ts`; each has a comment
+- Cross-business lookups are named functions in a single file `kernel/database/across-accounts.ts`; each has a comment
   saying why. Today: phone number → business, WhatsApp phone id → business, mailbox → business, widget key → business,
   user by email for sign-in, platform console reads.
 - Another business's id → **404**.

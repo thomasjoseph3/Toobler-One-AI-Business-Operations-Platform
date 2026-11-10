@@ -4,10 +4,10 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import tseslint from 'typescript-eslint';
 import moduleBoundaries from './tools/eslint/module-boundaries.js';
 
-// What a file may import, by layer (docs/BACKEND.md): routes -> service -> repository -> kernel/db.
+// What a file may import, by layer (docs/BACKEND.md): routes -> service -> repository -> kernel/database.
 // ESLint applies ONE `no-restricted-imports` setting per file, so each group of files below lists every rule that applies to it.
 const DATABASE_ONLY_IN_REPOSITORIES = {
-  group: ['**/kernel/db', '**/kernel/db/index', '**/kernel/db/migrate'],
+  group: ['**/kernel/database', '**/kernel/database/index', '**/kernel/database/migrate'],
   allowTypeImports: true,
   message:
     'Only repository.ts talks to the database. Call the repository from the service (importing the Db type is fine).',

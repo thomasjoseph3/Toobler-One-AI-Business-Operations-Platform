@@ -7,7 +7,7 @@ import { buildTestApp, captureLogs, testConfig } from './support/app';
 import { newAccountId, openTestDatabase } from './support/harness';
 import { buildApp } from '../src/app';
 import { modules } from '../src/modules';
-import type { Database } from '../src/kernel/db';
+import type { Database } from '../src/kernel/database';
 
 let database: Database;
 beforeAll(() => {

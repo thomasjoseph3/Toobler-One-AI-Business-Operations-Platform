@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pino } from 'pino';
 import { createContextFactory } from '../src/kernel/context';
-import type { Database } from '../src/kernel/db';
+import type { Database } from '../src/kernel/database';
 import { createJobRunner, type JobRunner } from '../src/kernel/jobs/job-runner';
 import type { JobData, JobRun } from '../src/kernel/jobs/jobs';
 import { defineModule } from '../src/kernel/module-system/define';

@@ -58,7 +58,7 @@ and WhatsApp will need it) but it is not verified. The design keeps (2) and (3) 
 
 ## Database (migration `002_auth.sql`)
 Credentials and login state sit in **global** tables that the app role (`app_user`) cannot touch at all; they are reached
-only through named functions in `kernel/db/across-accounts.ts` (each with a comment saying why). Profile data sits in
+only through named functions in `kernel/database/across-accounts.ts` (each with a comment saying why). Profile data sits in
 **fenced** tables like everything else.
 
 | Table | Fenced? | Purpose | Key columns |

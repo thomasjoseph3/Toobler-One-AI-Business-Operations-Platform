@@ -1,5 +1,5 @@
-import { createPool } from '../src/kernel/db';
-import { migrate } from '../src/kernel/db/migrate';
+import { createPool } from '../src/kernel/database';
+import { migrate } from '../src/kernel/database/migrate';
 import { migrationsDir, testDatabaseConfig } from './support/database';
 
 // Runs once before all API tests: a clean "app" schema with every migration applied.

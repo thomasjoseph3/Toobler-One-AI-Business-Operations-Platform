@@ -1,4 +1,4 @@
-import type { Db } from '../../../kernel/db';
+import type { Db } from '../../../kernel/database';
 
 // Every query for sign-in lives here, and nowhere else (the repository pattern). In this first slice that is four small
 // inserts and one check. They run on the owner connection (`database.system`) because when someone signs up there is no

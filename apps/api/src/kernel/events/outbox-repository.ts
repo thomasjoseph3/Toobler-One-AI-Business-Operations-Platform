@@ -1,5 +1,5 @@
 import { sql } from 'kysely';
-import type { Db } from '../db';
+import type { Db } from '../database';
 
 /** An event row as the dispatcher reads it after claiming it. */
 export interface ClaimedEvent {
