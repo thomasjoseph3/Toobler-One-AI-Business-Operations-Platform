@@ -8,7 +8,7 @@ Statuses: `planned`, `in_progress`, `in_review`, `approved`, `deferred`.
 
 | ID | Feature | Status | Brief | Approved on |
 | --- | --- | --- | --- | --- |
-| F00 | Foundation and design system | in_review | [brief](../features/F00-foundation.md) | |
+| F00 | Foundation and design system | approved | [brief](../features/F00-foundation.md) | 2026-11-10 |
 | F01 | Sign-up, sign-in and sessions | planned | | |
 | F02 | Team, roles, teams and the activity log | planned | | |
 | F03 | Modules: plug and play | planned | | |
