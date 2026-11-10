@@ -72,14 +72,14 @@ Paths are under `../hotel agent/`. At each feature, read only its row, before th
 - **Req:** `5-onboarding-and-launch/02-sign-up-and-sign-in.md`, security
 - **Backend:** `accounts`, `users`, `memberships`, `sessions`, `auth_codes`, `login_attempts`; signup (business +
   owner as manager, industry choice → general preset only for now), verify email, login, lockout, forgot/reset
-  password, WhatsApp code send/verify (console provider until F25), logout, `/me`, `PATCH /me`, switch business. Audit
-  entries for sign-ins.
-- **Front end:** sign-up (name, business, email, mobile, industry), verify email and mobile, sign-in (password or code),
-  forgot/reset, profile, business switcher. Session cookie set by the API.
+  password, logout, `/me`, `PATCH /me`, refresh tokens. Email only for now: mobile verification and WhatsApp-code sign-in
+  move to F25; one email manages one business (no switching). Audit entries for sign-ins.
+- **Front end:** sign-up (name, business, email, mobile, industry), verify email, sign-in (password),
+  forgot/reset, profile, Session cookies set by the API.
 - **Tests:** lockout after 5, same answer for unknown email, session expiry and rotation, code expiry and tries,
-  second business from inside the account, `/me` isolation.
-- **Manual:** sign up a business; open the verify link from Mailpit; read the code from the API log; sign in both ways;
-  wrong password ×5 → "try again in 15 minutes"; create a second business and switch.
+  `/me` isolation, refresh rotation and reuse detection.
+- **Manual:** sign up a business; open the verify link from the email; sign in;
+  wrong password ×5 → "try again in 15 minutes"; sign up again with the same email → refused.
 
 ### F02 Team, roles, teams and the activity log
 - **Req:** `1-foundation/02-users-roles-and-teams.md`, `1-foundation/04-security-privacy-and-audit.md` (activity log part)

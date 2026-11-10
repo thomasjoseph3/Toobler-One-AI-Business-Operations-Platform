@@ -34,6 +34,9 @@ proposal for each. **Q** marks a decision the owner needs to make; the "Needed b
 | R27 | Hotel-only operational states in the design system (Occupied, Needs cleaning, Do not disturb). | Not used in Phase 1. | — |
 | R28 | Build order: the requirements build the whole CRM core before the AI agent. | **Decided 10 Nov 2026:** build the first working lead engine first: F01, F03, F04, F06, F14, F16, F17, F18, F15, F19, F20, F31, then the rest. Tickets (F14) come before the router (F15). The AI setup chat (F31) needs the agent runtime (F19), so the form version of onboarding (F16) comes first. | — |
 | R29 | Knowledge search with embeddings (pgvector) in `08-knowledge-base.md`. | **Decided 10 Nov 2026:** no vector search to start. Structured facts (profile answers, offerings, offers, hours, situations, FAQs) go into the prompt from tables; FAQs and documents use Postgres full-text and trigram search. Add pgvector later only if the evals show missed questions. | F18 |
+| R30 | Mobile verification and WhatsApp-code sign-in (02-sign-up-and-sign-in.md) need an OTP/WhatsApp service we don't have yet. | **Decided 10 Nov 2026 (owner):** email only for now. Mobile is collected, unverified, not unique. Mobile verification and code sign-in arrive with F25. | F25 |
+| R31 | A second business from inside an account, and the business switcher (same requirement). | **Decided 10 Nov 2026 (owner):** one email manages one business for now; add a `memberships` table when needed. | Later |
+| R32 | Sign-in tokens: the plan said one opaque session token. | **Decided 10 Nov 2026 (owner):** access token (JWT, 15 min) + rotating refresh token, as in the hotel agent; the API sets httpOnly cookies. | — |
 
 ## Status
 

@@ -41,7 +41,7 @@ the hotel agent's `api-security` rules, OWASP ASVS level 2 and India's DPDP Act 
   refresh address. Refresh tokens last 7 days idle and 30 days at most. Every request also checks the session is live in
   the database, so signing out, a password change, removal or disabling a person stops access at once. Ended on password
   change or reset, removal from the business, or "sign out everywhere".
-- One-time codes (WhatsApp sign-in, free check): 6 digits, hashed, 10-minute expiry, 5 tries, then a 15-minute lock;
+- One-time codes (WhatsApp sign-in, free check; **not in F01**: no OTP service yet, they arrive with F25): 6 digits, hashed, 10-minute expiry, 5 tries, then a 15-minute lock;
   send limits per phone (3 per 15 min) and per IP.
 - Lockout: 5 wrong passwords for an email → 15 minutes (requirement), same message whether the email exists or not.
 - CSRF: state-changing requests need a matching `Origin` (our web address only), a custom `X-Requested-With` style header
