@@ -6,7 +6,6 @@
 //   4. starts the throwaway test database in Docker and applies the migrations to it
 // It never touches your development (DATABASE_URL) database: run `npm run db:migrate` yourself when you want that.
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -16,13 +15,6 @@ const repositoryRoot = path.resolve(import.meta.dirname, '..');
 /** The major Node version wanted by .nvmrc text such as "26.13.0" (returns 26). */
 export function readWantedNodeMajor(nvmrcText) {
   return Number.parseInt(nvmrcText.trim().replace(/^v/, '').split('.')[0], 10);
-}
-
-/** Whether the text of a .env file sets a variable (a line `NAME=...` that is not a comment). */
-export function envFileSetsVariable(environmentFileText, variableName) {
-  return environmentFileText
-    .split('\n')
-    .some((line) => line.startsWith(`${variableName}=`) && line.length > variableName.length + 1);
 }
 
 /** Runs a command in the repository, showing its output. Returns true when it succeeded. */
@@ -51,13 +43,6 @@ function runSetup() {
   const environmentFile = path.join(repositoryRoot, '.env');
   if (fs.existsSync(environmentFile)) {
     console.log('.env exists. (Its values are not shown here.)');
-  }
-  // The secret that signs sign-in tokens: made here, once, and never printed.
-  const environmentText = fs.readFileSync(environmentFile, 'utf8');
-  if (!envFileSetsVariable(environmentText, 'JWT_SECRET')) {
-    const separator = environmentText.endsWith('\n') || environmentText === '' ? '' : '\n';
-    fs.appendFileSync(environmentFile, `${separator}JWT_SECRET=${randomBytes(48).toString('base64url')}\n`);
-    console.log('Added a random JWT_SECRET to .env (it signs sign-in tokens; its value is not shown).');
   } else {
     fs.copyFileSync(path.join(repositoryRoot, '.env.example'), environmentFile);
     console.log('Created .env from .env.example. Open it and fill in DATABASE_URL before running the app.');

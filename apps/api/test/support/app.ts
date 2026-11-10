@@ -10,19 +10,7 @@ import type { ModuleManifest } from '../../src/kernel/modules/define';
 import { testDatabaseConfig } from './database';
 
 /** The app settings used in tests: the test environment, pointing at the throwaway test database. */
-export const TEST_WEB_ORIGIN = 'http://localhost:3000';
-/** The headers our web app adds to every request that changes something (the CSRF check refuses requests without them). */
-export const unsafeRequestHeaders = { origin: TEST_WEB_ORIGIN, 'x-requested-with': 'toobler-web' };
-export const testConfig = (extraSettings: Record<string, string> = {}) =>
-  loadConfig({
-    NODE_ENV: 'test',
-    DATABASE_URL: testDatabaseConfig().url,
-    JWT_SECRET: 'test-only-secret-test-only-secret-test-only',
-    WEB_URL: TEST_WEB_ORIGIN,
-    // Every test calls from 127.0.0.1, so the sign-in limits are raised; one test builds an app with the real limits.
-    AUTH_RATE_LIMIT_SCALE: '1000',
-    ...extraSettings,
-  });
+export const testConfig = () => loadConfig({ NODE_ENV: 'test', DATABASE_URL: testDatabaseConfig().url });
 
 /** A logger that keeps its lines, so a test can check what was (and was not) written to the log. */
 export function captureLogs() {

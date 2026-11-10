@@ -37,85 +37,9 @@ export interface ActivityLogTable {
   created_at: Generated<Date>;
 }
 
-/** A business. Fenced by its own id. */
-export interface AccountsTable {
-  id: string;
-  name: string;
-  industry: Generated<string>;
-  time_zone: Generated<string>;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-}
-
-/** A person in a business (one business each for now). Fenced by account_id. */
-export interface UsersTable {
-  id: string;
-  account_id: string;
-  email: string;
-  name: string;
-  mobile_e164: string | null;
-  mobile_key: string | null;
-  role: 'manager' | 'staff' | 'staff_own';
-  email_verified_at: Date | null;
-  status: Generated<'active' | 'disabled'>;
-  last_login_at: Date | null;
-  created_by: Json | null;
-  updated_by: Json | null;
-  created_at: Generated<Date>;
-  updated_at: Generated<Date>;
-}
-
-/** Password hashes. Global; closed to the app role. */
-export interface UserCredentialsTable {
-  user_id: string;
-  password_hash: string;
-  password_changed_at: Generated<Date>;
-}
-
-/** Sign-ins. Global; closed to the app role. */
-export interface SessionsTable {
-  id: string;
-  user_id: string;
-  refresh_token_hash: string;
-  previous_refresh_token_hash: string | null;
-  rotated_at: Date | null;
-  user_agent: string | null;
-  ip: string | null;
-  created_at: Generated<Date>;
-  last_used_at: Generated<Date>;
-  expires_at: Date;
-  revoked_at: Date | null;
-  revoked_reason: string | null;
-}
-
-/** Single-use email links. Global; closed to the app role. */
-export interface AuthTokensTable {
-  id: string;
-  kind: 'email_verify' | 'password_reset';
-  user_id: string;
-  secret_hash: string;
-  expires_at: Date;
-  used_at: Date | null;
-  created_at: Generated<Date>;
-}
-
-/** Failed sign-in counters. Global; closed to the app role. */
-export interface LoginAttemptsTable {
-  key_hash: string;
-  failed_count: Generated<number>;
-  locked_until: Date | null;
-  updated_at: Generated<Date>;
-}
-
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
   domain_events: DomainEventsTable;
   activity_log: ActivityLogTable;
-  accounts: AccountsTable;
-  users: UsersTable;
-  user_credentials: UserCredentialsTable;
-  sessions: SessionsTable;
-  auth_tokens: AuthTokensTable;
-  login_attempts: LoginAttemptsTable;
 }

@@ -1,19 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { Config } from './kernel/config';
-import { createContextFactory, createRequestContext, type ContextFactory } from './kernel/context';
+import { createContextFactory, type ContextFactory } from './kernel/context';
 import type { Database } from './kernel/db';
 import type { HealthCheck } from './kernel/health';
-import { registerCsrfProtection } from './kernel/http/csrf';
 import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
 import { loggerOptions } from './kernel/logger';
-import { createMailProvider, type MailProvider } from './providers/mail';
 import type { ModuleGate, Registry } from './kernel/modules/registry';
 import { coreOnlyGate } from './kernel/modules/registry';
 
@@ -27,7 +24,6 @@ export interface Kernel {
   gate: ModuleGate;
   /** Builds the context (business + actor + fenced transaction + audit + publish) for work done on a business's behalf. */
   contextFor: ContextFactory;
-  mail: MailProvider;
   healthChecks: HealthCheck[];
 }
 
@@ -42,10 +38,7 @@ export interface AppDeps {
   database: Database;
   registry: Registry;
   gate?: ModuleGate;
-  /** Overrides the authenticator a module provides. Tests use this to sign in without cookies. */
   authenticate?: Authenticator;
-  /** Overrides the mail provider chosen from the settings. Tests pass one that records messages. */
-  mail?: MailProvider;
   publicRoutes?: readonly PublicRoute[];
   healthChecks?: HealthCheck[];
   /** Requests per window per address; public routes get their own tighter limits. */
@@ -78,32 +71,22 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
   });
 
   const gate = dependencies.gate ?? coreOnlyGate(registry);
-  const contextFor = createContextFactory(database);
-  const mail = dependencies.mail ?? createMailProvider(config.mail, app.log);
   app.decorate('kernel', {
     config,
     database,
     registry,
     gate,
-    contextFor,
-    mail,
+    contextFor: createContextFactory(database),
     healthChecks: dependencies.healthChecks ?? [],
   });
 
-  // The authenticator comes from the module that provides one (core.auth); with none, every signed-in route answers 401.
-  const authenticatorFactory = registry.modules.find((moduleManifest) => moduleManifest.authenticator)?.authenticator;
-  const authenticate = dependencies.authenticate ?? authenticatorFactory?.({ config, database }) ?? rejectEveryone;
-
   registerErrorHandling(app);
-  registerCsrfProtection(app, { allowedOrigin: config.webUrl });
-  await app.register(cookie);
   await app.register(helmet);
   await app.register(rateLimit, { global: true, ...(dependencies.rateLimit ?? { max: 300, timeWindow: '1 minute' }) });
   registerGuard(app, {
-    authenticate,
+    authenticate: dependencies.authenticate ?? rejectEveryone,
     gate,
     publicRoutes: dependencies.publicRoutes ?? PUBLIC_ROUTES,
-    buildRequestContext: (principal) => createRequestContext(contextFor, principal),
   });
 
   // Each module's routes live under /api/v1 and answer 404 when the module is off for the business.
