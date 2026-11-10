@@ -2,7 +2,7 @@ import type { Config } from '../../../../kernel/config';
 import type { Database } from '../../../../kernel/database';
 import { ApiError, unauthorized } from '../../../../kernel/errors';
 import type { Authenticator } from '../../../../kernel/http/guard';
-import * as sessionsRepository from '../data/sessions.repository';
+import * as sessionsRepository from '../repositories/sessions.repository';
 import { readAccessCookie } from './cookies';
 import { AccessTokenError, verifyAccessToken } from './tokens';
 

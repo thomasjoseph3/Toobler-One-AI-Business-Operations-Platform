@@ -4,16 +4,19 @@ import type { Database } from '../../../../kernel/database';
 import { ApiError, conflict } from '../../../../kernel/errors';
 import { uuidv7 } from '../../../../kernel/ids';
 import { isActiveIndustry } from '../../industries';
-import * as accountsRepository from '../data/accounts.repository';
-import * as credentialsRepository from '../data/credentials.repository';
-import * as usersRepository from '../data/users.repository';
+import * as accountsRepository from '../repositories/accounts.repository';
+import * as credentialsRepository from '../repositories/credentials.repository';
+import * as usersRepository from '../repositories/users.repository';
 import { normaliseMobile } from '../helpers/phone';
-import { findPasswordProblem, hashPassword } from '../password/passwords';
+import { findPasswordProblem, hashPassword } from '../helpers/passwords';
 
 // The country code added to a mobile number typed without one (91 = India). It becomes a setting in a later slice.
 const DEFAULT_COUNTRY_CODE = '91';
 
-/** Everything about signing up. The route calls this; this calls the repositories in ../data. */
+/**
+ * Everything about signing up. The route calls this.
+ * Repositories used: accounts, users, credentials (all in ../repositories).
+ */
 export function createSignUpService({ database }: { database: Database }) {
   return {
     /**

@@ -5,11 +5,11 @@ import type { Database } from '../../../../kernel/database';
 import { ApiError } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
-import * as accountsRepository from '../data/accounts.repository';
-import * as credentialsRepository from '../data/credentials.repository';
-import * as sessionsRepository from '../data/sessions.repository';
-import * as usersRepository from '../data/users.repository';
-import { NO_SUCH_USER_HASH, passwordMatches } from '../password/passwords';
+import * as accountsRepository from '../repositories/accounts.repository';
+import * as credentialsRepository from '../repositories/credentials.repository';
+import * as sessionsRepository from '../repositories/sessions.repository';
+import * as usersRepository from '../repositories/users.repository';
+import { NO_SUCH_USER_HASH, passwordMatches } from '../helpers/passwords';
 import { generateSecret, hashSecret, signAccessToken } from './tokens';
 
 /** The browser or app signing in, kept with the session ("who signed in from where"). */
@@ -24,7 +24,10 @@ export interface SignInResult {
   profile: ProfileResponse;
 }
 
-/** Everything about signing in and out. The route calls this; this calls the repositories in ../data. */
+/**
+ * Everything about signing in and out. The route calls this.
+ * Repositories used: accounts, users, credentials, sessions (all in ../repositories).
+ */
 export function createSessionsService({ config, database }: { config: Config; database: Database }) {
   return {
     /**

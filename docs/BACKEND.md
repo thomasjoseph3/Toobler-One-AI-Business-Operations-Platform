@@ -54,12 +54,13 @@ modules/core/auth/
   index.ts             the public API
   sign-up/             routes.ts + service.ts (+ tests) for one feature
   sessions/            another feature folder
-  data/                ONE repository per table: <table>.repository.ts. The only files that touch the database.
-  helpers/             small pure functions several features share
+  repositories/        ONE repository per table: <table>.repository.ts. The only files that touch the database.
+  helpers/             shared tools with no routes (password hashing, phone cleaning)
 ```
 
-The flow does not change: `<feature>/routes.ts` → `<feature>/service.ts` → `data/<table>.repository.ts` → `kernel/database`.
-A repository is shared by every feature that needs that table, so SQL is never copied. The linter treats
+The flow does not change: `<feature>/routes.ts` → `<feature>/service.ts` → `repositories/<table>.repository.ts` → `kernel/database`.
+A folder with a `routes.ts` is a feature; a folder without routes is a helper. A service reaches a repository with a plain
+import, e.g. `import * as usersRepository from '../repositories/users.repository'`. A repository is shared by every feature that needs that table, so SQL is never copied. The linter treats
 `repository.ts` and `*.repository.ts` as the files allowed to use the database layer. Folder names must not repeat
 names used elsewhere in the project (the engine room is `kernel`, the machinery for modules is `kernel/module-system`).
 

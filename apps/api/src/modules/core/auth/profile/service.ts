@@ -2,10 +2,13 @@ import type { ProfileResponse } from '@toobler-one/shared';
 import type { Database } from '../../../../kernel/database';
 import { notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
-import * as accountsRepository from '../data/accounts.repository';
-import * as usersRepository from '../data/users.repository';
+import * as accountsRepository from '../repositories/accounts.repository';
+import * as usersRepository from '../repositories/users.repository';
 
-/** Everything about the signed-in person's own profile. The route calls this; this calls the repositories in ../data. */
+/**
+ * Everything about the signed-in person's own profile. The route calls this.
+ * Repositories used: accounts, users (both in ../repositories).
+ */
 export function createProfileService({ database }: { database: Database }) {
   return {
     /**
