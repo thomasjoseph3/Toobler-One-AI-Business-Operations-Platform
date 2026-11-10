@@ -10,15 +10,15 @@ const DATABASE_ONLY_IN_REPOSITORIES = {
   group: ['**/kernel/database', '**/kernel/database/index', '**/kernel/database/migrate'],
   allowTypeImports: true,
   message:
-    'Only repository.ts talks to the database. Call the repository from the service (importing the Db type is fine).',
+    'Only repository files (repository.ts or data/*.repository.ts) talk to the database. Call the repository from the service (importing the Db type is fine).',
 };
 const QUERY_BUILDER_ONLY_IN_REPOSITORIES = {
   group: ['kysely'],
   allowTypeImports: true,
-  message: 'Queries are written in repository.ts only.',
+  message: 'Queries are written in repository files only (repository.ts or data/*.repository.ts).',
 };
 const ROUTES_CALL_SERVICES = {
-  group: ['**/repository', '**/repository.ts'],
+  group: ['**/repository', '**/repository.ts', '**/*.repository', '**/*.repository.ts'],
   message: 'Routes call the service; only the service talks to the repository.',
 };
 
@@ -79,10 +79,10 @@ export default tseslint.config(
       'id-denylist': ['error', ...UNCLEAR_NAMES],
     },
   },
-  // Layering. Modules: only repository.ts may use the database layer or the query builder; routes may not use repositories.
+  // Layering. Modules: only repository files (repository.ts, or *.repository.ts in a data/ folder) may use the database layer or the query builder; routes may not use repositories.
   {
     files: ['apps/api/src/modules/**/*.ts'],
-    ignores: ['apps/api/src/modules/**/repository.ts'],
+    ignores: ['apps/api/src/modules/**/repository.ts', 'apps/api/src/modules/**/*.repository.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
