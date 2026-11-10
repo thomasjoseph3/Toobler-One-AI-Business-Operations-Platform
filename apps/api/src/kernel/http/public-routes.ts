@@ -13,4 +13,11 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
     path: '/api/v1/health',
     reason: 'Uptime checks and deploy health checks have no session. Reveals only up or down.',
   },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/signup',
+    reason:
+      'A new owner has no account yet. The password is checked and stored only as an argon2id hash. ' +
+      'Rate limiting and the CSRF check arrive in later F01 slices (3 and 6); until then it is open to repeated use.',
+  },
 ];

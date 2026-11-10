@@ -3,6 +3,7 @@ import { pino } from 'pino';
 import { buildApp, type AppDeps } from '../../src/app';
 import { loadConfig } from '../../src/kernel/config';
 import type { Database } from '../../src/kernel/db';
+import { PUBLIC_ROUTES } from '../../src/kernel/http/public-routes';
 import { loggerOptions } from '../../src/kernel/logger';
 import { createRegistry } from '../../src/kernel/modules/registry';
 import { modules } from '../../src/modules';
@@ -32,5 +33,7 @@ export async function buildTestApp(
   overrides: Partial<AppDeps> = {},
 ) {
   const registry = createRegistry([...modules, ...extraModules]);
-  return buildApp({ config: testConfig(), database, registry, ...overrides });
+  // The real open routes are always allowed; a test only adds the open routes of its own test modules.
+  const publicRoutes = [...PUBLIC_ROUTES, ...(overrides.publicRoutes ?? [])];
+  return buildApp({ config: testConfig(), database, registry, ...overrides, publicRoutes });
 }
