@@ -1,3 +1,5 @@
+import { EVENT_NAME_PATTERN } from '../events/events';
+import { JOB_NAME_PATTERN } from '../jobs/jobs';
 import type { ModuleKind, ModuleManifest } from './define';
 
 export class RegistryError extends Error {}
@@ -9,6 +11,31 @@ export interface Registry {
 }
 
 const MODULE_ID_PATTERN = /^(core|engine|channel|feature)\.[a-z][a-z0-9_]*$/;
+
+/** Names that only the kernel itself may use for jobs. */
+const RESERVED_JOB_NAMES = new Set(['kernel.heartbeat']);
+
+/** Checks event names are well formed, and job names are well formed, owned by their module and unique. */
+function checkEventAndJobNames(manifests: Iterable<ModuleManifest>): void {
+  const moduleIdByJobName = new Map<string, string>();
+  for (const manifest of manifests) {
+    for (const eventName of Object.keys(manifest.events ?? {})) {
+      if (!EVENT_NAME_PATTERN.test(eventName)) {
+        throw new RegistryError(`Module "${manifest.id}" listens for "${eventName}", which must look like "lead.stage_changed".`);
+      }
+    }
+    const moduleName = manifest.id.split('.')[1];
+    for (const job of manifest.jobs ?? []) {
+      if (!JOB_NAME_PATTERN.test(job.name) || !job.name.startsWith(`${moduleName}.`)) {
+        throw new RegistryError(`Job "${job.name}" of module "${manifest.id}" must be named "${moduleName}.<what>".`);
+      }
+      if (RESERVED_JOB_NAMES.has(job.name)) throw new RegistryError(`Job name "${job.name}" is reserved for the kernel.`);
+      const otherModuleId = moduleIdByJobName.get(job.name);
+      if (otherModuleId) throw new RegistryError(`Job "${job.name}" is declared by both "${otherModuleId}" and "${manifest.id}".`);
+      moduleIdByJobName.set(job.name, manifest.id);
+    }
+  }
+}
 
 /** Checks the set of modules is consistent (names, kinds, dependencies, no cycles) and orders it dependencies-first. */
 export function createRegistry(moduleManifests: readonly ModuleManifest[]): Registry {
@@ -24,6 +51,8 @@ export function createRegistry(moduleManifests: readonly ModuleManifest[]): Regi
     if (manifestsById.has(manifest.id)) throw new RegistryError(`Module "${manifest.id}" is registered twice.`);
     manifestsById.set(manifest.id, manifest);
   }
+
+  checkEventAndJobNames(manifestsById.values());
 
   for (const manifest of manifestsById.values()) {
     for (const requiredModuleId of manifest.requires ?? []) {

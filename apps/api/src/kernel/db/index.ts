@@ -19,7 +19,7 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (databaseValue) => Number(databas
  * 'off' = no encryption, 'require' = encrypted but the server's certificate is not checked,
  * 'verify' = encrypted and the certificate is checked (against the CA file when one is given).
  */
-function buildSslOptions({ ssl: sslMode, caFile }: Config['db']): false | pg.ClientConfig['ssl'] {
+export function buildSslOptions({ ssl: sslMode, caFile }: Config['db']): false | pg.ClientConfig['ssl'] {
   if (sslMode === 'off') return false;
   if (sslMode === 'require') return { rejectUnauthorized: false };
   return { rejectUnauthorized: true, ...(caFile ? { ca: fs.readFileSync(caFile, 'utf8') } : {}) };
