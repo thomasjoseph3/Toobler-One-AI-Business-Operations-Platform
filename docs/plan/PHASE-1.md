@@ -242,12 +242,20 @@ Paths are under `../hotel agent/`. At each feature, read only its row, before th
 - **Backend:** the `ChannelAdapter` contract and conversation engine; `channel.webchat` (widget key, allowed
   websites, visitor session tokens, streaming replies, idle end → finalise).
 - **Front end:** Channels → Website chat (code to copy, colour, greeting, position, allowed sites, live preview);
-  the widget in `apps/site` (iframe loader).
+  the widget in `apps/site`: a tiny plain JavaScript + CSS loader (no React) that shows the launcher buttons (Chat,
+  Call, WhatsApp) and opens the chat window, which is React in an iframe. Which buttons show, their order, colour,
+  greeting, position, phone number and WhatsApp number + prefilled message are business settings that the loader
+  fetches by widget key, so changing them never needs a re-paste. A button shows only if its channel is on for the
+  business. Setup screen: the one-line snippet, short per-platform steps (HTML, PHP, WordPress, Shopify, Wix/Squarespace/
+  Webflow, React/Next, Google Tag Manager), the exact CSP entries for strict sites, and a **Check installation** button
+  ("last seen on <website> today"). Fallback for sites that cannot run scripts: a plain HTML snippet with `tel:` and
+  `wa.me` links (no AI chat).
 - **Tests:** origin checks, rate limits, a chat giving a phone → contact + lead + task + timeline + summary; a
   complaint chat → ticket, no lead.
 - **Manual:** paste the code into a local test page, chat as a customer (an enquiry, then a complaint), see the lead,
   the ticket and the tasks appear.
-- **Note:** the web call button arrives with F29 (voice).
+- **Note:** the browser-call button (microphone, iframe `allow="microphone"`, HTTPS) arrives with F29 (voice); `tel:` and
+  `wa.me` buttons work from F20 on. Use a neutral script file name (ad blockers block "chat").
 
 ## Stage D: Staff workspace (requirements step 5)
 

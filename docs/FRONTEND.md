@@ -161,8 +161,22 @@ Malayalam, Hindi and English without clipping or fixed widths.
 ## 9. The website chat widget (`apps/site`)
 
 A small script (`<script src=".../w/{key}.js" async>`) that injects an iframe, so the business's CSS can't break it
-and it can't read the business's page. Under 30 KB gzipped for the loader; the chat UI loads on first open. Works at
-320 px and never blocks the host page's load.
+and it can't read the business's page. Works at 320 px and never blocks the host page's load.
+
+**Two parts, two technologies.** The *loader* (the floating Chat / Call / WhatsApp buttons on the client's page) is
+plain JavaScript and CSS, no React, built to one small file (target under 10 KB gzipped). The *chat window* is React
+(Vite build) inside the iframe and loads only when the visitor clicks Chat, so it can share `packages/ui`. The client
+only ever sees the one pasted line; Vite is our build tool, not their concern.
+
+**Buttons** (the business picks which show, their order and the numbers; the loader fetches this by widget key):
+Chat; Call (`tel:` link, on desktop the number with a copy button); Call from the browser (F29, needs HTTPS and
+microphone permission); WhatsApp (`https://wa.me/<number>?text=<prefilled message>`, lands in the WhatsApp channel).
+A button appears only if its channel is on for the business.
+
+**Fits any website:** the same line works on HTML, PHP, WordPress, Shopify, Wix/Squarespace/Webflow, React/Next and
+Google Tag Manager; the setup screen gives per-platform steps. Strict Content Security Policy sites must allow our
+domain (script, frame and connect); the setup screen lists the exact entries. A **Check installation** button shows
+"last seen on <website>". Sites that cannot run scripts get a plain HTML snippet of `tel:` / `wa.me` links (no AI chat).
 
 **The design system does not govern the bubble.** It is the business's own chat (SCREENS.md), so its accent colour,
 greeting and position come from the business's widget settings. We keep only the structure, spacing, radius, focus and
