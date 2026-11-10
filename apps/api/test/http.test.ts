@@ -27,7 +27,11 @@ describe('health', () => {
 
   it('answers 503 when the database does not', async () => {
     const databaseThatIsDown = { ...database, ping: async () => Promise.reject(new Error('boom')) } as Database;
-    const app = await buildApp({ config: testConfig(), database: databaseThatIsDown, registry: createRegistry(modules) });
+    const app = await buildApp({
+      config: testConfig(),
+      database: databaseThatIsDown,
+      registry: createRegistry(modules),
+    });
     const response = await app.inject('/api/v1/health');
     expect(response.statusCode).toBe(503);
     expect(response.json()).toEqual({ ok: false, error: 'database is not responding' });
@@ -57,14 +61,28 @@ describe('errors', () => {
       id: 'core.echo',
       kind: 'core',
       routes: (moduleApp) => {
-        moduleApp.post('/echo', { config: { access: 'public' }, schema: { body: z.object({ name: z.string().min(2).max(20) }) } }, async (request) => request.body);
+        moduleApp.post(
+          '/echo',
+          { config: { access: 'public' }, schema: { body: z.object({ name: z.string().min(2).max(20) }) } },
+          async (request) => request.body,
+        );
       },
     });
-    const app = await buildTestApp(database, [echoModule], { publicRoutes: [{ method: 'POST', path: '/api/v1/echo', reason: 'test' }, { method: 'GET', path: '/api/v1/health', reason: 'test' }] });
+    const app = await buildTestApp(database, [echoModule], {
+      publicRoutes: [
+        { method: 'POST', path: '/api/v1/echo', reason: 'test' },
+        { method: 'GET', path: '/api/v1/health', reason: 'test' },
+      ],
+    });
     const badInputResponse = await app.inject({ method: 'POST', url: '/api/v1/echo', payload: { name: 'x' } });
     expect(badInputResponse.statusCode).toBe(400);
     expect(badInputResponse.json().error).toMatchObject({ code: 'VALIDATION_ERROR', details: [{ path: 'name' }] });
-    const brokenJsonResponse = await app.inject({ method: 'POST', url: '/api/v1/echo', headers: { 'content-type': 'application/json' }, payload: '{nope' });
+    const brokenJsonResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/echo',
+      headers: { 'content-type': 'application/json' },
+      payload: '{nope',
+    });
     expect(brokenJsonResponse.statusCode).toBe(400);
     expect(brokenJsonResponse.json().error.code).toBe('BAD_JSON');
     const goodInputResponse = await app.inject({ method: 'POST', url: '/api/v1/echo', payload: { name: 'Priya' } });
@@ -82,7 +100,12 @@ describe('errors', () => {
         });
       },
     });
-    const app = await buildTestApp(database, [boomModule], { publicRoutes: [{ method: 'GET', path: '/api/v1/boom', reason: 'test' }, { method: 'GET', path: '/api/v1/health', reason: 'test' }] });
+    const app = await buildTestApp(database, [boomModule], {
+      publicRoutes: [
+        { method: 'GET', path: '/api/v1/boom', reason: 'test' },
+        { method: 'GET', path: '/api/v1/health', reason: 'test' },
+      ],
+    });
     const response = await app.inject('/api/v1/boom');
     expect(response.statusCode).toBe(500);
     expect(response.body).not.toContain('secret internal detail');
@@ -93,7 +116,8 @@ describe('errors', () => {
   it('limits how often one address can call', async () => {
     const app = await buildTestApp(database, [], { rateLimit: { max: 3, timeWindow: '1 minute' } });
     const statusCodes = [];
-    for (let attemptNumber = 0; attemptNumber < 5; attemptNumber++) statusCodes.push((await app.inject('/api/v1/health')).statusCode);
+    for (let attemptNumber = 0; attemptNumber < 5; attemptNumber++)
+      statusCodes.push((await app.inject('/api/v1/health')).statusCode);
     expect(statusCodes).toEqual([200, 200, 200, 429, 429]);
     expect((await app.inject('/api/v1/health')).json().error.code).toBe('TOO_MANY_REQUESTS');
     await app.close();
@@ -102,13 +126,23 @@ describe('errors', () => {
 
 describe('route rules', () => {
   it('refuses to start when a route does not say who may call it', async () => {
-    const routeWithoutAccessModule = defineModule({ id: 'core.lazy', kind: 'core', routes: (app) => void app.get('/lazy', async () => 'hi') });
+    const routeWithoutAccessModule = defineModule({
+      id: 'core.lazy',
+      kind: 'core',
+      routes: (app) => void app.get('/lazy', async () => 'hi'),
+    });
     await expect(buildTestApp(database, [routeWithoutAccessModule])).rejects.toThrow(/has no config\.access/);
   });
 
   it('refuses to start when a public route is not on the public list', async () => {
-    const unlistedPublicRouteModule = defineModule({ id: 'core.sneaky', kind: 'core', routes: (app) => void app.get('/sneaky', { config: { access: 'public' } }, async () => 'hi') });
-    await expect(buildTestApp(database, [unlistedPublicRouteModule])).rejects.toThrow(/not listed in kernel\/http\/public-routes\.ts/);
+    const unlistedPublicRouteModule = defineModule({
+      id: 'core.sneaky',
+      kind: 'core',
+      routes: (app) => void app.get('/sneaky', { config: { access: 'public' } }, async () => 'hi'),
+    });
+    await expect(buildTestApp(database, [unlistedPublicRouteModule])).rejects.toThrow(
+      /not listed in kernel\/http\/public-routes\.ts/,
+    );
   });
 
   it('answers 401 to staff and manager routes while nobody can sign in', async () => {
@@ -132,7 +166,9 @@ describe('route rules', () => {
       id: 'core.roles',
       kind: 'core',
       routes: (moduleApp) => {
-        moduleApp.get('/for-staff', { config: { access: 'staff' } }, async (request) => ({ role: request.principal?.role }));
+        moduleApp.get('/for-staff', { config: { access: 'staff' } }, async (request) => ({
+          role: request.principal?.role,
+        }));
         moduleApp.get('/for-managers', { config: { access: 'manager' } }, async () => 'ok');
       },
     });
@@ -147,7 +183,7 @@ describe('route rules', () => {
     await managerApp.close();
   });
 
-  it("answers 404 for a module that is off for the business, and works when it is on", async () => {
+  it('answers 404 for a module that is off for the business, and works when it is on', async () => {
     const accountId = newAccountId();
     const leadsModule = defineModule({
       id: 'engine.leads',
@@ -161,7 +197,13 @@ describe('route rules', () => {
     expect(response.json().error.code).toBe('NOT_FOUND');
     await appWithModuleOff.close();
     const registry = createRegistry([...modules, leadsModule]);
-    const appWithModuleOn = await buildTestApp(database, [leadsModule], { authenticate, gate: { isActive: async (checkedAccountId, moduleId) => moduleId === 'engine.leads' || coreOnlyGate(registry).isActive(checkedAccountId, moduleId) } });
+    const appWithModuleOn = await buildTestApp(database, [leadsModule], {
+      authenticate,
+      gate: {
+        isActive: async (checkedAccountId, moduleId) =>
+          moduleId === 'engine.leads' || coreOnlyGate(registry).isActive(checkedAccountId, moduleId),
+      },
+    });
     expect((await appWithModuleOn.inject('/api/v1/leads')).json()).toEqual({ leads: [] });
     await appWithModuleOn.close();
   });
@@ -174,14 +216,30 @@ describe('logs', () => {
       id: 'core.echo2',
       kind: 'core',
       routes: (moduleApp) => {
-        moduleApp.post('/echo2', { config: { access: 'public' }, schema: { body: z.object({ phone: z.string() }) } }, async () => 'ok');
+        moduleApp.post(
+          '/echo2',
+          { config: { access: 'public' }, schema: { body: z.object({ phone: z.string() }) } },
+          async () => 'ok',
+        );
       },
     });
-    const app = await buildTestApp(database, [echoModule], { logger, publicRoutes: [{ method: 'POST', path: '/api/v1/echo2', reason: 'test' }, { method: 'GET', path: '/api/v1/health', reason: 'test' }] });
-    await app.inject({ method: 'POST', url: '/api/v1/echo2?code=482913', headers: { authorization: 'Bearer top-secret-token', cookie: 'session=abc123secret' }, payload: { phone: '+919847012345' } });
+    const app = await buildTestApp(database, [echoModule], {
+      logger,
+      publicRoutes: [
+        { method: 'POST', path: '/api/v1/echo2', reason: 'test' },
+        { method: 'GET', path: '/api/v1/health', reason: 'test' },
+      ],
+    });
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/echo2?code=482913',
+      headers: { authorization: 'Bearer top-secret-token', cookie: 'session=abc123secret' },
+      payload: { phone: '+919847012345' },
+    });
     await app.close();
     const loggedText = text();
     expect(loggedText).toContain('/api/v1/echo2');
-    for (const sensitiveValue of ['482913', 'top-secret-token', 'abc123secret', '9847012345']) expect(loggedText).not.toContain(sensitiveValue);
+    for (const sensitiveValue of ['482913', 'top-secret-token', 'abc123secret', '9847012345'])
+      expect(loggedText).not.toContain(sensitiveValue);
   });
 });

@@ -102,7 +102,8 @@ export function createDatabase(databaseConfig: Config['db'], pool = createPool(d
         `select rolbypassrls, rolsuper from pg_roles where rolname = 'app_user'`,
       );
       if (!appUserRows[0]) throw new Error('The app_user role is missing: run npm run db:migrate.');
-      if (appUserRows[0].rolbypassrls || appUserRows[0].rolsuper) throw new Error('app_user must not bypass Row Level Security.');
+      if (appUserRows[0].rolbypassrls || appUserRows[0].rolsuper)
+        throw new Error('app_user must not bypass Row Level Security.');
     },
     close: async () => {
       await system.destroy(); // also ends the pool

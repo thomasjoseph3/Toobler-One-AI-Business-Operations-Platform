@@ -10,7 +10,12 @@ const MILLISECONDS_PER_DAY = 86_400_000;
 
 /** Asks the npm registry about a package (`npm view <package> <field> --json`) and returns the parsed answer. */
 const askNpmRegistry = (...viewArguments) =>
-  JSON.parse(execFileSync('npm', ['view', ...viewArguments, '--json'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) || 'null');
+  JSON.parse(
+    execFileSync('npm', ['view', ...viewArguments, '--json'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }) || 'null',
+  );
 
 /** True for plain release numbers like 4.2.1, and false for -beta, -rc, -next or -canary builds. */
 const isStableVersion = (version) => /^\d+\.\d+\.\d+$/.test(version);
@@ -36,29 +41,53 @@ async function vetPackage(packageSpec) {
   }
   const eligibleVersions = (Array.isArray(allVersions) ? allVersions : [allVersions])
     .filter(isStableVersion)
-    .filter((version) => !versionRange || version === versionRange || version.startsWith(versionRange + '.') || version.startsWith(versionRange))
+    .filter(
+      (version) =>
+        !versionRange ||
+        version === versionRange ||
+        version.startsWith(versionRange + '.') ||
+        version.startsWith(versionRange),
+    )
     .filter((version) => daysSince(publishTimes[version]) >= MIN_AGE_DAYS);
-  const chosenVersion = eligibleVersions.sort((first, second) => first.localeCompare(second, undefined, { numeric: true })).at(-1);
+  const chosenVersion = eligibleVersions
+    .sort((first, second) => first.localeCompare(second, undefined, { numeric: true }))
+    .at(-1);
   if (!chosenVersion) {
-    return { packageSpec, problems: [`no stable release older than ${MIN_AGE_DAYS} days${versionRange ? ` matches "${versionRange}"` : ''}`] };
+    return {
+      packageSpec,
+      problems: [
+        `no stable release older than ${MIN_AGE_DAYS} days${versionRange ? ` matches "${versionRange}"` : ''}`,
+      ],
+    };
   }
   const versionDetails = askNpmRegistry(`${packageName}@${chosenVersion}`);
   const versionAgeDays = daysSince(publishTimes[chosenVersion]);
   const packageAgeDays = daysSince(publishTimes.created);
   let weeklyDownloads = null;
   try {
-    const downloadsResponse = await fetch(`https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(packageName)}`);
+    const downloadsResponse = await fetch(
+      `https://api.npmjs.org/downloads/point/last-week/${encodeURIComponent(packageName)}`,
+    );
     weeklyDownloads = (await downloadsResponse.json()).downloads ?? null;
   } catch {
     /* offline: reported below */
   }
-  const repositoryUrl = (versionDetails.repository?.url ?? versionDetails.repository ?? '').toString().replace(/^git\+/, '').replace(/\.git$/, '');
-  const maintainerNames = (versionDetails.maintainers ?? []).map((maintainer) => (typeof maintainer === 'string' ? maintainer : maintainer.name));
-  const installScripts = ['preinstall', 'install', 'postinstall'].filter((scriptName) => versionDetails.scripts?.[scriptName]);
+  const repositoryUrl = (versionDetails.repository?.url ?? versionDetails.repository ?? '')
+    .toString()
+    .replace(/^git\+/, '')
+    .replace(/\.git$/, '');
+  const maintainerNames = (versionDetails.maintainers ?? []).map((maintainer) =>
+    typeof maintainer === 'string' ? maintainer : maintainer.name,
+  );
+  const installScripts = ['preinstall', 'install', 'postinstall'].filter(
+    (scriptName) => versionDetails.scripts?.[scriptName],
+  );
   if (versionDetails.deprecated) problems.push(`DEPRECATED: ${versionDetails.deprecated}`);
   if (weeklyDownloads === null) problems.push('could not read download counts');
   else if (weeklyDownloads < MIN_WEEKLY_DOWNLOADS) {
-    problems.push(`only ${weeklyDownloads.toLocaleString()} downloads a week (< ${MIN_WEEKLY_DOWNLOADS.toLocaleString()})`);
+    problems.push(
+      `only ${weeklyDownloads.toLocaleString()} downloads a week (< ${MIN_WEEKLY_DOWNLOADS.toLocaleString()})`,
+    );
   }
   if (!repositoryUrl) problems.push('no repository link');
   if (!maintainerNames.length) problems.push('no maintainers listed');
@@ -95,7 +124,9 @@ for (const packageSpec of packageSpecs) {
     continue;
   }
   const maintainerSummary = `${result.maintainerNames.slice(0, 3).join(', ')}${result.maintainerNames.length > 3 ? '…' : ''}`;
-  const installScriptNote = result.installScripts.length ? `  [install scripts: ${result.installScripts.join(',')}]` : '';
+  const installScriptNote = result.installScripts.length
+    ? `  [install scripts: ${result.installScripts.join(',')}]`
+    : '';
   console.log(
     `${hardProblems.length ? '✗' : '✓'} ${result.packageName}@${result.chosenVersion}  ${result.versionAgeDays}d old  ` +
       `${result.weeklyDownloads?.toLocaleString() ?? '?'}/wk  ${result.license ?? '?'}  by ${maintainerSummary}  ${result.repositoryUrl}${installScriptNote}`,

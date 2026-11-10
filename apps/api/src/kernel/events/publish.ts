@@ -21,6 +21,11 @@ export async function publishEvent(
     throw new Error(`Event "${event.eventName}" has too much data: send ids, not records.`);
   }
   const eventId = uuidv7();
-  await insertOutboxEvent(transaction, { id: eventId, accountId: event.accountId, name: event.eventName, payload: event.payload });
+  await insertOutboxEvent(transaction, {
+    id: eventId,
+    accountId: event.accountId,
+    name: event.eventName,
+    payload: event.payload,
+  });
   return eventId;
 }

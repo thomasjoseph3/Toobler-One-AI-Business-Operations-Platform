@@ -55,7 +55,13 @@ function readRequiredModuleIds(moduleFolder) {
 const moduleBoundariesRule = {
   meta: {
     type: 'problem',
-    schema: [{ type: 'object', properties: { modulesRoot: { type: 'string' }, kernelRoot: { type: 'string' } }, additionalProperties: false }],
+    schema: [
+      {
+        type: 'object',
+        properties: { modulesRoot: { type: 'string' }, kernelRoot: { type: 'string' } },
+        additionalProperties: false,
+      },
+    ],
   },
   create(context) {
     const options = context.options[0] ?? {};
@@ -82,7 +88,9 @@ const moduleBoundariesRule = {
         if (!targetModule) return;
         const isModuleList = path.dirname(importingFile) === modulesRoot;
         if (!(isModuleList && targetModule.innerPath === 'module')) {
-          report(`Only modules/index.ts may import a module's module.ts. Do not reach into ${targetModule.id} from here.`);
+          report(
+            `Only modules/index.ts may import a module's module.ts. Do not reach into ${targetModule.id} from here.`,
+          );
         }
         return;
       }
@@ -90,11 +98,15 @@ const moduleBoundariesRule = {
       if (!targetModule || targetModule.id === importingModule.id) return;
 
       if (importingModule.kind === 'core' && targetModule.kind !== 'core') {
-        report(`Core module ${importingModule.id} cannot import ${targetModule.id}: core never depends on engines, channels or features.`);
+        report(
+          `Core module ${importingModule.id} cannot import ${targetModule.id}: core never depends on engines, channels or features.`,
+        );
         return;
       }
       if (targetModule.innerPath !== '' && targetModule.innerPath !== 'index') {
-        report(`${importingModule.id} imports the inside of ${targetModule.id}. Import its index file only; its other files are private.`);
+        report(
+          `${importingModule.id} imports the inside of ${targetModule.id}. Import its index file only; its other files are private.`,
+        );
         return;
       }
       if (!readRequiredModuleIds(importingModule.folder).includes(targetModule.id)) {
@@ -102,7 +114,12 @@ const moduleBoundariesRule = {
       }
     };
 
-    return { ImportDeclaration: checkImport, ExportNamedDeclaration: checkImport, ExportAllDeclaration: checkImport, ImportExpression: checkImport };
+    return {
+      ImportDeclaration: checkImport,
+      ExportNamedDeclaration: checkImport,
+      ExportAllDeclaration: checkImport,
+      ImportExpression: checkImport,
+    };
   },
 };
 

@@ -13,7 +13,9 @@ const databaseAddress = new URL(databaseConfig.url);
 console.log(`Migrating ${databaseAddress.hostname}${databaseAddress.pathname} ...`);
 const pool = createPool(databaseConfig);
 try {
-  const { applied, skipped } = await migrate(pool, path.resolve(import.meta.dirname, '../db/migrations'), (line) => console.log(' ', line));
+  const { applied, skipped } = await migrate(pool, path.resolve(import.meta.dirname, '../db/migrations'), (line) =>
+    console.log(' ', line),
+  );
   console.log(`Done: ${applied.length} applied, ${skipped.length} already up to date.`);
 } finally {
   await pool.end();

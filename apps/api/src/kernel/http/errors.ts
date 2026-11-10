@@ -29,12 +29,19 @@ const fieldLabelFromPath = (fieldPath: string) => {
 /** Installs the handlers that turn every failure into the standard error response (unknown route, bad input, our own bugs). */
 export function registerErrorHandling(app: FastifyInstance) {
   app.setNotFoundHandler((request, reply) =>
-    sendErrorResponse(reply, 404, { code: 'NOT_FOUND', message: `No route for ${request.method} ${request.url.split('?')[0]}` }),
+    sendErrorResponse(reply, 404, {
+      code: 'NOT_FOUND',
+      message: `No route for ${request.method} ${request.url.split('?')[0]}`,
+    }),
   );
 
   app.setErrorHandler((error: FastifyError | ApiError, request: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof ApiError) {
-      return sendErrorResponse(reply, error.status, { code: error.code, message: error.message, details: error.details });
+      return sendErrorResponse(reply, error.status, {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
     }
 
     if (hasZodFastifySchemaValidationErrors(error)) {
@@ -57,7 +64,10 @@ export function registerErrorHandling(app: FastifyInstance) {
       fastifyErrorCode === 'FST_ERR_CTP_EMPTY_JSON_BODY' ||
       fastifyErrorCode === 'FST_ERR_CTP_INVALID_MEDIA_TYPE'
     ) {
-      return sendErrorResponse(reply, 400, { code: 'BAD_JSON', message: "The request couldn't be read (it isn't valid JSON)." });
+      return sendErrorResponse(reply, 400, {
+        code: 'BAD_JSON',
+        message: "The request couldn't be read (it isn't valid JSON).",
+      });
     }
     if (fastifyErrorCode === 'FST_ERR_CTP_BODY_TOO_LARGE') {
       return sendErrorResponse(reply, 413, { code: 'TOO_LARGE', message: 'That is too large to send.' });
@@ -71,15 +81,22 @@ export function registerErrorHandling(app: FastifyInstance) {
 
     // Postgres errors carry their own five-character code in the same `code` field.
     const postgresErrorCode = (error as { code?: string }).code;
-    if (postgresErrorCode === '23505') return sendErrorResponse(reply, 409, { code: 'DUPLICATE', message: 'That already exists.' });
+    if (postgresErrorCode === '23505')
+      return sendErrorResponse(reply, 409, { code: 'DUPLICATE', message: 'That already exists.' });
     if (postgresErrorCode && POSTGRES_ERROR_MESSAGES[postgresErrorCode]) {
-      return sendErrorResponse(reply, 400, { code: 'BAD_REQUEST', message: POSTGRES_ERROR_MESSAGES[postgresErrorCode] });
+      return sendErrorResponse(reply, 400, {
+        code: 'BAD_REQUEST',
+        message: POSTGRES_ERROR_MESSAGES[postgresErrorCode],
+      });
     }
 
     if (!isResponseSerializationError(error)) {
       const httpStatus = (error as FastifyError).statusCode;
       if (httpStatus && httpStatus >= 400 && httpStatus < 500) {
-        return sendErrorResponse(reply, httpStatus, { code: 'BAD_REQUEST', message: 'The request could not be processed.' });
+        return sendErrorResponse(reply, httpStatus, {
+          code: 'BAD_REQUEST',
+          message: 'The request could not be processed.',
+        });
       }
     }
     // Anything else is our bug: log it with the request id, tell the person only that id.

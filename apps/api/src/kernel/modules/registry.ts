@@ -21,7 +21,9 @@ function checkEventAndJobNames(manifests: Iterable<ModuleManifest>): void {
   for (const manifest of manifests) {
     for (const eventName of Object.keys(manifest.events ?? {})) {
       if (!EVENT_NAME_PATTERN.test(eventName)) {
-        throw new RegistryError(`Module "${manifest.id}" listens for "${eventName}", which must look like "lead.stage_changed".`);
+        throw new RegistryError(
+          `Module "${manifest.id}" listens for "${eventName}", which must look like "lead.stage_changed".`,
+        );
       }
     }
     const moduleName = manifest.id.split('.')[1];
@@ -29,9 +31,11 @@ function checkEventAndJobNames(manifests: Iterable<ModuleManifest>): void {
       if (!JOB_NAME_PATTERN.test(job.name) || !job.name.startsWith(`${moduleName}.`)) {
         throw new RegistryError(`Job "${job.name}" of module "${manifest.id}" must be named "${moduleName}.<what>".`);
       }
-      if (RESERVED_JOB_NAMES.has(job.name)) throw new RegistryError(`Job name "${job.name}" is reserved for the kernel.`);
+      if (RESERVED_JOB_NAMES.has(job.name))
+        throw new RegistryError(`Job name "${job.name}" is reserved for the kernel.`);
       const otherModuleId = moduleIdByJobName.get(job.name);
-      if (otherModuleId) throw new RegistryError(`Job "${job.name}" is declared by both "${otherModuleId}" and "${manifest.id}".`);
+      if (otherModuleId)
+        throw new RegistryError(`Job "${job.name}" is declared by both "${otherModuleId}" and "${manifest.id}".`);
       moduleIdByJobName.set(job.name, manifest.id);
     }
   }
@@ -43,10 +47,14 @@ export function createRegistry(moduleManifests: readonly ModuleManifest[]): Regi
   for (const manifest of moduleManifests) {
     const kindFromId = manifest.id.split('.')[0];
     if (!MODULE_ID_PATTERN.test(manifest.id)) {
-      throw new RegistryError(`Module id "${manifest.id}" must look like <kind>.<name> (core, engine, channel or feature).`);
+      throw new RegistryError(
+        `Module id "${manifest.id}" must look like <kind>.<name> (core, engine, channel or feature).`,
+      );
     }
     if (kindFromId !== manifest.kind) {
-      throw new RegistryError(`Module "${manifest.id}" says it is a ${manifest.kind}, but its id starts with "${kindFromId}".`);
+      throw new RegistryError(
+        `Module "${manifest.id}" says it is a ${manifest.kind}, but its id starts with "${kindFromId}".`,
+      );
     }
     if (manifestsById.has(manifest.id)) throw new RegistryError(`Module "${manifest.id}" is registered twice.`);
     manifestsById.set(manifest.id, manifest);

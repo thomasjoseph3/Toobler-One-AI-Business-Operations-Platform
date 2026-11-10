@@ -80,7 +80,10 @@ export function createEventDispatcher(dependencies: {
       } catch (error) {
         failedModuleIds.push(moduleManifest.id);
         firstErrorMessage ||= `${moduleManifest.id}: ${error instanceof Error ? error.message : String(error)}`;
-        logger.error({ err: error, eventId: event.id, eventName: event.name, moduleId: moduleManifest.id }, 'event handler failed');
+        logger.error(
+          { err: error, eventId: event.id, eventName: event.name, moduleId: moduleManifest.id },
+          'event handler failed',
+        );
       }
     }
 
@@ -95,7 +98,10 @@ export function createEventDispatcher(dependencies: {
       giveUp,
     });
     if (giveUp) {
-      logger.error({ eventId: event.id, eventName: event.name, attempts: claimedEvent.attempts }, 'event delivery gave up');
+      logger.error(
+        { eventId: event.id, eventName: event.name, attempts: claimedEvent.attempts },
+        'event delivery gave up',
+      );
     }
   };
 

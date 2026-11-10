@@ -35,7 +35,8 @@ function runSetup() {
   announce('Checking Node');
   const wantedMajor = readWantedNodeMajor(fs.readFileSync(path.join(repositoryRoot, '.nvmrc'), 'utf8'));
   const currentMajor = Number.parseInt(process.versions.node.split('.')[0], 10);
-  if (currentMajor !== wantedMajor) stopWith(`this project uses Node ${wantedMajor} but you are on ${process.versions.node}. Run: nvm use`);
+  if (currentMajor !== wantedMajor)
+    stopWith(`this project uses Node ${wantedMajor} but you are on ${process.versions.node}. Run: nvm use`);
   console.log(`Node ${process.versions.node} is right.`);
 
   announce('Checking .env');
@@ -61,7 +62,9 @@ function runSetup() {
 
   console.log('\nAll set. Next:');
   console.log('  npm test                run the tests');
-  console.log('  npm run db:migrate      apply the migrations to your development database (DATABASE_URL), when you want to');
+  console.log(
+    '  npm run db:migrate      apply the migrations to your development database (DATABASE_URL), when you want to',
+  );
   console.log('  npm run dev             start the app');
 }
 

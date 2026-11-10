@@ -23,7 +23,9 @@ const probeModule = defineModule({
       run: async (job) => {
         probeRuns.push(job);
         // Prove the job works inside the business's fence: write an activity line through its context.
-        await job.accountContext?.runInAccountTransaction((transaction) => job.accountContext!.audit(transaction, 'probe.ran'));
+        await job.accountContext?.runInAccountTransaction((transaction) =>
+          job.accountContext!.audit(transaction, 'probe.ran'),
+        );
       },
     },
   ],
@@ -54,7 +56,7 @@ afterAll(async () => {
 const ranForData = (data: JobData) => probeRuns.find((run) => run.data['marker'] === data['marker']);
 
 describe('job runner', () => {
-  it('runs a queued job with a context fenced to the job\'s business', async () => {
+  it("runs a queued job with a context fenced to the job's business", async () => {
     const accountId = newAccountId();
     const data = { accountId, marker: `run-${accountId}` };
     await runner.enqueueJob('probe.record', data);
@@ -64,7 +66,11 @@ describe('job runner', () => {
     expect(ranForData(data)?.accountContext?.actor).toEqual({ kind: 'system', id: 'probe.record' });
     // The activity line the job wrote belongs to that business only.
     await waitFor(async () => {
-      const lines = await database.system.selectFrom('activity_log').selectAll().where('account_id', '=', accountId).execute();
+      const lines = await database.system
+        .selectFrom('activity_log')
+        .selectAll()
+        .where('account_id', '=', accountId)
+        .execute();
       return lines.length === 1;
     });
   });

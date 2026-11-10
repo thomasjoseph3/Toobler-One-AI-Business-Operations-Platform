@@ -26,7 +26,9 @@ const everythingOn: ModuleGate = { isActive: async () => true };
 
 /** Saves one event for a business the way a real service would: inside that business's fenced transaction. */
 const publishFor = (accountId: string, eventName: string, payload: Record<string, unknown> = {}) =>
-  database.runInAccountTransaction(accountId, (transaction) => publishEvent(transaction, { accountId, eventName, payload }));
+  database.runInAccountTransaction(accountId, (transaction) =>
+    publishEvent(transaction, { accountId, eventName, payload }),
+  );
 
 /** A dispatcher over test modules; waits and limits are set so tests never sleep. */
 function dispatcherFor(
@@ -93,7 +95,12 @@ describe('delivering events', () => {
     expect(await dispatcher.dispatchPendingEventsOnce()).toBe(0); // already delivered
 
     expect(received).toHaveLength(1);
-    expect(received[0]?.event).toMatchObject({ id: eventId, accountId, name: 'lead.created', payload: { leadId: 'abc' } });
+    expect(received[0]?.event).toMatchObject({
+      id: eventId,
+      accountId,
+      name: 'lead.created',
+      payload: { leadId: 'abc' },
+    });
     expect(received[0]?.accountContext.accountId).toBe(accountId);
     expect(received[0]?.accountContext.actor).toEqual({ kind: 'system', id: 'feature.audience' });
     expect((await readEventRow(eventId)).dispatched_at).not.toBeNull();
@@ -103,8 +110,9 @@ describe('delivering events', () => {
     const businessA = newAccountId();
     const businessB = newAccountId();
     // Business B has an activity log line; the subscriber, working for A, must not be able to read it.
-    await createContextFactory(database)(businessB, { kind: 'system', id: 'test' }).runInAccountTransaction((transaction) =>
-      createContextFactory(database)(businessB, { kind: 'system', id: 'test' }).audit(transaction, 'secret.of.b'),
+    await createContextFactory(database)(businessB, { kind: 'system', id: 'test' }).runInAccountTransaction(
+      (transaction) =>
+        createContextFactory(database)(businessB, { kind: 'system', id: 'test' }).audit(transaction, 'secret.of.b'),
     );
     let linesSeenBySubscriber = -1;
     const subscriber = defineModule({
@@ -113,7 +121,9 @@ describe('delivering events', () => {
       events: {
         'lead.created': async (_event, accountContext) => {
           linesSeenBySubscriber = (
-            await accountContext.runInAccountTransaction((transaction) => transaction.selectFrom('activity_log').selectAll().execute())
+            await accountContext.runInAccountTransaction((transaction) =>
+              transaction.selectFrom('activity_log').selectAll().execute(),
+            )
           ).length;
         },
       },
@@ -132,7 +142,9 @@ describe('delivering events', () => {
       events: { 'lead.created': async () => void (wasCalled = true) },
     });
     const eventId = await publishFor(accountId, 'lead.created');
-    const gateWithAudienceOff: ModuleGate = { isActive: async (_accountId, moduleId) => moduleId !== 'feature.audience' };
+    const gateWithAudienceOff: ModuleGate = {
+      isActive: async (_accountId, moduleId) => moduleId !== 'feature.audience',
+    };
 
     await dispatcherFor([subscriber], gateWithAudienceOff).dispatchPendingEventsOnce();
 
@@ -153,7 +165,11 @@ describe('delivering events', () => {
         },
       },
     });
-    const sibling = defineModule({ id: 'feature.sibling', kind: 'feature', events: { 'lead.created': async () => void siblingRuns++ } });
+    const sibling = defineModule({
+      id: 'feature.sibling',
+      kind: 'feature',
+      events: { 'lead.created': async () => void siblingRuns++ },
+    });
     const eventId = await publishFor(accountId, 'lead.created');
     const dispatcher = dispatcherFor([flaky, sibling]);
 
@@ -172,7 +188,11 @@ describe('delivering events', () => {
     const alwaysFails = defineModule({
       id: 'feature.broken',
       kind: 'feature',
-      events: { 'lead.created': async () => { throw new Error('still broken'); } },
+      events: {
+        'lead.created': async () => {
+          throw new Error('still broken');
+        },
+      },
     });
     const eventId = await publishFor(accountId, 'lead.created');
 
@@ -182,7 +202,11 @@ describe('delivering events', () => {
     expect(await patient.dispatchPendingEventsOnce()).toBe(0);
 
     // No wait: attempts 2 and 3 happen straight away, then the event is parked as failed and left alone.
-    await database.system.updateTable('domain_events').set({ next_attempt_at: new Date() }).where('id', '=', eventId).execute();
+    await database.system
+      .updateTable('domain_events')
+      .set({ next_attempt_at: new Date() })
+      .where('id', '=', eventId)
+      .execute();
     const impatient = dispatcherFor([alwaysFails], everythingOn, { maxAttempts: 3 });
     expect(await impatient.dispatchPendingEventsOnce()).toBe(1);
     expect(await impatient.dispatchPendingEventsOnce()).toBe(1);
@@ -197,7 +221,11 @@ describe('delivering events', () => {
     const leaky = defineModule({
       id: 'feature.leaky',
       kind: 'feature',
-      events: { 'lead.created': async () => { throw new Error('x'.repeat(1_000)); } },
+      events: {
+        'lead.created': async () => {
+          throw new Error('x'.repeat(1_000));
+        },
+      },
     });
     const eventId = await publishFor(accountId, 'lead.created');
     await dispatcherFor([leaky]).dispatchPendingEventsOnce();
@@ -208,7 +236,10 @@ describe('delivering events', () => {
     await publishFor(newAccountId(), 'lead.created');
     expect(await claimDueEvents(database.system, 10, 60)).toHaveLength(1);
     expect(await claimDueEvents(database.system, 10, 60)).toHaveLength(0); // still leased to the first claimer
-    await database.system.updateTable('domain_events').set({ locked_until: new Date(Date.now() - 1000) }).execute(); // lease ran out
+    await database.system
+      .updateTable('domain_events')
+      .set({ locked_until: new Date(Date.now() - 1000) })
+      .execute(); // lease ran out
     const takenOver = await claimDueEvents(database.system, 10, 60);
     expect(takenOver).toHaveLength(1);
     expect(takenOver[0]?.attempts).toBe(2);
@@ -223,7 +254,10 @@ describe('the background loop', () => {
       kind: 'feature',
       events: { 'lead.created': async (event) => void delivered.push(event.id) },
     });
-    const dispatcher = dispatcherFor([subscriber], everythingOn, { pollIntervalMilliseconds: 20, staleAfterMilliseconds: 5_000 });
+    const dispatcher = dispatcherFor([subscriber], everythingOn, {
+      pollIntervalMilliseconds: 20,
+      staleAfterMilliseconds: 5_000,
+    });
     await expect(dispatcher.healthCheck.check()).rejects.toThrow('not running');
 
     dispatcher.start();
@@ -238,7 +272,10 @@ describe('the background loop', () => {
   });
 
   it('reports a problem when it has stopped checking', async () => {
-    const dispatcher = dispatcherFor([], everythingOn, { pollIntervalMilliseconds: 60_000, staleAfterMilliseconds: 10 });
+    const dispatcher = dispatcherFor([], everythingOn, {
+      pollIntervalMilliseconds: 60_000,
+      staleAfterMilliseconds: 10,
+    });
     dispatcher.start();
     try {
       await new Promise((resolve) => setTimeout(resolve, 50));

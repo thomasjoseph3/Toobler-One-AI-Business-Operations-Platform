@@ -9,7 +9,8 @@ import moduleBoundaries from './tools/eslint/module-boundaries.js';
 const DATABASE_ONLY_IN_REPOSITORIES = {
   group: ['**/kernel/db', '**/kernel/db/index', '**/kernel/db/migrate'],
   allowTypeImports: true,
-  message: 'Only repository.ts talks to the database. Call the repository from the service (importing the Db type is fine).',
+  message:
+    'Only repository.ts talks to the database. Call the repository from the service (importing the Db type is fine).',
 };
 const QUERY_BUILDER_ONLY_IN_REPOSITORIES = {
   group: ['kysely'],
@@ -22,10 +23,36 @@ const ROUTES_CALL_SERVICES = {
 };
 
 // Names that hide what a thing is. `err` is not listed because the logging library requires that exact key in log lines (`{ err: error }`).
-const UNCLEAR_NAMES = ['ctx', 'tx', 'trx', 'e', 'acc', 'cb', 'cfg', 'opts', 'msg', 'req', 'res', 'idx', 'val', 'tmp', 'arr', 'obj'];
+const UNCLEAR_NAMES = [
+  'ctx',
+  'tx',
+  'trx',
+  'e',
+  'acc',
+  'cb',
+  'cfg',
+  'opts',
+  'msg',
+  'req',
+  'res',
+  'idx',
+  'val',
+  'tmp',
+  'arr',
+  'obj',
+];
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', '**/dist/**', '**/coverage/**', '**/playwright-report/**', '**/test-results/**', 'tools/eslint/fixtures/**'] },
+  {
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
+      'tools/eslint/fixtures/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -34,7 +61,10 @@ export default tseslint.config(
       eqeqeq: ['error', 'always', { null: 'ignore' }],
       'prefer-const': 'error',
       'no-var': 'error',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+      ],
       // A local name that hides an import or an outer one: how a renamed service ended up undefined inside a function
       '@typescript-eslint/no-shadow': ['error', { hoist: 'all' }],
       // Readable names (CLAUDE.md "Readability rules"): no one-letter names and none of the usual abbreviations.
@@ -46,7 +76,12 @@ export default tseslint.config(
   {
     files: ['apps/api/src/modules/**/*.ts'],
     ignores: ['apps/api/src/modules/**/repository.ts'],
-    rules: { '@typescript-eslint/no-restricted-imports': ['error', { patterns: [DATABASE_ONLY_IN_REPOSITORIES, QUERY_BUILDER_ONLY_IN_REPOSITORIES] }] },
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [DATABASE_ONLY_IN_REPOSITORIES, QUERY_BUILDER_ONLY_IN_REPOSITORIES] },
+      ],
+    },
   },
   {
     files: ['apps/api/src/modules/**/routes.ts'],

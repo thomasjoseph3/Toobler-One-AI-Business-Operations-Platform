@@ -25,4 +25,5 @@ export interface ModuleManifest {
  * Declares a module. Returns the manifest exactly as given, but checked against ModuleManifest, so a mistake in a
  * manifest is a compile error. The kernel reads manifests; nothing else is registered by hand.
  */
-export const defineModule = <SpecificManifest extends ModuleManifest>(manifest: SpecificManifest): SpecificManifest => manifest;
+export const defineModule = <SpecificManifest extends ModuleManifest>(manifest: SpecificManifest): SpecificManifest =>
+  manifest;

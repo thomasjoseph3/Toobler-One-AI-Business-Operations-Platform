@@ -32,21 +32,33 @@ describe('module boundary rule', () => {
   /** Lints one import line as if it were written in `filePath` (relative to the fake modules folder) and returns the messages. */
   const lintImport = (filePath: string, importLine: string) => {
     const linter = new Linter({ configType: 'flat', cwd: workFolder });
-    const results = linter.verify(importLine, [
-      {
-        files: ['**/*.ts'],
-        plugins: { toobler: moduleBoundaries },
-        rules: { 'toobler/module-boundaries': ['error', { modulesRoot, kernelRoot }] },
-      },
-    ], { filename: path.join(modulesRoot, filePath) });
+    const results = linter.verify(
+      importLine,
+      [
+        {
+          files: ['**/*.ts'],
+          plugins: { toobler: moduleBoundaries },
+          rules: { 'toobler/module-boundaries': ['error', { modulesRoot, kernelRoot }] },
+        },
+      ],
+      { filename: path.join(modulesRoot, filePath) },
+    );
     return results.map((message) => message.message);
   };
   const lintKernelImport = (importLine: string) => {
     const linter = new Linter({ configType: 'flat', cwd: workFolder });
     return linter
-      .verify(importLine, [
-        { files: ['**/*.ts'], plugins: { toobler: moduleBoundaries }, rules: { 'toobler/module-boundaries': ['error', { modulesRoot, kernelRoot }] } },
-      ], { filename: path.join(kernelRoot, 'something.ts') })
+      .verify(
+        importLine,
+        [
+          {
+            files: ['**/*.ts'],
+            plugins: { toobler: moduleBoundaries },
+            rules: { 'toobler/module-boundaries': ['error', { modulesRoot, kernelRoot }] },
+          },
+        ],
+        { filename: path.join(kernelRoot, 'something.ts') },
+      )
       .map((message) => message.message);
   };
 
@@ -79,7 +91,9 @@ describe('module boundary rule', () => {
   });
 
   it('never lets the kernel import a module', () => {
-    expect(lintKernelImport("import { modules } from '../modules';")).toEqual([expect.stringContaining('The kernel never imports a module')]);
+    expect(lintKernelImport("import { modules } from '../modules';")).toEqual([
+      expect.stringContaining('The kernel never imports a module'),
+    ]);
   });
 
   it('only lets the module list import each module manifest', () => {
@@ -95,7 +109,9 @@ describe('module boundary rule', () => {
   it('ignores packages and also checks dynamic imports and re-exports', () => {
     expect(lintImport('engines/leads/service.ts', "import { z } from 'zod';")).toEqual([]);
     expect(lintImport('engines/leads/service.ts', "export * from '../../core/contacts/repository';")).toHaveLength(1);
-    expect(lintImport('engines/leads/service.ts', "const later = import('../../core/contacts/repository');")).toHaveLength(1);
+    expect(
+      lintImport('engines/leads/service.ts', "const later = import('../../core/contacts/repository');"),
+    ).toHaveLength(1);
   });
 });
 
@@ -108,15 +124,21 @@ describe('project lint configuration', () => {
   };
 
   it('stops routes from importing a repository', async () => {
-    const problems = await problemsIn('apps/api/src/modules/core/contacts/routes.ts', "import { insertContact } from './repository';\nexport const use = insertContact;\n");
+    const problems = await problemsIn(
+      'apps/api/src/modules/core/contacts/routes.ts',
+      "import { insertContact } from './repository';\nexport const use = insertContact;\n",
+    );
     expect(problems).toEqual([expect.stringContaining('Routes call the service')]);
   });
 
   it('stops anything but a repository from using the database layer or the query builder', async () => {
     const serviceFile = 'apps/api/src/modules/core/contacts/service.ts';
-    expect(await problemsIn(serviceFile, "import { createPool } from '../../../kernel/db';\nexport const use = createPool;\n")).toEqual([
-      expect.stringContaining('Only repository.ts talks to the database'),
-    ]);
+    expect(
+      await problemsIn(
+        serviceFile,
+        "import { createPool } from '../../../kernel/db';\nexport const use = createPool;\n",
+      ),
+    ).toEqual([expect.stringContaining('Only repository.ts talks to the database')]);
     expect(await problemsIn(serviceFile, "import { sql } from 'kysely';\nexport const use = sql;\n")).toEqual([
       expect.stringContaining('Queries are written in repository.ts only'),
     ]);
@@ -124,33 +146,50 @@ describe('project lint configuration', () => {
 
   it('allows type-only imports of the database types, and lets a repository use the database layer', async () => {
     expect(
-      await problemsIn('apps/api/src/modules/core/contacts/service.ts', "import type { Db } from '../../../kernel/db';\nexport type Use = Db;\n"),
+      await problemsIn(
+        'apps/api/src/modules/core/contacts/service.ts',
+        "import type { Db } from '../../../kernel/db';\nexport type Use = Db;\n",
+      ),
     ).toEqual([]);
     expect(
-      await problemsIn('apps/api/src/modules/core/contacts/repository.ts', "import { sql } from 'kysely';\nimport { createPool } from '../../../kernel/db';\nexport const use = [sql, createPool];\n"),
+      await problemsIn(
+        'apps/api/src/modules/core/contacts/repository.ts',
+        "import { sql } from 'kysely';\nimport { createPool } from '../../../kernel/db';\nexport const use = [sql, createPool];\n",
+      ),
     ).toEqual([]);
   });
 
   it('allows process.env only in kernel/config.ts', async () => {
     const code = 'export const port = process.env.PORT;\n';
     expect(await problemsIn('apps/api/src/kernel/config.ts', code)).toEqual([]);
-    expect(await problemsIn('apps/api/src/kernel/other.ts', code)).toEqual([expect.stringContaining('Read settings through loadConfig()')]);
+    expect(await problemsIn('apps/api/src/kernel/other.ts', code)).toEqual([
+      expect.stringContaining('Read settings through loadConfig()'),
+    ]);
   });
 
   it('requires readable names', async () => {
-    expect(await problemsIn('apps/api/src/kernel/names.ts', 'export const ctx = 1;\n')).toEqual([expect.stringContaining('id-denylist')]);
-    expect(await problemsIn('apps/api/src/kernel/names.ts', 'export const x = 1;\n')).toEqual([expect.stringContaining('id-length')]);
+    expect(await problemsIn('apps/api/src/kernel/names.ts', 'export const ctx = 1;\n')).toEqual([
+      expect.stringContaining('id-denylist'),
+    ]);
+    expect(await problemsIn('apps/api/src/kernel/names.ts', 'export const x = 1;\n')).toEqual([
+      expect.stringContaining('id-length'),
+    ]);
     expect(await problemsIn('apps/api/src/kernel/names.ts', 'export const accountContext = 1;\n')).toEqual([]);
   });
 
   it('reports a variable that hides another one', async () => {
-    const problems = await problemsIn('apps/api/src/kernel/shadow.ts', 'const account = 1;\nexport const read = () => { const account = 2; return account; };\nexport const first = account;\n');
+    const problems = await problemsIn(
+      'apps/api/src/kernel/shadow.ts',
+      'const account = 1;\nexport const read = () => { const account = 2; return account; };\nexport const first = account;\n',
+    );
     expect(problems).toEqual([expect.stringContaining('no-shadow')]);
   });
 
   it('is clean for the real source of the API', async () => {
     const results = await eslint.lintFiles([`${apiSource}/**/*.ts`]);
-    const problems = results.flatMap((result) => result.messages.map((message) => `${path.relative(repositoryRoot, result.filePath)}: ${message.message}`));
+    const problems = results.flatMap((result) =>
+      result.messages.map((message) => `${path.relative(repositoryRoot, result.filePath)}: ${message.message}`),
+    );
     expect(problems).toEqual([]);
   });
 });

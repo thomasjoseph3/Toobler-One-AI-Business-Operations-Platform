@@ -16,7 +16,13 @@ export function readFeatureRows(statusMarkdown) {
     // A table line starts and ends with "|", so the first and last cells are empty.
     if (cells.length < 7 || !/^F\d{2}$/.test(cells[1])) continue;
     const briefLink = cells[4].match(/\]\(([^)]+)\)/);
-    rows.push({ id: cells[1], name: cells[2], status: cells[3], briefPath: briefLink ? briefLink[1] : '', approvedOn: cells[5] });
+    rows.push({
+      id: cells[1],
+      name: cells[2],
+      status: cells[3],
+      briefPath: briefLink ? briefLink[1] : '',
+      approvedOn: cells[5],
+    });
   }
   return rows;
 }
@@ -39,22 +45,31 @@ export function checkFeatureRows(rows, briefExists) {
     if (row.status === 'approved' && !/^\d{4}-\d{2}-\d{2}$/.test(row.approvedOn)) {
       problems.push(`${row.id} is approved but has no "Approved on" date (YYYY-MM-DD).`);
     }
-    if ((row.status === 'in_progress' || row.status === 'in_review') && !(row.briefPath && briefExists(row.briefPath))) {
+    if (
+      (row.status === 'in_progress' || row.status === 'in_review') &&
+      !(row.briefPath && briefExists(row.briefPath))
+    ) {
       problems.push(`${row.id} is ${row.status} but its brief is missing. Write the brief before building.`);
     }
   }
 
   const featuresInFlight = rows.filter((row) => row.status === 'in_progress' || row.status === 'in_review');
   if (featuresInFlight.length > 1) {
-    problems.push(`Only one feature may be in progress or in review, but there are ${featuresInFlight.length}: ${featuresInFlight.map((row) => row.id).join(', ')}.`);
+    problems.push(
+      `Only one feature may be in progress or in review, but there are ${featuresInFlight.length}: ${featuresInFlight.map((row) => row.id).join(', ')}.`,
+    );
   }
 
   // A feature may only have started if every feature above it is approved or deferred by the owner.
   rows.forEach((row, position) => {
     if (row.status === 'planned' || row.status === 'deferred') return;
-    const unfinishedEarlier = rows.slice(0, position).filter((earlier) => earlier.status !== 'approved' && earlier.status !== 'deferred');
+    const unfinishedEarlier = rows
+      .slice(0, position)
+      .filter((earlier) => earlier.status !== 'approved' && earlier.status !== 'deferred');
     if (unfinishedEarlier.length > 0) {
-      problems.push(`${row.id} is ${row.status} but ${unfinishedEarlier.map((earlier) => earlier.id).join(', ')} above it is not approved or deferred yet.`);
+      problems.push(
+        `${row.id} is ${row.status} but ${unfinishedEarlier.map((earlier) => earlier.id).join(', ')} above it is not approved or deferred yet.`,
+      );
     }
   });
   return problems;

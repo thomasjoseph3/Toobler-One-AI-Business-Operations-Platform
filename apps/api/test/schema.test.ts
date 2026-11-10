@@ -22,7 +22,10 @@ describe('schema rules', () => {
         and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'account_id' and not a.attisdropped)`);
     expect(rows.length).toBeGreaterThan(0);
     for (const tableRow of rows) {
-      expect(tableRow, `${tableRow.table} must have RLS enabled, forced and a policy`).toMatchObject({ rls: true, forced: true });
+      expect(tableRow, `${tableRow.table} must have RLS enabled, forced and a policy`).toMatchObject({
+        rls: true,
+        forced: true,
+      });
       expect(tableRow.policies, `${tableRow.table} needs a tenant policy`).toBeGreaterThan(0);
     }
   });
@@ -32,7 +35,9 @@ describe('schema rules', () => {
       select c.relname as "table" from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'app' and c.relkind = 'r'
         and not exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'account_id' and not a.attisdropped)`);
-    const unexpectedTables = rows.map((tableRow) => tableRow.table).filter((tableName) => !GLOBAL_TABLES.has(tableName));
+    const unexpectedTables = rows
+      .map((tableRow) => tableRow.table)
+      .filter((tableName) => !GLOBAL_TABLES.has(tableName));
     expect(unexpectedTables, 'add the table to GLOBAL_TABLES with a reason, or give it an account_id').toEqual([]);
   });
 
@@ -40,11 +45,18 @@ describe('schema rules', () => {
     const { rows } = await database.pool.query<{ priv: string; ok: boolean }>(`
       select privilege as priv, has_table_privilege('app_user', 'app.activity_log', privilege) as ok
       from unnest(array['SELECT','INSERT','UPDATE','DELETE']) as privilege`);
-    expect(Object.fromEntries(rows.map((privilegeRow) => [privilegeRow.priv, privilegeRow.ok]))).toEqual({ SELECT: true, INSERT: true, UPDATE: false, DELETE: false });
+    expect(Object.fromEntries(rows.map((privilegeRow) => [privilegeRow.priv, privilegeRow.ok]))).toEqual({
+      SELECT: true,
+      INSERT: true,
+      UPDATE: false,
+      DELETE: false,
+    });
   });
 
   it('records each migration once, with a checksum', async () => {
-    const { rows } = await database.pool.query<{ name: string; checksum: string }>('select name, checksum from app.schema_migrations order by name');
+    const { rows } = await database.pool.query<{ name: string; checksum: string }>(
+      'select name, checksum from app.schema_migrations order by name',
+    );
     expect(rows[0]?.name).toBe('001_kernel.sql');
     expect(rows[0]?.checksum).toMatch(/^[0-9a-f]{64}$/);
   });

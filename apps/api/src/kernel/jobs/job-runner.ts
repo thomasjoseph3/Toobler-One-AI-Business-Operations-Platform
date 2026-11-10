@@ -74,7 +74,8 @@ export function createJobRunner(dependencies: {
 
   const enqueueJob = async (jobName: string, data: JobData): Promise<void> => {
     if (!declaredJobsByName.has(jobName)) throw new Error(`Job "${jobName}" is not declared by any module.`);
-    if (data.accountId !== undefined && !isUuid(data.accountId)) throw new Error(`Job "${jobName}" needs a valid accountId.`);
+    if (data.accountId !== undefined && !isUuid(data.accountId))
+      throw new Error(`Job "${jobName}" needs a valid accountId.`);
     await boss.send(jobName, data);
   };
 
@@ -98,7 +99,11 @@ export function createJobRunner(dependencies: {
   };
 
   // Creates the queue, starts a worker for it, and sets the cron schedule when the job has one.
-  const startQueue = async (jobName: string, handler: (data: JobData) => Promise<void>, schedule?: string): Promise<void> => {
+  const startQueue = async (
+    jobName: string,
+    handler: (data: JobData) => Promise<void>,
+    schedule?: string,
+  ): Promise<void> => {
     await boss.createQueue(jobName, { retryLimit: 5, retryDelay: 30, retryBackoff: true });
     await boss.work(jobName, { pollingIntervalSeconds: options.pollIntervalSeconds }, async (jobs) => {
       for (const job of jobs) {
@@ -119,9 +124,13 @@ export function createJobRunner(dependencies: {
       for (const [jobName, declared] of declaredJobsByName) {
         await startQueue(jobName, (data) => runDeclaredJob(jobName, data), declared.definition.schedule);
       }
-      await startQueue(HEARTBEAT_JOB_NAME, async () => {
-        lastHeartbeatAt = Date.now();
-      }, '* * * * *');
+      await startQueue(
+        HEARTBEAT_JOB_NAME,
+        async () => {
+          lastHeartbeatAt = Date.now();
+        },
+        '* * * * *',
+      );
       lastHeartbeatAt = Date.now(); // the first scheduled beat comes within a minute; count starting as a beat
       isStarted = true;
     },
@@ -134,7 +143,8 @@ export function createJobRunner(dependencies: {
       name: 'job runner',
       async check() {
         if (!isStarted) throw new Error('not running');
-        if (Date.now() - lastHeartbeatAt > options.heartbeatStaleAfterMilliseconds) throw new Error('jobs are not being picked up');
+        if (Date.now() - lastHeartbeatAt > options.heartbeatStaleAfterMilliseconds)
+          throw new Error('jobs are not being picked up');
       },
     },
   };
