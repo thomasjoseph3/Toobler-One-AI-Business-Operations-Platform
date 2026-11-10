@@ -1,21 +1,24 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { forbidden, notFound, unauthorized } from '../errors';
+import { ApiError, forbidden, notFound, unauthorized } from '../errors';
+import type { RequestContext } from '../context';
 import type { ModuleGate } from '../modules/registry';
 import type { PublicRoute } from './public-routes';
 
 export type Access = 'public' | 'staff' | 'manager';
 
-/** Who is signed in. Sessions arrive in F01; until then nobody is. */
+/** Who is signed in: the person, their business and role, the session they are using, and whether their email is verified. */
 export interface Principal {
   accountId: string;
   userId: string;
   role: 'manager' | 'staff' | 'staff_own';
+  sessionId: string;
+  emailVerified: boolean;
 }
 
-/** Turns the request's credentials into a Principal, or throws 401. Replaced by the real session check in F01. */
+/** Turns the request's credentials into a Principal, or throws 401. The real one comes from the `core.auth` module. */
 export type Authenticator = (request: FastifyRequest) => Promise<Principal>;
 
-/** The stand-in authenticator until sessions exist (F01): every request is refused with 401. */
+/** Used when no module provides an authenticator (the kernel alone): every request is refused with 401. */
 export const rejectEveryone: Authenticator = async () => {
   throw unauthorized();
 };
@@ -26,9 +29,12 @@ declare module 'fastify' {
     access?: Access;
     /** Set by the kernel for routes a module registers: the route 404s when that module is off. */
     moduleId?: string;
+    /** Lets a signed-in person whose email is not verified yet use the route (verify, resend, sign out, /me). Default: refused. */
+    allowUnverified?: boolean;
   }
   interface FastifyRequest {
     principal?: Principal;
+    requestContext?: RequestContext;
   }
 }
 
@@ -41,7 +47,12 @@ declare module 'fastify' {
  */
 export function registerGuard(
   app: FastifyInstance,
-  options: { authenticate: Authenticator; gate: ModuleGate; publicRoutes: readonly PublicRoute[] },
+  options: {
+    authenticate: Authenticator;
+    gate: ModuleGate;
+    publicRoutes: readonly PublicRoute[];
+    buildRequestContext: (principal: Principal) => RequestContext;
+  },
 ) {
   const listedPublicRouteKeys = new Set(
     options.publicRoutes.map((publicRoute) => `${publicRoute.method} ${publicRoute.path}`),
@@ -69,10 +80,15 @@ export function registerGuard(
 
     // Runs before the route's own handler on every request: signs the caller in, checks the role, checks the module is on.
     const checkAccessBeforeHandler = async (request: FastifyRequest) => {
-      const { access: requiredAccess, moduleId } = request.routeOptions.config;
+      const { access: requiredAccess, moduleId, allowUnverified } = request.routeOptions.config;
       if (requiredAccess === 'public') return;
       const principal = await options.authenticate(request);
       request.principal = principal;
+      request.requestContext = options.buildRequestContext(principal);
+      // A person who has not verified their email yet can reach only the routes that say so (docs/features/F01).
+      if (!principal.emailVerified && !allowUnverified) {
+        throw new ApiError(403, 'EMAIL_NOT_VERIFIED', 'Please verify your email address first.');
+      }
       if (requiredAccess === 'manager' && principal.role !== 'manager') throw forbidden();
       if (moduleId && !(await options.gate.isActive(principal.accountId, moduleId))) throw notFound();
     };

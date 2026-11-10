@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { Principal } from '../src/kernel/http/guard';
+import { PUBLIC_ROUTES } from '../src/kernel/http/public-routes';
 import { defineModule } from '../src/kernel/modules/define';
 import { coreOnlyGate, createRegistry } from '../src/kernel/modules/registry';
-import { buildTestApp, captureLogs, testConfig } from './support/app';
+import { buildTestApp, captureLogs, TEST_WEB_ORIGIN, testConfig, unsafeRequestHeaders } from './support/app';
 import { newAccountId, openTestDatabase } from './support/harness';
 import { buildApp } from '../src/app';
 import { modules } from '../src/modules';
@@ -70,22 +71,33 @@ describe('errors', () => {
     });
     const app = await buildTestApp(database, [echoModule], {
       publicRoutes: [
+        ...PUBLIC_ROUTES,
         { method: 'POST', path: '/api/v1/echo', reason: 'test' },
         { method: 'GET', path: '/api/v1/health', reason: 'test' },
       ],
     });
-    const badInputResponse = await app.inject({ method: 'POST', url: '/api/v1/echo', payload: { name: 'x' } });
+    const badInputResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/echo',
+      headers: unsafeRequestHeaders,
+      payload: { name: 'x' },
+    });
     expect(badInputResponse.statusCode).toBe(400);
     expect(badInputResponse.json().error).toMatchObject({ code: 'VALIDATION_ERROR', details: [{ path: 'name' }] });
     const brokenJsonResponse = await app.inject({
       method: 'POST',
       url: '/api/v1/echo',
-      headers: { 'content-type': 'application/json' },
+      headers: { ...unsafeRequestHeaders, 'content-type': 'application/json' },
       payload: '{nope',
     });
     expect(brokenJsonResponse.statusCode).toBe(400);
     expect(brokenJsonResponse.json().error.code).toBe('BAD_JSON');
-    const goodInputResponse = await app.inject({ method: 'POST', url: '/api/v1/echo', payload: { name: 'Priya' } });
+    const goodInputResponse = await app.inject({
+      method: 'POST',
+      url: '/api/v1/echo',
+      headers: unsafeRequestHeaders,
+      payload: { name: 'Priya' },
+    });
     expect(goodInputResponse.json()).toEqual({ name: 'Priya' });
     await app.close();
   });
@@ -102,6 +114,7 @@ describe('errors', () => {
     });
     const app = await buildTestApp(database, [boomModule], {
       publicRoutes: [
+        ...PUBLIC_ROUTES,
         { method: 'GET', path: '/api/v1/boom', reason: 'test' },
         { method: 'GET', path: '/api/v1/health', reason: 'test' },
       ],
@@ -172,7 +185,13 @@ describe('route rules', () => {
         moduleApp.get('/for-managers', { config: { access: 'manager' } }, async () => 'ok');
       },
     });
-    const authenticateAs = (role: Principal['role']) => async () => ({ accountId, userId: newAccountId(), role });
+    const authenticateAs = (role: Principal['role']) => async () => ({
+      accountId,
+      userId: newAccountId(),
+      role,
+      sessionId: newAccountId(),
+      emailVerified: true,
+    });
     const staffApp = await buildTestApp(database, [rolesModule], { authenticate: authenticateAs('staff') });
     expect((await staffApp.inject('/api/v1/for-staff')).json()).toEqual({ role: 'staff' });
     const denied = await staffApp.inject('/api/v1/for-managers');
@@ -190,7 +209,13 @@ describe('route rules', () => {
       kind: 'engine',
       routes: (app) => void app.get('/leads', { config: { access: 'staff' } }, async () => ({ leads: [] })),
     });
-    const authenticate = async () => ({ accountId, userId: accountId, role: 'manager' as const });
+    const authenticate = async () => ({
+      accountId,
+      userId: accountId,
+      role: 'manager' as const,
+      sessionId: accountId,
+      emailVerified: true,
+    });
     const appWithModuleOff = await buildTestApp(database, [leadsModule], { authenticate });
     const response = await appWithModuleOff.inject('/api/v1/leads');
     expect(response.statusCode).toBe(404);
@@ -226,6 +251,7 @@ describe('logs', () => {
     const app = await buildTestApp(database, [echoModule], {
       logger,
       publicRoutes: [
+        ...PUBLIC_ROUTES,
         { method: 'POST', path: '/api/v1/echo2', reason: 'test' },
         { method: 'GET', path: '/api/v1/health', reason: 'test' },
       ],
@@ -233,7 +259,7 @@ describe('logs', () => {
     await app.inject({
       method: 'POST',
       url: '/api/v1/echo2?code=482913',
-      headers: { authorization: 'Bearer top-secret-token', cookie: 'session=abc123secret' },
+      headers: { ...unsafeRequestHeaders, authorization: 'Bearer top-secret-token', cookie: 'session=abc123secret' },
       payload: { phone: '+919847012345' },
     });
     await app.close();
@@ -241,5 +267,91 @@ describe('logs', () => {
     expect(loggedText).toContain('/api/v1/echo2');
     for (const sensitiveValue of ['482913', 'top-secret-token', 'abc123secret', '9847012345'])
       expect(loggedText).not.toContain(sensitiveValue);
+  });
+});
+
+describe('CSRF protection', () => {
+  const buildAppWithEchoRoute = async () => {
+    const echoModule = defineModule({
+      id: 'core.echo',
+      kind: 'core',
+      routes: (moduleApp) => {
+        moduleApp.post('/echo', { config: { access: 'public' } }, async () => ({ ok: true }));
+        moduleApp.get('/echo', { config: { access: 'public' } }, async () => ({ ok: true }));
+      },
+    });
+    return buildTestApp(database, [echoModule], {
+      publicRoutes: [
+        ...PUBLIC_ROUTES,
+        { method: 'POST', path: '/api/v1/echo', reason: 'test' },
+        { method: 'GET', path: '/api/v1/echo', reason: 'test' },
+        { method: 'GET', path: '/api/v1/health', reason: 'test' },
+      ],
+    });
+  };
+
+  it('refuses a change that has no Origin, a foreign Origin, or no custom header, and accepts one with both', async () => {
+    const app = await buildAppWithEchoRoute();
+    const attempts = [
+      { headers: {} },
+      { headers: { origin: TEST_WEB_ORIGIN } },
+      { headers: { 'x-requested-with': 'toobler-web' } },
+      { headers: { origin: 'https://evil.example', 'x-requested-with': 'toobler-web' } },
+      { headers: { origin: TEST_WEB_ORIGIN, 'x-requested-with': 'XMLHttpRequest' } },
+    ];
+    for (const attempt of attempts) {
+      const response = await app.inject({ method: 'POST', url: '/api/v1/echo', ...attempt });
+      expect(response.statusCode, JSON.stringify(attempt)).toBe(403);
+      expect(response.json().error.code).toBe('CSRF_REJECTED');
+    }
+    const accepted = await app.inject({ method: 'POST', url: '/api/v1/echo', headers: unsafeRequestHeaders });
+    expect(accepted.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('leaves plain reads alone', async () => {
+    const app = await buildAppWithEchoRoute();
+    expect((await app.inject('/api/v1/echo')).statusCode).toBe(200);
+    await app.close();
+  });
+});
+
+describe('email verification is enforced by the server', () => {
+  const accountId = newAccountId();
+  const probeModule = defineModule({
+    id: 'core.probe',
+    kind: 'core',
+    routes: (moduleApp) => {
+      moduleApp.get('/normal', { config: { access: 'staff' } }, async () => ({ ok: true }));
+      moduleApp.get('/for-unverified', { config: { access: 'staff', allowUnverified: true } }, async (request) => ({
+        accountId: request.requestContext?.accountId,
+        actor: request.requestContext?.actor,
+        userRole: request.requestContext?.user.role,
+      }));
+    },
+  });
+  const authenticateWith = (emailVerified: boolean) => async () => ({
+    accountId,
+    userId: newAccountId(),
+    role: 'manager' as const,
+    sessionId: newAccountId(),
+    emailVerified,
+  });
+
+  it('refuses a person with an unverified email on every route that does not opt in', async () => {
+    const app = await buildTestApp(database, [probeModule], { authenticate: authenticateWith(false) });
+    const refused = await app.inject('/api/v1/normal');
+    expect(refused.statusCode).toBe(403);
+    expect(refused.json().error.code).toBe('EMAIL_NOT_VERIFIED');
+    expect((await app.inject('/api/v1/for-unverified')).statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('lets a verified person in, and gives routes a request context for their business', async () => {
+    const app = await buildTestApp(database, [probeModule], { authenticate: authenticateWith(true) });
+    expect((await app.inject('/api/v1/normal')).statusCode).toBe(200);
+    const response = await app.inject('/api/v1/for-unverified');
+    expect(response.json()).toMatchObject({ accountId, actor: { kind: 'user' }, userRole: 'manager' });
+    await app.close();
   });
 });

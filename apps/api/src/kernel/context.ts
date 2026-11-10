@@ -1,4 +1,5 @@
 import type { Db, Database } from './db';
+import type { Principal } from './http/guard';
 import { writeActivityLog, type ActivityDetails } from './activity-log';
 import { publishEvent } from './events/publish';
 
@@ -25,8 +26,24 @@ export interface AccountContext {
   publish(transaction: Db, eventName: string, payload?: Record<string, unknown>): Promise<string>;
 }
 
+/**
+ * What a signed-in web request works with: the AccountContext for the person's business (actor = that person) plus who
+ * they are. Reached as `request.requestContext` on every `staff` or `manager` route.
+ */
+export interface RequestContext extends AccountContext {
+  readonly user: { readonly id: string; readonly role: Principal['role'] };
+}
+
 /** Builds an AccountContext for a business and an actor. Jobs, event handlers and webhooks all start from this. */
 export type ContextFactory = (accountId: string, actor: Actor) => AccountContext;
+
+/** Builds the RequestContext for a signed-in person. */
+export function createRequestContext(contextFor: ContextFactory, principal: Principal): RequestContext {
+  return {
+    ...contextFor(principal.accountId, { kind: 'user', id: principal.userId }),
+    user: { id: principal.userId, role: principal.role },
+  };
+}
 
 /** Creates the function that builds contexts, wired to the database. */
 export function createContextFactory(database: Database): ContextFactory {
