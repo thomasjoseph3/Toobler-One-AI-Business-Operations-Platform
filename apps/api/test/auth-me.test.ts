@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
-import { createProfileService } from '../src/modules/core/auth/profile/service';
+import { createProfileService } from '../src/modules/core/auth/services/profile.service';
 import { buildTestApp, captureLogs } from './support/app';
 import { createSignedInPerson } from './support/auth';
 import { openTestDatabase } from './support/harness';

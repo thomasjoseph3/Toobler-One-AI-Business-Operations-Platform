@@ -1,8 +1,8 @@
 import { defineModule } from '../../../kernel/module-system/define';
-import { profileRoutes } from './profile/routes';
-import { createSessionAuthenticator } from './sessions/authenticator';
-import { sessionsRoutes } from './sessions/routes';
-import { signUpRoutes } from './sign-up/routes';
+import { profileRoutes } from './routes/profile.routes';
+import { createSessionAuthenticator } from './authenticator';
+import { sessionsRoutes } from './routes/sessions.routes';
+import { signUpRoutes } from './routes/sign-up.routes';
 
 /**
  * Sign-up, sign-in, sessions and passwords. Built in slices (docs/features/F01-sign-up-and-sign-in.md): each feature

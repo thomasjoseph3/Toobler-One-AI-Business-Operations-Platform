@@ -2,8 +2,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { okResponseSchema, profileResponseSchema, signInRequestSchema } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
-import { clearAuthCookies, setAuthCookies } from './cookies';
-import { createSessionsService, type ClientInfo } from './service';
+import { clearAuthCookies, setAuthCookies } from '../helpers/cookies';
+import { createSessionsService, type ClientInfo } from '../services/sessions.service';
 
 /** Who is making the request, for the session record and the activity log. */
 const clientOf = (request: FastifyRequest): ClientInfo => ({

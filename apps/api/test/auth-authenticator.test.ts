@@ -3,7 +3,7 @@ import { sql } from 'kysely';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
 import { defineModule } from '../src/kernel/module-system/define';
-import { signAccessToken } from '../src/modules/core/auth/sessions/tokens';
+import { signAccessToken } from '../src/modules/core/auth/helpers/tokens';
 import { buildTestApp, testConfig } from './support/app';
 import { createSignedInPerson } from './support/auth';
 import { openTestDatabase } from './support/harness';

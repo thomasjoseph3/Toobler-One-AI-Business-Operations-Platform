@@ -5,17 +5,23 @@ live and how a request travels, so you can find any piece quickly.
 
 ## The one rule for finding things
 
-- A folder **with a `routes.ts`** is a feature (`sign-up`, `sessions`, `profile`, later `email-verification`).
-- `helpers/` holds shared tools that have no routes (password hashing and rules, mobile number cleaning).
-- `repositories/` holds the database code, one file per table.
+Open the folder named for the layer. The feature's name is in the file name.
+
+| Folder | What is in it |
+| --- | --- |
+| `routes/` | `sign-up.routes.ts` (`POST /auth/signup`), `sessions.routes.ts` (`POST /auth/login`, `POST /auth/logout`), `profile.routes.ts` (`GET /me`) |
+| `services/` | `sign-up.service.ts`, `sessions.service.ts`, `profile.service.ts`: the rules and the steps |
+| `repositories/` | One file per table: `accounts`, `users`, `credentials`, `sessions` (later `auth-tokens`, `login-attempts`) |
+| `helpers/` | Shared tools with no routes: `passwords.ts`, `phone.ts`, `tokens.ts`, `cookies.ts` |
+| `authenticator.ts` | Tells the kernel who is signed in on every request |
 
 ## How a request travels
 
 ```text
 HTTP request
   → kernel checks (CSRF, rate limit, "is a signed-in person needed?")      apps/api/src/kernel/
-  → <feature>/routes.ts     checks the request shape, calls the service, sends the answer
-  → <feature>/service.ts    the rules and the steps (hash the password, save, send an email...)
+  → routes/<feature>.routes.ts      checks the request shape, calls the service, sends the answer
+  → services/<feature>.service.ts   the rules and the steps (hash the password, save, send an email...)
   → repositories/<table>.repository.ts   the SQL, nothing else
   → the database (through kernel/database)
 ```
@@ -24,7 +30,7 @@ Only the files in `repositories/` talk to the database. Routes never call a repo
 
 ### How a service reaches a repository
 
-There is no wiring file. The service imports the repository file and calls its functions. From `profile/service.ts`:
+There is no wiring file. The service imports the repository file and calls its functions. From `profile.service.ts`:
 
 ```ts
 import * as usersRepository from '../repositories/users.repository';
@@ -32,27 +38,16 @@ import * as usersRepository from '../repositories/users.repository';
 const person = await usersRepository.findPersonProfileById(transaction, principal.userId);
 ```
 
-Each `service.ts` also lists, in a comment at the top, the repositories it uses.
-
-## The folders
-
-| Folder | What is in it |
-| --- | --- |
-| `sign-up/` | `POST /auth/signup`: creates the business and its owner |
-| `sessions/` | `POST /auth/login`, `POST /auth/logout`, the access token, the cookies, "who is signed in" (later: refresh) |
-| `profile/` | `GET /me` (later: `PATCH /me`) |
-| `helpers/` | `passwords.ts` (argon2id hashing and the password rules), `phone.ts` (mobile number cleaning) |
-| `repositories/` | `accounts`, `users`, `credentials`, `sessions` (later: `auth-tokens`, `login-attempts`) |
-| `email-verification/` (not yet) | Verify and resend, and the text of the emails (slice 4) |
+Each service file also lists, in a comment at the top, the repositories it uses.
 
 ## Adding a feature
 
-1. Make a folder named for the feature, with `routes.ts` and `service.ts` (and tests next to them).
+1. Add `routes/<feature>.routes.ts` and `services/<feature>.service.ts` (tests go in `apps/api/test/`).
 2. Put its SQL in `repositories/<table>.repository.ts` (add to an existing file if the table already has one).
 3. Register the routes with one line in `module.ts`.
 4. If it is an open route (no sign-in), list it in `apps/api/src/kernel/http/public-routes.ts` with the reason.
 
 ## Files at the top
 
-- `module.ts`: declares the module (`core.auth`) and registers each feature's routes.
+- `module.ts`: declares the module (`core.auth`) and registers each route file.
 - `index.ts`: the only file other modules may import from. Empty for now.

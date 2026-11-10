@@ -1,10 +1,10 @@
-import type { Config } from '../../../../kernel/config';
-import type { Database } from '../../../../kernel/database';
-import { ApiError, unauthorized } from '../../../../kernel/errors';
-import type { Authenticator } from '../../../../kernel/http/guard';
-import * as sessionsRepository from '../repositories/sessions.repository';
-import { readAccessCookie } from './cookies';
-import { AccessTokenError, verifyAccessToken } from './tokens';
+import type { Config } from '../../../kernel/config';
+import type { Database } from '../../../kernel/database';
+import { ApiError, unauthorized } from '../../../kernel/errors';
+import type { Authenticator } from '../../../kernel/http/guard';
+import * as sessionsRepository from './repositories/sessions.repository';
+import { readAccessCookie } from './helpers/cookies';
+import { AccessTokenError, verifyAccessToken } from './helpers/tokens';
 
 /**
  * Builds the function that tells who is signed in. The kernel calls it before every route that needs a signed-in person.

@@ -10,7 +10,7 @@ import * as credentialsRepository from '../repositories/credentials.repository';
 import * as sessionsRepository from '../repositories/sessions.repository';
 import * as usersRepository from '../repositories/users.repository';
 import { NO_SUCH_USER_HASH, passwordMatches } from '../helpers/passwords';
-import { generateSecret, hashSecret, signAccessToken } from './tokens';
+import { generateSecret, hashSecret, signAccessToken } from '../helpers/tokens';
 
 /** The browser or app signing in, kept with the session ("who signed in from where"). */
 export interface ClientInfo {

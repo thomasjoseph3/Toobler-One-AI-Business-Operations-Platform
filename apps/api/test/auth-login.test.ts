@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
-import { hashSecret, verifyAccessToken } from '../src/modules/core/auth/sessions/tokens';
+import { hashSecret, verifyAccessToken } from '../src/modules/core/auth/helpers/tokens';
 import { buildTestApp, captureLogs, testConfig, unsafeRequestHeaders } from './support/app';
 import { openTestDatabase } from './support/harness';
 

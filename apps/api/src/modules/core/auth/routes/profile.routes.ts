@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { profileResponseSchema } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
-import { createProfileService } from './service';
+import { createProfileService } from '../services/profile.service';
 
 /** Registers GET /api/v1/me: who the signed-in person is, and their business. */
 export function profileRoutes(app: FastifyInstance) {

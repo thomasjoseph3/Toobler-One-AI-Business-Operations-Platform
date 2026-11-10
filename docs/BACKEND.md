@@ -41,28 +41,29 @@ modules/core/contacts/
   contacts.api.test.ts  API tests: works, wrong role, other business, not signed in, bad input
 ```
 
-### A bigger module: one folder per feature (decided 10 Nov 2026)
+### A bigger module: one folder per layer (decided 10 Nov 2026)
 
-A module with more than about 4 routes (like `core.auth`, which will have 12) is split into **feature folders**, so a
-developer finds everything about one feature in one place and a new feature adds a folder instead of growing three big
-files. Small modules (like contacts) stay flat as above.
+Every module uses the same layers. A small module (like contacts) has one file per layer. A bigger module (like
+`core.auth`, which will have 12 routes) has one **folder** per layer, and the feature's name is in the file name. The rule
+is the same everywhere: to find routes, open `routes/`; services, `services/`; SQL, `repositories/`.
 
 ```text
 modules/core/auth/
   README.md            the layout and the request flow, written for people opening the folder
-  module.ts            declares the module; one line per feature registers its routes
+  module.ts            declares the module; one line per route file registers its routes
   index.ts             the public API
-  sign-up/             routes.ts + service.ts (+ tests) for one feature
-  sessions/            another feature folder
-  repositories/        ONE repository per table: <table>.repository.ts. The only files that touch the database.
-  helpers/             shared tools with no routes (password hashing, phone cleaning)
+  routes/              <feature>.routes.ts      check the request, call the service, send the answer
+  services/            <feature>.service.ts     the rules and the steps
+  repositories/        <table>.repository.ts    ONE per table; the only files that touch the database
+  helpers/             shared tools with no routes (passwords, phone, tokens, cookies)
+  authenticator.ts     answers "who is signed in" for the kernel
 ```
 
-The flow does not change: `<feature>/routes.ts` → `<feature>/service.ts` → `repositories/<table>.repository.ts` → `kernel/database`.
-A folder with a `routes.ts` is a feature; a folder without routes is a helper. A service reaches a repository with a plain
-import, e.g. `import * as usersRepository from '../repositories/users.repository'`. A repository is shared by every feature that needs that table, so SQL is never copied. The linter treats
-`repository.ts` and `*.repository.ts` as the files allowed to use the database layer. Folder names must not repeat
-names used elsewhere in the project (the engine room is `kernel`, the machinery for modules is `kernel/module-system`).
+The flow does not change: `routes/` -> `services/` -> `repositories/` -> `kernel/database`. A service reaches a repository
+with a plain import, e.g. `import * as usersRepository from '../repositories/users.repository'`. A repository is shared by
+every feature that needs that table, so SQL is never copied. The linter treats `repository.ts` and `*.repository.ts` as
+the files allowed to use the database layer. Folder names must not repeat names used elsewhere in the project (the engine
+room is `kernel`, the machinery for modules is `kernel/module-system`).
 
 ### Example
 

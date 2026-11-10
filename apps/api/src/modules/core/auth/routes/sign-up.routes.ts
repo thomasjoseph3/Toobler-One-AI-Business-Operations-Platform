@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { profileResponseSchema, signUpRequestSchema } from '@toobler-one/shared';
-import { createSignUpService } from './service';
+import { createSignUpService } from '../services/sign-up.service';
 
 /** Registers the sign-up route: POST /api/v1/auth/signup. */
 export function signUpRoutes(app: FastifyInstance) {
