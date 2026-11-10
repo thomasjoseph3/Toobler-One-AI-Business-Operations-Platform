@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@toobler-one/ui/tokens.css';
+@import '@toobler-one/ui/styles.css';
+/* Tailwind must also look inside the shared UI package for the classes its components use. */
+@source '../../../packages/ui/src';

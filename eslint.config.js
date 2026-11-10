@@ -68,7 +68,14 @@ export default tseslint.config(
       // A local name that hides an import or an outer one: how a renamed service ended up undefined inside a function
       '@typescript-eslint/no-shadow': ['error', { hoist: 'all' }],
       // Readable names (CLAUDE.md "Readability rules"): no one-letter names and none of the usual abbreviations.
-      'id-length': ['error', { min: 2, properties: 'never', exceptions: ['_'] }],
+      'id-length': [
+        'error',
+        {
+          min: 2,
+          properties: 'never',
+          exceptions: ['_', 't'] /* `t` is the translate function CLAUDE.md prescribes */,
+        },
+      ],
       'id-denylist': ['error', ...UNCLEAR_NAMES],
     },
   },
@@ -111,6 +118,11 @@ export default tseslint.config(
         },
       ],
     },
+  },
+  // The small scripts served as they are by the web app (they run in the browser)
+  {
+    files: ['apps/web/public/**/*.js'],
+    languageOptions: { globals: globals.browser },
   },
   // The React apps and the shared UI package
   {
