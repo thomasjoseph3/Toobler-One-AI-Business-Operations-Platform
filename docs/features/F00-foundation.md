@@ -87,6 +87,6 @@ The migration runner itself creates the schema and `app.schema_migrations` (with
 
 ## Decisions and differences from the requirements
 - Node 26 LTS, TypeScript, Fastify 5, Kysely on `pg` (typed queries; SQL stays visible in repositories), pg-boss for
-  scheduled and retried jobs, plain polling with an advisory lock for the event dispatcher.
+  scheduled and retried jobs, plain polling for the event dispatcher, with a per-event lease (`FOR UPDATE SKIP LOCKED` + `locked_until`) instead of an advisory lock, because a session lock does not survive a transaction pooler such as Supabase's.
 - The dev app talks to the Supabase database from `.env` (owner confirmed dev only); tests use the Docker database.
 - Contrast: designer's values used unchanged (owner decision).

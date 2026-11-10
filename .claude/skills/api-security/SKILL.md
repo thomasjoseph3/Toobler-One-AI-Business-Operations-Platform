@@ -9,7 +9,7 @@ Every business is a separate customer: no request, job or tool may ever read or 
 design in `docs/SECURITY.md`; this is the working checklist. (Adapted from the hotel agent's `api-security` skill.)
 
 ## 1. Keep businesses apart
-- Business work runs in `ctx.runInAccountTransaction(...)` (fenced: `SET ROLE app_user`, `app.account_id`). Never use the owner pool for
+- Business work runs in `accountContext.runInAccountTransaction(...)` (fenced: `SET ROLE app_user`, `app.account_id`). Never use the owner pool for
   business data.
 - The account comes from the session (staff), the widget key (webchat), the provider-id lookup (webhooks) or the job
   payload. **Never** from body, query, params or tool arguments.

@@ -29,7 +29,7 @@ Add the module to the module list (`apps/api/src/modules/index.ts`) and, for the
 - [ ] Routes are declared in the manifest (the kernel adds the "module active" guard); pages call
       a `<RequireModule id="<id>">` wrapper on their routes (a switched-off module shows the not-found page).
 - [ ] Tables: own migration, `account_id`, RLS; tables are named for the module's things (`quotes`, not `sales_data`).
-- [ ] Reacts to other modules only through `events` (idempotent handlers); publishes its own events via `ctx.publish`
+- [ ] Reacts to other modules only through `events` (idempotent handlers); publishes its own events via `accountContext.publish`
       in the same transaction as the change. Document new events in ARCHITECTURE.md §4.
 - [ ] Agent tools: zod input, `effect`, `module` set; identity from `ToolContext`; offered only while active.
 - [ ] Conversation types / outcomes / playbooks it adds are declared in the manifest, with a fallback when it's off.

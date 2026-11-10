@@ -76,7 +76,7 @@ The whole app and every **text** channel (web chat, WhatsApp, email, setup chat,
 ## Data and security rules
 
 - Every business table: `account_id`, RLS enabled and forced. Business work runs inside the account fence
-  (`ctx.runInAccountTransaction`). The account comes from the session / widget key / provider lookup / job, never from input.
+  (`accountContext.runInAccountTransaction`). The account comes from the session / widget key / provider lookup / job, never from input.
 - Another business's id → 404. Wrong role → 403. Every route tested for works / 401 / 403 / 404 / 400.
 - Money in paise (integers). Times in UTC (`timestamptz`), shown in the business's time zone. Phones as E.164 +
   `phone_key`. IDs are UUIDs.
