@@ -50,6 +50,7 @@ None so far.
 | Database and jobs | pg 8.23.1, kysely 0.29.7, pg-boss 12.38.0 |
 | Web (React + Vite, no Next.js) | vite 8.3.5, @vitejs/plugin-react 6.1.2, react-router 8.5.0, react / react-dom 19.3.1, tailwindcss and @tailwindcss/vite 4.3.3, lucide-react 1.61.0, clsx 2.1.1 |
 | Tooling | **typescript 6.0.3** (not 7.x: typescript-eslint 8.72 supports TypeScript below 6.1 only), tsx 4.23.15, vitest 5.0.5, @playwright/test 1.64.1, @axe-core/playwright 4.14.0 (MPL-2.0, dev only), eslint 10.13.0, @eslint/js 10.0.1, typescript-eslint 8.72.0, eslint-plugin-react-hooks 7.1.1, globals 17.13.0, prettier 3.9.10, concurrently 10.0.6 |
+| Fonts (self-hosted, vetted 10 Nov 2026) | @fontsource-variable/manrope 5.3.0, @fontsource-variable/inter 5.3.0, @fontsource/noto-sans-malayalam 5.3.0, @fontsource/noto-sans-devanagari 5.3.0 (all OFL-1.1, same publisher, no install scripts) |
 | Types | @types/node 26.6.5, @types/pg 8.23.1, @types/react and @types/react-dom 19.3.0 |
 
 All MIT, ISC or Apache-2.0 (one dev-only MPL-2.0), none with install scripts, all published by their official projects.

@@ -1,5 +1,7 @@
 # How the system is built
 
+> **Note (10 Nov 2026):** the engineering decisions made while building (TypeScript, Fastify, plug-in modules, conversation types) are in `docs/ARCHITECTURE.md`. Where the two differ, `docs/ARCHITECTURE.md` wins; the differences are listed in `docs/REQUIREMENTS-REVIEW.md`.
+
 *For everyone first, then for developers.*
 
 ## In plain words
