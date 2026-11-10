@@ -1,2 +1,3 @@
-// Types shared by the API and the web app arrive with the features that need them.
-export {};
+// What the API and the web app share: the shape of the data between them.
+export * from './auth';
+export * from './industries';

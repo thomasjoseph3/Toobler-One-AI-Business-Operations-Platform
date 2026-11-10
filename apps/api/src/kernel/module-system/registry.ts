@@ -12,6 +12,14 @@ export interface Registry {
 
 const MODULE_ID_PATTERN = /^(core|engine|channel|feature)\.[a-z][a-z0-9_]*$/;
 
+/** At most one module may provide the authenticator (the function that says who is signed in). */
+function checkOnlyOneAuthenticator(manifests: Iterable<ModuleManifest>): void {
+  const providerIds = [...manifests].filter((manifest) => manifest.authenticator).map((manifest) => manifest.id);
+  if (providerIds.length > 1) {
+    throw new RegistryError(`Only one module may provide the authenticator, but these do: ${providerIds.join(', ')}.`);
+  }
+}
+
 /** Names that only the kernel itself may use for jobs. */
 const RESERVED_JOB_NAMES = new Set(['kernel.heartbeat']);
 
@@ -61,6 +69,7 @@ export function createRegistry(moduleManifests: readonly ModuleManifest[]): Regi
   }
 
   checkEventAndJobNames(manifestsById.values());
+  checkOnlyOneAuthenticator(manifestsById.values());
 
   for (const manifest of manifestsById.values()) {
     for (const requiredModuleId of manifest.requires ?? []) {

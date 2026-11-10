@@ -13,9 +13,10 @@ Architecture: `docs/ARCHITECTURE.md` (§1 modules, §2 conversation engine, §4 
 apps/api/src/modules/<core|engines|channels|features>/<name>/
   module.ts      defineModule({...}): the only thing the kernel reads
   index.ts       public API for modules that list this one in `requires`
-  routes.ts  service.ts  repository.ts  schemas.ts
+  routes/<feature>.routes.ts   services/<feature>.service.ts   repositories/<table>.repository.ts   helpers/
   adapter.ts     channels only (ChannelAdapter)
-  *.test.ts  *.api.test.ts
+  (request/response shapes live in packages/shared; tests in apps/api/test, helper tests beside the helper)
+  apps/api/test/module-structure.test.ts fails if a module breaks this shape
 apps/web/src/features/<name>/      pages, nav items, slot components, registered in index.ts
 ```
 

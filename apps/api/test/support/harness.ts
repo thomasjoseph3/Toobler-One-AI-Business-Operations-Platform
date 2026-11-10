@@ -1,4 +1,4 @@
-import { createDatabase, type Database } from '../../src/kernel/db';
+import { createDatabase, type Database } from '../../src/kernel/database';
 import { uuidv7 } from '../../src/kernel/ids';
 import { testDatabaseConfig } from './database';
 

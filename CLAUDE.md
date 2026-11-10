@@ -31,6 +31,10 @@ engine and the CRM core**.
 4. If something in the requirements is missing, conflicting or could be better: **ask before building it differently**,
    then record the decision in the brief and in REQUIREMENTS-REVIEW.md.
 5. Use the `feature` skill for every step of this process.
+6. **Small slices (owner rule, 10 Nov 2026): never build more than 2 API routes at a time.** A feature is built as a
+   series of slices of at most 2 routes (with the screen that uses them). After each slice: explain, folder by folder and
+   file by file, what was added or changed and why; give the owner the exact steps to test it in Postman and in the
+   browser; then **stop** until the owner has verified it and says to continue. Never batch slices together.
 
 ## Dependencies rule
 
@@ -52,7 +56,7 @@ The whole app and every **text** channel (web chat, WhatsApp, email, setup chat,
   active for the business (entitled + enabled + ready). Off = 404 and hidden; data is kept.
 - **Channels** only translate provider ⇄ normalised messages (`ChannelAdapter`). All conversation logic is in the
   conversation engine, the same for every channel.
-- **Repository pattern.** `routes.ts → service.ts → repository.ts → kernel/db`. Only repositories touch the database.
+- **Repository pattern.** `routes/ → services/ → repositories/ → kernel/database`, in folders of those names in every module (checked by `module-structure.test.ts`). Only repositories touch the database.
   Routes never import repositories. Pure logic (scoring, router, maths) in its own file without I/O.
 - **The AI states facts; code decides.** Lead temperature, conversation outcomes, prices, totals, due times and report
   numbers are computed in code. The AI never does maths.

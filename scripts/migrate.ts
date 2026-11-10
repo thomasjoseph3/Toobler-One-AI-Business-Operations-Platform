@@ -2,8 +2,8 @@
 // npm run db:migrate:test   applies them to the local test database
 import path from 'node:path';
 import { loadConfig, loadEnvFile } from '../apps/api/src/kernel/config';
-import { createPool } from '../apps/api/src/kernel/db';
-import { migrate } from '../apps/api/src/kernel/db/migrate';
+import { createPool } from '../apps/api/src/kernel/database';
+import { migrate } from '../apps/api/src/kernel/database/migrate';
 import { testDatabaseConfig } from '../apps/api/test/support/database';
 
 const useTestDatabase = process.argv.includes('--test');

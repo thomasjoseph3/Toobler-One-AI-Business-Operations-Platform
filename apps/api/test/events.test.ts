@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { pino } from 'pino';
 import { createContextFactory, type AccountContext } from '../src/kernel/context';
-import type { Database } from '../src/kernel/db';
+import type { Database } from '../src/kernel/database';
 import { createEventDispatcher, type EventDispatcherOptions } from '../src/kernel/events/dispatcher';
 import type { DomainEvent } from '../src/kernel/events/events';
 import { claimDueEvents } from '../src/kernel/events/outbox-repository';
 import { publishEvent } from '../src/kernel/events/publish';
-import { defineModule } from '../src/kernel/modules/define';
-import { createRegistry, type ModuleGate } from '../src/kernel/modules/registry';
+import { defineModule } from '../src/kernel/module-system/define';
+import { createRegistry, type ModuleGate } from '../src/kernel/module-system/registry';
 import { newAccountId, openTestDatabase, waitFor } from './support/harness';
 
 let database: Database;

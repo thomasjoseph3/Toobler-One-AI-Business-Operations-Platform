@@ -1,5 +1,8 @@
 import type { FastifyInstance } from 'fastify';
+import type { Config } from '../config';
+import type { Database } from '../database';
 import type { EventHandlers } from '../events/events';
+import type { Authenticator } from '../http/guard';
 import type { JobDefinition } from '../jobs/jobs';
 
 /**
@@ -15,6 +18,11 @@ export interface ModuleManifest {
   requires?: string[];
   /** Registers this module's routes. Mounted under /api/v1; every route declares `config.access`. */
   routes?: (app: FastifyInstance) => void | Promise<void>;
+  /**
+   * Only the `core.auth` module sets this: it builds the function that turns a request's cookies into a signed-in person.
+   * The kernel picks it up from the registry, so the kernel never imports the module.
+   */
+  authenticator?: (services: { config: Config; database: Database }) => Authenticator;
   /** Events this module reacts to (the module's handlers run only while the module is on for the business). */
   events?: EventHandlers;
   /** Background jobs this module owns, named `<module name>.<what>`. */

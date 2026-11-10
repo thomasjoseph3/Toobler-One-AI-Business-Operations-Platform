@@ -38,6 +38,7 @@ describe('createRegistry', () => {
     expect(() => createRegistry([withJob('engine.leads', 'engine', 'tasks.remind')])).toThrow(
       /must be named "leads\.<what>"/,
     );
+    // An example module called "kernel" (not a real one) so the name kernel.heartbeat passes the naming rule and hits the reserved-name rule.
     expect(() => createRegistry([withJob('core.kernel', 'core', 'kernel.heartbeat')])).toThrow(/reserved/);
     expect(() =>
       createRegistry([
@@ -45,6 +46,15 @@ describe('createRegistry', () => {
         withJob('feature.leads', 'feature', 'leads.remind'),
       ]),
     ).toThrow(/both/);
+  });
+  it('allows only one module to provide the authenticator', () => {
+    const neverSignsIn = () => async () => {
+      throw new Error('not used in this test');
+    };
+    const providerOne = defineModule({ id: 'core.auth', kind: 'core', authenticator: neverSignsIn });
+    const providerTwo = defineModule({ id: 'core.other_auth', kind: 'core', authenticator: neverSignsIn });
+    expect(() => createRegistry([providerOne])).not.toThrow();
+    expect(() => createRegistry([providerOne, providerTwo])).toThrow(/Only one module may provide the authenticator/);
   });
   it('never lets core depend on an engine, channel or feature', () => {
     expect(() =>

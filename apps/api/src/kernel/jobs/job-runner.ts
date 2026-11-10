@@ -2,10 +2,10 @@ import type { FastifyBaseLogger } from 'fastify';
 import { PgBoss } from 'pg-boss';
 import type { Config } from '../config';
 import type { ContextFactory } from '../context';
-import { buildSslOptions } from '../db';
+import { buildSslOptions } from '../database';
 import type { HealthCheck } from '../health';
 import { isUuid } from '../ids';
-import type { ModuleGate, Registry } from '../modules/registry';
+import type { ModuleGate, Registry } from '../module-system/registry';
 import type { JobData, JobDefinition } from './jobs';
 
 export interface JobRunnerOptions {

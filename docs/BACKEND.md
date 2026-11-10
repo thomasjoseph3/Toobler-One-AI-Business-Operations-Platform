@@ -6,40 +6,53 @@ moved to TypeScript and Fastify. Most rules here are enforced by ESLint or tests
 ## 1. Layers (repository pattern)
 
 ```text
-routes.ts       HTTP only: schema (zod), auth + role guard, call ONE service function, shape the response.
+routes/          HTTP only: schema (zod), auth + role guard, call ONE service function, shape the response.
    │            No business rules. No SQL. Never imports a repository.
    ▼
-service.ts      Business rules, orchestration, transactions, events, audit. The module's public face.
+services/        Business rules, orchestration, transactions, events, audit. The module's public face.
    │            Other modules call it through the module's index.ts (only if listed in `requires`).
    ▼
-repository.ts   Database reads and writes, private to its module. Functions named for intentions
+repositories/   Database reads and writes, private to its module. Functions named for intentions
    │            (`findByPhoneKey`, `moveToStage`, `claimHold`), returning plain typed records.
    ▼
-kernel/db       Kysely + pg, the account fence, transactions.
+kernel/database       Kysely + pg, the account fence, transactions.
 ```
 
 | Rule | Enforced by |
 | --- | --- |
-| Only `repository.ts` (and `kernel/db`) imports the database | ESLint `no-restricted-imports` |
-| `routes.ts` never imports `./repository` | ESLint |
+| Only repository files (and `kernel/database`) imports the database | ESLint `no-restricted-imports` |
+| a routes file never imports a repository | ESLint |
 | No module imports another module's `repository`, `service` or internals; only its `index.ts`, and only if `requires` lists it | ESLint boundaries rule + a registry test |
 | Core never imports engines, channels or features | ESLint boundaries rule |
 | Pure logic (scoring, router, completeness, report maths, phone keys) lives in its own file with no I/O | Review; unit tests need no database |
 
-### A module's files
+### A module's files: the same shape for every module (decided 10 Nov 2026)
+
+Every module, small or big, uses the same folders. To find routes, open `routes/`; services, `services/`; SQL,
+`repositories/`. The feature or table name is in the file name. A folder is created only when the module needs it (a
+module with no database has no `repositories/`), and an empty folder is not allowed.
 
 ```text
 modules/core/contacts/
-  module.ts          the manifest (id, kind, requires, routes, events, jobs, …)
-  index.ts           the public API other modules may use: re-exports chosen service functions and types
-  routes.ts          endpoints
-  service.ts         rules
-  repository.ts      SQL
-  schemas.ts         zod schemas for this module's requests (shared ones live in packages/shared)
-  phone.ts           a pure helper (example)
-  contacts.test.ts   unit tests of pure logic
-  contacts.api.test.ts  API tests: works, wrong role, other business, not signed in, bad input
+  module.ts                          the manifest (id, kind, requires, routes, events, jobs, ...)
+  index.ts                           optional: the public API other modules may use (re-exports chosen service functions)
+  README.md                          optional: layout notes for a big module
+  authenticator.ts / adapter.ts      only for modules that provide an authenticator / a channel adapter
+  routes/<feature>.routes.ts         HTTP only: check the request, call the service, send the answer
+  services/<feature>.service.ts      the rules and the steps
+  repositories/<table>.repository.ts ONE per table; the only files that touch the database
+  helpers/                           shared tools with no routes (pure logic, e.g. phone.ts + phone.test.ts)
 ```
+
+`apps/api/test/module-structure.test.ts` checks every module against this shape on every test run and in CI. It fails with
+a plain message if a file is in the wrong folder or named wrongly, a folder is empty or unknown, a file sits loose at the
+top, or `module.ts` forgets to register a routes file. API tests live in `apps/api/test/`.
+
+The flow: `routes/` -> `services/` -> `repositories/` -> `kernel/database`. A service reaches a repository with a plain
+import, e.g. `import * as usersRepository from '../repositories/users.repository'`. A repository is shared by every
+feature that needs that table, so SQL is never copied. The linter treats `repository.ts` and `*.repository.ts` as the
+files allowed to use the database layer. Folder names must not repeat names used elsewhere in the project (the engine
+room is `kernel`, the machinery for modules is `kernel/module-system`).
 
 ### Example
 

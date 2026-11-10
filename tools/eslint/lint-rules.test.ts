@@ -64,7 +64,7 @@ describe('module boundary rule', () => {
 
   it('lets a module use its own files and the kernel', () => {
     expect(lintImport('core/contacts/service.ts', "import { find } from './repository';")).toEqual([]);
-    expect(lintImport('core/contacts/service.ts', "import { find } from '../../../kernel/db';")).toEqual([]);
+    expect(lintImport('core/contacts/service.ts', "import { find } from '../../../kernel/database';")).toEqual([]);
   });
 
   it('lets a module use another module through its index when it lists it in requires', () => {
@@ -131,16 +131,49 @@ describe('project lint configuration', () => {
     expect(problems).toEqual([expect.stringContaining('Routes call the service')]);
   });
 
+  it('also stops routes from importing a repository kept in a data/ folder', async () => {
+    const problems = await problemsIn(
+      'apps/api/src/modules/core/contacts/create/routes.ts',
+      "import { insertContact } from '../data/contacts.repository';\nexport const use = insertContact;\n",
+    );
+    expect(problems).toEqual([expect.stringContaining('Routes call the service')]);
+  });
+
+  it('lets a service in a feature folder use a repository from data/, but not the database layer directly', async () => {
+    const serviceFile = 'apps/api/src/modules/core/contacts/create/service.ts';
+    expect(
+      await problemsIn(
+        serviceFile,
+        "import * as contactsRepository from '../data/contacts.repository';\nexport const use = contactsRepository;\n",
+      ),
+    ).toEqual([]);
+    expect(
+      await problemsIn(
+        serviceFile,
+        "import { createPool } from '../../../../kernel/database';\nexport const use = createPool;\n",
+      ),
+    ).toEqual([expect.stringContaining('Only repository files')]);
+  });
+
+  it('lets a *.repository.ts file in data/ use the database layer and the query builder', async () => {
+    expect(
+      await problemsIn(
+        'apps/api/src/modules/core/contacts/data/contacts.repository.ts',
+        "import { sql } from 'kysely';\nimport { createPool } from '../../../../kernel/database';\nexport const use = [sql, createPool];\n",
+      ),
+    ).toEqual([]);
+  });
+
   it('stops anything but a repository from using the database layer or the query builder', async () => {
     const serviceFile = 'apps/api/src/modules/core/contacts/service.ts';
     expect(
       await problemsIn(
         serviceFile,
-        "import { createPool } from '../../../kernel/db';\nexport const use = createPool;\n",
+        "import { createPool } from '../../../kernel/database';\nexport const use = createPool;\n",
       ),
-    ).toEqual([expect.stringContaining('Only repository.ts talks to the database')]);
+    ).toEqual([expect.stringContaining('Only repository files')]);
     expect(await problemsIn(serviceFile, "import { sql } from 'kysely';\nexport const use = sql;\n")).toEqual([
-      expect.stringContaining('Queries are written in repository.ts only'),
+      expect.stringContaining('Queries are written in repository files only'),
     ]);
   });
 
@@ -148,13 +181,13 @@ describe('project lint configuration', () => {
     expect(
       await problemsIn(
         'apps/api/src/modules/core/contacts/service.ts',
-        "import type { Db } from '../../../kernel/db';\nexport type Use = Db;\n",
+        "import type { Db } from '../../../kernel/database';\nexport type Use = Db;\n",
       ),
     ).toEqual([]);
     expect(
       await problemsIn(
         'apps/api/src/modules/core/contacts/repository.ts',
-        "import { sql } from 'kysely';\nimport { createPool } from '../../../kernel/db';\nexport const use = [sql, createPool];\n",
+        "import { sql } from 'kysely';\nimport { createPool } from '../../../kernel/database';\nexport const use = [sql, createPool];\n",
       ),
     ).toEqual([]);
   });

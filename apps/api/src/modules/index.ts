@@ -1,5 +1,7 @@
-import type { ModuleManifest } from '../kernel/modules/define';
-import kernel from './core/kernel/module';
+import type { ModuleManifest } from '../kernel/module-system/define';
+import auth from './core/auth/module';
+import health from './core/health/module';
+import industries from './core/industries/module';
 
 // Every module in the product. Adding a module = one line here (see the plug-in-module skill).
-export const modules: readonly ModuleManifest[] = [kernel];
+export const modules: readonly ModuleManifest[] = [health, industries, auth];
