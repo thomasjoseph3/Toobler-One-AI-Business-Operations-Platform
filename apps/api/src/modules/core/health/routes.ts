@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 
 /** Registers the infrastructure routes every deployment has. Today that is only GET /api/v1/health. */
-export function kernelRoutes(app: FastifyInstance) {
+export function healthRoutes(app: FastifyInstance) {
   // Up only when everything a request needs answers. Public by design (public-routes.ts); says only up or down.
   app.get('/health', { config: { access: 'public' } }, async (request, reply) => {
     const databaseCheck = { name: 'database', check: () => app.kernel.database.ping() };

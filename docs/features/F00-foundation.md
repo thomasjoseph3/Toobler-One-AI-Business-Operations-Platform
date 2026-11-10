@@ -1,7 +1,7 @@
 # F00: Foundation and design system
 
 **Requirements:** `1-foundation/01-project-setup.md`; docs/ARCHITECTURE.md, BACKEND.md, FRONTEND.md, SECURITY.md, DEPENDENCIES.md; designer's Design System v1.0
-**Depends on:** nothing      **Module:** `core.kernel` (infrastructure, not a business feature)
+**Depends on:** nothing      **Module:** `core.health` (infrastructure, not a business feature)
 
 ## Scope
 - In: monorepo and tooling; API kernel (config, logging, errors, database with the account fence, module registry and
@@ -82,8 +82,8 @@ Your development servers can keep running: the web app on http://localhost:3000 
 7. **API:** `curl -i http://localhost:4000/api/v1/health` returns `{"ok":true}` with an `x-request-id` header and security
    headers. `curl http://localhost:4000/api/v1/nothing` returns the standard error shape `{"error":{"code":"NOT_FOUND",...}}`.
 8. **A rule being enforced:** add the line `import './repository';` to the end of
-   `apps/api/src/modules/core/kernel/routes.ts` and run `npm run lint`. It fails with "Routes call the service". Undo with
-   `git checkout apps/api/src/modules/core/kernel/routes.ts`.
+   `apps/api/src/modules/core/health/routes.ts` and run `npm run lint`. It fails with "Routes call the service". Undo with
+   `git checkout apps/api/src/modules/core/health/routes.ts`.
 9. **The one-feature gate:** `npm run gate` says F00 is in review. Change F01 to `in_progress` in `docs/plan/STATUS.md`
    and run it again: it fails because F00 is not approved. Undo with `git checkout docs/plan/STATUS.md`.
 10. **Everything:** `npm run verify` finishes green (gate, formatting, lint, types, 117 unit and API tests, 94 browser tests).

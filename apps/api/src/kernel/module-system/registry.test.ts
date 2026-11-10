@@ -38,6 +38,7 @@ describe('createRegistry', () => {
     expect(() => createRegistry([withJob('engine.leads', 'engine', 'tasks.remind')])).toThrow(
       /must be named "leads\.<what>"/,
     );
+    // An example module called "kernel" (not a real one) so the name kernel.heartbeat passes the naming rule and hits the reserved-name rule.
     expect(() => createRegistry([withJob('core.kernel', 'core', 'kernel.heartbeat')])).toThrow(/reserved/);
     expect(() =>
       createRegistry([
