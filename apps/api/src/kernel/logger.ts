@@ -26,12 +26,15 @@ export const REDACT_PATHS = [
  * Builds the logger settings Fastify uses: the log level from the configuration (silent while testing), a list of fields
  * that are replaced with "[redacted]", and a request summary that never contains a body, header or query string.
  */
-export function loggerOptions(config: Pick<Config, 'logLevel' | 'env'>): Exclude<FastifyServerOptions['logger'], boolean | undefined> {
+export function loggerOptions(
+  config: Pick<Config, 'logLevel' | 'env'>,
+): Exclude<FastifyServerOptions['logger'], boolean | undefined> {
   return {
     level: config.env === 'test' ? 'silent' : config.logLevel,
     redact: { paths: REDACT_PATHS, censor: '[redacted]' },
     serializers: {
       // The path without its query string (it can hold a phone number or a code), and never a body or a header
+      // eslint-disable-next-line id-denylist -- `req` is the key the logging library looks for, not a name we chose
       req: (request: { method: string; url: string; id: string; ip?: string }) => ({
         method: request.method,
         url: request.url.split('?')[0],

@@ -8,5 +8,9 @@ export interface PublicRoute {
 }
 
 export const PUBLIC_ROUTES: readonly PublicRoute[] = [
-  { method: 'GET', path: '/api/v1/health', reason: 'Uptime checks and deploy health checks have no session. Reveals only up or down.' },
+  {
+    method: 'GET',
+    path: '/api/v1/health',
+    reason: 'Uptime checks and deploy health checks have no session. Reveals only up or down.',
+  },
 ];

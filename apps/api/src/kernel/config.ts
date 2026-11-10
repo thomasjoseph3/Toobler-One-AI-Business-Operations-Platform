@@ -19,9 +19,7 @@ const EnvironmentVariablesSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).default(4000),
   HOST: z.string().min(1).default('127.0.0.1'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
-  DATABASE_URL: z
-    .string()
-    .regex(/^postgres(ql)?:\/\//, 'DATABASE_URL must be a postgres:// address'),
+  DATABASE_URL: z.string().regex(/^postgres(ql)?:\/\//, 'DATABASE_URL must be a postgres:// address'),
   DATABASE_SSL: z.enum(['off', 'require', 'verify']).default('off'),
   DATABASE_CA_FILE: z.string().default(''),
   DATABASE_POOL_SIZE: z.coerce.number().int().min(1).max(50).default(6),
@@ -48,7 +46,10 @@ export class ConfigError extends Error {}
 function parseTrustProxy(rawValue: string): boolean | string | string[] {
   const trimmedValue = rawValue.trim();
   if (trimmedValue === 'none' || trimmedValue === 'false' || trimmedValue === '') return false;
-  if (trimmedValue === 'true') throw new ConfigError('TRUST_PROXY=true trusts anyone who sends X-Forwarded-For. Use loopback or a list of proxy IPs.');
+  if (trimmedValue === 'true')
+    throw new ConfigError(
+      'TRUST_PROXY=true trusts anyone who sends X-Forwarded-For. Use loopback or a list of proxy IPs.',
+    );
   return trimmedValue.includes(',') ? trimmedValue.split(',').map((address) => address.trim()) : trimmedValue;
 }
 
@@ -81,9 +82,11 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
   if (config.env === 'production') {
     const unsafeSettings: string[] = [];
     if (config.db.ssl === 'off') unsafeSettings.push('DATABASE_SSL must be require or verify in production');
-    if (!config.publicBaseUrl.startsWith('https://')) unsafeSettings.push('PUBLIC_BASE_URL must be https in production');
+    if (!config.publicBaseUrl.startsWith('https://'))
+      unsafeSettings.push('PUBLIC_BASE_URL must be https in production');
     if (!config.webUrl.startsWith('https://')) unsafeSettings.push('WEB_URL must be https in production');
-    if (unsafeSettings.length) throw new ConfigError(`Unsafe production configuration:\n  ${unsafeSettings.join('\n  ')}`);
+    if (unsafeSettings.length)
+      throw new ConfigError(`Unsafe production configuration:\n  ${unsafeSettings.join('\n  ')}`);
   }
   return config;
 }

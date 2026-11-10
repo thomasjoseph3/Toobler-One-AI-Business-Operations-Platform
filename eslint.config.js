@@ -1,0 +1,133 @@
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import tseslint from 'typescript-eslint';
+import moduleBoundaries from './tools/eslint/module-boundaries.js';
+
+// What a file may import, by layer (docs/BACKEND.md): routes -> service -> repository -> kernel/db.
+// ESLint applies ONE `no-restricted-imports` setting per file, so each group of files below lists every rule that applies to it.
+const DATABASE_ONLY_IN_REPOSITORIES = {
+  group: ['**/kernel/db', '**/kernel/db/index', '**/kernel/db/migrate'],
+  allowTypeImports: true,
+  message:
+    'Only repository.ts talks to the database. Call the repository from the service (importing the Db type is fine).',
+};
+const QUERY_BUILDER_ONLY_IN_REPOSITORIES = {
+  group: ['kysely'],
+  allowTypeImports: true,
+  message: 'Queries are written in repository.ts only.',
+};
+const ROUTES_CALL_SERVICES = {
+  group: ['**/repository', '**/repository.ts'],
+  message: 'Routes call the service; only the service talks to the repository.',
+};
+
+// Names that hide what a thing is. `err` is not listed because the logging library requires that exact key in log lines (`{ err: error }`).
+const UNCLEAR_NAMES = [
+  'ctx',
+  'tx',
+  'trx',
+  'e',
+  'acc',
+  'cb',
+  'cfg',
+  'opts',
+  'msg',
+  'req',
+  'res',
+  'idx',
+  'val',
+  'tmp',
+  'arr',
+  'obj',
+];
+
+export default tseslint.config(
+  {
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/coverage/**',
+      '**/playwright-report/**',
+      '**/test-results/**',
+      'tools/eslint/fixtures/**',
+    ],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    languageOptions: { globals: globals.node },
+    rules: {
+      eqeqeq: ['error', 'always', { null: 'ignore' }],
+      'prefer-const': 'error',
+      'no-var': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+      ],
+      // A local name that hides an import or an outer one: how a renamed service ended up undefined inside a function
+      '@typescript-eslint/no-shadow': ['error', { hoist: 'all' }],
+      // Readable names (CLAUDE.md "Readability rules"): no one-letter names and none of the usual abbreviations.
+      'id-length': [
+        'error',
+        {
+          min: 2,
+          properties: 'never',
+          exceptions: ['_', 't'] /* `t` is the translate function CLAUDE.md prescribes */,
+        },
+      ],
+      'id-denylist': ['error', ...UNCLEAR_NAMES],
+    },
+  },
+  // Layering. Modules: only repository.ts may use the database layer or the query builder; routes may not use repositories.
+  {
+    files: ['apps/api/src/modules/**/*.ts'],
+    ignores: ['apps/api/src/modules/**/repository.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [DATABASE_ONLY_IN_REPOSITORIES, QUERY_BUILDER_ONLY_IN_REPOSITORIES] },
+      ],
+    },
+  },
+  {
+    files: ['apps/api/src/modules/**/routes.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        { patterns: [DATABASE_ONLY_IN_REPOSITORIES, QUERY_BUILDER_ONLY_IN_REPOSITORIES, ROUTES_CALL_SERVICES] },
+      ],
+    },
+  },
+  // Module boundaries (tools/eslint/module-boundaries.js): kernel, core/engine/channel/feature and `requires`.
+  {
+    files: ['apps/api/src/**/*.ts'],
+    plugins: { toobler: moduleBoundaries },
+    rules: { 'toobler/module-boundaries': 'error' },
+  },
+  // Settings are read in one place only, and checked there.
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: ['apps/api/src/kernel/config.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "MemberExpression[object.name='process'][property.name='env']",
+          message: 'Read settings through loadConfig() in kernel/config.ts, not process.env.',
+        },
+      ],
+    },
+  },
+  // The small scripts served as they are by the web app (they run in the browser)
+  {
+    files: ['apps/web/public/**/*.js'],
+    languageOptions: { globals: globals.browser },
+  },
+  // The React apps and the shared UI package
+  {
+    files: ['apps/web/**/*.{ts,tsx}', 'packages/ui/**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.browser },
+    ...reactHooks.configs.flat.recommended,
+  },
+);

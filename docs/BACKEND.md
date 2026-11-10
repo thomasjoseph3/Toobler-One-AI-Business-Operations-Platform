@@ -47,17 +47,17 @@ modules/core/contacts/
 // routes.ts
 export const contactRoutes: ModuleRoutes = (r) => {
   r.post('/contacts', { schema: { body: ContactCreate, response: { 201: Contact } }, preHandler: r.role('staff') },
-    async (req, reply) => reply.code(201).send(await contacts.create(req.ctx, req.body)));
+    async (request, reply) => reply.code(201).send(await contacts.create(request.requestContext, request.body)));
 };
 
 // service.ts
-export async function create(ctx: RequestCtx, input: ContactCreate): Promise<Contact> {
+export async function create(requestContext: RequestContext, input: ContactCreate): Promise<Contact> {
   const phoneKey = input.phone ? toPhoneKey(input.phone) : null;          // pure helper
-  return ctx.runInAccountTransaction(async (db) => {
-    if (phoneKey && (await repo.findByPhoneKey(db, phoneKey))) throw conflict('CONTACT_EXISTS', 'A contact already has this phone number.');
-    const contact = await repo.insert(db, { ...input, phoneKey, lifecycleStage: 'new', createdBy: ctx.actor });
-    await ctx.audit(db, 'contact.created', { contactId: contact.id });
-    await ctx.publish(db, 'contact.created', { contactId: contact.id });
+  return requestContext.runInAccountTransaction(async (transaction) => {
+    if (phoneKey && (await repo.findByPhoneKey(transaction, phoneKey))) throw conflict('CONTACT_EXISTS', 'A contact already has this phone number.');
+    const contact = await repo.insert(transaction, { ...input, phoneKey, lifecycleStage: 'new', createdBy: requestContext.actor });
+    await requestContext.audit(transaction, 'contact.created', { contactId: contact.id });
+    await requestContext.publish(transaction, 'contact.created', { contactId: contact.id });
     return contact;
   });
 }
@@ -69,21 +69,22 @@ export const findByPhoneKey = (db: Db, phoneKey: string) =>
 
 ## 2. Request context and the account fence
 
-Every authenticated request gets `req.ctx: RequestCtx`:
+Every piece of business work runs with an `AccountContext` (built in `kernel/context.ts`, built so far by
+`kernel.contextFor(accountId, actor)`):
 
 | Field | Meaning |
 | --- | --- |
-| `accountId` | The signed-in person's **current business**, from the session. Never from the URL, body or query. |
-| `user` | id, name, role in this business (`manager`, `staff`, `staff_own`), team ids |
+| `accountId` | The business. Fixed when the context is built: from the session, widget key, provider lookup or job data. Never from the URL, body or query. |
 | `actor` | Who is acting, stamped on every change: `{ kind: 'user' \| 'agent' \| 'assistant' \| 'import' \| 'system' \| 'workflow', id }` |
-| `runInAccountTransaction(fn)` | Runs `fn` in a transaction **fenced to the account** (RLS: `SET ROLE app_user`, `app.account_id`) |
-| `audit(db, kind, data)` | Writes the activity log in the same transaction |
-| `publish(db, event, payload)` | Writes the outbox event in the same transaction |
-| `modules` | The active modules for this business (cached per request) |
+| `runInAccountTransaction(work)` | Runs `work` in a transaction **fenced to the account** (RLS: `SET ROLE app_user`, `app.account_id`) |
+| `audit(transaction, kind, details)` | Writes the activity log in the same transaction (field names, never values) |
+| `publish(transaction, eventName, payload)` | Writes the outbox event in the same transaction |
 
-Background jobs, webhooks and the agent build the same context with `kernel.contextFor(accountId, actor)`; nothing
-does business work outside a fenced context. The few cross-business lookups (which business owns this WhatsApp
-number?) are named repository functions marked `acrossAccounts`, listed in [SECURITY.md](SECURITY.md).
+For web requests, sign-in (F01) turns this into `request.requestContext: RequestContext`, which adds the signed-in person (id, name, role in
+this business, team ids) and the active modules. Event handlers get a context with actor `{ kind: 'system', id: <module> }`;
+jobs get one with actor `{ kind: 'system', id: <job name> }`. Nothing does business work outside a fenced context. The few
+cross-business lookups (which business owns this WhatsApp number?) are named repository functions marked
+`acrossAccounts`, listed in [SECURITY.md](SECURITY.md).
 
 ## 3. Conventions
 
@@ -107,11 +108,26 @@ number?) are named repository functions marked `acrossAccounts`, listed in [SECU
 
 ## 4. Events, jobs and the outbox
 
-- Publish inside the same transaction as the change (`ctx.publish`). Never call another module to "tell" it something.
-- Subscribers are idempotent; they get `{ eventId, accountId, name, payload, occurredAt }` and run fenced to the account.
-- Jobs are named `<module>.<what>` (`tasks.remind`, `knowledge.read_document`). Scheduled jobs that loop over businesses
-  enqueue one job per business, so one slow business never blocks the others.
-- Retries with backoff; after the last failure, an alert to the platform team (monitoring).
+- Publish inside the same transaction as the change (`accountContext.publish(transaction, 'lead.created', { leadId })`). Never call
+  another module to "tell" it something. Event names are `thing.what_happened`; payloads are ids and small facts (max 8,000
+  characters), never personal data.
+- A module lists what it reacts to in its manifest: `events: { 'lead.created': async (event, accountContext) => ... }`.
+  The dispatcher (`kernel/events/`) polls the outbox every second, takes events with a lease (`FOR UPDATE SKIP LOCKED`,
+  so several instances never deliver the same event twice at once, and a crashed instance's events are taken over), and
+  runs each active subscriber with a context fenced to the event's business.
+- **At least once.** If any handler fails, the whole event is tried again after a wait (30 s, 1 m, 2 m ... up to 1 h),
+  up to 8 attempts, then it is parked (`failed_at`) for a person to look at. So **handlers must be safe to repeat**
+  (use `event.id` to spot work already done), and a handler that already succeeded runs again when its sibling failed.
+- A module that is off for a business is skipped for that event (the event is not kept for it; its data is untouched).
+- Only a short error message is kept on the event (`last_error`, 300 characters), never database detail text.
+- Jobs (`kernel/jobs/`, pg-boss in its own `pgboss` schema) are declared in the manifest: `jobs: [{ name: 'tasks.remind', schedule?: '0 3 * * *', run }]`.
+  Names are `<module>.<what>` (checked at start-up). The business goes in the job data (`accountId`); `run` receives a
+  fenced `accountContext` for it, and the job is skipped when the module is off for that business. Scheduled jobs that
+  loop over businesses enqueue one job per business, so one slow business never blocks the others.
+- Jobs retry up to 5 times with a growing wait. The runner also runs `kernel.heartbeat` once a minute; `/health` fails
+  when it stops. `/health` also fails when the event dispatcher stops checking.
+- Still to do (later features): delete delivered events after 30 days; alert the platform team when an event or job
+  gives up (F35 monitoring).
 
 ## 5. Agent tools
 

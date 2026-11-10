@@ -43,7 +43,9 @@ export function registerGuard(
   app: FastifyInstance,
   options: { authenticate: Authenticator; gate: ModuleGate; publicRoutes: readonly PublicRoute[] },
 ) {
-  const listedPublicRouteKeys = new Set(options.publicRoutes.map((publicRoute) => `${publicRoute.method} ${publicRoute.path}`));
+  const listedPublicRouteKeys = new Set(
+    options.publicRoutes.map((publicRoute) => `${publicRoute.method} ${publicRoute.path}`),
+  );
 
   // Runs once for every route as it is registered, so a badly declared route stops the app at start-up.
   app.addHook('onRoute', (route) => {
@@ -58,7 +60,9 @@ export function registerGuard(
       for (const httpMethod of httpMethods) {
         if (httpMethod === 'HEAD') continue; // Fastify adds HEAD for every GET
         if (!listedPublicRouteKeys.has(`${httpMethod} ${route.url}`)) {
-          throw new Error(`Public route ${httpMethod} ${route.url} is not listed in kernel/http/public-routes.ts (with a reason).`);
+          throw new Error(
+            `Public route ${httpMethod} ${route.url} is not listed in kernel/http/public-routes.ts (with a reason).`,
+          );
         }
       }
     }

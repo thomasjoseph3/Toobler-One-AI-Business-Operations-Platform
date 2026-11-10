@@ -183,8 +183,9 @@ Phase 1 tools (from the requirements, with the conversation-types change):
 ## 4. Events: how modules react to each other
 
 A **transactional outbox**: a service writes its change and the event in the same database transaction
-(`domain_events` table), and the job runner delivers each event to its subscribers at least once. Handlers are
-idempotent (keyed by event id).
+(`domain_events` table), and the event dispatcher (`kernel/events/`, a polling loop with leases, separate from the
+pg-boss job runner) delivers each event to its subscribers at least once. Handlers are idempotent (keyed by event id).
+Details and the retry rules are in [BACKEND.md](BACKEND.md) §4.
 
 Phase 1 events (names are the contract, payloads are ids, not personal data):
 

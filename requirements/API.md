@@ -1,5 +1,7 @@
 # API list
 
+> **Note (10 Nov 2026):** the API is built feature by feature following `docs/BACKEND.md` and `docs/plan/PHASE-1.md`. This list stays the product's intent; the built routes and any differences are recorded in each feature's brief (`docs/features/`).
+
 Every API we build, phase by phase and feature by feature, in the same order as the feature files.
 
 ## In plain words

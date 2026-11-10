@@ -19,7 +19,7 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (databaseValue) => Number(databas
  * 'off' = no encryption, 'require' = encrypted but the server's certificate is not checked,
  * 'verify' = encrypted and the certificate is checked (against the CA file when one is given).
  */
-function buildSslOptions({ ssl: sslMode, caFile }: Config['db']): false | pg.ClientConfig['ssl'] {
+export function buildSslOptions({ ssl: sslMode, caFile }: Config['db']): false | pg.ClientConfig['ssl'] {
   if (sslMode === 'off') return false;
   if (sslMode === 'require') return { rejectUnauthorized: false };
   return { rejectUnauthorized: true, ...(caFile ? { ca: fs.readFileSync(caFile, 'utf8') } : {}) };
@@ -102,7 +102,8 @@ export function createDatabase(databaseConfig: Config['db'], pool = createPool(d
         `select rolbypassrls, rolsuper from pg_roles where rolname = 'app_user'`,
       );
       if (!appUserRows[0]) throw new Error('The app_user role is missing: run npm run db:migrate.');
-      if (appUserRows[0].rolbypassrls || appUserRows[0].rolsuper) throw new Error('app_user must not bypass Row Level Security.');
+      if (appUserRows[0].rolbypassrls || appUserRows[0].rolsuper)
+        throw new Error('app_user must not bypass Row Level Security.');
     },
     close: async () => {
       await system.destroy(); // also ends the pool

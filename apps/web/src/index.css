@@ -1,0 +1,13 @@
+/* Fonts come from npm packages and are bundled by Vite, so nothing is loaded from Google and the content security policy
+   can stay 'self'. The Noto fonts only appear for customer text in Malayalam or Hindi (docs/FRONTEND.md section 2). */
+@import '@fontsource-variable/manrope';
+@import '@fontsource-variable/inter';
+@import '@fontsource/noto-sans-malayalam/400.css';
+@import '@fontsource/noto-sans-malayalam/600.css';
+@import '@fontsource/noto-sans-devanagari/400.css';
+@import '@fontsource/noto-sans-devanagari/600.css';
+@import 'tailwindcss';
+@import '@toobler-one/ui/tokens.css';
+@import '@toobler-one/ui/styles.css';
+/* Tailwind must also look inside the shared UI package for the classes its components use. */
+@source '../../../packages/ui/src';

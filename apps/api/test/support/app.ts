@@ -26,7 +26,11 @@ export function captureLogs() {
 }
 
 /** The real app on the test database, plus any extra modules the test brings. */
-export async function buildTestApp(database: Database, extraModules: ModuleManifest[] = [], overrides: Partial<AppDeps> = {}) {
+export async function buildTestApp(
+  database: Database,
+  extraModules: ModuleManifest[] = [],
+  overrides: Partial<AppDeps> = {},
+) {
   const registry = createRegistry([...modules, ...extraModules]);
   return buildApp({ config: testConfig(), database, registry, ...overrides });
 }

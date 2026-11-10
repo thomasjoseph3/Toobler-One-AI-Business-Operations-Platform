@@ -12,7 +12,9 @@ const accountIdOfBusinessB = newAccountId();
 
 beforeAll(async () => {
   database = openTestDatabase();
-  await sql`create table if not exists app.fence_probe (id uuid primary key, account_id uuid not null, note text)`.execute(database.system);
+  await sql`create table if not exists app.fence_probe (id uuid primary key, account_id uuid not null, note text)`.execute(
+    database.system,
+  );
   await sql`select app.enable_tenant_rls('app.fence_probe')`.execute(database.system).catch(() => {}); // already done on a re-run
   await sql`delete from app.fence_probe`.execute(database.system);
   const insertNoteFor = (accountId: string, note: string) =>
@@ -49,7 +51,9 @@ describe('the account fence', () => {
   it('refuses to write a row for another business', async () => {
     await expect(
       database.runInAccountTransaction(accountIdOfBusinessA, (transaction) =>
-        sql`insert into app.fence_probe (id, account_id, note) values (${uuidv7()}, ${accountIdOfBusinessB}, 'planted')`.execute(transaction),
+        sql`insert into app.fence_probe (id, account_id, note) values (${uuidv7()}, ${accountIdOfBusinessB}, 'planted')`.execute(
+          transaction,
+        ),
       ),
     ).rejects.toThrow(/row-level security/i);
   });
@@ -69,7 +73,10 @@ describe('the account fence', () => {
   it('does not leak the account or the role to the next transaction on the same connection', async () => {
     await database.runInAccountTransaction(accountIdOfBusinessA, readVisibleNotes);
     const [connectionStateAfterwards] = await database.runInSystemTransaction((transaction) =>
-      sql<{ account: string | null; role: string }>`select current_setting('app.account_id', true) as account, current_user as role`
+      sql<{
+        account: string | null;
+        role: string;
+      }>`select current_setting('app.account_id', true) as account, current_user as role`
         .execute(transaction)
         .then((result) => result.rows),
     );
@@ -78,7 +85,9 @@ describe('the account fence', () => {
   });
 
   it('rejects an account id that is not a UUID before touching the database', () => {
-    expect(() => database.runInAccountTransaction("x'; drop table app.fence_probe; --", async () => 1)).toThrow(/account id/);
+    expect(() => database.runInAccountTransaction("x'; drop table app.fence_probe; --", async () => 1)).toThrow(
+      /account id/,
+    );
   });
 
   it('has roles set up the way the fence needs', async () => {

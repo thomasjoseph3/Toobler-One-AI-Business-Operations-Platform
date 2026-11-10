@@ -4,7 +4,9 @@ import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { Config } from './kernel/config';
+import { createContextFactory, type ContextFactory } from './kernel/context';
 import type { Database } from './kernel/db';
+import type { HealthCheck } from './kernel/health';
 import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
@@ -12,11 +14,7 @@ import { loggerOptions } from './kernel/logger';
 import type { ModuleGate, Registry } from './kernel/modules/registry';
 import { coreOnlyGate } from './kernel/modules/registry';
 
-/** One extra thing the /health route verifies, besides the database. `check` throws when that thing is down. */
-export interface HealthCheck {
-  name: string;
-  check(): Promise<void>;
-}
+export type { HealthCheck };
 
 /** What the kernel offers to module routes: reached as `app.kernel`. */
 export interface Kernel {
@@ -24,6 +22,8 @@ export interface Kernel {
   database: Database;
   registry: Registry;
   gate: ModuleGate;
+  /** Builds the context (business + actor + fenced transaction + audit + publish) for work done on a business's behalf. */
+  contextFor: ContextFactory;
   healthChecks: HealthCheck[];
 }
 
@@ -71,7 +71,14 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
   });
 
   const gate = dependencies.gate ?? coreOnlyGate(registry);
-  app.decorate('kernel', { config, database, registry, gate, healthChecks: dependencies.healthChecks ?? [] });
+  app.decorate('kernel', {
+    config,
+    database,
+    registry,
+    gate,
+    contextFor: createContextFactory(database),
+    healthChecks: dependencies.healthChecks ?? [],
+  });
 
   registerErrorHandling(app);
   await app.register(helmet);

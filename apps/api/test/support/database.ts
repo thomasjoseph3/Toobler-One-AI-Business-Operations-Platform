@@ -14,7 +14,9 @@ export function testDatabaseConfig(): Config['db'] {
   const url = process.env.TEST_DATABASE_URL || DEFAULT_URL;
   const host = new URL(url).hostname;
   if (!LOCAL_HOSTS.has(host)) {
-    throw new Error(`Refusing to run tests on "${host}": TEST_DATABASE_URL must point at this machine (npm run db:up).`);
+    throw new Error(
+      `Refusing to run tests on "${host}": TEST_DATABASE_URL must point at this machine (npm run db:up).`,
+    );
   }
   return { url, ssl: 'off', caFile: '', poolSize: 5 };
 }
