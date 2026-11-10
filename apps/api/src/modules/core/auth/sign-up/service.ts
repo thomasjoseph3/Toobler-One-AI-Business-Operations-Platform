@@ -1,17 +1,19 @@
 import type { ProfileResponse, SignUpRequest } from '@toobler-one/shared';
-import { writeActivityLog } from '../../../kernel/activity-log';
-import type { Database } from '../../../kernel/database';
-import { ApiError, conflict } from '../../../kernel/errors';
-import { uuidv7 } from '../../../kernel/ids';
-import { findPasswordProblem, hashPassword } from './passwords';
-import { normaliseMobile } from './phone';
-import * as repository from './repository';
+import { writeActivityLog } from '../../../../kernel/activity-log';
+import type { Database } from '../../../../kernel/database';
+import { ApiError, conflict } from '../../../../kernel/errors';
+import { uuidv7 } from '../../../../kernel/ids';
+import * as accountsRepository from '../data/accounts.repository';
+import * as credentialsRepository from '../data/credentials.repository';
+import * as usersRepository from '../data/users.repository';
+import { normaliseMobile } from '../helpers/phone';
+import { findPasswordProblem, hashPassword } from '../password/passwords';
 
 // The country code added to a mobile number typed without one (91 = India). It becomes a setting in a later slice.
 const DEFAULT_COUNTRY_CODE = '91';
 
-/** Everything about signing up, signing in and passwords. Routes call this; this calls the repository. */
-export function createAuthService({ database }: { database: Database }) {
+/** Everything about signing up. The route calls this; this calls the repositories in ../data. */
+export function createSignUpService({ database }: { database: Database }) {
   return {
     /**
      * Creates a business and its owner (a manager), and stores the owner's password as a hash. Nothing is signed in yet:
@@ -37,13 +39,13 @@ export function createAuthService({ database }: { database: Database }) {
       try {
         // One transaction: either the business, the owner and the password are all saved, or none of them are.
         await database.runInSystemTransaction(async (transaction) => {
-          if (await repository.emailIsRegistered(transaction, request.email)) throw emailTakenError();
-          await repository.insertAccount(transaction, {
+          if (await usersRepository.emailIsRegistered(transaction, request.email)) throw emailTakenError();
+          await accountsRepository.insertAccount(transaction, {
             id: accountId,
             name: request.businessName,
             industry: request.industry,
           });
-          await repository.insertUser(transaction, {
+          await usersRepository.insertUser(transaction, {
             id: userId,
             accountId,
             email: request.email,
@@ -53,7 +55,7 @@ export function createAuthService({ database }: { database: Database }) {
             role: 'manager',
             createdBy: { kind: 'user', id: userId },
           });
-          await repository.insertCredentials(transaction, userId, passwordHash);
+          await credentialsRepository.insertCredentials(transaction, userId, passwordHash);
           await writeActivityLog(transaction, {
             accountId,
             actor: { kind: 'user', id: userId },
@@ -80,4 +82,4 @@ export function createAuthService({ database }: { database: Database }) {
   };
 }
 
-export type AuthService = ReturnType<typeof createAuthService>;
+export type SignUpService = ReturnType<typeof createSignUpService>;

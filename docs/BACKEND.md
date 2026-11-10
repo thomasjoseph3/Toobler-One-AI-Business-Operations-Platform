@@ -41,6 +41,28 @@ modules/core/contacts/
   contacts.api.test.ts  API tests: works, wrong role, other business, not signed in, bad input
 ```
 
+### A bigger module: one folder per feature (decided 10 Nov 2026)
+
+A module with more than about 4 routes (like `core.auth`, which will have 12) is split into **feature folders**, so a
+developer finds everything about one feature in one place and a new feature adds a folder instead of growing three big
+files. Small modules (like contacts) stay flat as above.
+
+```text
+modules/core/auth/
+  README.md            the layout and the request flow, written for people opening the folder
+  module.ts            declares the module; one line per feature registers its routes
+  index.ts             the public API
+  sign-up/             routes.ts + service.ts (+ tests) for one feature
+  sessions/            another feature folder
+  data/                ONE repository per table: <table>.repository.ts. The only files that touch the database.
+  helpers/             small pure functions several features share
+```
+
+The flow does not change: `<feature>/routes.ts` → `<feature>/service.ts` → `data/<table>.repository.ts` → `kernel/database`.
+A repository is shared by every feature that needs that table, so SQL is never copied. The linter treats
+`repository.ts` and `*.repository.ts` as the files allowed to use the database layer. Folder names must not repeat
+names used elsewhere in the project (the engine room is `kernel`, the machinery for modules is `kernel/module-system`).
+
 ### Example
 
 ```ts

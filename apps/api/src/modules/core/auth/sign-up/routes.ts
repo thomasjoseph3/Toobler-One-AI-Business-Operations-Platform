@@ -1,12 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { profileResponseSchema, signUpRequestSchema } from '@toobler-one/shared';
-import { createAuthService } from './service';
+import { createSignUpService } from './service';
 
-/** Registers the sign-in routes. Slice 1 has one: POST /api/v1/auth/signup. */
-export function authRoutes(app: FastifyInstance) {
+/** Registers the sign-up route: POST /api/v1/auth/signup. */
+export function signUpRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
-  const authService = createAuthService({ database: app.kernel.database });
+  const signUpService = createSignUpService({ database: app.kernel.database });
 
   // Open to anyone (a new owner has no account yet), so it is listed in kernel/http/public-routes.ts.
   // The body is checked against the shared schema before the handler runs; the answer is checked against the profile
@@ -18,7 +18,7 @@ export function authRoutes(app: FastifyInstance) {
       schema: { body: signUpRequestSchema, response: { 201: profileResponseSchema } },
     },
     async (request, reply) => {
-      const profile = await authService.signUp(request.body);
+      const profile = await signUpService.signUp(request.body);
       return reply.code(201).send(profile);
     },
   );
