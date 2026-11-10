@@ -185,6 +185,13 @@ describe('project lint configuration', () => {
     expect(problems).toEqual([expect.stringContaining('no-shadow')]);
   });
 
+  it('reports a React hook called inside a condition in the web app', async () => {
+    const code =
+      "import { useState } from 'react';\nexport function Broken({ show }: { show: boolean }) {\n  if (show) {\n    useState(0);\n  }\n  return null;\n}\n";
+    const problems = await problemsIn('apps/web/src/Broken.tsx', code);
+    expect(problems).toEqual([expect.stringContaining('react-hooks/rules-of-hooks')]);
+  });
+
   it('is clean for the real source of the API', async () => {
     const results = await eslint.lintFiles([`${apiSource}/**/*.ts`]);
     const problems = results.flatMap((result) =>
