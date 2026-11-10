@@ -13,7 +13,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | ID | Feature | Status | Brief | Approved on |
 | --- | --- | --- | --- | --- |
 | F00 | Foundation and design system | approved | [brief](../features/F00-foundation.md) | 2026-11-10 |
-| F01 | Sign-up, sign-in and sessions | planned | | |
+| F01 | Sign-up, sign-in and sessions | in_progress | [brief](../features/F01-sign-up-and-sign-in.md) | |
 | F03 | Modules: plug and play | planned | | |
 | F04 | Contacts | planned | | |
 | F06 | Pipeline and leads board | planned | | |
