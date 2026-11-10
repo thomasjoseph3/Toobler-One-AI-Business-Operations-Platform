@@ -43,3 +43,6 @@ export const profileResponseSchema = z.object({
   }),
 });
 export type ProfileResponse = z.infer<typeof profileResponseSchema>;
+
+/** The answer of a route that has nothing to report except that it worked (sign-out, and later more). */
+export const okResponseSchema = z.object({ ok: z.literal(true) });

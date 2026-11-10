@@ -70,6 +70,29 @@ export async function findPersonByEmail(db: Db, email: string): Promise<PersonFo
   };
 }
 
+/** A person as the profile shows them. */
+export interface PersonProfile {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string | null;
+  role: 'manager' | 'staff' | 'staff_own';
+}
+
+/**
+ * A person by id, or undefined. Run it inside a business's fence (`runInAccountTransaction`): it can then only ever find
+ * people of that business, so another business's person answers exactly like a missing one.
+ */
+export async function findPersonProfileById(db: Db, userId: string): Promise<PersonProfile | undefined> {
+  const row = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email', 'mobile_e164', 'role'])
+    .where('id', '=', userId)
+    .executeTakeFirst();
+  if (!row) return undefined;
+  return { id: row.id, name: row.name, email: row.email, mobile: row.mobile_e164, role: row.role };
+}
+
 /** Records that the person has just signed in. */
 export async function markLoggedIn(db: Db, userId: string): Promise<void> {
   await db

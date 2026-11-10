@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { profileRoutes } from './profile/routes';
 import { createSessionAuthenticator } from './sessions/authenticator';
 import { sessionsRoutes } from './sessions/routes';
 import { signUpRoutes } from './sign-up/routes';
@@ -17,5 +18,6 @@ export default defineModule({
   routes: (app) => {
     signUpRoutes(app);
     sessionsRoutes(app);
+    profileRoutes(app);
   },
 });

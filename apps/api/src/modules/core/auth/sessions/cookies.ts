@@ -32,6 +32,13 @@ export function setAuthCookies(
   });
 }
 
+/** Removes both cookies from the browser (sign-out). The path must match the one they were set with. */
+export function clearAuthCookies(reply: FastifyReply, config: Config): void {
+  const names = cookieNames(config.env);
+  reply.clearCookie(names.access, { path: ACCESS_COOKIE_PATH });
+  reply.clearCookie(names.refresh, { path: REFRESH_COOKIE_PATH });
+}
+
 /** The access token the browser sent, if any. */
 export const readAccessCookie = (request: FastifyRequest, config: Config): string | undefined =>
   request.cookies[cookieNames(config.env).access];

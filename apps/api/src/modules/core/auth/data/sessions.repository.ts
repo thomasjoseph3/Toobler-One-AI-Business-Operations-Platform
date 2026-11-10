@@ -45,6 +45,16 @@ export async function findLivePrincipal(db: Db, sessionId: string, userId: strin
   };
 }
 
+/** Ends a session, with the reason ("signed out"). Does nothing if it has already ended. */
+export async function revokeSession(db: Db, sessionId: string, reason: string): Promise<void> {
+  await db
+    .updateTable('sessions')
+    .set({ revoked_at: sql`now()`, revoked_reason: reason })
+    .where('id', '=', sessionId)
+    .where('revoked_at', 'is', null)
+    .execute();
+}
+
 /** Opens a session. It ends `maxDays` from now at the latest. */
 export async function insertSession(
   db: Db,

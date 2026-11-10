@@ -33,6 +33,22 @@ and WhatsApp will need it) but it is not verified. The design keeps (2) and (3) 
   coming from `/me` (F03); mobile verification and WhatsApp-code sign-in (they arrive with F25, when an OTP/WhatsApp provider exists); platform admin login and support access (F03/F24); changing
   email or mobile (after F02); single sign-on and two-factor (not in Phase 1).
 
+## Build order inside F01 (owner decision, 10 Nov 2026)
+Slices of at most 2 API routes, backend first; **the screens come after the whole auth backend is finished**.
+
+| Slice | Routes | State |
+| --- | --- | --- |
+| 1 | `POST /auth/signup`, `GET /industries` | done and tested by the owner |
+| 2a | `POST /auth/login` | done and tested by the owner |
+| 2b | `POST /industries` (platform admin: adding industries only) | done and tested by the owner |
+| 3 | `POST /auth/logout`, `GET /me` | built, waiting for the owner's test |
+| 4 | `POST /auth/verify-email`, `POST /auth/resend-email` | planned |
+| 5 | `POST /auth/refresh` | planned |
+| 6 | lockout after 5 wrong passwords, rate limits (no new route) | planned |
+| 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | planned |
+| 8 | `PATCH /me`, `POST /me/password` | planned |
+| UI | sign-up, verify, sign-in, forgot and reset, profile, sign-out | after slice 8 |
+
 ## Reused from the hotel agent
 - Read: `src/modules/core/auth/{routes,service,sessions,repository}.js`, `src/middleware/auth.js` (489 lines). **We keep
   what serves our goal and change what doesn't.**

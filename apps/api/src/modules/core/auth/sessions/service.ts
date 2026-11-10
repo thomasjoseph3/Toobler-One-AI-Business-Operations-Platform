@@ -3,6 +3,7 @@ import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Config } from '../../../../kernel/config';
 import type { Database } from '../../../../kernel/database';
 import { ApiError } from '../../../../kernel/errors';
+import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import * as accountsRepository from '../data/accounts.repository';
 import * as credentialsRepository from '../data/credentials.repository';
@@ -23,9 +24,30 @@ export interface SignInResult {
   profile: ProfileResponse;
 }
 
-/** Everything about signing in. The route calls this; this calls the repositories in ../data. */
+/** Everything about signing in and out. The route calls this; this calls the repositories in ../data. */
 export function createSessionsService({ config, database }: { config: Config; database: Database }) {
   return {
+    /**
+     * Ends the session the person is using, so its tokens stop working at once (the authenticator checks the session on
+     * every request). The person's other sessions, on other devices, are not touched. Writes an activity-log line.
+     */
+    async signOut(principal: Principal, client: ClientInfo): Promise<void> {
+      await database.runInSystemTransaction(async (transaction) => {
+        await sessionsRepository.revokeSession(transaction, principal.sessionId, 'signed out');
+        await writeActivityLog(transaction, {
+          accountId: principal.accountId,
+          actor: { kind: 'user', id: principal.userId },
+          kind: 'auth.signed_out',
+          details: {
+            recordType: 'user',
+            recordId: principal.userId,
+            ...(client.ip ? { ip: client.ip } : {}),
+            ...(client.userAgent ? { userAgent: client.userAgent } : {}),
+          },
+        });
+      });
+    },
+
     /**
      * Checks the email and password and opens a session. A wrong password, an unknown email and a disabled person all get
      * the same answer, and take about the same time (an unknown email is checked against a stand-in hash).

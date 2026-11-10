@@ -1,7 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { profileResponseSchema, signInRequestSchema } from '@toobler-one/shared';
-import { setAuthCookies } from './cookies';
+import { okResponseSchema, profileResponseSchema, signInRequestSchema } from '@toobler-one/shared';
+import { unauthorized } from '../../../../kernel/errors';
+import { clearAuthCookies, setAuthCookies } from './cookies';
 import { createSessionsService, type ClientInfo } from './service';
 
 /** Who is making the request, for the session record and the activity log. */
@@ -10,7 +11,7 @@ const clientOf = (request: FastifyRequest): ClientInfo => ({
   ip: request.ip,
 });
 
-/** Registers the sign-in route: POST /api/v1/auth/login. */
+/** Registers the sign-in and sign-out routes: POST /api/v1/auth/login and POST /api/v1/auth/logout. */
 export function sessionsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const { config, database } = app.kernel;
@@ -32,6 +33,19 @@ export function sessionsRoutes(app: FastifyInstance) {
       );
       setAuthCookies(reply, config, tokens);
       return profile;
+    },
+  );
+
+  // For anyone signed in. The kernel's guard has already checked the cookie and the session before this runs. Like every
+  // request that changes something, it needs our Origin and X-Requested-With headers (CSRF).
+  typedApp.post(
+    '/auth/logout',
+    { config: { access: 'staff' }, schema: { response: { 200: okResponseSchema } } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await sessionsService.signOut(request.principal, clientOf(request));
+      clearAuthCookies(reply, config);
+      return { ok: true as const };
     },
   );
 }
