@@ -56,7 +56,7 @@ The whole app and every **text** channel (web chat, WhatsApp, email, setup chat,
   active for the business (entitled + enabled + ready). Off = 404 and hidden; data is kept.
 - **Channels** only translate provider ⇄ normalised messages (`ChannelAdapter`). All conversation logic is in the
   conversation engine, the same for every channel.
-- **Repository pattern.** `routes.ts → service.ts → repository.ts → kernel/database`. Only repositories touch the database.
+- **Repository pattern.** `routes/ → services/ → repositories/ → kernel/database`, in folders of those names in every module (checked by `module-structure.test.ts`). Only repositories touch the database.
   Routes never import repositories. Pure logic (scoring, router, maths) in its own file without I/O.
 - **The AI states facts; code decides.** Lead temperature, conversation outcomes, prices, totals, due times and report
   numbers are computed in code. The AI never does maths.

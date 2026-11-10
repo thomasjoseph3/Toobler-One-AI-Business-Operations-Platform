@@ -1,4 +1,4 @@
-import type { Db } from '../../../kernel/database';
+import type { Db } from '../../../../kernel/database';
 
 // The SQL for the `industries` table (the kinds of business a person can pick). The only file in this module that talks
 // to the database. The table is shared by every business, so these queries are not fenced to one.

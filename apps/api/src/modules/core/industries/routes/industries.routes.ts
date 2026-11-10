@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { createIndustryRequestSchema, industriesResponseSchema, industrySchema } from '@toobler-one/shared';
-import { unauthorized } from '../../../kernel/errors';
-import { addIndustry, listIndustries } from './service';
+import { unauthorized } from '../../../../kernel/errors';
+import { addIndustry, listIndustries } from '../services/industries.service';
 
 /** Registers GET and POST /api/v1/industries. */
 export function industriesRoutes(app: FastifyInstance) {

@@ -1,9 +1,9 @@
 import type { CreateIndustryRequest, Industry, IndustriesResponse } from '@toobler-one/shared';
-import { writeActivityLog } from '../../../kernel/activity-log';
-import type { Database } from '../../../kernel/database';
-import { conflict } from '../../../kernel/errors';
-import type { Principal } from '../../../kernel/http/guard';
-import * as repository from './repository';
+import { writeActivityLog } from '../../../../kernel/activity-log';
+import type { Database } from '../../../../kernel/database';
+import { conflict } from '../../../../kernel/errors';
+import type { Principal } from '../../../../kernel/http/guard';
+import * as repository from '../repositories/industries.repository';
 
 // Where a new industry goes in the list when the platform admin does not say: after the seeded ones (10 to 70) and before
 // "Something else" (999).

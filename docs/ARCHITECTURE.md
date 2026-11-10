@@ -254,7 +254,7 @@ The same recipe works for service (tickets pipeline, portal), marketing (consent
 │   │   └── src/
 │   │       ├── kernel/           registry, module guard, event bus, jobs, config, db, errors, http plumbing
 │   │       ├── modules/
-│   │       │   ├── core/<name>/  routes.ts · service.ts · repository.ts · schemas.ts · module.ts · index.ts · *.test.ts
+│   │       │   ├── core/<name>/  routes/ · services/ · repositories/ · helpers/ · module.ts · index.ts (same shape for every module)
 │   │       │   ├── engines/<name>/
 │   │       │   ├── channels/<name>/   + adapter.ts
 │   │       │   └── features/<name>/
