@@ -49,7 +49,42 @@ describe('loadConfig', () => {
       DATABASE_SSL: 'require',
       PUBLIC_BASE_URL: 'https://api.example.com',
       WEB_URL: 'https://app.example.com',
+      SMTP_HOST: 'smtp.example.com',
+      EMAIL_FROM: 'Toobler One <no-reply@example.com>',
     });
     expect(safeProductionConfig.env).toBe('production');
+  });
+  it('production refuses the console mail sender, which would print working links in the log', () => {
+    const productionWithoutMail = {
+      ...minimalValidEnvironment,
+      NODE_ENV: 'production',
+      DATABASE_SSL: 'require',
+      PUBLIC_BASE_URL: 'https://api.example.com',
+      WEB_URL: 'https://app.example.com',
+    };
+    expect(() => loadConfig(productionWithoutMail)).toThrow(/MAIL_PROVIDER must be smtp/);
+    expect(() => loadConfig({ ...productionWithoutMail, MAIL_PROVIDER: 'console' })).toThrow(
+      /MAIL_PROVIDER must be smtp/,
+    );
+  });
+  it('picks the mail sender from the settings, and never repeats the mail password in an error', () => {
+    expect(loadConfig(minimalValidEnvironment).mail.provider).toBe('console'); // nothing set
+    const withServer = loadConfig({ ...minimalValidEnvironment, SMTP_HOST: 'smtp.example.com', EMAIL_FROM: 'a@b.co' });
+    expect(withServer.mail.provider).toBe('smtp');
+    expect(withServer.mail.smtp.port).toBe(587); // an unset port uses the default
+    expect(loadConfig({ ...minimalValidEnvironment, SMTP_PORT: '' }).mail.smtp.port).toBe(587); // an empty one too
+    expect(loadConfig({ ...minimalValidEnvironment, MAIL_PROVIDER: 'console', SMTP_HOST: 'x' }).mail.provider).toBe(
+      'console',
+    );
+    expect(() => loadConfig({ ...minimalValidEnvironment, MAIL_PROVIDER: 'smtp' })).toThrow(/SMTP_HOST and EMAIL_FROM/);
+    expect(() =>
+      loadConfig({
+        ...minimalValidEnvironment,
+        SMTP_HOST: 'h',
+        EMAIL_FROM: 'f',
+        SMTP_PASS: 'hunter2-secret',
+        SMTP_PORT: 'abc',
+      }),
+    ).toThrow(expect.not.stringContaining('hunter2-secret'));
   });
 });

@@ -13,6 +13,7 @@ import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
 import { loggerOptions } from './kernel/logger';
+import { createMailSender, type MailSender } from './providers/mail';
 import type { ModuleGate, Registry } from './kernel/module-system/registry';
 import { coreOnlyGate } from './kernel/module-system/registry';
 
@@ -27,6 +28,8 @@ export interface Kernel {
   /** Builds the context (business + actor + fenced transaction + audit + publish) for work done on a business's behalf. */
   contextFor: ContextFactory;
   healthChecks: HealthCheck[];
+  /** Sends email. Modules use it through `app.kernel.mail`, never by importing the provider. */
+  mail: MailSender;
 }
 
 declare module 'fastify' {
@@ -44,6 +47,8 @@ export interface AppDeps {
   authenticate?: Authenticator;
   publicRoutes?: readonly PublicRoute[];
   healthChecks?: HealthCheck[];
+  /** Replaces the mail sender the settings choose. Tests pass a recording one so no email is really sent. */
+  mailSender?: MailSender;
   /** Requests per window per address; public routes get their own tighter limits. */
   rateLimit?: { max: number; timeWindow: string };
   /** Tests capture log lines here. */
@@ -81,6 +86,7 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     gate,
     contextFor: createContextFactory(database),
     healthChecks: dependencies.healthChecks ?? [],
+    mail: dependencies.mailSender ?? createMailSender(config, (line) => app.log.info(line)),
   });
 
   // The authenticator comes from the module that provides one (core.auth). With none, every signed-in route answers 401.

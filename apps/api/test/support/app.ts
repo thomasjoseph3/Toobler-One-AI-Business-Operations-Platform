@@ -9,6 +9,7 @@ import { createRegistry } from '../../src/kernel/module-system/registry';
 import { modules } from '../../src/modules';
 import type { ModuleManifest } from '../../src/kernel/module-system/define';
 import { testDatabaseConfig } from './database';
+import { createRecordingMailSender } from './mail';
 
 /** The web address the app accepts changes from (the CSRF check), the same as the app's default setting. */
 export const TEST_WEB_ORIGIN = 'http://localhost:3000';
@@ -47,5 +48,7 @@ export async function buildTestApp(
   const registry = createRegistry([...modules, ...extraModules]);
   // The real open routes are always allowed; a test only adds the open routes of its own test modules.
   const publicRoutes = [...PUBLIC_ROUTES, ...(overrides.publicRoutes ?? [])];
-  return buildApp({ config: testConfig(), database, registry, ...overrides, publicRoutes });
+  // No test sends a real email: unless a test brings its own recorder, emails are kept and thrown away.
+  const mailSender = overrides.mailSender ?? createRecordingMailSender();
+  return buildApp({ config: testConfig(), database, registry, ...overrides, mailSender, publicRoutes });
 }

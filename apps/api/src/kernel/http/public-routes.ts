@@ -29,6 +29,14 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   },
   {
     method: 'POST',
+    path: '/api/v1/auth/verify-email',
+    reason:
+      'The link in the email is opened in a browser that may not be signed in. The long random token in the body is the ' +
+      'proof; it works once, expires, and an unknown, used or expired token all get the same answer. Rate limits arrive ' +
+      'in a later F01 slice (6).',
+  },
+  {
+    method: 'POST',
     path: '/api/v1/auth/signup',
     reason:
       'A new owner has no account yet. The password is checked and stored only as an argon2id hash. ' +

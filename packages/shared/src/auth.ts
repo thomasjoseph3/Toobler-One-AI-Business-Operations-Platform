@@ -34,6 +34,8 @@ export const profileResponseSchema = z.object({
     email: z.string(),
     mobile: z.string().nullable(),
     role: z.enum(['manager', 'staff', 'staff_own']),
+    // Whether the person has confirmed their email address (the link we email them)
+    emailVerified: z.boolean(),
   }),
   business: z.object({
     id: z.string(),
@@ -43,6 +45,10 @@ export const profileResponseSchema = z.object({
   }),
 });
 export type ProfileResponse = z.infer<typeof profileResponseSchema>;
+
+/** What the "verify my email" page sends: the token from the link in the email. */
+export const verifyEmailRequestSchema = z.object({ token: z.string().trim().min(20).max(200) });
+export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
 
 /** The answer of a route that has nothing to report except that it worked (sign-out, and later more). */
 export const okResponseSchema = z.object({ ok: z.literal(true) });

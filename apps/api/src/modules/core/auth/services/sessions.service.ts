@@ -98,7 +98,14 @@ export function createSessionsService({ config, database }: { config: Config; da
       return {
         tokens: { accessToken, refreshToken },
         profile: {
-          user: { id: person.id, name: person.name, email: person.email, mobile: person.mobile, role: person.role },
+          user: {
+            id: person.id,
+            name: person.name,
+            email: person.email,
+            mobile: person.mobile,
+            role: person.role,
+            emailVerified: person.emailVerified,
+          },
           business,
         },
       };

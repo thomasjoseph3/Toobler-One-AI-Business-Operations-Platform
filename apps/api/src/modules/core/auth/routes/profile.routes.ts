@@ -13,7 +13,7 @@ export function profileRoutes(app: FastifyInstance) {
   // need the CSRF headers.
   typedApp.get(
     '/me',
-    { config: { access: 'staff' }, schema: { response: { 200: profileResponseSchema } } },
+    { config: { access: 'staff', allowUnverified: true }, schema: { response: { 200: profileResponseSchema } } },
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return profileService.getProfile(request.principal);

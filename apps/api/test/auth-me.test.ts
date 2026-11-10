@@ -81,6 +81,7 @@ describe('GET /api/v1/me', () => {
       role: 'manager' as const,
       sessionId: randomUUID(),
       isPlatformAdmin: false,
+      emailVerified: true,
     });
 
     // Correct pairing: the person with their own business

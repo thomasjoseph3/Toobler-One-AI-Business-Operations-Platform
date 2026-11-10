@@ -34,6 +34,19 @@ const EnvironmentVariablesSchema = z.object({
   // How long an access token works before the app must refresh it (minutes), and how long a session lasts at most (days)
   ACCESS_TOKEN_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
   SESSION_MAX_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+  // Email. `smtp` sends through a real mail server; `console` prints the email in the API's terminal (development only).
+  // Left empty it is `smtp` when SMTP_HOST is set, otherwise `console`.
+  MAIL_PROVIDER: z.enum(['smtp', 'console']).optional(),
+  SMTP_HOST: z.string().default(''),
+  // An empty SMTP_PORT in .env means "use the default"
+  SMTP_PORT: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    z.coerce.number().int().min(1).max(65535).default(587),
+  ),
+  SMTP_USER: z.string().default(''),
+  SMTP_PASS: z.string().default(''),
+  // The "From" line of every email, like: Toobler One <no-reply@yourdomain.com>
+  EMAIL_FROM: z.string().default(''),
 });
 
 export interface Config {
@@ -46,6 +59,11 @@ export interface Config {
   webUrl: string;
   publicBaseUrl: string;
   auth: { jwtSecret: string; accessTokenMinutes: number; sessionMaxDays: number };
+  mail: {
+    provider: 'smtp' | 'console';
+    from: string;
+    smtp: { host: string; port: number; user: string; password: string };
+  };
 }
 
 export class ConfigError extends Error {}
@@ -91,13 +109,29 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
       accessTokenMinutes: validEnvironment.ACCESS_TOKEN_MINUTES,
       sessionMaxDays: validEnvironment.SESSION_MAX_DAYS,
     },
+    mail: {
+      provider: validEnvironment.MAIL_PROVIDER ?? (validEnvironment.SMTP_HOST ? 'smtp' : 'console'),
+      from: validEnvironment.EMAIL_FROM,
+      smtp: {
+        host: validEnvironment.SMTP_HOST,
+        port: validEnvironment.SMTP_PORT,
+        user: validEnvironment.SMTP_USER,
+        password: validEnvironment.SMTP_PASS,
+      },
+    },
   };
+  if (config.mail.provider === 'smtp' && (!config.mail.smtp.host || !config.mail.from)) {
+    throw new ConfigError('Bad configuration:\n  MAIL_PROVIDER=smtp needs SMTP_HOST and EMAIL_FROM to be set');
+  }
   if (config.env === 'production') {
     const unsafeSettings: string[] = [];
     if (config.db.ssl === 'off') unsafeSettings.push('DATABASE_SSL must be require or verify in production');
     if (!config.publicBaseUrl.startsWith('https://'))
       unsafeSettings.push('PUBLIC_BASE_URL must be https in production');
     if (!config.webUrl.startsWith('https://')) unsafeSettings.push('WEB_URL must be https in production');
+    if (config.mail.provider === 'console') {
+      unsafeSettings.push('MAIL_PROVIDER must be smtp in production (console would print working links in the log)');
+    }
     if (unsafeSettings.length)
       throw new ConfigError(`Unsafe production configuration:\n  ${unsafeSettings.join('\n  ')}`);
   }

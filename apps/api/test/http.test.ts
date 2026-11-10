@@ -188,6 +188,7 @@ describe('route rules', () => {
       role,
       sessionId: newAccountId(),
       isPlatformAdmin: false,
+      emailVerified: true,
     });
     const staffApp = await buildTestApp(database, [rolesModule], { authenticate: authenticateAs('staff') });
     expect((await staffApp.inject('/api/v1/for-staff')).json()).toEqual({ role: 'staff' });
@@ -214,6 +215,7 @@ describe('route rules', () => {
       role: 'manager' as const, // even a manager is refused unless the flag is on
       sessionId: newAccountId(),
       isPlatformAdmin,
+      emailVerified: true,
     });
 
     const anonymousApp = await buildTestApp(database, [platformModule]);
@@ -244,6 +246,7 @@ describe('route rules', () => {
       role: 'manager' as const,
       sessionId: accountId,
       isPlatformAdmin: false,
+      emailVerified: true,
     });
     const appWithModuleOff = await buildTestApp(database, [leadsModule], { authenticate });
     const response = await appWithModuleOff.inject('/api/v1/leads');

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { forbidden, notFound, unauthorized } from '../errors';
+import { ApiError, forbidden, notFound, unauthorized } from '../errors';
 import type { ModuleGate } from '../module-system/registry';
 import type { PublicRoute } from './public-routes';
 
@@ -16,6 +16,8 @@ export interface Principal {
   role: 'manager' | 'staff' | 'staff_own';
   sessionId: string;
   isPlatformAdmin: boolean;
+  /** Whether the person has proved they own their email. Until they have, they can only reach the routes marked `allowUnverified`. */
+  emailVerified: boolean;
 }
 
 /** Turns the request's credentials into a Principal, or throws 401. The real one comes from the `core.auth` module. */
@@ -32,6 +34,8 @@ declare module 'fastify' {
     access?: Access;
     /** Set by the kernel for routes a module registers: the route 404s when that module is off. */
     moduleId?: string;
+    /** Let a signed-in person whose email is not verified yet call this route (sign out, see my profile, resend the email). Off by default. */
+    allowUnverified?: boolean;
   }
   interface FastifyRequest {
     principal?: Principal;
@@ -42,7 +46,8 @@ declare module 'fastify' {
  * Makes the security rules impossible to forget:
  *  - a route without `config.access` stops the app from starting;
  *  - a `public` route must be listed in public-routes.ts;
- *  - `staff`, `manager` and `platform` routes are authenticated and role-checked before the handler;
+ *  - `staff`, `manager` and `platform` routes are authenticated and role-checked before the handler, and refuse a person
+ *    whose email is not verified unless the route says `allowUnverified`;
  *  - a module's routes answer 404 for a business that doesn't have the module on.
  */
 export function registerGuard(
@@ -79,6 +84,9 @@ export function registerGuard(
       if (requiredAccess === 'public') return;
       const principal = await options.authenticate(request);
       request.principal = principal;
+      if (!principal.emailVerified && !request.routeOptions.config.allowUnverified) {
+        throw new ApiError(403, 'EMAIL_NOT_VERIFIED', 'Please verify your email address first.');
+      }
       if (requiredAccess === 'manager' && principal.role !== 'manager') throw forbidden();
       if (requiredAccess === 'platform' && !principal.isPlatformAdmin) throw forbidden();
       if (moduleId && !(await options.gate.isActive(principal.accountId, moduleId))) throw notFound();

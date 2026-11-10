@@ -9,10 +9,10 @@ Open the folder named for the layer. The feature's name is in the file name.
 
 | Folder | What is in it |
 | --- | --- |
-| `routes/` | `sign-up.routes.ts` (`POST /auth/signup`), `sessions.routes.ts` (`POST /auth/login`, `POST /auth/logout`), `profile.routes.ts` (`GET /me`) |
-| `services/` | `sign-up.service.ts`, `sessions.service.ts`, `profile.service.ts`: the rules and the steps |
-| `repositories/` | One file per table: `accounts`, `users`, `credentials`, `sessions` (later `auth-tokens`, `login-attempts`) |
-| `helpers/` | Shared tools with no routes: `passwords.ts`, `phone.ts`, `tokens.ts`, `cookies.ts` |
+| `routes/` | `sign-up.routes.ts` (`POST /auth/signup`), `sessions.routes.ts` (`POST /auth/login`, `POST /auth/logout`), `profile.routes.ts` (`GET /me`), `email-verification.routes.ts` (`POST /auth/verify-email`, `POST /auth/resend-email`) |
+| `services/` | `sign-up.service.ts`, `sessions.service.ts`, `profile.service.ts`, `email-verification.service.ts`: the rules and the steps |
+| `repositories/` | One file per table: `accounts`, `users`, `credentials`, `sessions`, `auth-tokens` (later `login-attempts`) |
+| `helpers/` | Shared tools with no routes: `passwords.ts`, `phone.ts`, `tokens.ts`, `cookies.ts`, `verification-email.ts` (the email's text) |
 | `authenticator.ts` | Tells the kernel who is signed in on every request |
 
 ## How a request travels
@@ -39,6 +39,11 @@ const person = await usersRepository.findPersonProfileById(transaction, principa
 ```
 
 Each service file also lists, in a comment at the top, the repositories it uses.
+
+## Outside services
+
+The mail sender lives outside the modules, in `apps/api/src/providers/mail/` (a real mail server, or the terminal for
+development). A service reaches it as `app.kernel.mail`, never by importing the provider.
 
 ## Adding a feature
 

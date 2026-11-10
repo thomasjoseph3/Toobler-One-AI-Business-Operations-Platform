@@ -4,6 +4,7 @@ import type { Database } from '../../../../kernel/database';
 import { ApiError, conflict } from '../../../../kernel/errors';
 import { uuidv7 } from '../../../../kernel/ids';
 import { isActiveIndustry } from '../../industries';
+import type { EmailVerificationService } from './email-verification.service';
 import * as accountsRepository from '../repositories/accounts.repository';
 import * as credentialsRepository from '../repositories/credentials.repository';
 import * as usersRepository from '../repositories/users.repository';
@@ -15,9 +16,16 @@ const DEFAULT_COUNTRY_CODE = '91';
 
 /**
  * Everything about signing up. The route calls this.
- * Repositories used: accounts, users, credentials (all in ../repositories).
+ * Repositories used: accounts, users, credentials (all in ../repositories). Emails the verification link through the
+ * email-verification service.
  */
-export function createSignUpService({ database }: { database: Database }) {
+export function createSignUpService({
+  database,
+  emailVerificationService,
+}: {
+  database: Database;
+  emailVerificationService: EmailVerificationService;
+}) {
   return {
     /**
      * Creates a business and its owner (a manager), and stores the owner's password as a hash. Nothing is signed in yet:
@@ -78,8 +86,18 @@ export function createSignUpService({ database }: { database: Database }) {
         throw error;
       }
 
+      // After the business is saved: email the verification link. A mail failure does not undo the sign-up.
+      await emailVerificationService.sendAfterSignUp(userId);
+
       return {
-        user: { id: userId, name: request.name, email: request.email, mobile: mobile.e164, role: 'manager' },
+        user: {
+          id: userId,
+          name: request.name,
+          email: request.email,
+          mobile: mobile.e164,
+          role: 'manager',
+          emailVerified: false,
+        },
         business: {
           id: accountId,
           name: request.businessName,

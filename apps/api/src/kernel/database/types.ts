@@ -70,10 +70,23 @@ export interface UsersTable {
   /** Unlocks platform-only actions (adding industries). Set only by someone with database access; false for everyone else. */
   is_platform_admin: Generated<boolean>;
   last_login_at: Date | null;
+  /** When the person proved they own the email; empty until then. Written only on the owner connection. */
+  email_verified_at: Date | null;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+}
+
+/** Single-use links we email (verify the email now, reset the password later). Only a hash of each link is stored. */
+export interface AuthTokensTable {
+  id: string;
+  user_id: string;
+  purpose: 'verify_email' | 'reset_password';
+  token_hash: string;
+  created_at: Generated<Date>;
+  expires_at: Date;
+  used_at: Date | null;
 }
 
 /** Password hashes. Not fenced; closed to the app role instead. */
@@ -109,4 +122,5 @@ export interface DB {
   users: UsersTable;
   user_credentials: UserCredentialsTable;
   sessions: SessionsTable;
+  auth_tokens: AuthTokensTable;
 }

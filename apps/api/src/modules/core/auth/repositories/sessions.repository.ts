@@ -11,6 +11,7 @@ export interface LivePrincipal {
   role: 'manager' | 'staff' | 'staff_own';
   sessionId: string;
   isPlatformAdmin: boolean;
+  emailVerified: boolean;
 }
 
 /**
@@ -27,6 +28,7 @@ export async function findLivePrincipal(db: Db, sessionId: string, userId: strin
       'users.id as user_id',
       'users.role',
       'users.is_platform_admin',
+      'users.email_verified_at',
       'sessions.id as session_id',
     ])
     .where('sessions.id', '=', sessionId)
@@ -42,6 +44,7 @@ export async function findLivePrincipal(db: Db, sessionId: string, userId: strin
     role: row.role,
     sessionId: row.session_id,
     isPlatformAdmin: row.is_platform_admin,
+    emailVerified: row.email_verified_at !== null,
   };
 }
 

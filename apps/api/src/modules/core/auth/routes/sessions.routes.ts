@@ -40,7 +40,10 @@ export function sessionsRoutes(app: FastifyInstance) {
   // request that changes something, it needs our Origin and X-Requested-With headers (CSRF).
   typedApp.post(
     '/auth/logout',
-    { config: { access: 'staff' }, schema: { response: { 200: okResponseSchema } } },
+    {
+      config: { access: 'staff', allowUnverified: true },
+      schema: { response: { 200: okResponseSchema } },
+    },
     async (request, reply) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       await sessionsService.signOut(request.principal, clientOf(request));

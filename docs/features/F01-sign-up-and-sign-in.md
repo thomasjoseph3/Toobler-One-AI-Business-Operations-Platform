@@ -41,8 +41,8 @@ Slices of at most 2 API routes, backend first; **the screens come after the whol
 | 1 | `POST /auth/signup`, `GET /industries` | done and tested by the owner |
 | 2a | `POST /auth/login` | done and tested by the owner |
 | 2b | `POST /industries` (platform admin: adding industries only) | done and tested by the owner |
-| 3 | `POST /auth/logout`, `GET /me` | built, waiting for the owner's test |
-| 4 | `POST /auth/verify-email`, `POST /auth/resend-email` | planned |
+| 3 | `POST /auth/logout`, `GET /me` | done and tested by the owner |
+| 4 | `POST /auth/verify-email`, `POST /auth/resend-email` | built, waiting for the owner's test |
 | 5 | `POST /auth/refresh` | planned |
 | 6 | lockout after 5 wrong passwords, rate limits (no new route) | planned |
 | 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | planned |
