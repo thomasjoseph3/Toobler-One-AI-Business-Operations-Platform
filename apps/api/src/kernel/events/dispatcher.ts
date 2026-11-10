@@ -2,7 +2,7 @@ import type { FastifyBaseLogger } from 'fastify';
 import type { ContextFactory } from '../context';
 import type { Database } from '../db';
 import type { HealthCheck } from '../health';
-import type { ModuleGate, Registry } from '../modules/registry';
+import type { ModuleGate, Registry } from '../module-system/registry';
 import type { DomainEvent } from './events';
 import { claimDueEvents, markEventDeliveryFailed, markEventDispatched, type ClaimedEvent } from './outbox-repository';
 

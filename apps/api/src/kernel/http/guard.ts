@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { forbidden, notFound, unauthorized } from '../errors';
-import type { ModuleGate } from '../modules/registry';
+import type { ModuleGate } from '../module-system/registry';
 import type { PublicRoute } from './public-routes';
 
 export type Access = 'public' | 'staff' | 'manager';

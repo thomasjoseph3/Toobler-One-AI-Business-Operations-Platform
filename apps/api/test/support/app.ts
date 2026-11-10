@@ -5,9 +5,9 @@ import { loadConfig } from '../../src/kernel/config';
 import type { Database } from '../../src/kernel/db';
 import { PUBLIC_ROUTES } from '../../src/kernel/http/public-routes';
 import { loggerOptions } from '../../src/kernel/logger';
-import { createRegistry } from '../../src/kernel/modules/registry';
+import { createRegistry } from '../../src/kernel/module-system/registry';
 import { modules } from '../../src/modules';
-import type { ModuleManifest } from '../../src/kernel/modules/define';
+import type { ModuleManifest } from '../../src/kernel/module-system/define';
 import { testDatabaseConfig } from './database';
 
 /** The app settings used in tests: the test environment, pointing at the throwaway test database. */

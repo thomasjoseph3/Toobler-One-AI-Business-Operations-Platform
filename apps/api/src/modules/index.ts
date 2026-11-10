@@ -1,4 +1,4 @@
-import type { ModuleManifest } from '../kernel/modules/define';
+import type { ModuleManifest } from '../kernel/module-system/define';
 import auth from './core/auth/module';
 import kernel from './core/kernel/module';
 

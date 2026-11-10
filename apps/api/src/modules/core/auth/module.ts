@@ -1,4 +1,4 @@
-import { defineModule } from '../../../kernel/modules/define';
+import { defineModule } from '../../../kernel/module-system/define';
 import { authRoutes } from './routes';
 
 /** Sign-up, sign-in, sessions and passwords. Built in slices (docs/features/F01-sign-up-and-sign-in.md). */

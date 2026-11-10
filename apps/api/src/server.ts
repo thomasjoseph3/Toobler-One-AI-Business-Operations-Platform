@@ -4,7 +4,7 @@ import { createContextFactory } from './kernel/context';
 import { createDatabase } from './kernel/db';
 import { createEventDispatcher } from './kernel/events/dispatcher';
 import { createJobRunner } from './kernel/jobs/job-runner';
-import { coreOnlyGate, createRegistry } from './kernel/modules/registry';
+import { coreOnlyGate, createRegistry } from './kernel/module-system/registry';
 import { modules } from './modules';
 
 // Start-up, in order: read settings, connect to the database and prove it works, build the web server, start listening.

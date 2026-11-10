@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import type { Principal } from '../src/kernel/http/guard';
-import { defineModule } from '../src/kernel/modules/define';
-import { coreOnlyGate, createRegistry } from '../src/kernel/modules/registry';
+import { defineModule } from '../src/kernel/module-system/define';
+import { coreOnlyGate, createRegistry } from '../src/kernel/module-system/registry';
 import { buildTestApp, captureLogs, testConfig } from './support/app';
 import { newAccountId, openTestDatabase } from './support/harness';
 import { buildApp } from '../src/app';

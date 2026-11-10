@@ -1,4 +1,4 @@
-import { defineModule } from '../../../kernel/modules/define';
+import { defineModule } from '../../../kernel/module-system/define';
 import { kernelRoutes } from './routes';
 
 /** Infrastructure routes every deployment has: health. */

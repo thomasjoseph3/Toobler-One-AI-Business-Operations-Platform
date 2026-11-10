@@ -4,8 +4,8 @@ import { createContextFactory } from '../src/kernel/context';
 import type { Database } from '../src/kernel/db';
 import { createJobRunner, type JobRunner } from '../src/kernel/jobs/job-runner';
 import type { JobData, JobRun } from '../src/kernel/jobs/jobs';
-import { defineModule } from '../src/kernel/modules/define';
-import { createRegistry, type ModuleGate } from '../src/kernel/modules/registry';
+import { defineModule } from '../src/kernel/module-system/define';
+import { createRegistry, type ModuleGate } from '../src/kernel/module-system/registry';
 import { newAccountId, openTestDatabase, waitFor } from './support/harness';
 import { testConfig } from './support/app';
 

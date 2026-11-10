@@ -11,8 +11,8 @@ import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
 import { loggerOptions } from './kernel/logger';
-import type { ModuleGate, Registry } from './kernel/modules/registry';
-import { coreOnlyGate } from './kernel/modules/registry';
+import type { ModuleGate, Registry } from './kernel/module-system/registry';
+import { coreOnlyGate } from './kernel/module-system/registry';
 
 export type { HealthCheck };
 

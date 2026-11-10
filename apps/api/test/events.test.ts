@@ -6,8 +6,8 @@ import { createEventDispatcher, type EventDispatcherOptions } from '../src/kerne
 import type { DomainEvent } from '../src/kernel/events/events';
 import { claimDueEvents } from '../src/kernel/events/outbox-repository';
 import { publishEvent } from '../src/kernel/events/publish';
-import { defineModule } from '../src/kernel/modules/define';
-import { createRegistry, type ModuleGate } from '../src/kernel/modules/registry';
+import { defineModule } from '../src/kernel/module-system/define';
+import { createRegistry, type ModuleGate } from '../src/kernel/module-system/registry';
 import { newAccountId, openTestDatabase, waitFor } from './support/harness';
 
 let database: Database;
