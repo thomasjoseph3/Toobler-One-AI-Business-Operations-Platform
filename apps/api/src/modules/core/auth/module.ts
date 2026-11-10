@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { sessionsRoutes } from './sessions/routes';
 import { signUpRoutes } from './sign-up/routes';
 
 /**
@@ -12,5 +13,6 @@ export default defineModule({
   requires: ['core.industries'],
   routes: (app) => {
     signUpRoutes(app);
+    sessionsRoutes(app);
   },
 });

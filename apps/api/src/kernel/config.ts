@@ -27,6 +27,13 @@ const EnvironmentVariablesSchema = z.object({
   TRUST_PROXY: z.string().default('loopback'),
   WEB_URL: z.url().default('http://localhost:3000'),
   PUBLIC_BASE_URL: z.url().default('http://localhost:4000'),
+  // Sign-in. The secret signs the access tokens: at least 32 characters, only ever in the environment, never shared.
+  JWT_SECRET: z
+    .string({ error: 'JWT_SECRET is missing. Run `npm run setup`, which adds a random one to .env.' })
+    .min(32, 'JWT_SECRET must be at least 32 characters'),
+  // How long an access token works before the app must refresh it (minutes), and how long a session lasts at most (days)
+  ACCESS_TOKEN_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
+  SESSION_MAX_DAYS: z.coerce.number().int().min(1).max(90).default(30),
 });
 
 export interface Config {
@@ -38,6 +45,7 @@ export interface Config {
   trustProxy: boolean | string | string[];
   webUrl: string;
   publicBaseUrl: string;
+  auth: { jwtSecret: string; accessTokenMinutes: number; sessionMaxDays: number };
 }
 
 export class ConfigError extends Error {}
@@ -78,6 +86,11 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
     trustProxy: parseTrustProxy(validEnvironment.TRUST_PROXY),
     webUrl: validEnvironment.WEB_URL.replace(/\/$/, ''),
     publicBaseUrl: validEnvironment.PUBLIC_BASE_URL.replace(/\/$/, ''),
+    auth: {
+      jwtSecret: validEnvironment.JWT_SECRET,
+      accessTokenMinutes: validEnvironment.ACCESS_TOKEN_MINUTES,
+      sessionMaxDays: validEnvironment.SESSION_MAX_DAYS,
+    },
   };
   if (config.env === 'production') {
     const unsafeSettings: string[] = [];

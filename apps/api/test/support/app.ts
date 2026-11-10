@@ -11,7 +11,12 @@ import type { ModuleManifest } from '../../src/kernel/module-system/define';
 import { testDatabaseConfig } from './database';
 
 /** The app settings used in tests: the test environment, pointing at the throwaway test database. */
-export const testConfig = () => loadConfig({ NODE_ENV: 'test', DATABASE_URL: testDatabaseConfig().url });
+export const testConfig = () =>
+  loadConfig({
+    NODE_ENV: 'test',
+    DATABASE_URL: testDatabaseConfig().url,
+    JWT_SECRET: 'test-only-secret-test-only-secret-test-only',
+  });
 
 /** A logger that keeps its lines, so a test can check what was (and was not) written to the log. */
 export function captureLogs() {

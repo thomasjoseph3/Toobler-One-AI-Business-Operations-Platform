@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyBaseLogger, type FastifyInstance } from 'fastify';
@@ -81,6 +82,7 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
   });
 
   registerErrorHandling(app);
+  await app.register(cookie); // lets routes set cookies (the sign-in cookies)
   await app.register(helmet);
   await app.register(rateLimit, { global: true, ...(dependencies.rateLimit ?? { max: 300, timeWindow: '1 minute' }) });
   registerGuard(app, {

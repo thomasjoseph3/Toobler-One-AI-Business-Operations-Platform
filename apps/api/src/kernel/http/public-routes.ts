@@ -22,6 +22,13 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   },
   {
     method: 'POST',
+    path: '/api/v1/auth/login',
+    reason:
+      'Signing in needs no session. A wrong password and an unknown email get the same answer and take the same time. ' +
+      'Lockout after repeated wrong passwords and rate limits arrive in a later F01 slice (6).',
+  },
+  {
+    method: 'POST',
     path: '/api/v1/auth/signup',
     reason:
       'A new owner has no account yet. The password is checked and stored only as an argon2id hash. ' +

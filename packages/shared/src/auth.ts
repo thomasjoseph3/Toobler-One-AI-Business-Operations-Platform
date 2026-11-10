@@ -19,6 +19,13 @@ export const signUpRequestSchema = z.object({
 });
 export type SignUpRequest = z.infer<typeof signUpRequestSchema>;
 
+/** What the sign-in form sends. The password is not length-checked here: a wrong one is simply "not right". */
+export const signInRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
+  password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+});
+export type SignInRequest = z.infer<typeof signInRequestSchema>;
+
 /** The person and their business, as the API answers. Never contains a password or a hash. */
 export const profileResponseSchema = z.object({
   user: z.object({

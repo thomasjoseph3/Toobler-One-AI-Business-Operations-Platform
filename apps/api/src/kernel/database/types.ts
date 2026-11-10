@@ -67,6 +67,7 @@ export interface UsersTable {
   mobile_key: string | null;
   role: 'manager' | 'staff' | 'staff_own';
   status: Generated<'active' | 'disabled'>;
+  last_login_at: Date | null;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;
@@ -80,6 +81,22 @@ export interface UserCredentialsTable {
   password_changed_at: Generated<Date>;
 }
 
+/** Sign-ins, one per device. Not fenced; closed to the app role instead. */
+export interface SessionsTable {
+  id: string;
+  user_id: string;
+  refresh_token_hash: string;
+  previous_refresh_token_hash: string | null;
+  rotated_at: Date | null;
+  user_agent: string | null;
+  ip: string | null;
+  created_at: Generated<Date>;
+  last_used_at: Generated<Date>;
+  expires_at: Date;
+  revoked_at: Date | null;
+  revoked_reason: string | null;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -89,4 +106,5 @@ export interface DB {
   accounts: AccountsTable;
   users: UsersTable;
   user_credentials: UserCredentialsTable;
+  sessions: SessionsTable;
 }

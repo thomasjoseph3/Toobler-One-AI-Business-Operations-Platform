@@ -1,6 +1,5 @@
-import { verify } from '@node-rs/argon2';
 import { describe, expect, it } from 'vitest';
-import { findPasswordProblem, hashPassword } from './passwords';
+import { findPasswordProblem, hashPassword, NO_SUCH_USER_HASH, passwordMatches } from './passwords';
 
 const details = { email: 'anita@example.com', mobileDigits: '919847012345' };
 
@@ -10,8 +9,13 @@ describe('passwords', () => {
     const secondHash = await hashPassword('correct horse battery');
     expect(firstHash).toMatch(/^\$argon2id\$/);
     expect(firstHash).not.toBe(secondHash);
-    expect(await verify(firstHash, 'correct horse battery')).toBe(true);
-    expect(await verify(firstHash, 'correct horse batterY')).toBe(false);
+    expect(await passwordMatches(firstHash, 'correct horse battery')).toBe(true);
+    expect(await passwordMatches(firstHash, 'correct horse batterY')).toBe(false);
+  });
+
+  it('has a stand-in hash for unknown emails that no ordinary password matches', async () => {
+    expect(await NO_SUCH_USER_HASH).toMatch(/^\$argon2id\$/);
+    expect(await passwordMatches(await NO_SUCH_USER_HASH, 'river-lamp-kettle-42')).toBe(false);
   });
 
   it('accepts a good password', () => {
