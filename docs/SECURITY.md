@@ -27,9 +27,11 @@ the hotel agent's `api-security` rules, OWASP ASVS level 2 and India's DPDP Act 
   platform jobs run as the owner role.
 - The account comes **only** from the session (staff), the signed widget key (webchat), the provider id lookup
   (webhooks) or the job payload (jobs). Never from a body, query or tool argument.
-- Cross-business lookups are named functions in a single file `kernel/db/across-accounts.ts`; each has a comment
-  saying why. Today: phone number → business, WhatsApp phone id → business, mailbox → business, widget key → business,
-  user by email for sign-in, platform console reads.
+- Cross-business lookups are **named repository functions marked `ACROSS BUSINESSES`** in the module that owns the table,
+  each with a comment saying why. They run on the owner connection and read tables closed to `app_user`. Today: sign-in,
+  refresh and email links (`core.auth` repository). Later: phone number to business, WhatsApp phone id to business, mailbox
+  to business, widget key to business, platform console reads. A schema test lists every table without an `account_id`
+  and checks the app role cannot touch the credential tables.
 - Another business's id → **404**.
 
 ### 2.2 Sign-in and sessions
