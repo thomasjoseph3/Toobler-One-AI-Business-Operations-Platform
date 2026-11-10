@@ -1,0 +1,20 @@
+# Weekly pull requests for updates. `cooldown` keeps us on the rule "a release must be at least 14 days old"
+# (docs/DEPENDENCIES.md). Every update still goes through `npm run vet` and a review before it is merged.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 14
+    groups:
+      development-tools:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 14
