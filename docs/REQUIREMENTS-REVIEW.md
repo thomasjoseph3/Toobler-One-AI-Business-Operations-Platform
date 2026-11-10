@@ -37,6 +37,7 @@ proposal for each. **Q** marks a decision the owner needs to make; the "Needed b
 | R30 | Mobile verification and WhatsApp-code sign-in (02-sign-up-and-sign-in.md) need an OTP/WhatsApp service we don't have yet. | **Decided 10 Nov 2026 (owner):** email only for now. Mobile is collected, unverified, not unique. Mobile verification and code sign-in arrive with F25. | F25 |
 | R31 | A second business from inside an account, and the business switcher (same requirement). | **Decided 10 Nov 2026 (owner):** one email manages one business for now; add a `memberships` table when needed. | Later |
 | R32 | Sign-in tokens: the plan said one opaque session token. | **Decided 10 Nov 2026 (owner):** access token (JWT, 15 min) + rotating refresh token, as in the hotel agent; the API sets httpOnly cookies. | — |
+| R33 | The industry list was written into the code (and the web app). | **Decided 10 Nov 2026 (owner):** the list lives in the database (`industries` table, seeded) and comes from `GET /api/v1/industries`; sign-up checks the table. The web app never carries its own copy. Adding or switching off industries (a platform-only `POST`) comes after sign-in exists (F03/F35). | F01 later, F35 |
 
 ## Status
 

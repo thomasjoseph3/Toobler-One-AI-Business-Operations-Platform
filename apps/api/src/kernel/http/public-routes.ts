@@ -14,6 +14,13 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
     reason: 'Uptime checks and deploy health checks have no session. Reveals only up or down.',
   },
   {
+    method: 'GET',
+    path: '/api/v1/industries',
+    reason:
+      'The sign-up form needs the list of industries before anyone is signed in. It only reads, and it reveals ' +
+      'nothing about any business.',
+  },
+  {
     method: 'POST',
     path: '/api/v1/auth/signup',
     reason:

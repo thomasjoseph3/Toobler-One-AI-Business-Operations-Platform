@@ -97,7 +97,8 @@ describe('POST /api/v1/auth/signup', () => {
       [{ password: 'short' }, 'VALIDATION_ERROR'],
       [{ businessName: '' }, 'VALIDATION_ERROR'],
       [{ name: '' }, 'VALIDATION_ERROR'],
-      [{ industry: 'spaceships' }, 'VALIDATION_ERROR'],
+      [{ industry: '' }, 'VALIDATION_ERROR'],
+      [{ industry: 'spaceships' }, 'INVALID_INDUSTRY'], // not on the list from GET /industries
       [{ mobile: 'abcdefgh1' }, 'INVALID_MOBILE'],
       [{ mobile: '12345' }, 'INVALID_MOBILE'],
       [{ password: '9847012345' }, 'WEAK_PASSWORD'],
@@ -121,6 +122,20 @@ describe('POST /api/v1/auth/signup', () => {
   it('names the field that is wrong', async () => {
     const response = await postSignUp(validSignUp({ email: 'not-an-email' }));
     expect(response.json().error.details).toEqual([expect.objectContaining({ path: 'email' })]);
+  });
+
+  it('only accepts industries that are on the list, and not ones that have been switched off', async () => {
+    for (const industry of ['general', 'clinic', 'other']) {
+      expect((await postSignUp(validSignUp({ industry }))).statusCode, industry).toBe(201);
+    }
+    await database.system.updateTable('industries').set({ is_active: false }).where('id', '=', 'education').execute();
+    try {
+      const refused = await postSignUp(validSignUp({ industry: 'education' }));
+      expect(refused.statusCode).toBe(400);
+      expect(refused.json().error.code).toBe('INVALID_INDUSTRY');
+    } finally {
+      await database.system.updateTable('industries').set({ is_active: true }).where('id', '=', 'education').execute();
+    }
   });
 
   it('lets one email manage one business: a second sign-up with it is refused, whatever the letter case', async () => {

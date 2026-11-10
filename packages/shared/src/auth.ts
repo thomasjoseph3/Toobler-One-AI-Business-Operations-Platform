@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { INDUSTRY_IDS } from './industries';
 
 // The shape of the sign-up request and of the answer. The API checks requests with these; the sign-up form will check
 // with the same ones, so the two can never disagree about what is allowed.
@@ -15,7 +14,8 @@ export const signUpRequestSchema = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
   mobile: z.string().trim().min(5).max(20),
   password: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
-  industry: z.enum(INDUSTRY_IDS),
+  // The id of one of the industries from GET /api/v1/industries. The server checks it is on the list.
+  industry: z.string().trim().min(1).max(40),
 });
 export type SignUpRequest = z.infer<typeof signUpRequestSchema>;
 

@@ -14,6 +14,7 @@ const GLOBAL_TABLES = new Set([
   'schema_migrations',
   'accounts', // the business itself: it has its own forced RLS on `id` (checked below)
   'user_credentials', // password hashes: needed before a business is known; closed to app_user (checked below)
+  'industries', // a list shared by every business; app_user may read it but not change it (checked in industries.test.ts)
 ]);
 // Global tables that the app role must not be able to touch at all
 const CLOSED_TO_APP_ROLE = ['user_credentials'];

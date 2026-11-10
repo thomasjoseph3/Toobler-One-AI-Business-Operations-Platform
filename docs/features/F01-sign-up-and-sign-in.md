@@ -25,7 +25,9 @@ and WhatsApp will need it) but it is not verified. The design keeps (2) and (3) 
     (the `AccountContext` plus the signed-in person) for later features.
   - Mail provider behind an interface: `smtp` (nodemailer, using the `SMTP_*` and `EMAIL_FROM` settings already in your
     `.env`) and `console` (prints the link to the API log when no SMTP is configured). Automated tests send to Mailpit in Docker.
-  - Industry is chosen and stored; only the "general" preset exists for now (stages, fields and words arrive with F16/F31).
+  - Industry is chosen from a list that lives in the database (`industries`, seeded; `GET /api/v1/industries`) and stored on
+    the business; only the "general" preset exists for now (stages, fields and words arrive with F16/F31). Adding an
+    industry (a platform-only `POST`) comes after sign-in exists.
 - Out (later feature): a person in several businesses, switching business, "add another business" (owner's decision:
   later; it becomes a `memberships` table then); inviting staff and the roles screens (F02); module switches and the menu
   coming from `/me` (F03); mobile verification and WhatsApp-code sign-in (they arrive with F25, when an OTP/WhatsApp provider exists); platform admin login and support access (F03/F24); changing

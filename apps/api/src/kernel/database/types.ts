@@ -37,6 +37,16 @@ export interface ActivityLogTable {
   created_at: Generated<Date>;
 }
 
+/** A kind of business a person can pick at sign-up. Shared by every business; read-only for the app role. */
+export interface IndustriesTable {
+  id: string;
+  label: string;
+  sort_order: Generated<number>;
+  is_active: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** A business. Fenced by its own id. */
 export interface AccountsTable {
   id: string;
@@ -75,6 +85,7 @@ export interface DB {
   schema_migrations: SchemaMigrationsTable;
   domain_events: DomainEventsTable;
   activity_log: ActivityLogTable;
+  industries: IndustriesTable;
   accounts: AccountsTable;
   users: UsersTable;
   user_credentials: UserCredentialsTable;

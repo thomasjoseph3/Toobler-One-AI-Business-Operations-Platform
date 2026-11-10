@@ -8,6 +8,8 @@ import { signUpRoutes } from './sign-up/routes';
 export default defineModule({
   id: 'core.auth',
   kind: 'core',
+  // Sign-up checks the chosen industry against the industries module (through its index.ts only)
+  requires: ['core.industries'],
   routes: (app) => {
     signUpRoutes(app);
   },

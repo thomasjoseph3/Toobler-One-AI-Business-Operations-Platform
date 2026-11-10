@@ -3,6 +3,7 @@ import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Database } from '../../../../kernel/database';
 import { ApiError, conflict } from '../../../../kernel/errors';
 import { uuidv7 } from '../../../../kernel/ids';
+import { isActiveIndustry } from '../../industries';
 import * as accountsRepository from '../data/accounts.repository';
 import * as credentialsRepository from '../data/credentials.repository';
 import * as usersRepository from '../data/users.repository';
@@ -21,6 +22,11 @@ export function createSignUpService({ database }: { database: Database }) {
      * registered is refused.
      */
     async signUp(request: SignUpRequest): Promise<ProfileResponse> {
+      // The industry must be one on the list (GET /api/v1/industries). Checked first because it is the cheapest check.
+      if (!(await isActiveIndustry(database, request.industry))) {
+        throw new ApiError(400, 'INVALID_INDUSTRY', 'Choose one of the industries on the list.');
+      }
+
       const mobile = normaliseMobile(request.mobile, DEFAULT_COUNTRY_CODE);
       if (!mobile) throw new ApiError(400, 'INVALID_MOBILE', 'Enter a valid mobile number, like +91 98470 12345.');
 
