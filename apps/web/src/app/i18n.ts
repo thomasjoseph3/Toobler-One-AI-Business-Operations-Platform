@@ -36,14 +36,91 @@ const englishMessages = {
   'page.knowledge.description': 'What the AI agents know about your business.',
   'page.channels.description': 'Switch on the ways customers reach you: phone, WhatsApp, website chat and email.',
   'page.settings.description': 'Your business details, your team and your preferences.',
-  'placeholder.title': 'Nothing here yet',
-  'placeholder.description': 'This page is part of Toobler One and will be filled in as each feature is built.',
+  'page.today.emptyTitle': 'Nothing needs you yet',
+  'page.today.emptyDescription': 'When customers call, message or email, the things that need you show up here first.',
+  'page.today.preview1': 'Callbacks and follow-ups due today',
+  'page.today.preview2': 'New leads, hottest first',
+  'page.today.preview3': 'Customers waiting for a person',
+  'page.leads.emptyTitle': 'No leads yet',
+  'page.leads.emptyDescription':
+    'A lead appears when someone shows real interest. Switch on a channel and the AI agents start picking them up.',
+  'page.leads.preview1': 'Every enquiry from calls, WhatsApp, chat and email',
+  'page.leads.preview2': 'Hot, warm or cold, with the reason',
+  'page.leads.preview3': 'Who is handling each lead and what happens next',
+  'page.contacts.emptyTitle': 'No contacts yet',
+  'page.contacts.emptyDescription': 'Everyone who calls, messages or emails is saved here with their history.',
+  'page.contacts.preview1': 'Name, phone and email in one record',
+  'page.contacts.preview2': 'Every call and message on one timeline',
+  'page.contacts.preview3': 'Call or WhatsApp with one tap',
+  'page.companies.emptyTitle': 'No companies yet',
+  'page.companies.emptyDescription':
+    'Group contacts by the business they work for, to see everything about them in one place.',
+  'page.companies.preview1': 'Contacts and leads for each company',
+  'page.companies.preview2': 'Notes and history in one place',
+  'page.companies.preview3': 'Who in your team looks after them',
+  'page.inbox.emptyTitle': 'No conversations yet',
+  'page.inbox.emptyDescription':
+    "Calls, WhatsApp messages, website chats and emails land here, with the AI's answer next to each one.",
+  'page.inbox.preview1': 'Conversations that need a person come first',
+  'page.inbox.preview2': 'Take over from the AI, and hand back when done',
+  'page.inbox.preview3': 'What the AI knew and what it answered',
+  'page.tasks.emptyTitle': 'No tasks yet',
+  'page.tasks.emptyDescription': 'Tasks are created for you, such as a callback you promised a customer.',
+  'page.tasks.preview1': 'Calls to make and messages to send',
+  'page.tasks.preview2': 'Due today, overdue and coming up',
+  'page.tasks.preview3': 'Reminders before anything slips',
+  'page.tickets.emptyTitle': 'No tickets yet',
+  'page.tickets.emptyDescription': 'Complaints and service requests are kept apart from sales leads, so none get lost.',
+  'page.tickets.preview1': 'Open and closed requests',
+  'page.tickets.preview2': 'High-priority ones flagged',
+  'page.tickets.preview3': 'Who is looking after each one',
+  'page.reports.emptyTitle': 'No numbers yet',
+  'page.reports.emptyDescription': 'Reports fill in once enquiries start arriving.',
+  'page.reports.preview1': 'Enquiries by channel and by day',
+  'page.reports.preview2': 'How many became leads, and how many were won',
+  'page.reports.preview3': 'How quickly your team answers',
+  'page.knowledge.emptyTitle': 'Nothing taught yet',
+  'page.knowledge.emptyDescription': 'Add your prices, hours and answers so the AI agents can reply correctly.',
+  'page.knowledge.preview1': 'Business details and opening hours',
+  'page.knowledge.preview2': 'Services and offers',
+  'page.knowledge.preview3': 'Questions the AI could not answer, for you to fill in',
+  'page.channels.emptyTitle': 'No channels connected',
+  'page.channels.emptyDescription':
+    'Switch on phone, WhatsApp, website chat or email so customers can reach you and the AI can answer.',
+  'page.channels.preview1': 'Your phone number and call forwarding',
+  'page.channels.preview2': 'WhatsApp and website chat',
+  'page.channels.preview3': 'Your email inbox',
+  'page.settings.emptyTitle': 'Settings arrive step by step',
+  'page.settings.emptyDescription': 'Your business details, team and preferences will be managed here.',
+  'page.settings.preview1': 'Business profile and opening hours',
+  'page.settings.preview2': 'Team members and roles',
+  'page.settings.preview3': 'Notifications and preferences',
+  'page.previewHeading': 'What you will see here',
+  'page.setUpChannels': 'Set up channels',
+  'today.greeting.morning': 'Good morning',
+  'today.greeting.afternoon': 'Good afternoon',
+  'today.greeting.evening': 'Good evening',
+  'theme.change': 'Click to change',
   'notFound.title': 'Page not found',
   'notFound.description': 'This page does not exist, or it is switched off for your business.',
   'notFound.back': 'Go to Today',
 } as const;
 
 export type MessageKey = keyof typeof englishMessages;
+
+/** The ids of the pages in the menu. Page texts are named `page.<id>.…`, so a missing text is a compile error. */
+export type PageId =
+  | 'today'
+  | 'leads'
+  | 'contacts'
+  | 'companies'
+  | 'inbox'
+  | 'tasks'
+  | 'tickets'
+  | 'reports'
+  | 'knowledge'
+  | 'channels'
+  | 'settings';
 
 /** Returns the text for a message key. */
 export function t(messageKey: MessageKey): string {

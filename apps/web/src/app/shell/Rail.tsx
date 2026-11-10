@@ -13,7 +13,7 @@ export function Rail() {
       aria-label={t('nav.main')}
       className="sticky top-0 hidden h-screen w-[72px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-border bg-surface px-3 py-4 md:flex xl:w-[232px]"
     >
-      <div className="text-lg-subsection-title flex h-8 items-center gap-2 px-2 text-text-primary">
+      <div className="text-lg-subsection-title mb-2 flex h-8 items-center gap-2 px-2 text-text-primary">
         <span
           aria-hidden
           className="flex size-8 shrink-0 items-center justify-center rounded-md bg-action text-sm-button text-white"

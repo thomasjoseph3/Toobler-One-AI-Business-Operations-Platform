@@ -69,7 +69,7 @@ The migration runner itself creates the schema and `app.schema_migrations` (with
 1. `nvm use` (Node 26.13), `npm run setup`, `npm run dev`.
 2. Open http://localhost:3000 at desktop width: rail on the left, Today page with an empty state. Click each menu item.
 3. Narrow the window below 768 px: bottom bar with Today, Leads, Inbox, Tasks, More. Open More.
-4. Switch Light / Dark / System in the top bar; open `/dev/ui` in both.
+4. Press the theme button in the top bar to go Light, Dark, System; open `/dev/ui` in each.
 5. `curl http://localhost:4000/api/v1/health` → `{"ok":true,...}`. Stop the test database and it returns 503.
 6. Add `import './repository'` to any `routes.ts` and run `npm run lint`: it fails with the layering message. Remove it.
 7. `npm run verify` is green.

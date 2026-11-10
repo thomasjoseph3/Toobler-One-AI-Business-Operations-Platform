@@ -12,14 +12,14 @@ import {
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import type { MessageKey } from './i18n';
+import type { MessageKey, PageId } from './i18n';
 
 /**
  * One menu entry. This has the shape the API's `GET /me` will return later (F03): the menu is data, built from the
  * modules that are switched on for the business. For now it is a fixed list of the Phase 1 pages.
  */
 export interface NavigationItem {
-  id: string;
+  id: PageId;
   labelKey: MessageKey;
   /** One line shown under the page title. */
   descriptionKey: MessageKey;
