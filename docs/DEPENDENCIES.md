@@ -53,4 +53,4 @@ None so far.
 | Fonts (self-hosted, vetted 10 Nov 2026) | @fontsource-variable/manrope 5.3.0, @fontsource-variable/inter 5.3.0, @fontsource/noto-sans-malayalam 5.3.0, @fontsource/noto-sans-devanagari 5.3.0 (all OFL-1.1, same publisher, no install scripts) |
 | Types | @types/node 26.6.5, @types/pg 8.23.1, @types/react and @types/react-dom 19.3.0 |
 
-All MIT, ISC or Apache-2.0 (one dev-only MPL-2.0), none with install scripts, all published by their official projects.
+All MIT, ISC, Apache-2.0 or OFL-1.1 (fonts; one dev-only MPL-2.0), all published by their official projects. One dependency of the tooling, `esbuild`, declares an install script; `ignore-scripts=true` stops it from running and builds work without it.
