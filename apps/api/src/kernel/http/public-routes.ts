@@ -25,29 +25,29 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
     path: '/api/v1/auth/login',
     reason:
       'Signing in needs no session. A wrong password and an unknown email get the same answer and take the same time. ' +
-      'Lockout after repeated wrong passwords and rate limits arrive in a later F01 slice (6).',
+      'After 5 wrong passwords an email is locked for 15 minutes (known or not), and each address is limited to 10 tries a minute.',
   },
   {
     method: 'POST',
     path: '/api/v1/auth/verify-email',
     reason:
       'The link in the email is opened in a browser that may not be signed in. The long random token in the body is the ' +
-      'proof; it works once, expires, and an unknown, used or expired token all get the same answer. Rate limits arrive ' +
-      'in a later F01 slice (6).',
+      'proof; it works once, expires, and an unknown, used or expired token all get the same answer. Each ' +
+      'address is limited to 20 tries a minute.',
   },
   {
     method: 'POST',
     path: '/api/v1/auth/refresh',
     reason:
       'The access token has usually run out by the time the app refreshes, so the refresh cookie is the proof (it is only ' +
-      'sent to this address). Each refresh replaces the token; a replaced token used again ends the whole session. Rate ' +
-      'limits arrive in a later F01 slice (6).',
+      'sent to this address). Each refresh replaces the token; a replaced token used again ends the whole session. Each ' +
+      'address is limited to 30 refreshes a minute.',
   },
   {
     method: 'POST',
     path: '/api/v1/auth/signup',
     reason:
       'A new owner has no account yet. The password is checked and stored only as an argon2id hash. ' +
-      'Rate limiting and the CSRF check arrive in later F01 slices (3 and 6); until then it is open to repeated use.',
+      'Each address is limited to 10 sign-ups an hour, and the CSRF check applies.',
   },
 ];

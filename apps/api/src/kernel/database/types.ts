@@ -89,6 +89,14 @@ export interface AuthTokensTable {
   used_at: Date | null;
 }
 
+/** Wrong passwords per email typed, for the lockout. Not fenced; closed to the app role instead. */
+export interface LoginAttemptsTable {
+  email: string;
+  failed_count: number;
+  window_started_at: Date;
+  locked_until: Date | null;
+}
+
 /** Password hashes. Not fenced; closed to the app role instead. */
 export interface UserCredentialsTable {
   user_id: string;
@@ -123,4 +131,5 @@ export interface DB {
   user_credentials: UserCredentialsTable;
   sessions: SessionsTable;
   auth_tokens: AuthTokensTable;
+  login_attempts: LoginAttemptsTable;
 }

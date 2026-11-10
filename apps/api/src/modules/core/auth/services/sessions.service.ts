@@ -6,6 +6,7 @@ import { ApiError } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import * as accountsRepository from '../repositories/accounts.repository';
+import * as loginAttemptsRepository from '../repositories/login-attempts.repository';
 import * as credentialsRepository from '../repositories/credentials.repository';
 import * as sessionsRepository from '../repositories/sessions.repository';
 import * as usersRepository from '../repositories/users.repository';
@@ -33,6 +34,9 @@ export interface RefreshResult {
   profile: ProfileResponse;
 }
 
+/** The lockout: 5 wrong passwords within 15 minutes lock the email for 15 minutes. */
+const LOCKOUT_RULES = { maxFailures: 5, windowMinutes: 15, lockMinutes: 15 };
+
 /** How long a just-replaced refresh token still counts as a harmless race (two tabs refreshing together), in seconds. */
 const REFRESH_GRACE_SECONDS = 60;
 
@@ -41,7 +45,7 @@ export const sessionEnded = () => new ApiError(401, 'SESSION_ENDED', 'Your sessi
 
 /**
  * Everything about signing in and out. The route calls this.
- * Repositories used: accounts, users, credentials, sessions (all in ../repositories).
+ * Repositories used: accounts, users, credentials, sessions, login-attempts (all in ../repositories).
  */
 export function createSessionsService({ config, database }: { config: Config; database: Database }) {
   const profileService = createProfileService({ database });
@@ -126,10 +130,16 @@ export function createSessionsService({ config, database }: { config: Config; da
      * the same answer, and take about the same time (an unknown email is checked against a stand-in hash).
      */
     async signIn(email: string, password: string, client: ClientInfo): Promise<SignInResult> {
+      // Locked emails are refused before any password is checked (even the right one). The count is kept for every email
+      // typed, known or not, so being locked out never reveals whether an account exists.
+      if (await loginAttemptsRepository.isLockedOut(database.system, email)) {
+        throw new ApiError(429, 'TOO_MANY_ATTEMPTS', 'Too many wrong passwords. Please try again in 15 minutes.');
+      }
       const person = await usersRepository.findPersonByEmail(database.system, email);
       const storedHash = person ? await credentialsRepository.findPasswordHash(database.system, person.id) : undefined;
       const passwordIsRight = await passwordMatches(storedHash ?? (await NO_SUCH_USER_HASH), password);
       if (!person || !storedHash || person.status !== 'active' || !passwordIsRight) {
+        await loginAttemptsRepository.recordFailure(database.system, email, LOCKOUT_RULES);
         throw new ApiError(401, 'INVALID_CREDENTIALS', 'The email or password is not right.');
       }
 
@@ -146,6 +156,7 @@ export function createSessionsService({ config, database }: { config: Config; da
           maxDays: config.auth.sessionMaxDays,
         });
         await usersRepository.markLoggedIn(transaction, person.id);
+        await loginAttemptsRepository.clearFailures(transaction, email);
         await writeActivityLog(transaction, {
           accountId: person.accountId,
           actor: { kind: 'user', id: person.id },

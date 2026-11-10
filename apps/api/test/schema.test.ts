@@ -16,10 +16,11 @@ const GLOBAL_TABLES = new Set([
   'user_credentials', // password hashes: needed before a business is known; closed to app_user (checked below)
   'industries', // a list shared by every business; app_user may read it but not change it (checked in industries.test.ts)
   'sessions', // sign-ins: needed before a business is known; closed to app_user (checked below)
+  'login_attempts', // wrong passwords per email, for the lockout: needed before sign-in; closed to app_user (checked below)
   'auth_tokens', // emailed single-use links: used before anyone is signed in; closed to app_user (checked below)
 ]);
 // Global tables that the app role must not be able to touch at all
-const CLOSED_TO_APP_ROLE = ['user_credentials', 'sessions', 'auth_tokens'];
+const CLOSED_TO_APP_ROLE = ['user_credentials', 'sessions', 'auth_tokens', 'login_attempts'];
 
 describe('schema rules', () => {
   it('every table with an account_id has Row Level Security enabled, forced and a policy', async () => {

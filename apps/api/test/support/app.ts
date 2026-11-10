@@ -50,5 +50,14 @@ export async function buildTestApp(
   const publicRoutes = [...PUBLIC_ROUTES, ...(overrides.publicRoutes ?? [])];
   // No test sends a real email: unless a test brings its own recorder, emails are kept and thrown away.
   const mailSender = overrides.mailSender ?? createRecordingMailSender();
-  return buildApp({ config: testConfig(), database, registry, ...overrides, mailSender, publicRoutes });
+  // Per-route limits are off unless a test asks for them: most tests create many people from one address.
+  return buildApp({
+    config: testConfig(),
+    database,
+    registry,
+    strictRouteLimits: false,
+    ...overrides,
+    mailSender,
+    publicRoutes,
+  });
 }

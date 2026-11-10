@@ -30,6 +30,8 @@ export interface Kernel {
   healthChecks: HealthCheck[];
   /** Sends email. Modules use it through `app.kernel.mail`, never by importing the provider. */
   mail: MailSender;
+  /** Whether the per-route limits (login, sign-up, ...) apply. On unless a test turns it off. */
+  strictRouteLimits: boolean;
 }
 
 declare module 'fastify' {
@@ -49,6 +51,8 @@ export interface AppDeps {
   healthChecks?: HealthCheck[];
   /** Replaces the mail sender the settings choose. Tests pass a recording one so no email is really sent. */
   mailSender?: MailSender;
+  /** Turn the per-route limits off (default on). Tests that create many people from one address use this. */
+  strictRouteLimits?: boolean;
   /** Requests per window per address; public routes get their own tighter limits. */
   rateLimit?: { max: number; timeWindow: string };
   /** Tests capture log lines here. */
@@ -86,6 +90,7 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     gate,
     contextFor: createContextFactory(database),
     healthChecks: dependencies.healthChecks ?? [],
+    strictRouteLimits: dependencies.strictRouteLimits ?? true,
     mail: dependencies.mailSender ?? createMailSender(config, (line) => app.log.info(line)),
   });
 

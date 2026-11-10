@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { profileResponseSchema, signUpRequestSchema } from '@toobler-one/shared';
+import { routeLimit } from '../../../../kernel/http/route-limits';
 import { createEmailVerificationService } from '../services/email-verification.service';
 import { createSignUpService } from '../services/sign-up.service';
 
@@ -17,7 +18,7 @@ export function signUpRoutes(app: FastifyInstance) {
   typedApp.post(
     '/auth/signup',
     {
-      config: { access: 'public' },
+      config: { access: 'public', ...routeLimit(app, 'signUp') },
       schema: { body: signUpRequestSchema, response: { 201: profileResponseSchema } },
     },
     async (request, reply) => {

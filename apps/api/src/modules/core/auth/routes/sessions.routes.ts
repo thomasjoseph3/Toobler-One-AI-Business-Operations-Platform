@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { okResponseSchema, profileResponseSchema, signInRequestSchema } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
+import { routeLimit } from '../../../../kernel/http/route-limits';
 import {
   clearAuthCookies,
   readRefreshCookie,
@@ -28,7 +29,7 @@ export function sessionsRoutes(app: FastifyInstance) {
   typedApp.post(
     '/auth/login',
     {
-      config: { access: 'public' },
+      config: { access: 'public', ...routeLimit(app, 'login') },
       schema: { body: signInRequestSchema, response: { 200: profileResponseSchema } },
     },
     async (request, reply) => {
@@ -63,7 +64,10 @@ export function sessionsRoutes(app: FastifyInstance) {
   // The answer is the profile; the new tokens travel only in cookies.
   typedApp.post(
     '/auth/refresh',
-    { config: { access: 'public' }, schema: { response: { 200: profileResponseSchema } } },
+    {
+      config: { access: 'public', ...routeLimit(app, 'refresh') },
+      schema: { response: { 200: profileResponseSchema } },
+    },
     async (request, reply) => {
       const refreshToken = readRefreshCookie(request, config);
       if (!refreshToken) throw sessionEnded();

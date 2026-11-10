@@ -40,6 +40,15 @@ const postSignUp = (payload: unknown) =>
   });
 
 describe('POST /api/v1/auth/signup', () => {
+  it('refuses a very common password, whatever the capitals and punctuation', async () => {
+    for (const password of ['Password123!', 'qwertyuiop', '1234567890']) {
+      const response = await postSignUp(validSignUp({ password }));
+      expect(response.statusCode, password).toBe(400);
+      expect(response.json().error.code).toBe('WEAK_PASSWORD');
+      expect(response.json().error.message).toMatch(/too common/);
+    }
+  });
+
   it('creates the business and its owner, and answers with the profile', async () => {
     const body = validSignUp();
     const response = await postSignUp(body);
