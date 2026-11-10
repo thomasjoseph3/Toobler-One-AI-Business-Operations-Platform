@@ -148,8 +148,9 @@ Malayalam, Hindi and English without clipping or fixed widths.
 
 - **Single-page app.** `apps/web` is React + Vite. In development Vite proxies `/api` to the API; in production a reverse
   proxy serves the app and `/api` from one address, so the browser sees one origin.
-- **Sign-in cookie.** The API sets the session in an **httpOnly, Secure, SameSite=Lax** cookie. Tokens never reach
-  browser JavaScript, `localStorage` or a URL. State-changing requests are checked for a matching `Origin` and a CSRF
+- **Sign-in cookies.** The API sets a short-lived access token and a refresh token in **httpOnly, Secure, SameSite=Lax**
+  cookies. Tokens never reach browser JavaScript, `localStorage` or a URL. When a request answers `TOKEN_EXPIRED`, the
+  API client in `lib/api.ts` calls `/auth/refresh` once and repeats the request; if that fails it signs the person out. State-changing requests are checked for a matching `Origin` and a CSRF
   header (docs/SECURITY.md 2.2).
 - **Data.** A small typed client in `lib/api.ts` (schemas from `packages/shared`). Each page loads through a hook with
   loading, empty and error states; forms show field errors from `error.details`.

@@ -34,9 +34,13 @@ the hotel agent's `api-security` rules, OWASP ASVS level 2 and India's DPDP Act 
 
 ### 2.2 Sign-in and sessions
 - Passwords: argon2id; at least 10 characters; checked against a common-password list.
-- Sessions: random 256-bit token, stored **hashed** in `sessions`, sent in an httpOnly Secure SameSite=Lax cookie by the
-  API (httpOnly cookie); 12-hour idle timeout, 30-day maximum; rotated on sign-in and on role change; ended on password change,
-  removal from a business, or "sign out everywhere".
+- Sessions (owner decision 10 Nov 2026, the old setup's design): a signed **access token** (JWT, 15 minutes, carries only
+  the user id and session id) plus a random 256-bit **refresh token** stored **hashed** in `sessions` and replaced at every
+  refresh. A replaced refresh token used again after a one-minute grace means a copy was stolen, so the session ends.
+  The API sets both in httpOnly SameSite=Lax cookies (Secure in production); the refresh cookie is only sent to the
+  refresh address. Refresh tokens last 7 days idle and 30 days at most. Every request also checks the session is live in
+  the database, so signing out, a password change, removal or disabling a person stops access at once. Ended on password
+  change or reset, removal from the business, or "sign out everywhere".
 - One-time codes (WhatsApp sign-in, free check): 6 digits, hashed, 10-minute expiry, 5 tries, then a 15-minute lock;
   send limits per phone (3 per 15 min) and per IP.
 - Lockout: 5 wrong passwords for an email → 15 minutes (requirement), same message whether the email exists or not.

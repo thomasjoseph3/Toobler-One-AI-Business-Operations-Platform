@@ -236,8 +236,8 @@ The same recipe works for service (tickets pipeline, portal), marketing (consent
   API runs business work inside `forAccount(accountId, fn)`, on connections that `SET ROLE app_user` and set the
   account. A query that forgets its `WHERE account_id` still sees only that business. (Same design as the hotel
   agent's `remi_app` fence.)
-- **Global tables** (no `account_id`, no RLS, reached only from named repository functions): `users`, `sessions`,
-  `auth_codes`, `accounts` (RLS by `id`), `platform_*`, `domain_events` delivery state, and the cross-business
+- **Global tables** (no `account_id`, no RLS, reached only from named repository functions): `user_credentials`,
+  `sessions`, `auth_codes`, `login_attempts`, `accounts` (RLS by `id`; `users` itself is fenced: one business per person for now), `platform_*`, `domain_events` delivery state, and the cross-business
   lookups for webhooks (`phone_numbers`, `connections` lookup by provider id).
 - **Migrations**: `db/migrations/NNN_<module>_<what>.sql`, numbered, forward-only, one per change, each enabling RLS
   on the tables it creates.

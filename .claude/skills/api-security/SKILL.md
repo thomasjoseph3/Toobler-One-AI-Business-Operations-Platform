@@ -21,8 +21,9 @@ design in `docs/SECURITY.md`; this is the working checklist. (Adapted from the h
 - Another business's record → 404 (never 403).
 
 ## 2. Sessions and sign-in
-- Sessions are opaque random tokens, stored hashed, in an httpOnly, SameSite cookie that the API sets. Never in browser JS,
-  `localStorage` or URLs.
+- Sign-in is a short-lived access token (JWT, 15 min) plus a rotating refresh token stored hashed, both in httpOnly,
+  SameSite cookies that the API sets. Never in browser JS, `localStorage` or URLs. Every request checks the session is live.
+  A replaced refresh token used again ends the session.
 - Changing password, role or removing a person ends their sessions.
 - Codes and passwords: hashed, limited tries, lockouts, same response whether the account exists or not.
 
