@@ -241,7 +241,7 @@ The same recipe works for service (tickets pipeline, portal), marketing (consent
   lookups for webhooks (`phone_numbers`, `connections` lookup by provider id).
 - **Migrations**: `db/migrations/NNN_<module>_<what>.sql`, numbered, forward-only, one per change, each enabling RLS
   on the tables it creates.
-- **Extensions**: `pgcrypto` (UUIDs), `pg_trgm` (search), `citext` (emails), `unaccent`, `vector` (knowledge search).
+- **Extensions**: `pgcrypto` (UUIDs), `pg_trgm` (search), `citext` (emails), `unaccent`, `vector` (optional, only if evals show keyword search is not enough).
 - **Jobs**: `pg-boss` (a job queue stored in Postgres), so there is no Redis to run in Phase 1.
 - **Files**: S3-compatible storage (Supabase Storage), private buckets, short-lived signed links.
 

@@ -32,6 +32,8 @@ proposal for each. **Q** marks a decision the owner needs to make; the "Needed b
 | R25 | Design system has no CRM states (hot/warm/cold, AI actor, channels, stages, task and ticket states, chart series). | **Our decisions, existing tokens only**, in [FRONTEND.md §4](FRONTEND.md#4-toobler-one-extensions-our-decisions-existing-tokens-only). Not sent to the designer for now. | F00, F06, F10 |
 | R26 | No screen mock-ups delivered, only foundations. | Build from SCREENS.md and the design system; the owner reviews each feature by hand. | — |
 | R27 | Hotel-only operational states in the design system (Occupied, Needs cleaning, Do not disturb). | Not used in Phase 1. | — |
+| R28 | Build order: the requirements build the whole CRM core before the AI agent. | **Decided 10 Nov 2026:** build the first working lead engine first: F01, F03, F04, F06, F14, F16, F17, F18, F15, F19, F20, F31, then the rest. Tickets (F14) come before the router (F15). The AI setup chat (F31) needs the agent runtime (F19), so the form version of onboarding (F16) comes first. | — |
+| R29 | Knowledge search with embeddings (pgvector) in `08-knowledge-base.md`. | **Decided 10 Nov 2026:** no vector search to start. Structured facts (profile answers, offerings, offers, hours, situations, FAQs) go into the prompt from tables; FAQs and documents use Postgres full-text and trigram search. Add pgvector later only if the evals show missed questions. | F18 |
 
 ## Status
 
