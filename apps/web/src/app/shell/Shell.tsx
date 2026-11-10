@@ -17,7 +17,11 @@ export function Shell() {
       <Rail />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
-        <main id="main-content" className="mx-auto w-full max-w-[1440px] flex-1 p-4 pb-24 md:p-6 md:pb-6 xl:p-8">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="focus:outline-none mx-auto w-full max-w-[1440px] flex-1 p-4 pb-24 md:p-6 md:pb-6 xl:p-8"
+        >
           <Outlet />
         </main>
       </div>
