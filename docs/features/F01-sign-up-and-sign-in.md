@@ -46,8 +46,13 @@ Slices of at most 2 API routes, backend first; **the screens come after the whol
 | 5 | `POST /auth/refresh` | done and tested by the owner |
 | 6 | lockout after 5 wrong passwords, rate limits, common-password list (no new route) | built, waiting for the owner's test |
 | 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | done and tested by the owner |
-| 8 | `PATCH /me`, `POST /me/password` | built, waiting for the owner's test |
-| UI | sign-up, verify, sign-in, forgot and reset, profile, sign-out | after slice 8 |
+| 8 | `PATCH /me`, `POST /me/password` | done and tested by the owner |
+| UI 1 | sign-in, sign-out and the signed-in guard (no new routes) | built, waiting for the owner's test |
+| UI 2 | sign-up and the "check your email" screen (adds the "Create an account" link) | planned |
+| UI 3 | the verify-email page, "verify your email" banner, resend | planned |
+| UI 4 | forgot and reset password pages (adds the "Forgot password?" link) | planned |
+| UI 5 | profile page: edit name and mobile, change password | planned |
+| UI 6 | full-stack browser tests (real API and test database), hand-off script | planned |
 
 ## Reused from the hotel agent
 - Read: `src/modules/core/auth/{routes,service,sessions,repository}.js`, `src/middleware/auth.js` (489 lines). **We keep

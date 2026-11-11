@@ -1,7 +1,11 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { RequireSignIn } from '../auth/RequireSignIn';
+import { SessionProvider } from '../auth/session';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
+import { SignInPage } from '../pages/SignInPage';
+import { AuthLayout } from './AuthLayout';
 import { NAVIGATION_ITEMS } from './navigation';
 import { Shell } from './shell/Shell';
 import { ThemeProvider } from './theme';
@@ -12,29 +16,36 @@ const UiGallery = import.meta.env.DEV
   ? lazy(() => import('../dev/UiGallery').then((module) => ({ default: module.UiGallery })))
   : null;
 
-/** The whole staff app: theme, the page frame, and one route for each menu entry. */
+/** The whole staff app: theme, who is signed in, the sign-in page, and (behind the guard) the page frame with one route for each menu entry. */
 export function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <Routes>
-          <Route element={<Shell />}>
-            {NAVIGATION_ITEMS.map((item) => (
-              <Route key={item.id} path={item.path} element={<PlaceholderPage item={item} />} />
-            ))}
-            {UiGallery ? (
-              <Route
-                path="/dev/ui"
-                element={
-                  <Suspense fallback={null}>
-                    <UiGallery />
-                  </Suspense>
-                }
-              />
-            ) : null}
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
+        <SessionProvider>
+          <Routes>
+            <Route element={<AuthLayout />}>
+              <Route path="/sign-in" element={<SignInPage />} />
+            </Route>
+            <Route element={<RequireSignIn />}>
+              <Route element={<Shell />}>
+                {NAVIGATION_ITEMS.map((item) => (
+                  <Route key={item.id} path={item.path} element={<PlaceholderPage item={item} />} />
+                ))}
+                {UiGallery ? (
+                  <Route
+                    path="/dev/ui"
+                    element={
+                      <Suspense fallback={null}>
+                        <UiGallery />
+                      </Suspense>
+                    }
+                  />
+                ) : null}
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Route>
+          </Routes>
+        </SessionProvider>
       </BrowserRouter>
     </ThemeProvider>
   );

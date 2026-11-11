@@ -104,6 +104,25 @@ const englishMessages = {
   'notFound.title': 'Page not found',
   'notFound.description': 'This page does not exist, or it is switched off for your business.',
   'notFound.back': 'Go to Today',
+  'session.loading': 'Checking who is signed in',
+  'session.errorTitle': 'We could not reach the server',
+  'session.errorDescription': 'Check your connection and try again. Your work is safe.',
+  'session.retry': 'Try again',
+  'session.signOut': 'Sign out',
+  'signIn.title': 'Sign in',
+  'signIn.description': 'Use the email and password you signed up with.',
+  'signIn.email': 'Email',
+  'signIn.password': 'Password',
+  'signIn.submit': 'Sign in',
+  'signIn.error.emailRequired': 'Enter your email address.',
+  'signIn.error.emailInvalid': 'Enter a valid email address, like name@company.com.',
+  'signIn.error.passwordRequired': 'Enter your password.',
+  'signIn.error.invalidCredentials': 'The email or password is not right.',
+  'signIn.error.tooManyAttempts':
+    'Too many wrong passwords. This email is locked for 15 minutes, or until you reset the password.',
+  'signIn.error.tooManyRequests': 'Too many tries from this device. Wait a minute and try again.',
+  'signIn.error.network': 'We could not reach the server. Check your connection and try again.',
+  'signIn.error.unknown': 'Something went wrong. Please try again.',
 } as const;
 
 export type MessageKey = keyof typeof englishMessages;

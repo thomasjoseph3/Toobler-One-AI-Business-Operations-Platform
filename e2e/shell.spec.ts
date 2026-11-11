@@ -62,6 +62,8 @@ test.describe('navigation', () => {
 
   test('the skip link is the first thing a keyboard reaches and jumps to the content', async ({ page }) => {
     await page.goto('/');
+    // The page frame appears once the app knows who is signed in, so wait for it before pressing Tab
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await page.keyboard.press('Tab');
     const skipLink = page.getByRole('link', { name: 'Skip to content' });
     await expect(skipLink).toBeFocused();
