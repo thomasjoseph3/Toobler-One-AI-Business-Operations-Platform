@@ -1,7 +1,7 @@
 # F03: Modules, plug and play
 
 **Requirements:** `1-foundation/03-engines-and-plans.md`; docs/ARCHITECTURE.md §1
-**Depends on:** F00, F01      **Module:** `core.modules` (core)
+**Depends on:** F00, F01      **Module:** `core.module_switches` (core)
 
 **Goal in one line:** each business has its own switches for the parts of the product (lead engine, website chat,
 WhatsApp, and so on). A part that is off is hidden: its routes answer 404, its menu items go, and its data is kept.
@@ -32,7 +32,7 @@ turned on, and turning an engine off turns off the features that need it.
 1. **What a new business gets at sign-up.** *Recommended:* `engine.leads` and `channel.webchat` entitled and enabled; the
    other modules not entitled until you grant them. Existing businesses get the same through the migration.
 2. **Catalogue versus manifests.** Modules such as `engine.leads` have no code yet. *Recommended:* the catalogue is a plain
-   list in `core.modules`; when a real module arrives its manifest must match the catalogue (a test checks it), so a
+   list in `core.module_switches`; when a real module arrives its manifest must match the catalogue (a test checks it), so a
    module can never exist without a switch.
 
 ## Build order (slices of at most 2 routes)

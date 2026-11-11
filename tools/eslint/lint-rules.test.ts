@@ -26,6 +26,13 @@ describe('module boundary rule', () => {
     writeFile('engines/leads/module.ts', "export default { id: 'engine.leads', requires: ['core.contacts'] };");
     writeFile('engines/sales/module.ts', "export default { id: 'engine.sales', requires: ['engine.leads'] };");
     writeFile('features/followups/module.ts', "export default { id: 'feature.followups' };");
+    // A folder named with a hyphen has an id with an underscore
+    writeFile('core/switch-board/module.ts', "export default { id: 'core.switch_board' };");
+    writeFile(
+      'core/user-of-board/module.ts',
+      "export default { id: 'core.user_of_board', requires: ['core.switch_board'] };",
+    );
+    writeFile('core/stranger/module.ts', "export default { id: 'core.stranger' };");
   });
   afterAll(() => fs.rmSync(workFolder, { recursive: true, force: true }));
 
@@ -70,6 +77,11 @@ describe('module boundary rule', () => {
   it('lets a module use another module through its index when it lists it in requires', () => {
     expect(lintImport('engines/leads/service.ts', "import { find } from '../../core/contacts';")).toEqual([]);
     expect(lintImport('engines/leads/service.ts', "import { find } from '../../core/contacts/index';")).toEqual([]);
+  });
+
+  it('matches a folder named with hyphens to its id with underscores', () => {
+    expect(lintImport('core/user-of-board/service.ts', "import { find } from '../switch-board';")).toEqual([]);
+    expect(lintImport('core/stranger/service.ts', "import { find } from '../switch-board';")).toHaveLength(1);
   });
 
   it("reports a module reaching into another module's private files", () => {

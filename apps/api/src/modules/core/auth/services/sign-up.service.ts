@@ -4,7 +4,7 @@ import type { Database } from '../../../../kernel/database';
 import { ApiError, conflict } from '../../../../kernel/errors';
 import { uuidv7 } from '../../../../kernel/ids';
 import { isActiveIndustry } from '../../industries';
-import { grantStartingModules } from '../../modules';
+import { grantStartingModules } from '../../module-switches';
 import type { EmailVerificationService } from './email-verification.service';
 import * as accountsRepository from '../repositories/accounts.repository';
 import * as credentialsRepository from '../repositories/credentials.repository';

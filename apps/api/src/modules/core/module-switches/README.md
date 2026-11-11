@@ -1,4 +1,4 @@
-# core.modules: which parts of the product each business has
+# core.module_switches: which parts of the product each business has
 
 Built in slices of at most 2 API routes (see `docs/features/F03-modules.md`).
 
