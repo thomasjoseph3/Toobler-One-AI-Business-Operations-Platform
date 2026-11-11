@@ -44,10 +44,10 @@ Slices of at most 2 API routes, backend first; **the screens come after the whol
 | 3 | `POST /auth/logout`, `GET /me` | done and tested by the owner |
 | 4 | `POST /auth/verify-email`, `POST /auth/resend-email` | done and tested by the owner |
 | 5 | `POST /auth/refresh` | done and tested by the owner |
-| 6 | lockout after 5 wrong passwords, rate limits, common-password list (no new route) | built, waiting for the owner's test |
+| 6 | lockout after 5 wrong passwords, rate limits, common-password list (no new route) | done and tested by the owner |
 | 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | done and tested by the owner |
-| 8 | `PATCH /me`, `POST /me/password` | built, waiting for the owner's test |
-| UI | sign-up, verify, sign-in, forgot and reset, profile, sign-out | after slice 8 |
+| 8 | `PATCH /me`, `POST /me/password` | done and tested by the owner |
+| UI | sign-up, verify, sign-in, forgot and reset, profile, sign-out | **deferred** until the designer's screens arrive (see "Deferred work" in docs/plan/STATUS.md). UI slice 1, sign-in with the guard and API client, is built on the branch `feature/F01-ui-sign-in`. |
 
 ## Reused from the hotel agent
 - Read: `src/modules/core/auth/{routes,service,sessions,repository}.js`, `src/middleware/auth.js` (489 lines). **We keep
