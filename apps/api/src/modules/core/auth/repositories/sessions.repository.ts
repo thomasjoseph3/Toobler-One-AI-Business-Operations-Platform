@@ -58,13 +58,22 @@ export async function revokeSession(db: Db, sessionId: string, reason: string): 
     .execute();
 }
 
-/** Ends every live session of a person, on every device, with the reason. Returns how many it ended. */
-export async function revokeAllSessionsForUser(db: Db, userId: string, reason: string): Promise<number> {
+/**
+ * Ends every live session of a person, on every device, with the reason. Pass `exceptSessionId` to keep one session (the
+ * device the person is using right now). Returns how many it ended.
+ */
+export async function revokeAllSessionsForUser(
+  db: Db,
+  userId: string,
+  reason: string,
+  exceptSessionId?: string,
+): Promise<number> {
   const rows = await db
     .updateTable('sessions')
     .set({ revoked_at: sql`now()`, revoked_reason: reason })
     .where('user_id', '=', userId)
     .where('revoked_at', 'is', null)
+    .$if(exceptSessionId !== undefined, (query) => query.where('id', '<>', exceptSessionId as string))
     .returning('id')
     .execute();
   return rows.length;

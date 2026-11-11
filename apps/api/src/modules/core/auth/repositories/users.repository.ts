@@ -167,3 +167,28 @@ export async function findPersonForEmail(
   if (!row) return undefined;
   return { name: row.name, email: row.email, emailVerified: row.email_verified_at !== null };
 }
+
+/**
+ * Changes the person's own name and/or mobile number (only the fields given). Run it inside the business's fence, so it
+ * can only ever reach a person of that business. Returns false when no such person is visible.
+ */
+export async function updateOwnDetails(
+  db: Db,
+  userId: string,
+  changes: { name?: string; mobileE164?: string; mobileKey?: string },
+): Promise<boolean> {
+  const row = await db
+    .updateTable('users')
+    .set({
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.mobileE164 !== undefined
+        ? { mobile_e164: changes.mobileE164, mobile_key: changes.mobileKey ?? null }
+        : {}),
+      updated_by: { kind: 'user', id: userId },
+      updated_at: sql`now()`,
+    })
+    .where('id', '=', userId)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}
