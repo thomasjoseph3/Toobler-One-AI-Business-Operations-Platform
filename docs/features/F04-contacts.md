@@ -41,7 +41,8 @@ feature (leads, tickets, conversations, tasks) hangs off one contact.
 | --- | --- | --- |
 | 1 | `POST /contacts`, `GET /contacts` | built and committed |
 | 2 | `GET /contacts/{id}`, `PATCH /contacts/{id}` | done and tested by the owner |
-| 3 | `DELETE /contacts/{id}` | built, waiting for the owner's test |
+| 3 | `DELETE /contacts/{id}` | built; owner test pending |
+| Journey | chained story test (`contacts-journeys.test.ts`) | done |
 | UI | Contacts list, contact page, add/edit, delete | on hold (designer) |
 
 ## Reused from the hotel agent
