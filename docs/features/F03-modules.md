@@ -48,8 +48,8 @@ turned on, and turning an engine off turns off the features that need it.
 | Slice | Routes | Content |
 | --- | --- | --- |
 | 1 | `GET /modules`, `PATCH /modules/{id}` | Migration, catalogue, repository, service, the two routes, dependency rule. **Done and tested by the owner.** |
-| 2 | `POST /platform/businesses/{id}/modules`, `GET /me` (extended) | Platform entitle, module guard on routes, active modules in `/me` |
-| UI | Settings → Modules, menu from `/me`, platform page | **Deferred** until the designer's screens arrive |
+| 2 | `POST /platform/businesses/{id}/modules`, `GET /me` (extended) | Platform entitle, the real module gate, active modules in `/me`. **Done and tested by the owner.** |
+| UI | Settings → Modules, menu from `/me`, platform page | **Deferred** until the designer's screens arrive (owner decision, 11 Nov 2026: the front end stays on hold) |
 
 ## Reused from the hotel agent
 - Read: `src/modules/core/platform/*` (113 lines of service) and `src/modules/core/industries.js`.
@@ -88,4 +88,30 @@ A disabled module's route answers 404; re-enabling keeps data; a feature cannot 
 off when its engine goes off; staff cannot toggle; a business cannot enable a module it is not entitled to; the app role
 cannot write `entitled`; the catalogue matches the manifests; the schema test sees `account_modules` fenced.
 
-## Manual test (written when each slice is built)
+## Hand-off (11 Nov 2026)
+`npm run verify` is green: 368 API and unit tests, 94 Playwright tests (2 skipped as before). Four module test files
+(`modules`, `modules-platform`, `modules-gate`, `modules-journeys`) plus the unit tests of the rules. Each protection was
+broken once on purpose and a test failed. The migration `008_modules.sql` is applied to Supabase. The screens are deferred.
+
+## Manual test (Postman; send `Origin: http://localhost:3000` and `X-Requested-With: toobler-web` on every POST and PATCH)
+Sign in first with `POST /api/v1/auth/login`. You need two people: yourself (platform admin) and, for the 403 checks, a
+second sign-up that is an ordinary business manager.
+
+| # | Request | Expect |
+| --- | --- | --- |
+| 1 | `GET /modules` | 200, 8 items; `engine.leads` and `channel.webchat` are `active`, the rest `not_in_plan` |
+| 2 | `PATCH /modules/channel.webchat` `{"enabled":false}` | 200, it shows `off`; sending it again changes nothing |
+| 3 | `PATCH /modules/channel.webchat` `{"enabled":true}` | 200, `active` again |
+| 4 | `PATCH /modules/channel.whatsapp` `{"enabled":true}` | 409 `NOT_IN_PLAN` |
+| 5 | `PATCH /modules/channel.telegram` `{"enabled":true}` | 404 |
+| 6 | `PATCH /modules/channel.webchat` `{}` | 400 |
+| 7 | `POST /platform/businesses/<business id>/modules` `{"moduleId":"channel.whatsapp","entitled":true}` | 200, it shows `off` |
+| 8 | `PATCH /modules/channel.whatsapp` `{"enabled":true}` | 200, `active` |
+| 9 | `GET /me` | `activeModules` lists Lead engine, Website chat, WhatsApp |
+| 10 | `POST` the platform route with `{"moduleId":"engine.leads","entitled":false}` | 200; `engine.leads` is `not_in_plan` and features that needed it are `off` |
+| 11 | Put it back with `"entitled":true` | `engine.leads` is `off` (the business switches it on) |
+| 12 | The platform route with a random uuid / `channel.telegram` / `abc` | 404 / 404 / 400 |
+| 13 | The platform route as an ordinary manager | 403 |
+| 14 | Any module route without the cookie | 401 |
+
+The browser steps (switch a channel off and on and watch its menu item go and come back) wait for the screens.

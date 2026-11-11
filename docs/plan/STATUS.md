@@ -14,7 +14,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | --- | --- | --- | --- | --- |
 | F00 | Foundation and design system | approved | [brief](../features/F00-foundation.md) | 2026-11-10 |
 | F01 | Sign-up, sign-in and sessions | approved | [brief](../features/F01-sign-up-and-sign-in.md) | 2026-11-11 |
-| F03 | Modules: plug and play | in_progress | [brief](../features/F03-modules.md) | |
+| F03 | Modules: plug and play | approved | [brief](../features/F03-modules.md) | 2026-11-11 |
 | F04 | Contacts | planned | | |
 | F06 | Pipeline and leads board | planned | | |
 | F14 | Tickets | planned | | |
@@ -55,6 +55,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | Work | Why it waits | Where it is |
 | --- | --- | --- |
 | **F01-UI: the auth screens** (sign-in, sign-up, verify email, forgot and reset password, profile, full-stack browser tests) | The designer is making the screens. The owner approved the F01 **backend** on 2026-11-11 (8 slices, all tested by the owner) and parked the screens. | UI slice 1 (sign-in, sign-out, the guard, the API client) is built on the local branch `feature/F01-ui-sign-in`, commit `0d78997`. It works, and the designer's look goes on top. UI slices 2 to 6 are planned in the F01 brief. |
+| **F03-UI: the module screens** (Settings → Modules, the menu built from `/me`, the platform page) | The designer is making the screens; the owner put the front end on hold (11 Nov 2026). The F03 backend is built and tested. | Planned in the F03 brief. |
 | **API docs (Swagger / OpenAPI)** | The routes already describe their shapes with zod, so a docs page can be generated. It is a small feature of its own, planned right after F03 is approved (owner agreed 2026-11-11). Packages to be vetted first; served in development only. | Not started. Needs its own brief. |
 
 When the designer's screens arrive, the F01-UI work is done as slices (one screen at a time, owner testing each), and it is approved separately.
