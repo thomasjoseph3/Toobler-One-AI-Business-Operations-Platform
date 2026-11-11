@@ -50,6 +50,7 @@ None so far.
 | Sign-in (F01, vetted 10 Nov 2026) | jose 6.2.13 (signs and checks the access tokens; MIT, no dependencies), @fastify/cookie 11.1.5 (reads and sets cookies; Fastify's own, MIT) |
 | Email (F01 slice 4, vetted 10 Nov 2026) | nodemailer 10.2.1 (sends email over SMTP; MIT-0, no dependencies, 36M downloads a week) and @types/nodemailer 8.0.2 (its types, dev only) |
 | Passwords (F01, vetted 10 Nov 2026) | @node-rs/argon2 2.2.2: argon2id password hashing, a prebuilt binary with no install script (the other `argon2` package runs one, so it was rejected) |
+| API docs (vetted 11 Nov 2026) | @fastify/swagger 9.9.2 (builds the OpenAPI document from the routes' zod shapes) and @fastify/swagger-ui 6.1.2 (the `/docs` page); both MIT, Fastify core team, no install scripts. They pull in @fastify/static 10.1.8 and a few small helpers. Served in development only. |
 | Database and jobs | pg 8.23.1, kysely 0.29.7, pg-boss 12.38.0 |
 | Web (React + Vite, no Next.js) | vite 8.3.5, @vitejs/plugin-react 6.1.2, react-router 8.5.0, react / react-dom 19.3.1, tailwindcss and @tailwindcss/vite 4.3.3, lucide-react 1.61.0, clsx 2.1.1 |
 | Tooling | **typescript 6.0.3** (not 7.x: typescript-eslint 8.72 supports TypeScript below 6.1 only), tsx 4.23.15, vitest 5.0.5, @playwright/test 1.64.1, @axe-core/playwright 4.14.0 (MPL-2.0, dev only), eslint 10.13.0, @eslint/js 10.0.1, typescript-eslint 8.72.0, eslint-plugin-react-hooks 7.1.1, globals 17.13.0, prettier 3.9.10, concurrently 10.0.6 |
