@@ -39,14 +39,14 @@ describe('GET /api/v1/me', () => {
   it('gives the same profile that signing up and signing in gave', async () => {
     const person = await createSignedInPerson(app, database);
     const response = await app.inject({ url: '/api/v1/me', headers: { cookie: person.cookieHeader } });
-    expect(response.json()).toEqual(person.profile);
+    expect(response.json()).toEqual({ ...person.profile, activeModules: expect.any(Array) });
   });
 
   it('never contains a password, a hash, a token, or the platform admin flag', async () => {
     const person = await createSignedInPerson(app, database, { isPlatformAdmin: true });
     const response = await app.inject({ url: '/api/v1/me', headers: { cookie: person.cookieHeader } });
     expect(response.body).not.toMatch(/password|hash|argon|token|platform/i);
-    expect(Object.keys(response.json()).sort()).toEqual(['business', 'user']);
+    expect(Object.keys(response.json()).sort()).toEqual(['activeModules', 'business', 'user']);
   });
 
   it('shows each person only their own business, never another one', async () => {

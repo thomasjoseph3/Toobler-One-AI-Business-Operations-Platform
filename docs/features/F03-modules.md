@@ -28,7 +28,16 @@ turned on, and turning an engine off turns off the features that need it.
   screens arrive); the "ready" check per channel (each channel feature); plans and billing (F35); the agent's tool
   filtering (F19, it will ask the same gate).
 
-## Open decisions (recommendation first)
+## Decisions (owner, 11 Nov 2026)
+1. New businesses start with `engine.leads` and `channel.webchat` in the plan and switched on; everything else is added by Toobler.
+2. The catalogue is a plain list in `core.module_switches`; a test keeps real manifests matching it.
+3. Voice and other paid channels will run on the business's **own** keys (stored encrypted in `connections`, from F25/F29). The
+   web call is not default-on and no shared Toobler key is used.
+4. The module was renamed from `core.modules` to `core.module_switches` so the path does not read "modules inside modules".
+5. The kernel finds the real gate through the module manifest (`moduleGate`), the same way it finds the authenticator.
+   A business's answer is remembered for 10 seconds; any change on the same server clears it at once.
+
+## Open decisions (closed above)
 1. **What a new business gets at sign-up.** *Recommended:* `engine.leads` and `channel.webchat` entitled and enabled; the
    other modules not entitled until you grant them. Existing businesses get the same through the migration.
 2. **Catalogue versus manifests.** Modules such as `engine.leads` have no code yet. *Recommended:* the catalogue is a plain
@@ -38,7 +47,7 @@ turned on, and turning an engine off turns off the features that need it.
 ## Build order (slices of at most 2 routes)
 | Slice | Routes | Content |
 | --- | --- | --- |
-| 1 | `GET /modules`, `PATCH /modules/{id}` | Migration, catalogue, repository, service, the two routes, dependency rule |
+| 1 | `GET /modules`, `PATCH /modules/{id}` | Migration, catalogue, repository, service, the two routes, dependency rule. **Done and tested by the owner.** |
 | 2 | `POST /platform/businesses/{id}/modules`, `GET /me` (extended) | Platform entitle, module guard on routes, active modules in `/me` |
 | UI | Settings → Modules, menu from `/me`, platform page | **Deferred** until the designer's screens arrive |
 

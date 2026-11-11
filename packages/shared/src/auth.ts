@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { activeModuleSchema } from './modules';
 
 // The shape of the sign-up request and of the answer. The API checks requests with these; the sign-up form will check
 // with the same ones, so the two can never disagree about what is allowed.
@@ -45,6 +46,10 @@ export const profileResponseSchema = z.object({
   }),
 });
 export type ProfileResponse = z.infer<typeof profileResponseSchema>;
+
+/** `GET /me` and `PATCH /me`: the profile plus the modules that are on for the business, so the app can build its menu. */
+export const meResponseSchema = profileResponseSchema.extend({ activeModules: z.array(activeModuleSchema) });
+export type MeResponse = z.infer<typeof meResponseSchema>;
 
 /** What the "verify my email" page sends: the token from the link in the email. */
 export const verifyEmailRequestSchema = z.object({ token: z.string().trim().min(20).max(200) });

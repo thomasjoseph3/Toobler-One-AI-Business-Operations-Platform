@@ -32,3 +32,20 @@ export type SwitchModuleRequest = z.infer<typeof switchModuleRequestSchema>;
 
 /** The address part naming a module, like `channel.webchat`. */
 export const moduleIdParamsSchema = z.object({ id: z.string().regex(/^[a-z]+\.[a-z_]+$/) });
+
+/** What the Toobler team sends to put a module into a business's plan (`entitled: true`) or take it out. */
+export const setEntitlementRequestSchema = z
+  .object({ moduleId: z.string().regex(/^[a-z]+\.[a-z_]+$/), entitled: z.boolean() })
+  .strict();
+export type SetEntitlementRequest = z.infer<typeof setEntitlementRequestSchema>;
+
+/** The address part naming a business. */
+export const platformBusinessParamsSchema = z.object({ id: z.uuid() });
+
+/** A module that is on for the business, as the menu needs it (`GET /me`). */
+export const activeModuleSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['engine', 'channel', 'feature']),
+  name: z.string(),
+});
+export type ActiveModule = z.infer<typeof activeModuleSchema>;

@@ -7,7 +7,7 @@ import { createModulesService } from '../services/modules.service';
 /** Registers GET /api/v1/modules (the business's modules) and PATCH /api/v1/modules/{id} (switch one on or off). */
 export function modulesRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
-  const modulesService = createModulesService({ database: app.kernel.database });
+  const modulesService = createModulesService({ database: app.kernel.database, moduleGate: app.kernel.gate });
 
   // For anyone signed in: staff see what is on, so the menu and the Settings screen can show it. A plain read.
   typedApp.get(
