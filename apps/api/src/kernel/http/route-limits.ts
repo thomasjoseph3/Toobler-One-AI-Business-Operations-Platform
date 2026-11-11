@@ -16,6 +16,8 @@ export const ROUTE_LIMITS = {
   verifyEmail: { max: 20, timeWindow: '1 minute' },
   refresh: { max: 30, timeWindow: '1 minute' },
   resendEmail: { max: 3, timeWindow: '10 minutes' },
+  forgotPassword: { max: 3, timeWindow: '10 minutes' },
+  resetPassword: { max: 10, timeWindow: '1 minute' },
 } as const satisfies Record<string, RouteLimit>;
 
 /**

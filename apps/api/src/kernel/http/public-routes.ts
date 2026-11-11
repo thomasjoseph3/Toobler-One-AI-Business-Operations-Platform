@@ -50,4 +50,19 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
       'A new owner has no account yet. The password is checked and stored only as an argon2id hash. ' +
       'Each address is limited to 10 sign-ups an hour, and the CSRF check applies.',
   },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/forgot-password',
+    reason:
+      'Someone who forgot their password cannot sign in. It always answers the same, whether or not the email has an ' +
+      'account, and only ever emails the address on the account. Each address is limited to 3 requests per 10 minutes.',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/reset-password',
+    reason:
+      'The link in the email is opened by someone who cannot sign in. The long random token is the proof; it works once, ' +
+      'expires after an hour, and an unknown, used or expired token all get the same answer. Each address is limited ' +
+      'to 10 tries a minute.',
+  },
 ];

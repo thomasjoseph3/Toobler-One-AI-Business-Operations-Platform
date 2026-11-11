@@ -45,7 +45,7 @@ Slices of at most 2 API routes, backend first; **the screens come after the whol
 | 4 | `POST /auth/verify-email`, `POST /auth/resend-email` | done and tested by the owner |
 | 5 | `POST /auth/refresh` | done and tested by the owner |
 | 6 | lockout after 5 wrong passwords, rate limits, common-password list (no new route) | built, waiting for the owner's test |
-| 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | planned |
+| 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | built, waiting for the owner's test |
 | 8 | `PATCH /me`, `POST /me/password` | planned |
 | UI | sign-up, verify, sign-in, forgot and reset, profile, sign-out | after slice 8 |
 
