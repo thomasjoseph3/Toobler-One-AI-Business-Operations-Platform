@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { profileResponseSchema, updateProfileRequestSchema } from '@toobler-one/shared';
+import { meResponseSchema, updateProfileRequestSchema } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createProfileService } from '../services/profile.service';
 
-/** Registers GET /api/v1/me (who the signed-in person is, and their business) and PATCH /api/v1/me (change own details). */
+/** Registers GET /api/v1/me (who the signed-in person is, their business and its active modules) and PATCH /api/v1/me (change own details). */
 export function profileRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const profileService = createProfileService({ database: app.kernel.database });
@@ -13,7 +13,7 @@ export function profileRoutes(app: FastifyInstance) {
   // need the CSRF headers.
   typedApp.get(
     '/me',
-    { config: { access: 'staff', allowUnverified: true }, schema: { response: { 200: profileResponseSchema } } },
+    { config: { access: 'staff', allowUnverified: true }, schema: { response: { 200: meResponseSchema } } },
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return profileService.getProfile(request.principal);
@@ -26,7 +26,7 @@ export function profileRoutes(app: FastifyInstance) {
     '/me',
     {
       config: { access: 'staff' },
-      schema: { body: updateProfileRequestSchema, response: { 200: profileResponseSchema } },
+      schema: { body: updateProfileRequestSchema, response: { 200: meResponseSchema } },
     },
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker

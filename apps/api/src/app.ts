@@ -82,7 +82,9 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     reply.header('x-request-id', request.id);
   });
 
-  const gate = dependencies.gate ?? coreOnlyGate(registry);
+  // The gate comes from the module that provides one (core.module_switches). With none, only core modules are on.
+  const gateFactory = registry.modules.find((moduleManifest) => moduleManifest.moduleGate)?.moduleGate;
+  const gate = dependencies.gate ?? gateFactory?.({ config, database, registry }) ?? coreOnlyGate(registry);
   app.decorate('kernel', {
     config,
     database,

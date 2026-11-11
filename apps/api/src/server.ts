@@ -4,7 +4,7 @@ import { createContextFactory } from './kernel/context';
 import { createDatabase } from './kernel/database';
 import { createEventDispatcher } from './kernel/events/dispatcher';
 import { createJobRunner } from './kernel/jobs/job-runner';
-import { coreOnlyGate, createRegistry } from './kernel/module-system/registry';
+import { createRegistry } from './kernel/module-system/registry';
 import { modules } from './modules';
 
 // Start-up, in order: read settings, connect to the database and prove it works, build the web server, start listening.
@@ -15,12 +15,12 @@ await database.ping();
 await database.verifyRoles();
 
 const registry = createRegistry(modules);
-const gate = coreOnlyGate(registry); // replaced by the real per-business switches in F03
 const contextFor = createContextFactory(database);
 
 // Background work: events are delivered to the modules that listen for them, and scheduled/queued jobs run.
 // Both report to /health. The web server is built last so it can list them.
-const app = await buildApp({ config, database, registry, gate, healthChecks: [] });
+const app = await buildApp({ config, database, registry, healthChecks: [] });
+const gate = app.kernel.gate; // is this module on for this business? (built from the module-switches module)
 const eventDispatcher = createEventDispatcher({ database, registry, gate, contextFor, logger: app.log });
 const jobRunner = createJobRunner({ config, registry, gate, contextFor, logger: app.log });
 app.kernel.healthChecks.push(eventDispatcher.healthCheck, jobRunner.healthCheck);
