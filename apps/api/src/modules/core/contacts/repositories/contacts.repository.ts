@@ -196,3 +196,19 @@ export async function updateContact(
     .executeTakeFirst();
   return row ? toContact(row) : undefined;
 }
+
+/**
+ * Soft-deletes a live contact: sets `deleted_at` and stamps who did it. The row stays (the app role cannot delete rows), it
+ * just stops showing up and frees its phone and email for a new contact. Returns false when there is no such live contact.
+ */
+export async function softDeleteContact(db: Db, accountId: string, contactId: string, actor: Actor): Promise<boolean> {
+  const row = await db
+    .updateTable('contacts')
+    .set({ deleted_at: new Date(), updated_by: { kind: actor.kind, id: actor.id } })
+    .where('account_id', '=', accountId)
+    .where('id', '=', contactId)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}

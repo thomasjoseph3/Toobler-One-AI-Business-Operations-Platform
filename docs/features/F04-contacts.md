@@ -40,8 +40,8 @@ feature (leads, tickets, conversations, tasks) hangs off one contact.
 | Slice | Routes | State |
 | --- | --- | --- |
 | 1 | `POST /contacts`, `GET /contacts` | built and committed |
-| 2 | `GET /contacts/{id}`, `PATCH /contacts/{id}` | built, waiting for the owner's test |
-| 3 | `DELETE /contacts/{id}` | not started |
+| 2 | `GET /contacts/{id}`, `PATCH /contacts/{id}` | done and tested by the owner |
+| 3 | `DELETE /contacts/{id}` | built, waiting for the owner's test |
 | UI | Contacts list, contact page, add/edit, delete | on hold (designer) |
 
 ## Reused from the hotel agent
@@ -95,3 +95,18 @@ present; `email = lower(email)`; the stage is one of five values. Partial unique
 | 9 | `PATCH` `{"lifecycleStage":"customer"}` | 400 (staff cannot set the stage) |
 | 10 | `PATCH` `{"notAFit":true}`, then `{"notAFit":false}` | stage `not_a_fit`, then `new` |
 | 11 | `PATCH` or `GET` another business's contact id, or without the cookie | 404, 401 |
+
+## Manual test, slice 3 (managers only; send the two headers)
+| # | Request | Expect |
+| --- | --- | --- |
+| 1 | `DELETE /contacts/<id>` as a manager | 204, no body |
+| 2 | `GET /contacts/<id>` and `GET /contacts` | 404 for the contact; it is gone from the list |
+| 3 | `PATCH /contacts/<id>` | 404 |
+| 4 | `DELETE /contacts/<id>` again | 404 |
+| 5 | `POST /contacts` with the deleted contact's phone or email | 201: the number is free again |
+| 6 | `DELETE` a random uuid, `abc`, and another business's contact id | 404, 400, 404 |
+| 7 | `DELETE` as ordinary staff (change a test user's role to `staff` in the database) | 403 |
+| 8 | `DELETE` without the cookie | 401 |
+
+The contact's row stays in the database with `deleted_at` set (check in the Supabase table editor). There is no restore
+route and no erase-personal-data step in F04 (decided; see the review log).

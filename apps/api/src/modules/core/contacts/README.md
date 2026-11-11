@@ -4,7 +4,7 @@ Built in slices of at most 2 API routes (see `docs/features/F04-contacts.md`).
 
 | Folder | What is in it |
 | --- | --- |
-| `routes/` | `contacts.routes.ts` (`POST /contacts`, `GET /contacts`, `GET /contacts/{id}`, `PATCH /contacts/{id}`) |
+| `routes/` | `contacts.routes.ts` (`POST /contacts`, `GET /contacts`, `GET /contacts/{id}`, `PATCH /contacts/{id}`, `DELETE /contacts/{id}`) |
 | `services/` | `contacts.service.ts`: the rules (phone or email needed, duplicates, editing, activity log, events) |
 | `repositories/` | `contacts.repository.ts`: the SQL for the `contacts` table |
 | `helpers/` | `lifecycle.ts` (the stage rules, pure) and `contact-search.ts` (what the search box means, pure). The phone reader is `kernel/phone.ts`. |

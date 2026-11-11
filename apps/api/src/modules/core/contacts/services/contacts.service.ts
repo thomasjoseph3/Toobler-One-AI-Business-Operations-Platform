@@ -216,6 +216,30 @@ export function createContactsService({ database }: { database: Database }) {
       }
     },
 
+    /**
+     * Deletes a contact the soft way: it disappears from the list and from every route, but its row (and so its history)
+     * stays, and its phone and email can be used by a new contact. An unknown id, an already deleted contact and another
+     * business's contact all answer 404. The log line and the event carry the contact's id only, never its phone or email.
+     */
+    async deleteContact(principal: Pick<Principal, 'accountId' | 'userId'>, contactId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        // Lock the row first, so two deletes at the same moment cannot both succeed
+        const current = await contactsRepository.findContactForUpdate(transaction, accountId, contactId);
+        if (!current) throw notFound('That contact');
+        const deleted = await contactsRepository.softDeleteContact(transaction, accountId, contactId, actor);
+        if (!deleted) throw notFound('That contact');
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'contacts.deleted',
+          details: { recordType: 'contact', recordId: contactId },
+        });
+        await publishEvent(transaction, { accountId, eventName: 'contact.deleted', payload: { contactId } });
+      });
+    },
+
     /** One page of the business's contacts: search by name, email or phone digits, optional stage filter, newest change first. */
     async listContacts(
       principal: Pick<Principal, 'accountId'>,

@@ -11,7 +11,7 @@ import {
 import { unauthorized } from '../../../../kernel/errors';
 import { createContactsService } from '../services/contacts.service';
 
-/** Registers /api/v1/contacts (add, list) and /api/v1/contacts/{id} (read one, change one). */
+/** Registers /api/v1/contacts (add, list) and /api/v1/contacts/{id} (read one, change one, delete one). */
 export function contactsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const contactsService = createContactsService({ database: app.kernel.database });
@@ -60,6 +60,17 @@ export function contactsRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return contactsService.updateContact(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // For managers only (the guard answers 403 to staff). A soft delete: the contact disappears, its data is kept.
+  typedApp.delete(
+    '/contacts/:id',
+    { config: { access: 'manager' }, schema: { params: contactIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await contactsService.deleteContact(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }
