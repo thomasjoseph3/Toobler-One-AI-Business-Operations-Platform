@@ -13,7 +13,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | ID | Feature | Status | Brief | Approved on |
 | --- | --- | --- | --- | --- |
 | F00 | Foundation and design system | approved | [brief](../features/F00-foundation.md) | 2026-11-10 |
-| F01 | Sign-up, sign-in and sessions | in_progress | [brief](../features/F01-sign-up-and-sign-in.md) | |
+| F01 | Sign-up, sign-in and sessions | approved | [brief](../features/F01-sign-up-and-sign-in.md) | 2026-11-11 |
 | F03 | Modules: plug and play | planned | | |
 | F04 | Contacts | planned | | |
 | F06 | Pipeline and leads board | planned | | |
@@ -49,3 +49,11 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F34 | Subscription billing | planned | | |
 | F35 | Platform console | planned | | |
 | F36 | Go live | planned | | |
+
+## Deferred work (not in the table, so the gate ignores it)
+
+| Work | Why it waits | Where it is |
+| --- | --- | --- |
+| **F01-UI: the auth screens** (sign-in, sign-up, verify email, forgot and reset password, profile, full-stack browser tests) | The designer is making the screens. The owner approved the F01 **backend** on 2026-11-11 (8 slices, all tested by the owner) and parked the screens. | UI slice 1 (sign-in, sign-out, the guard, the API client) is built on the local branch `feature/F01-ui-sign-in`, commit `0d78997`. It works, and the designer's look goes on top. UI slices 2 to 6 are planned in the F01 brief. |
+
+When the designer's screens arrive, the F01-UI work is done as slices (one screen at a time, owner testing each), and it is approved separately.
