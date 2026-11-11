@@ -120,6 +120,21 @@ export interface SessionsTable {
   revoked_reason: string | null;
 }
 
+/** Which modules a business has: `entitled` by the plan (platform only), `enabled` by the business. Fenced by account_id. */
+export interface AccountModulesTable {
+  account_id: string;
+  module_id: string;
+  entitled: Generated<boolean>;
+  enabled: Generated<boolean>;
+  enabled_at: Date | null;
+  disabled_at: Date | null;
+  settings: Generated<Json>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -132,4 +147,5 @@ export interface DB {
   sessions: SessionsTable;
   auth_tokens: AuthTokensTable;
   login_attempts: LoginAttemptsTable;
+  account_modules: AccountModulesTable;
 }
