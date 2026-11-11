@@ -87,4 +87,38 @@ describe('loadConfig', () => {
       }),
     ).toThrow(expect.not.stringContaining('hunter2-secret'));
   });
+
+  describe('API_DOCS_ORIGIN (the API docs page)', () => {
+    it('defaults to the dev server address in development', () => {
+      expect(loadConfig(minimalValidEnvironment).docsOrigin).toBe('http://localhost:4000');
+    });
+    it('can be set in development, and a trailing slash is dropped', () => {
+      const config = loadConfig({ ...minimalValidEnvironment, API_DOCS_ORIGIN: 'http://localhost:4100/' });
+      expect(config.docsOrigin).toBe('http://localhost:4100');
+    });
+    it('is switched off outside development, even when the setting is present', () => {
+      const docsSetting = { API_DOCS_ORIGIN: 'http://localhost:4000' };
+      expect(loadConfig({ ...minimalValidEnvironment, NODE_ENV: 'test', ...docsSetting }).docsOrigin).toBeNull();
+      expect(loadConfig({ ...minimalValidEnvironment, NODE_ENV: 'test' }).docsOrigin).toBeNull();
+    });
+    it('makes production refuse to start when it is set', () => {
+      const productionEnvironment = {
+        ...minimalValidEnvironment,
+        NODE_ENV: 'production',
+        DATABASE_SSL: 'require',
+        PUBLIC_BASE_URL: 'https://api.example.com',
+        WEB_URL: 'https://app.example.com',
+        MAIL_PROVIDER: 'smtp',
+        SMTP_HOST: 'smtp.example.com',
+        EMAIL_FROM: 'Toobler One <no-reply@example.com>',
+      };
+      expect(loadConfig(productionEnvironment).docsOrigin).toBeNull(); // a good production setup has no docs
+      expect(() => loadConfig({ ...productionEnvironment, API_DOCS_ORIGIN: 'http://localhost:4000' })).toThrow(
+        /API_DOCS_ORIGIN must not be set in production/,
+      );
+    });
+    it('treats an empty value as not set', () => {
+      expect(loadConfig({ ...minimalValidEnvironment, API_DOCS_ORIGIN: '' }).docsOrigin).toBe('http://localhost:4000');
+    });
+  });
 });

@@ -27,6 +27,9 @@ const EnvironmentVariablesSchema = z.object({
   TRUST_PROXY: z.string().default('loopback'),
   WEB_URL: z.url().default('http://localhost:3000'),
   PUBLIC_BASE_URL: z.url().default('http://localhost:4000'),
+  // Development only: the address the API docs page (/docs) runs on. Requests from it are allowed to change data so
+  // "Try it out" works. Ignored outside development, and production refuses to start when it is set.
+  API_DOCS_ORIGIN: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
   // Sign-in. The secret signs the access tokens: at least 32 characters, only ever in the environment, never shared.
   JWT_SECRET: z
     .string({ error: 'JWT_SECRET is missing. Run `npm run setup`, which adds a random one to .env.' })
@@ -60,6 +63,8 @@ export interface Config {
   trustProxy: boolean | string | string[];
   webUrl: string;
   publicBaseUrl: string;
+  /** The address of the API docs page (development only). Null everywhere else: the docs page does not exist there. */
+  docsOrigin: string | null;
   auth: { jwtSecret: string; accessTokenMinutes: number; sessionMaxDays: number; sessionIdleDays: number };
   mail: {
     provider: 'smtp' | 'console';
@@ -106,6 +111,10 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
     trustProxy: parseTrustProxy(validEnvironment.TRUST_PROXY),
     webUrl: validEnvironment.WEB_URL.replace(/\/$/, ''),
     publicBaseUrl: validEnvironment.PUBLIC_BASE_URL.replace(/\/$/, ''),
+    docsOrigin:
+      validEnvironment.NODE_ENV === 'development'
+        ? (validEnvironment.API_DOCS_ORIGIN ?? 'http://localhost:4000').replace(/\/$/, '')
+        : null,
     auth: {
       jwtSecret: validEnvironment.JWT_SECRET,
       accessTokenMinutes: validEnvironment.ACCESS_TOKEN_MINUTES,
@@ -128,6 +137,9 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
   }
   if (config.env === 'production') {
     const unsafeSettings: string[] = [];
+    if (validEnvironment.API_DOCS_ORIGIN) {
+      unsafeSettings.push('API_DOCS_ORIGIN must not be set in production (it opens the API docs page to changes)');
+    }
     if (config.db.ssl === 'off') unsafeSettings.push('DATABASE_SSL must be require or verify in production');
     if (!config.publicBaseUrl.startsWith('https://'))
       unsafeSettings.push('PUBLIC_BASE_URL must be https in production');

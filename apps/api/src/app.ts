@@ -9,6 +9,7 @@ import { createContextFactory, type ContextFactory } from './kernel/context';
 import type { Database } from './kernel/database';
 import type { HealthCheck } from './kernel/health';
 import { registerCsrfProtection } from './kernel/http/csrf';
+import { registerApiDocs } from './kernel/http/api-docs';
 import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
@@ -101,10 +102,14 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
   const authenticate = dependencies.authenticate ?? authenticatorFactory?.({ config, database }) ?? rejectEveryone;
 
   registerErrorHandling(app);
-  registerCsrfProtection(app, { allowedOrigin: config.webUrl }); // changes need our Origin and header
+  // Changes need our Origin and header. In development the API docs page counts as ours too (so "Try it out" works).
+  registerCsrfProtection(app, { allowedOrigins: [config.webUrl, ...(config.docsOrigin ? [config.docsOrigin] : [])] });
   await app.register(cookie); // lets routes set and read cookies (the sign-in cookies)
   await app.register(helmet);
   await app.register(rateLimit, { global: true, ...(dependencies.rateLimit ?? { max: 300, timeWindow: '1 minute' }) });
+  // Development only. Registered before the guard on purpose: the docs page's own routes carry no `config.access`, and the
+  // guard refuses routes without one. They are read-only pages and do not exist outside development.
+  if (config.docsOrigin) await registerApiDocs(app, { docsOrigin: config.docsOrigin });
   registerGuard(app, {
     authenticate,
     gate,
