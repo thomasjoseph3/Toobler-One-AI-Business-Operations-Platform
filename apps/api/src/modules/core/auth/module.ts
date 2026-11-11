@@ -1,5 +1,7 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { emailVerificationRoutes } from './routes/email-verification.routes';
+import { passwordRoutes } from './routes/password.routes';
+import { passwordResetRoutes } from './routes/password-reset.routes';
 import { profileRoutes } from './routes/profile.routes';
 import { createSessionAuthenticator } from './authenticator';
 import { sessionsRoutes } from './routes/sessions.routes';
@@ -21,5 +23,7 @@ export default defineModule({
     sessionsRoutes(app);
     profileRoutes(app);
     emailVerificationRoutes(app);
+    passwordResetRoutes(app);
+    passwordRoutes(app);
   },
 });

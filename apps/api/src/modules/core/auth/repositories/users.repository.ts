@@ -52,14 +52,29 @@ export interface PersonForSignIn {
   emailVerified: boolean;
 }
 
-/** ACROSS BUSINESSES (runs on the owner connection). The person with this email, or undefined. */
-export async function findPersonByEmail(db: Db, email: string): Promise<PersonForSignIn | undefined> {
-  const row = await db
-    .selectFrom('users')
-    .select(['id', 'account_id', 'name', 'email', 'mobile_e164', 'role', 'status', 'email_verified_at'])
-    .where('email', '=', email)
-    .executeTakeFirst();
-  if (!row) return undefined;
+/** The columns both lookups read, and how a row becomes a PersonForSignIn. */
+const PERSON_COLUMNS = [
+  'id',
+  'account_id',
+  'name',
+  'email',
+  'mobile_e164',
+  'role',
+  'status',
+  'email_verified_at',
+] as const;
+
+/** Turns a database row into a PersonForSignIn. */
+function toPersonForSignIn(row: {
+  id: string;
+  account_id: string;
+  name: string;
+  email: string;
+  mobile_e164: string | null;
+  role: 'manager' | 'staff' | 'staff_own';
+  status: 'active' | 'disabled';
+  email_verified_at: Date | null;
+}): PersonForSignIn {
   return {
     id: row.id,
     accountId: row.account_id,
@@ -70,6 +85,18 @@ export async function findPersonByEmail(db: Db, email: string): Promise<PersonFo
     status: row.status,
     emailVerified: row.email_verified_at !== null,
   };
+}
+
+/** ACROSS BUSINESSES (runs on the owner connection). The person with this email, or undefined. */
+export async function findPersonByEmail(db: Db, email: string): Promise<PersonForSignIn | undefined> {
+  const row = await db.selectFrom('users').select(PERSON_COLUMNS).where('email', '=', email).executeTakeFirst();
+  return row ? toPersonForSignIn(row) : undefined;
+}
+
+/** ACROSS BUSINESSES (runs on the owner connection). The person with this id, or undefined. */
+export async function findPersonById(db: Db, userId: string): Promise<PersonForSignIn | undefined> {
+  const row = await db.selectFrom('users').select(PERSON_COLUMNS).where('id', '=', userId).executeTakeFirst();
+  return row ? toPersonForSignIn(row) : undefined;
 }
 
 /** A person as the profile shows them. */
@@ -139,4 +166,29 @@ export async function findPersonForEmail(
     .executeTakeFirst();
   if (!row) return undefined;
   return { name: row.name, email: row.email, emailVerified: row.email_verified_at !== null };
+}
+
+/**
+ * Changes the person's own name and/or mobile number (only the fields given). Run it inside the business's fence, so it
+ * can only ever reach a person of that business. Returns false when no such person is visible.
+ */
+export async function updateOwnDetails(
+  db: Db,
+  userId: string,
+  changes: { name?: string; mobileE164?: string; mobileKey?: string },
+): Promise<boolean> {
+  const row = await db
+    .updateTable('users')
+    .set({
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.mobileE164 !== undefined
+        ? { mobile_e164: changes.mobileE164, mobile_key: changes.mobileKey ?? null }
+        : {}),
+      updated_by: { kind: 'user', id: userId },
+      updated_at: sql`now()`,
+    })
+    .where('id', '=', userId)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
 }

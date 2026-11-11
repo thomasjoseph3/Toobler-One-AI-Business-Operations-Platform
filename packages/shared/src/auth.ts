@@ -50,5 +50,37 @@ export type ProfileResponse = z.infer<typeof profileResponseSchema>;
 export const verifyEmailRequestSchema = z.object({ token: z.string().trim().min(20).max(200) });
 export type VerifyEmailRequest = z.infer<typeof verifyEmailRequestSchema>;
 
+/** What the "forgot password" page sends: the email the account was created with. */
+export const forgotPasswordRequestSchema = z.object({
+  email: z.string().trim().toLowerCase().pipe(z.email().max(254)),
+});
+export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequestSchema>;
+
+/** What the "choose a new password" page sends: the token from the emailed link, and the new password. */
+export const resetPasswordRequestSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+  newPassword: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+});
+export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
+
+/** What the profile page sends to change the person's own details. Send only what changes; at least one is needed. */
+export const updateProfileRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(100).optional(),
+    mobile: z.string().trim().min(5).max(20).optional(),
+  })
+  .strict() // anything else (email, role, business...) is refused, not silently ignored
+  .refine((details) => details.name !== undefined || details.mobile !== undefined, {
+    message: 'Send a name, a mobile number, or both.',
+  });
+export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
+
+/** What the "change my password" form sends: the password now in use, and the new one. */
+export const changePasswordRequestSchema = z.object({
+  currentPassword: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+  newPassword: z.string().min(PASSWORD_MIN_LENGTH).max(PASSWORD_MAX_LENGTH),
+});
+export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
+
 /** The answer of a route that has nothing to report except that it worked (sign-out, and later more). */
 export const okResponseSchema = z.object({ ok: z.literal(true) });
