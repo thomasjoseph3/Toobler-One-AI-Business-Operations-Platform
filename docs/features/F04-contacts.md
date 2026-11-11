@@ -39,8 +39,8 @@ feature (leads, tickets, conversations, tasks) hangs off one contact.
 ## Slices (at most 2 routes each)
 | Slice | Routes | State |
 | --- | --- | --- |
-| 1 | `POST /contacts`, `GET /contacts` | built, waiting for the owner's test |
-| 2 | `GET /contacts/{id}`, `PATCH /contacts/{id}` | not started |
+| 1 | `POST /contacts`, `GET /contacts` | built and committed |
+| 2 | `GET /contacts/{id}`, `PATCH /contacts/{id}` | built, waiting for the owner's test |
 | 3 | `DELETE /contacts/{id}` | not started |
 | UI | Contacts list, contact page, add/edit, delete | on hold (designer) |
 
@@ -80,3 +80,18 @@ present; `email = lower(email)`; the stage is one of five values. Partial unique
 | 11 | `GET /contacts?limit=500`, `?page=0` | 400 |
 | 12 | Any contacts route without the cookie | 401 |
 
+
+## Manual test, slice 2 (use the `id` of a contact from slice 1; send the two headers on the PATCH)
+| # | Request | Expect |
+| --- | --- | --- |
+| 1 | `GET /contacts/<id>` | 200, the contact |
+| 2 | `GET /contacts/<a random uuid>` and `GET /contacts/abc` | 404, then 400 |
+| 3 | `PATCH /contacts/<id>` `{"name":"Priya M","language":"ML"}` | 200; name changed, language `ml`; phone and email as before |
+| 4 | `PATCH` `{"phone":"0484 2345678"}` | 200; phone `+914842345678` |
+| 5 | `PATCH` with another contact's phone (any format) | 409 `CONTACT_EXISTS` with that contact's id |
+| 6 | `PATCH` `{"name":null}` | 200; name is null |
+| 7 | `PATCH` `{"phone":null,"email":null}` on a contact with both | 400 `PHONE_OR_EMAIL_REQUIRED`; nothing changed |
+| 8 | `PATCH` `{}` | 400 `NOTHING_TO_CHANGE` |
+| 9 | `PATCH` `{"lifecycleStage":"customer"}` | 400 (staff cannot set the stage) |
+| 10 | `PATCH` `{"notAFit":true}`, then `{"notAFit":false}` | stage `not_a_fit`, then `new` |
+| 11 | `PATCH` or `GET` another business's contact id, or without the cookie | 404, 401 |

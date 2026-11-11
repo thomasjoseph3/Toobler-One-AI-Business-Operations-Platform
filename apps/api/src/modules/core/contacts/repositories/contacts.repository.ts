@@ -136,3 +136,63 @@ export async function listContacts(
     .executeTakeFirstOrThrow();
   return { items: rows.map(toContact), total: Number(countRow.total) };
 }
+
+/** One live contact of the business, or undefined (also for a deleted contact or another business's contact). */
+export async function findContactById(db: Db, accountId: string, contactId: string): Promise<Contact | undefined> {
+  const row = await db
+    .selectFrom('contacts')
+    .select(CONTACT_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', '=', contactId)
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  return row ? toContact(row) : undefined;
+}
+
+/** Like findContactById, but locks the row until the transaction ends, so two edits at once cannot overwrite each other. */
+export async function findContactForUpdate(db: Db, accountId: string, contactId: string): Promise<Contact | undefined> {
+  const row = await db
+    .selectFrom('contacts')
+    .select(CONTACT_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', '=', contactId)
+    .where('deleted_at', 'is', null)
+    .forUpdate()
+    .executeTakeFirst();
+  return row ? toContact(row) : undefined;
+}
+
+/** The new values of a contact. A key that is left out is not touched; `null` clears the field. */
+export interface ContactChanges {
+  name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  language?: string | null;
+  lifecycleStage?: LifecycleStage;
+}
+
+/** Changes the listed fields of a live contact, stamps who did it, and returns the contact. Undefined if there is no such live contact. */
+export async function updateContact(
+  db: Db,
+  accountId: string,
+  contactId: string,
+  changes: ContactChanges,
+  actor: Actor,
+): Promise<Contact | undefined> {
+  const row = await db
+    .updateTable('contacts')
+    .set({
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.phone !== undefined ? { phone: changes.phone } : {}),
+      ...(changes.email !== undefined ? { email: changes.email } : {}),
+      ...(changes.language !== undefined ? { language: changes.language } : {}),
+      ...(changes.lifecycleStage !== undefined ? { lifecycle_stage: changes.lifecycleStage } : {}),
+      updated_by: { kind: actor.kind, id: actor.id },
+    })
+    .where('account_id', '=', accountId)
+    .where('id', '=', contactId)
+    .where('deleted_at', 'is', null)
+    .returning(CONTACT_COLUMNS)
+    .executeTakeFirst();
+  return row ? toContact(row) : undefined;
+}

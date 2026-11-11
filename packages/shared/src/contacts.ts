@@ -60,3 +60,34 @@ export const contactsListResponseSchema = z.object({
   limit: z.number().int(),
 });
 export type ContactsListResponse = z.infer<typeof contactsListResponseSchema>;
+
+/** The address part naming a contact. */
+export const contactIdParamsSchema = z.object({ id: z.uuid() });
+
+/** For an edit: a blank text, like an emptied form field, means "clear it". Leaving the key out means "leave it as it is". */
+const clearIfBlank = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
+
+/**
+ * What staff send to change a contact. Only the fields sent change; `null` (or blank text) clears a field. The contact must
+ * keep a phone or an email. `notAFit` is staff's one say over the lifecycle stage: true marks the contact as not a fit
+ * (spam, a wrong number, never buying), false takes the mark off. Any other field is refused.
+ */
+export const updateContactRequestSchema = z
+  .object({
+    name: z.preprocess(clearIfBlank, z.string().trim().max(120).nullable().optional()),
+    phone: z.preprocess(clearIfBlank, z.string().trim().max(40).nullable().optional()),
+    email: z.preprocess(clearIfBlank, z.string().trim().toLowerCase().pipe(z.email().max(254)).nullable().optional()),
+    language: z.preprocess(
+      clearIfBlank,
+      z
+        .string()
+        .trim()
+        .toLowerCase()
+        .regex(/^[a-z]{2}$/, 'Use a two-letter code like en')
+        .nullable()
+        .optional(),
+    ),
+    notAFit: z.boolean().optional(),
+  })
+  .strict();
+export type UpdateContactRequest = z.infer<typeof updateContactRequestSchema>;
