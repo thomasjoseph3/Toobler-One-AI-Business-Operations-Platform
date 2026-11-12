@@ -87,7 +87,7 @@ answer already carries the progress) and F31 (reading a website); they are not b
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
 | Slice | What | Routes |
 | --- | --- | --- |
-| 0 | Migration `017`, table types, shared words and shapes, the pure functions (money in words, offer is current, what the AI may see) with unit tests, empty `core.offerings` module | none |
+| 0 | Migration `017`, table types, shared words and shapes, the pure functions (money in words, offer is current, what the AI may see) with unit tests, empty `core.offerings` module | none; **built, owner review pending** |
 | 1 | Add an offering, list offerings | `POST /offerings`, `GET /offerings` |
 | 2 | Edit (and switch on or off), remove | `PATCH /offerings/{id}`, `DELETE /offerings/{id}` |
 | 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers` |

@@ -9,3 +9,4 @@ export * from './leads';
 export * from './assignment-rules';
 export * from './tickets';
 export * from './knowledge';
+export * from './offerings';
