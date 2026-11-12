@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/09-business-questions.md`, `08-knowledge-base.md` (the Business profile and Situations parts); `requirements/API.md` (Knowledge base); docs/plan/PHASE-1.md (F16)
 **Depends on:** F00, F01     **Module:** `core.knowledge` (core: always on, no switch; later features F17, F18 and F19 add to it)
-**Status:** in progress. Slice 0 built (12 Nov 2026). The owner chose all four defaults ("your defaults") and said "go".
+**Status:** in review (12 Nov 2026). Slices 0 to 5 are built; the owner tested slices 1 to 3 in Postman; slice 4 and the hand-off wait for the owner.
 
 **Goal in one line:** a fixed list of questions tells the system everything the AI agent must know about a business: what it does, where it
 is, when it opens, how it handles a discount request, a complaint, an after-hours call. The owner answers them (the form now, the setup
@@ -84,7 +84,7 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 | 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm`; **built, owner test pending** |
 | 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}`; **built, owner test pending** |
 | 4 | Time zone and default country; contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings`; **built, owner test pending** |
-| 5 | Journey tests, an entry for every route in `test/isolation.test.ts`, `api-security` review, Postman collection, hand-off with the manual test script | none |
+| 5 | Team journey (several real people, every feature so far), the consistency checker, simultaneous-request tests, `api-security` review, hand-off with the manual test script | none; **built** |
 
 ## Slice 0 notes (found while building)
 - **The seven industries and the industries table.** The requirement's seven example industries did not all exist in the industries table.
@@ -167,4 +167,67 @@ The old code asks nothing like this fixed question list, so the list, the answer
 ## Known limits to watch (R39 to R45)
 None of them blocks F16. R42 (contacts and `staff_own`) does not apply to the profile. R44 (npm audit) is checked at the start.
 
-## Security checklist (to fill in at hand-off)
+## Slice 5 notes: the team journey and the consistency checker
+Owner request (12 Nov 2026): a full journey with real people of different roles, and proof that the database stays connected and free of duplicates, so
+the lead engine is a solid base for other developers and later modules. Built, with no new routes:
+- `test/support/team.ts`: real people with their own sign-in and session (`signUpOwner`, `addTeamMember`).
+- `test/support/consistency.ts`: **11 rules** read from the whole business in the database (duplicate contacts, lifecycle stage versus leads, pipeline shape,
+  leads and tickets pointing at another business, done/closed agreement, answers and situations valid for the industry, stamps naming real people, every
+  creation logged and announced exactly once, no personal data in the log or events). A test damages the data behind the app's back and proves the
+  checker notices each kind of damage.
+- `test/team-journey.test.ts`: "a busy day at Nair Stays" with a manager, a second manager, a staff member, an "own leads only" person and an outsider
+  (about 90 steps), then sign-out and switching a person off; plus five simultaneous-request tests (same phone, same lead, nine leads shared out,
+  ten changes to one ticket, two managers answering one question).
+- `docs/TESTING.md`: how the layers fit together and what to add with a new route, table or feature.
+- **Finding R46** (see REQUIREMENTS-REVIEW.md): deleting a contact leaves its open lead on the board with no contact. Pinned by a test; the owner decides.
+
+## Security checklist
+Reviewed with the `api-security` skill on 12 Nov 2026 (the whole F16 diff: 7 routes, 2 tables, migrations 014 to 016, plus the `Principal` change).
+
+- [x] Every new table has account_id, RLS enabled + forced, and the schema test passes (`business_answers`, `situations`; `accounts` gained a column).
+- [x] Every new route: role guard (`staff` for reads, `manager` for writes) and tests for works / 401 / 403 wrong role / 404 / 400. The question, situation and settings
+  routes name codes from lists in code, not business records, so there is no "other business's id" to try; the nearest cases are tested (another industry's
+  question is 404; B answering the same question leaves A's answer as it was, in `isolation.test.ts`).
+- [x] staff_own: the profile and settings are business-wide by nature (reads for everyone, writes for managers); tested for all three roles.
+- [x] No business id taken from body, query or params; the business and its industry, time zone and country come from the session; every body is
+  `.strict()` or a fixed shape.
+- [x] All input validated with zod with maximum lengths; the answer checks refuse bad links, GST numbers, hours, picks and lists; no SQL built from strings
+  and the knowledge module has no raw SQL.
+- [x] New public route / webhook / tool / outside call / upload: none.
+- [x] Nothing personal in the log or events: only question and situation keys and setting names; the consistency checker scans the whole log for the
+  names, phones and emails of the business's contacts and people.
+- [x] An answer that is waiting for a check can never reach the AI: the `onlyConfirmedAnswers` function is the only way F19 will read answers (unit-tested).
+- [x] Cross-module access only through `index.ts` (auth exports the business-settings service; `core.knowledge` requires `core.auth`, no loop).
+- [x] `process.env` is read only in `kernel/config.ts`; `npm audit --audit-level=high` shows no high or critical finding (10 moderate, as before).
+- [x] `npm run verify` parts that exist today pass (see the hand-off message).
+
+Known limits (tracked in docs/REQUIREMENTS-REVIEW.md R39 to R46): disabled people can still be owners (R39); malformed body gets 400 before 401 (R40);
+contacts and `staff_own` (R42); the open lead of a deleted contact (R46, new). The website reader, documents and FAQs are F18 and F31.
+
+## Decisions and differences from the requirements
+- The question list is code, not a table (the requirement: new questions are added by us). 26 general questions (22 answerable here, 4 answered in
+  offerings, FAQs and documents) and the extras of seven industries; the industries table gained seven everyday industries (migration `015`).
+- A typed answer is confirmed at once; "Please check" is only for answers the system fills in later (F31). Confirming is all-or-none.
+- Situations E4, E5 and E6 are fixed as in the requirement; the others start on their first choice. `custom_text` is not built.
+- The time zone and default country sit on the business (one home each), and the signed-in person carries them with the industry.
+- Offerings, FAQs, documents, the website reader, competitors' use and the AI's use of the answers are later features (F17, F18, F31, F33, F19).
+
+## Manual test script
+The screens are parked for the designer, so F16 is tested through the API.
+
+**A. Postman (recommended).** Collection *Toobler One - F16 business profile (run in order)* and environment *Toobler One - local dev* (a verified **manager**).
+1. `npm run db:migrate` (014, 015 and 016 must be applied), restart `npm run dev`.
+2. Run the collection with the Runner, folders 0 to 8 in order. Every request checks its answer; all must pass. For a real "confirm", run the one-line SQL in the
+   description of folder 6 first. It leaves your business in India, with its answers filled in.
+
+**B. By hand, the main path.**
+1. Sign in as a manager. `GET /knowledge/questions` lists the 26 general questions (plus your industry's extras), all unanswered, 0 percent, not ready to go live.
+2. `PUT /knowledge/answers/business_name` `{"value":"Nair Stays"}`: confirmed, progress up. Answer the other six "needed to go live" questions: `readyToGoLive` becomes true.
+3. Send a bad answer (a link that is not a link, three picks where two is the most): 400 `INVALID_ANSWER` with a plain message. Send the same answer twice: the second writes nothing.
+4. `GET /knowledge/situations`: seven situations, the first choice picked. `PUT /knowledge/situations/discount_request` `{"choice":"prices_are_fixed"}`; try
+   the fixed `complaint`: 400 `SITUATION_FIXED`.
+5. `PUT /knowledge/settings` `{"defaultCountry":"AE"}`, then add a contact with a phone typed as `0501234567`: it is stored as `+971501234567`. Set it back to `IN`.
+6. As a **staff** member, every `PUT` and `POST` of the knowledge module is 403, every `GET` is 200. Signed out: 401.
+7. Database: one log line per change (`knowledge.answer_saved`, `knowledge.situation_changed`, `business.settings_changed`) with keys only, never the answers.
+
+**C. The team journey:** `npx vitest run team-journey isolation` (about 5 seconds) tells the whole busy day and checks the database afterwards.
