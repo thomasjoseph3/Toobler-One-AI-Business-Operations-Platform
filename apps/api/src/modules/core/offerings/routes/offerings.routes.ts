@@ -3,13 +3,15 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   createOfferingRequestSchema,
   listOfferingsQuerySchema,
+  offeringIdParamsSchema,
   offeringSchema,
   offeringsResponseSchema,
+  updateOfferingRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createOfferingsService } from '../services/offerings.service';
 
-/** Registers /api/v1/offerings (add, list). More routes arrive with the later slices. */
+/** Registers /api/v1/offerings (add, list) and /offerings/{id} (change, remove). More routes arrive with the later slices. */
 export function offeringsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const offeringsService = createOfferingsService({ database: app.kernel.database });
@@ -38,6 +40,30 @@ export function offeringsRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return offeringsService.listOfferings(request.principal, request.query);
+    },
+  );
+
+  // For managers only (the guard answers 403 to staff). Only the fields sent change; another business's offering answers 404.
+  typedApp.patch(
+    '/offerings/:id',
+    {
+      config: { access: 'manager' },
+      schema: { params: offeringIdParamsSchema, body: updateOfferingRequestSchema, response: { 200: offeringSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return offeringsService.updateOffering(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // For managers only. A soft delete: the offering disappears from every list, its row is kept.
+  typedApp.delete(
+    '/offerings/:id',
+    { config: { access: 'manager' }, schema: { params: offeringIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await offeringsService.deleteOffering(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }

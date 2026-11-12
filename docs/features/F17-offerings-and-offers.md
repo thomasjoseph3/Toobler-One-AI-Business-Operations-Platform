@@ -89,7 +89,7 @@ answer already carries the progress) and F31 (reading a website); they are not b
 | --- | --- | --- |
 | 0 | Migration `017`, table types, shared words and shapes, the pure functions (money in words, offer is current, what the AI may see) with unit tests, empty `core.offerings` module | none; **built, owner review pending** |
 | 1 | Add an offering, list offerings | `POST /offerings`, `GET /offerings`; **built, owner test pending** |
-| 2 | Edit (and switch on or off), remove | `PATCH /offerings/{id}`, `DELETE /offerings/{id}` |
+| 2 | Edit (and switch on or off), remove | `PATCH /offerings/{id}`, `DELETE /offerings/{id}`; **built, owner test pending** |
 | 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers` |
 | 4 | List and edit offers | `GET /offers`, `PATCH /offers/{id}` |
 | 5 | Remove an offer; the link to F16 (the questions answered by this data, completeness and go-live count them) | `DELETE /offers/{id}` |
@@ -105,6 +105,18 @@ answer already carries the progress) and F31 (reading a website); they are not b
   of one name make one offering (both tested).
 - The log line holds field names only and the event holds the id and `active`: no names, descriptions or prices (tested).
 - Postman: collection *Toobler One - F17 offerings and offers (run in order)* with a random tag in the names, so reruns never clash. Offerings cannot be removed until slice 2.
+
+## Slice 2 notes
+- `PATCH /offerings/{id}` (manager): only the fields sent change; the values it already has change nothing and write no log line; `{}` is 400 `NOTHING_TO_CHANGE`.
+  **The price moves as one piece:** `fromPricePaise: null` takes the price, its unit and its GST note away together; changing just the number keeps the unit and GST
+  note; adding a price to an offering that has none must send all three; anything that would leave a price half described is 400 `INCOMPLETE_PRICE`. `details` replaces
+  the whole list, `active` switches an offering on or off (an off offering can still be edited), `ownerUserId: null` takes the person away. A name another live
+  offering has is 409 `OFFERING_EXISTS` (changing the capitals of its own name is fine). Two managers changing different fields of one offering at the same moment keep
+  both changes (row lock; tested). The position has its own route (reorder, slice 3), so `sort` is refused.
+- `DELETE /offerings/{id}` (manager) is a **soft delete** (204): gone from every list, row kept (a lead may point at it in slice 6), name free to use again, the app role still
+  cannot really delete a row (tested). Positions are not renumbered after a removal; the reorder route (slice 3) tidies them.
+- Log lines (`offerings.updated`, `offerings.deleted`) hold field names and ids only; events (`offering.updated`, `offering.deleted`) hold ids and field names.
+- Postman: folders 3 (change) and 4 (remove, and clean up everything the run added with a script).
 
 ## Reused from the hotel agent
 The "Port from" table has no row for F17. The old agent has hotel-specific tables (`hotel_room_types` with a base price, weekend price and rate overrides per

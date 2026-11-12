@@ -120,3 +120,29 @@ export type ListOfferingsQuery = z.infer<typeof listOfferingsQuerySchema>;
 
 export const offeringsResponseSchema = z.object({ items: z.array(offeringSchema) });
 export type OfferingsResponse = z.infer<typeof offeringsResponseSchema>;
+
+/** For an edit: a blank text, like an emptied form field, means "clear it". Leaving the key out means "leave it as it is". */
+const clearIfBlank = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
+
+/**
+ * What a manager sends to change an offering: only the fields sent change. `null` (or blank text) clears the description, the season
+ * note, what is included, or the owner. **`fromPricePaise: null` takes the price away completely** (its unit and GST note go with it);
+ * a price needs its unit and GST note, so adding a price to an offering that has none must send all three. `details` replaces the whole
+ * list. `active` switches it on or off. The position has its own route (reorder), and the business, the creator and the removal state
+ * can never be sent.
+ */
+export const updateOfferingRequestSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Give the offering a name').max(120).optional(),
+    description: z.preprocess(clearIfBlank, z.string().trim().max(1000).nullable().optional()),
+    fromPricePaise: z.number().int('Use whole paise').min(0).max(MAX_PRICE_PAISE).nullable().optional(),
+    priceUnit: z.preprocess(clearIfBlank, z.string().trim().min(1).max(40).nullable().optional()),
+    gstMode: gstModeSchema.nullable().optional(),
+    seasonNote: z.preprocess(clearIfBlank, z.string().trim().max(300).nullable().optional()),
+    includes: z.preprocess(clearIfBlank, z.string().trim().max(500).nullable().optional()),
+    details: z.array(offeringDetailSchema).max(MAX_OFFERING_DETAILS).optional(),
+    active: z.boolean().optional(),
+    ownerUserId: z.uuid().nullable().optional(),
+  })
+  .strict();
+export type UpdateOfferingRequest = z.infer<typeof updateOfferingRequestSchema>;

@@ -59,6 +59,7 @@ interface BusinessAData {
   leadId: string;
   ticketId: string;
   stageId: string;
+  offeringId: string;
   userId: string;
   secretWords: string;
 }
@@ -93,7 +94,7 @@ beforeAll(async () => {
   await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
   await sendOk(businessA, 'PUT', '/knowledge/situations/discount_request', { choice: 'tell_current_offer' });
   await sendOk(businessA, 'PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
-  await sendOk(
+  const offering = await sendOk(
     businessA,
     'POST',
     '/offerings',
@@ -116,6 +117,7 @@ beforeAll(async () => {
     leadId: lead.id,
     ticketId: ticket.id,
     stageId: stage.id,
+    offeringId: offering.id,
     userId: businessA.profile.user.id,
     secretWords,
   };
@@ -270,6 +272,22 @@ const attempts: Attempt[] = [
     expectedStatus: 200,
   },
   // ---- offerings
+  {
+    route: 'PATCH /api/v1/offerings/{id}',
+    what: "change A's offering",
+    request: () => ({
+      method: 'PATCH',
+      url: `/offerings/${dataOfA.offeringId}`,
+      payload: { name: 'Hacked', active: false },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/offerings/{id}',
+    what: "remove A's offering",
+    request: () => ({ method: 'DELETE', url: `/offerings/${dataOfA.offeringId}` }),
+    expectedStatus: 404,
+  },
   {
     route: 'POST /api/v1/offerings',
     what: "add an offering owned by A's person",

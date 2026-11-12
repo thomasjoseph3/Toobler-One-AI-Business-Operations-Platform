@@ -175,3 +175,74 @@ export async function findOfferingByName(db: Db, accountId: string, name: string
     .executeTakeFirst();
   return row ? toOfferingRow(row) : undefined;
 }
+
+/**
+ * Locks one live offering until the end of the transaction, so two people changing it at the same moment take turns.
+ * Returns false when the id is unknown, removed, or another business's.
+ */
+export async function lockOfferingForUpdate(db: Db, accountId: string, offeringId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('offerings')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('id', '=', offeringId)
+    .where('deleted_at', 'is', null)
+    .forUpdate()
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/** The new values of an offering. A key that is left out is not touched; `null` clears the field. */
+export interface OfferingChanges {
+  name?: string;
+  description?: string | null;
+  fromPricePaise?: number | null;
+  priceUnit?: string | null;
+  gstMode?: GstMode | null;
+  seasonNote?: string | null;
+  includes?: string | null;
+  details?: OfferingDetail[];
+  active?: boolean;
+  ownerUserId?: string | null;
+}
+
+/** Changes the fields named in `changes` on one live offering. Fails with a unique error on a name clash, a foreign-key error for an owner of another business. */
+export async function updateOffering(
+  db: Db,
+  options: { accountId: string; offeringId: string; changes: OfferingChanges; actor: Actor },
+): Promise<void> {
+  const { changes } = options;
+  await db
+    .updateTable('offerings')
+    .set({
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.description !== undefined ? { description: changes.description } : {}),
+      ...(changes.fromPricePaise !== undefined ? { from_price_paise: changes.fromPricePaise } : {}),
+      ...(changes.priceUnit !== undefined ? { price_unit: changes.priceUnit } : {}),
+      ...(changes.gstMode !== undefined ? { gst_mode: changes.gstMode } : {}),
+      ...(changes.seasonNote !== undefined ? { season_note: changes.seasonNote } : {}),
+      ...(changes.includes !== undefined ? { includes: changes.includes } : {}),
+      ...(changes.details !== undefined ? { details: JSON.stringify(changes.details) } : {}),
+      ...(changes.active !== undefined ? { active: changes.active } : {}),
+      ...(changes.ownerUserId !== undefined ? { owner_user_id: changes.ownerUserId } : {}),
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.offeringId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}
+
+/** Removes an offering from view (a soft delete: the row stays, because a lead may point at it). */
+export async function softDeleteOffering(
+  db: Db,
+  options: { accountId: string; offeringId: string; actor: Actor; now: Date },
+): Promise<void> {
+  await db
+    .updateTable('offerings')
+    .set({ deleted_at: options.now, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.offeringId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}

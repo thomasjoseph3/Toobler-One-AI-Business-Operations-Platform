@@ -1,15 +1,21 @@
 import { MAX_OFFERINGS } from '@toobler-one/shared';
-import type { CreateOfferingRequest, ListOfferingsQuery, Offering, OfferingsResponse } from '@toobler-one/shared';
+import type {
+  CreateOfferingRequest,
+  ListOfferingsQuery,
+  Offering,
+  OfferingsResponse,
+  UpdateOfferingRequest,
+} from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
-import { conflict, notFound } from '../../../../kernel/errors';
+import { ApiError, conflict, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { describePriceInWords } from '../helpers/money-in-words';
 import * as offeringsRepository from '../repositories/offerings.repository';
-import type { OfferingRow } from '../repositories/offerings.repository';
+import type { OfferingChanges, OfferingRow } from '../repositories/offerings.repository';
 
 // The database error codes for "a unique rule was broken" and "a foreign key points at nothing".
 const UNIQUE_VIOLATION = '23505';
@@ -39,6 +45,10 @@ function toOffering(row: OfferingRow): Offering {
     updatedAt: row.updatedAt.toISOString(),
   };
 }
+
+/** The details as a short comparable text, so "the same list sent again" is recognised. */
+const detailsAsText = (details: Array<{ label: string; value: string }>) =>
+  JSON.stringify(details.map((detail) => [detail.label, detail.value]));
 
 /**
  * Everything about offerings that is not plain reading of the database. The routes call this.
@@ -130,6 +140,134 @@ export function createOfferingsService({ database }: { database: Database }) {
           existing ? { offeringId: existing.id } : undefined,
         );
       }
+    },
+
+    /**
+     * Changes an offering. Only the fields that really change are written; sending the values it already has changes nothing and
+     * writes no log line. `fromPricePaise: null` takes the whole price away; any other change must leave a price complete (a price,
+     * its unit and its GST note, or none of the three), otherwise 400 INCOMPLETE_PRICE. A name another live offering has answers 409
+     * OFFERING_EXISTS; an unknown, removed or other business's offering, and an owner from another business, answer 404. Switching
+     * `active` on or off is a change like any other. Answers with the offering.
+     */
+    async updateOffering(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      offeringId: string,
+      request: UpdateOfferingRequest,
+    ): Promise<Offering> {
+      if (Object.values(request).every((value) => value === undefined)) {
+        throw new ApiError(400, 'NOTHING_TO_CHANGE', 'Send at least one field to change.');
+      }
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      try {
+        return await database.runInAccountTransaction(accountId, async (transaction) => {
+          // Two people changing one offering at the same moment take turns
+          if (!(await offeringsRepository.lockOfferingForUpdate(transaction, accountId, offeringId))) {
+            throw notFound('That offering');
+          }
+          const current = await offeringsRepository.findOfferingById(transaction, accountId, offeringId);
+          if (!current) throw notFound('That offering');
+
+          // What the offering would look like: a field not sent stays as it is, `null` clears it
+          const changes: OfferingChanges = {};
+          if (request.name !== undefined && request.name !== current.name) changes.name = request.name;
+          if (request.description !== undefined && request.description !== current.description)
+            changes.description = request.description;
+          if (request.seasonNote !== undefined && request.seasonNote !== current.seasonNote)
+            changes.seasonNote = request.seasonNote;
+          if (request.includes !== undefined && request.includes !== current.includes)
+            changes.includes = request.includes;
+          if (request.active !== undefined && request.active !== current.active) changes.active = request.active;
+          if (request.ownerUserId !== undefined && request.ownerUserId !== current.ownerUserId)
+            changes.ownerUserId = request.ownerUserId;
+          if (request.details !== undefined && detailsAsText(request.details) !== detailsAsText(current.details)) {
+            changes.details = request.details;
+          }
+
+          // The price: null takes all three away, otherwise the three must stay together
+          let price = {
+            fromPricePaise: current.fromPricePaise,
+            priceUnit: current.priceUnit,
+            gstMode: current.gstMode,
+          };
+          if (request.fromPricePaise === null) {
+            if ((request.priceUnit ?? null) !== null || (request.gstMode ?? null) !== null) {
+              throw new ApiError(400, 'INCOMPLETE_PRICE', 'To take the price away, send only fromPricePaise: null.');
+            }
+            price = { fromPricePaise: null, priceUnit: null, gstMode: null };
+          } else {
+            if (request.fromPricePaise !== undefined) price.fromPricePaise = request.fromPricePaise;
+            if (request.priceUnit !== undefined) price.priceUnit = request.priceUnit;
+            if (request.gstMode !== undefined) price.gstMode = request.gstMode;
+          }
+          const given = [price.fromPricePaise, price.priceUnit, price.gstMode].filter((value) => value !== null);
+          if (given.length !== 0 && given.length !== 3) {
+            throw new ApiError(
+              400,
+              'INCOMPLETE_PRICE',
+              'A price needs its unit (per night...) and its GST note (included, plus or none).',
+            );
+          }
+          if (price.fromPricePaise !== current.fromPricePaise) changes.fromPricePaise = price.fromPricePaise;
+          if (price.priceUnit !== current.priceUnit) changes.priceUnit = price.priceUnit;
+          if (price.gstMode !== current.gstMode) changes.gstMode = price.gstMode;
+
+          const changedFields = Object.keys(changes); // the names of the fields that really change
+          if (changedFields.length > 0) {
+            await offeringsRepository.updateOffering(transaction, { accountId, offeringId, changes, actor });
+            await writeActivityLog(transaction, {
+              accountId,
+              actor,
+              kind: 'offerings.updated',
+              // Which fields changed, never their values
+              details: { recordType: 'offering', recordId: offeringId, fields: changedFields },
+            });
+            await publishEvent(transaction, {
+              accountId,
+              eventName: 'offering.updated',
+              payload: { offeringId, fields: changedFields },
+            });
+          }
+          const saved = await offeringsRepository.findOfferingById(transaction, accountId, offeringId);
+          if (!saved) throw new Error('The offering that was just changed cannot be read');
+          return toOffering(saved);
+        });
+      } catch (error) {
+        if (isDatabaseError(error, FOREIGN_KEY_VIOLATION)) throw notFound('That person');
+        if (!isDatabaseError(error, UNIQUE_VIOLATION)) throw error;
+        const name = request.name ?? '';
+        const existing = await database.runInAccountTransaction(accountId, (transaction) =>
+          offeringsRepository.findOfferingByName(transaction, accountId, name),
+        );
+        throw conflict(
+          'OFFERING_EXISTS',
+          'You already have an offering with this name.',
+          existing ? { offeringId: existing.id } : undefined,
+        );
+      }
+    },
+
+    /**
+     * Removes an offering from view: a soft delete, the row stays because a lead may point at it. The name is free to use again. An
+     * unknown id, a removed one and another business's offering answer 404. Writes an activity-log line and the `offering.deleted` event.
+     */
+    async deleteOffering(principal: Pick<Principal, 'accountId' | 'userId'>, offeringId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        if (!(await offeringsRepository.lockOfferingForUpdate(transaction, accountId, offeringId))) {
+          throw notFound('That offering');
+        }
+        await offeringsRepository.softDeleteOffering(transaction, { accountId, offeringId, actor, now: new Date() });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'offerings.deleted',
+          details: { recordType: 'offering', recordId: offeringId },
+        });
+        await publishEvent(transaction, { accountId, eventName: 'offering.deleted', payload: { offeringId } });
+      });
     },
   };
 }

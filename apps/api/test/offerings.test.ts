@@ -371,3 +371,362 @@ describe('GET /api/v1/offerings', () => {
     expect((await listOfferings(person, 'active=maybe')).statusCode).toBe(400);
   });
 });
+
+/** Changes an offering as the person. */
+const patchOffering = (person: SignedInPerson | null, offeringId: string, body: unknown, withCsrfHeaders = true) =>
+  send(person, 'PATCH', `/offerings/${offeringId}`, body, withCsrfHeaders);
+
+/** Removes an offering as the person. */
+const deleteOffering = (person: SignedInPerson | null, offeringId: string, withCsrfHeaders = true) =>
+  send(person, 'DELETE', `/offerings/${offeringId}`, undefined, withCsrfHeaders);
+
+/** Adds an offering through the real route and returns its id. */
+async function addOfferingAndGetId(person: SignedInPerson, fields: object): Promise<string> {
+  const response = await addOffering(person, fields);
+  expect(response.statusCode, response.body).toBe(201);
+  return response.json().id;
+}
+
+/** An offering with a price, for the tests that change it. */
+const FAMILY_ROOM = { name: 'Family room', fromPricePaise: 450_000, priceUnit: 'per night', gstMode: 'plus' } as const;
+
+describe('PATCH /api/v1/offerings/{id}', () => {
+  it('changes the words and leaves the rest as it was', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, { ...FAMILY_ROOM, description: 'Old words' });
+    const response = await patchOffering(person, offeringId, {
+      name: '  Deluxe family room  ',
+      description: 'New words',
+      seasonNote: 'Higher in December',
+      includes: 'Breakfast',
+      details: [{ label: 'Check-in', value: '2 PM' }],
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: offeringId,
+      name: 'Deluxe family room',
+      description: 'New words',
+      seasonNote: 'Higher in December',
+      includes: 'Breakfast',
+      details: [{ label: 'Check-in', value: '2 PM' }],
+      fromPricePaise: 450_000,
+      priceUnit: 'per night',
+      gstMode: 'plus',
+      active: true,
+      sort: 0,
+    });
+  });
+
+  it('changes just the price and keeps its unit and GST note, and says the new price in words', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    const response = await patchOffering(person, offeringId, { fromPricePaise: 520_000 });
+    expect(response.json()).toMatchObject({
+      fromPricePaise: 520_000,
+      priceUnit: 'per night',
+      gstMode: 'plus',
+      priceInWords: 'from ₹5,200 a night plus GST',
+    });
+    const other = await patchOffering(person, offeringId, { priceUnit: 'per person', gstMode: 'included' });
+    expect(other.json().priceInWords).toBe('from ₹5,200 a person including GST');
+  });
+
+  it('takes the whole price away with fromPricePaise null, and puts one back with all three', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    const cleared = await patchOffering(person, offeringId, { fromPricePaise: null });
+    expect(cleared.statusCode, cleared.body).toBe(200);
+    expect(cleared.json()).toMatchObject({ fromPricePaise: null, priceUnit: null, gstMode: null, priceInWords: null });
+    const back = await patchOffering(person, offeringId, {
+      fromPricePaise: 300_000,
+      priceUnit: 'per visit',
+      gstMode: 'none',
+    });
+    expect(back.json().priceInWords).toBe('from ₹3,000 a visit with no GST');
+  });
+
+  it('answers 400 INCOMPLETE_PRICE when a change would leave a price half described', async () => {
+    const person = await createSignedInPerson(app, database);
+    const priced = await addOfferingAndGetId(person, FAMILY_ROOM);
+    const unpriced = await addOfferingAndGetId(person, { name: 'Day tour' });
+    const bad: Array<[string, object]> = [
+      [unpriced, { fromPricePaise: 100_000 }],
+      [unpriced, { priceUnit: 'per night' }],
+      [unpriced, { gstMode: 'plus' }],
+      [unpriced, { fromPricePaise: 100_000, priceUnit: 'per night' }],
+      [priced, { priceUnit: null }],
+      [priced, { gstMode: null }],
+      [priced, { fromPricePaise: null, priceUnit: 'per night' }],
+    ];
+    for (const [offeringId, body] of bad) {
+      const response = await patchOffering(person, offeringId, body);
+      expect(response.statusCode, JSON.stringify(body)).toBe(400);
+      expect(response.json().error.code).toBe('INCOMPLETE_PRICE');
+    }
+    expect((await listOfferings(person)).json().items[0]).toMatchObject({ fromPricePaise: 450_000 });
+  });
+
+  it('clears the description, the season note and what is included with null or blank text', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, {
+      name: 'Spa',
+      description: 'A',
+      seasonNote: 'B',
+      includes: 'C',
+    });
+    const response = await patchOffering(person, offeringId, { description: null, seasonNote: '   ', includes: '' });
+    expect(response.json()).toMatchObject({ description: null, seasonNote: null, includes: null });
+  });
+
+  it('switches an offering off and on, and an off offering can still be edited', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    expect((await patchOffering(person, offeringId, { active: false })).json().active).toBe(false);
+    expect((await listOfferings(person, 'active=true')).json().items).toHaveLength(0);
+    expect((await patchOffering(person, offeringId, { name: 'Renamed while off' })).json()).toMatchObject({
+      name: 'Renamed while off',
+      active: false,
+    });
+    expect((await patchOffering(person, offeringId, { active: true })).json().active).toBe(true);
+    expect((await listOfferings(person, 'active=true')).json().items).toHaveLength(1);
+  });
+
+  it('names the person who looks after it, and takes them away again with null', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    expect((await patchOffering(person, offeringId, { ownerUserId: person.profile.user.id })).json().ownerUserId).toBe(
+      person.profile.user.id,
+    );
+    expect((await patchOffering(person, offeringId, { ownerUserId: null })).json().ownerUserId).toBeNull();
+  });
+
+  it('replaces the whole list of details', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, {
+      ...FAMILY_ROOM,
+      details: [
+        { label: 'A', value: '1' },
+        { label: 'B', value: '2' },
+      ],
+    });
+    expect((await patchOffering(person, offeringId, { details: [{ label: 'C', value: '3' }] })).json().details).toEqual(
+      [{ label: 'C', value: '3' }],
+    );
+    expect((await patchOffering(person, offeringId, { details: [] })).json().details).toEqual([]);
+  });
+
+  it('writes one log line with the changed field names only, and an offering.updated event with no words or prices', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    await patchOffering(person, offeringId, { name: 'Secret Suite', fromPricePaise: 999_900, active: false });
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', offeringId)
+      .where('kind', '=', 'offerings.updated')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect([...lines[0]!.fields].sort()).toEqual(['active', 'fromPricePaise', 'name']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'offering.updated')
+      .execute();
+    expect(events.map((event) => event.payload)).toEqual([
+      { offeringId, fields: expect.arrayContaining(['name', 'fromPricePaise', 'active']) },
+    ]);
+    expect(JSON.stringify([lines, events])).not.toContain('Secret Suite');
+    expect(JSON.stringify([lines, events])).not.toContain('9999');
+    const row = await database.system
+      .selectFrom('offerings')
+      .selectAll()
+      .where('id', '=', offeringId)
+      .executeTakeFirstOrThrow();
+    expect(row.updated_by).toEqual({ kind: 'user', id: person.profile.user.id });
+  });
+
+  it('writes nothing when the values sent are the ones it already has', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, { ...FAMILY_ROOM, details: [{ label: 'A', value: '1' }] });
+    const before = (await listOfferings(person)).json().items[0];
+    const response = await patchOffering(person, offeringId, {
+      ...FAMILY_ROOM,
+      name: 'Family room',
+      active: true,
+      details: [{ label: 'A', value: '1' }],
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().updatedAt).toBe(before.updatedAt);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('record_id', '=', offeringId)
+      .where('kind', '=', 'offerings.updated')
+      .execute();
+    expect(lines).toHaveLength(0);
+  });
+
+  it("answers 409 OFFERING_EXISTS when the new name is another live offering's, but lets an offering change the capitals of its own name", async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = await addOfferingAndGetId(person, { name: 'Family room' });
+    const second = await addOfferingAndGetId(person, { name: 'Day tour' });
+    const clash = await patchOffering(person, second, { name: 'FAMILY ROOM' });
+    expect(clash.statusCode, clash.body).toBe(409);
+    expect(clash.json().error.code).toBe('OFFERING_EXISTS');
+    expect(clash.json().error.details).toEqual({ offeringId: first });
+    expect((await patchOffering(person, first, { name: 'FAMILY ROOM' })).json().name).toBe('FAMILY ROOM');
+  });
+
+  it('answers 400 NOTHING_TO_CHANGE for an empty body, and 400 for bad values and for fields it does not take', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    const empty = await patchOffering(person, offeringId, {});
+    expect(empty.statusCode).toBe(400);
+    expect(empty.json().error.code).toBe('NOTHING_TO_CHANGE');
+    const badBodies: unknown[] = [
+      { name: '   ' },
+      { name: 'x'.repeat(121) },
+      { description: 'y'.repeat(1001) },
+      { fromPricePaise: -1 },
+      { fromPricePaise: 10.5 },
+      { fromPricePaise: 100_000_000_001 },
+      { gstMode: 'maybe' },
+      { details: Array.from({ length: 11 }, (_, index) => ({ label: `L${index}`, value: 'v' })) },
+      { details: [{ label: 'No value' }] },
+      { active: 'yes' },
+      { ownerUserId: 'abc' },
+      { sort: 3 },
+      { deletedAt: '2026-01-01T00:00:00Z' },
+      { accountId: randomUUID() },
+      { createdBy: { kind: 'user', id: 'x' } },
+    ];
+    for (const body of badBodies) {
+      expect((await patchOffering(person, offeringId, body)).statusCode, JSON.stringify(body)).toBe(400);
+    }
+    expect((await patchOffering(person, 'abc', { name: 'x' })).statusCode).toBe(400);
+  });
+
+  it('answers 403 to staff and to the "own leads only" role, 401 with nobody signed in, 403 without the web app headers, and changes nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await patchOffering(person, offeringId, { name: 'Sneaky' })).statusCode, role).toBe(403);
+    }
+    await setRole(person, 'manager');
+    expect((await patchOffering(null, offeringId, { name: 'x' })).statusCode).toBe(401);
+    expect((await patchOffering(person, offeringId, { name: 'x' }, false)).statusCode).toBe(403);
+    expect((await listOfferings(person)).json().items[0].name).toBe('Family room');
+  });
+
+  it("answers 404 for an unknown id, a removed offering, another business's offering, and an owner from another business", async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const strangersOffering = await addOfferingAndGetId(stranger, { name: 'Theirs' });
+    const removed = await addOfferingAndGetId(person, { name: 'Removed' });
+    await deleteOffering(person, removed);
+    const own = await addOfferingAndGetId(person, { name: 'Own' });
+    expect((await patchOffering(person, randomUUID(), { name: 'x' })).statusCode).toBe(404);
+    expect((await patchOffering(person, removed, { name: 'x' })).statusCode).toBe(404);
+    expect((await patchOffering(person, strangersOffering, { name: 'Mine now' })).statusCode).toBe(404);
+    expect((await listOfferings(stranger)).json().items[0].name).toBe('Theirs');
+    expect((await patchOffering(person, own, { ownerUserId: stranger.profile.user.id })).statusCode).toBe(404);
+    expect((await patchOffering(person, own, { ownerUserId: randomUUID() })).statusCode).toBe(404);
+  });
+
+  it('keeps both changes when two managers change different fields of one offering at the same moment', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    const responses = await Promise.all([
+      patchOffering(person, offeringId, { description: 'Written by one' }),
+      patchOffering(person, offeringId, { includes: 'Written by two' }),
+      patchOffering(person, offeringId, { seasonNote: 'Written by three' }),
+    ]);
+    expect(responses.map((response) => response.statusCode)).toEqual([200, 200, 200]);
+    expect((await listOfferings(person)).json().items[0]).toMatchObject({
+      description: 'Written by one',
+      includes: 'Written by two',
+      seasonNote: 'Written by three',
+    });
+  });
+});
+
+describe('DELETE /api/v1/offerings/{id}', () => {
+  it('removes an offering from every list but keeps its row, and frees the name', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    await addOfferingAndGetId(person, { name: 'Stays' });
+    const response = await deleteOffering(person, offeringId);
+    expect(response.statusCode, response.body).toBe(204);
+    expect(namesOf((await listOfferings(person)).json())).toEqual(['Stays']);
+    const row = await database.system
+      .selectFrom('offerings')
+      .selectAll()
+      .where('id', '=', offeringId)
+      .executeTakeFirstOrThrow();
+    expect(row.deleted_at).not.toBeNull();
+    expect(row.updated_by).toEqual({ kind: 'user', id: person.profile.user.id });
+    // The name can be used again, and the new offering goes to the end
+    const again = await addOffering(person, { name: 'Family room' });
+    expect(again.statusCode, again.body).toBe(201);
+    expect(namesOf((await listOfferings(person)).json())).toEqual(['Stays', 'Family room']);
+  });
+
+  it('writes a log line and an offering.deleted event with no words in them', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, { name: 'Secret Suite' });
+    await deleteOffering(person, offeringId);
+    const line = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', offeringId)
+      .where('kind', '=', 'offerings.deleted')
+      .executeTakeFirstOrThrow();
+    expect(line).toMatchObject({ record_type: 'offering', actor: { kind: 'user', id: person.profile.user.id } });
+    const event = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'offering.deleted')
+      .executeTakeFirstOrThrow();
+    expect(event.payload).toEqual({ offeringId });
+    expect(JSON.stringify([line, event])).not.toContain('Secret Suite');
+  });
+
+  it("answers 404 for a second delete, an unknown id and another business's offering, and 400 for a bad id", async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const strangersOffering = await addOfferingAndGetId(stranger, { name: 'Theirs' });
+    const offeringId = await addOfferingAndGetId(person, { name: 'Mine' });
+    expect((await deleteOffering(person, offeringId)).statusCode).toBe(204);
+    expect((await deleteOffering(person, offeringId)).statusCode).toBe(404);
+    expect((await deleteOffering(person, randomUUID())).statusCode).toBe(404);
+    expect((await deleteOffering(person, strangersOffering)).statusCode).toBe(404);
+    expect((await deleteOffering(person, 'abc')).statusCode).toBe(400);
+    expect(namesOf((await listOfferings(stranger)).json())).toEqual(['Theirs']);
+  });
+
+  it('answers 403 to staff and to the "own leads only" role, 401 with nobody signed in, 403 without the web app headers, and removes nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await deleteOffering(person, offeringId)).statusCode, role).toBe(403);
+    }
+    await setRole(person, 'manager');
+    expect((await deleteOffering(null, offeringId)).statusCode).toBe(401);
+    expect((await deleteOffering(person, offeringId, false)).statusCode).toBe(403);
+    expect((await listOfferings(person)).json().items).toHaveLength(1);
+  });
+
+  it('never lets the app really delete a row', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offeringId = await addOfferingAndGetId(person, FAMILY_ROOM);
+    await expect(
+      database.runInAccountTransaction(person.profile.business.id, (transaction) =>
+        transaction.deleteFrom('offerings').where('id', '=', offeringId).execute(),
+      ),
+    ).rejects.toThrow();
+  });
+});
