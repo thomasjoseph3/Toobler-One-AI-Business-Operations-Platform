@@ -1,10 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { createTicketRequestSchema, ticketDetailSchema, ticketIdParamsSchema } from '@toobler-one/shared';
+import {
+  createTicketRequestSchema,
+  listTicketsQuerySchema,
+  ticketDetailSchema,
+  ticketIdParamsSchema,
+  ticketsListResponseSchema,
+} from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createTicketsService } from '../services/tickets.service';
 
-/** Registers /api/v1/tickets (add) and /tickets/{id} (read one). More routes arrive with the later slices. */
+/** Registers /api/v1/tickets (add, list) and /tickets/{id} (read one). More routes arrive with the later slices. */
 export function ticketsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const ticketsService = createTicketsService({ database: app.kernel.database });
@@ -17,6 +23,19 @@ export function ticketsRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const ticket = await ticketsService.createTicket(request.principal, request.body);
       return reply.code(201).send(ticket);
+    },
+  );
+
+  // For any signed-in, verified person, whatever their role (tickets are shared work). A plain read with filters.
+  typedApp.get(
+    '/tickets',
+    {
+      config: { access: 'staff' },
+      schema: { querystring: listTicketsQuerySchema, response: { 200: ticketsListResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return ticketsService.listTickets(request.principal, request.query);
     },
   );
 

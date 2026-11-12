@@ -1,4 +1,10 @@
-import type { CreateTicketRequest, TicketDetail } from '@toobler-one/shared';
+import type {
+  CreateTicketRequest,
+  ListTicketsQuery,
+  Ticket,
+  TicketDetail,
+  TicketsListResponse,
+} from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
@@ -7,7 +13,9 @@ import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { findContactSummaries } from '../../contacts';
+import type { ContactSummary } from '../../contacts';
 import * as ticketsRepository from '../repositories/tickets.repository';
+import type { TicketRow } from '../repositories/tickets.repository';
 
 // The database error code for "a foreign key points at nothing" (here: an owner who does not work for the business).
 const FOREIGN_KEY_VIOLATION = '23503';
@@ -15,6 +23,33 @@ const FOREIGN_KEY_VIOLATION = '23503';
 /** True when the error is the database saying a foreign key points at nothing. */
 const isForeignKeyViolation = (error: unknown) =>
   error instanceof Error && 'code' in error && error.code === FOREIGN_KEY_VIOLATION;
+
+/** The person to filter by: `me` is the signed-in person, `unassigned` names nobody, anything else is a person's id. */
+function pickOwnerFilter(ownerFilter: string | undefined, signedInUserId: string): string | undefined {
+  if (ownerFilter === 'me') return signedInUserId;
+  if (ownerFilter === 'unassigned') return undefined;
+  return ownerFilter;
+}
+
+/** Turns a database row plus the person it is for into the Ticket the API answers with. */
+function toTicket(row: TicketRow, contact: ContactSummary | undefined): Ticket {
+  return {
+    id: row.id,
+    contactId: row.contactId,
+    contact: contact ?? null,
+    title: row.title,
+    details: row.details,
+    type: row.type,
+    priority: row.priority,
+    status: row.status,
+    ownerUserId: row.ownerUserId,
+    conversationTypeKey: row.conversationTypeKey,
+    closedAt: row.closedAt?.toISOString() ?? null,
+    closedByUserId: row.closedByUserId,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
 /**
  * Everything about tickets that is not plain reading of the database. The routes call this.
@@ -29,20 +64,7 @@ export function createTicketsService({ database }: { database: Database }) {
     const notes = await ticketsRepository.listNotesForTicket(transaction, accountId, ticketId);
     const contacts = await findContactSummaries(transaction, { accountId, contactIds: [ticket.contactId] });
     return {
-      id: ticket.id,
-      contactId: ticket.contactId,
-      contact: contacts[0] ?? null,
-      title: ticket.title,
-      details: ticket.details,
-      type: ticket.type,
-      priority: ticket.priority,
-      status: ticket.status,
-      ownerUserId: ticket.ownerUserId,
-      conversationTypeKey: ticket.conversationTypeKey,
-      closedAt: ticket.closedAt?.toISOString() ?? null,
-      closedByUserId: ticket.closedByUserId,
-      createdAt: ticket.createdAt.toISOString(),
-      updatedAt: ticket.updatedAt.toISOString(),
+      ...toTicket(ticket, contacts[0]),
       notes: notes.map((note) => ({
         id: note.id,
         body: note.body,
@@ -109,6 +131,43 @@ export function createTicketsService({ database }: { database: Database }) {
         if (isForeignKeyViolation(error)) throw notFound('That person');
         throw error;
       }
+    },
+
+    /**
+     * One page of the business's tickets, newest first, narrowed by the filters. `ownerUserId=me` means the signed-in
+     * person and `unassigned` means tickets nobody owns. Every role sees every ticket. Each ticket shows who it is for.
+     */
+    async listTickets(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      query: ListTicketsQuery,
+    ): Promise<TicketsListResponse> {
+      const accountId = principal.accountId;
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const { rows, total } = await ticketsRepository.listTicketRows(
+          transaction,
+          {
+            accountId,
+            status: query.status,
+            ownerUserId: pickOwnerFilter(query.ownerUserId, principal.userId),
+            unassignedOnly: query.ownerUserId === 'unassigned',
+            type: query.type,
+            priority: query.priority,
+            contactId: query.contactId,
+          },
+          { limit: query.limit, offset: (query.page - 1) * query.limit },
+        );
+        const contacts = await findContactSummaries(transaction, {
+          accountId,
+          contactIds: [...new Set(rows.map((row) => row.contactId))],
+        });
+        const contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
+        return {
+          items: rows.map((row) => toTicket(row, contactsById.get(row.contactId))),
+          total,
+          page: query.page,
+          limit: query.limit,
+        };
+      });
     },
 
     /** One ticket of the business with its notes. An unknown id and another business's ticket both answer 404. */

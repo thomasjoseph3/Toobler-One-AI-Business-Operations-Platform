@@ -82,3 +82,27 @@ export const createTicketRequestSchema = z
   })
   .strict();
 export type CreateTicketRequest = z.infer<typeof createTicketRequestSchema>;
+
+/**
+ * The list, with filters. `ownerUserId` is a person's id, `me` (the signed-in person) or `unassigned` (nobody owns it).
+ * Newest tickets first.
+ */
+export const listTicketsQuerySchema = z.object({
+  status: ticketStatusSchema.optional(),
+  ownerUserId: z.union([z.uuid(), z.enum(['me', 'unassigned'])]).optional(),
+  type: ticketTypeSchema.optional(),
+  priority: ticketPrioritySchema.optional(),
+  contactId: z.uuid().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+});
+export type ListTicketsQuery = z.infer<typeof listTicketsQuerySchema>;
+
+export const ticketsListResponseSchema = z.object({
+  items: z.array(ticketSchema),
+  /** How many tickets match the filters in all, not just on this page. */
+  total: z.number().int(),
+  page: z.number().int(),
+  limit: z.number().int(),
+});
+export type TicketsListResponse = z.infer<typeof ticketsListResponseSchema>;

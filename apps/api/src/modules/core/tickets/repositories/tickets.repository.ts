@@ -1,6 +1,8 @@
 import type { TicketPriority, TicketStatus, TicketType } from '@toobler-one/shared';
+import type { Selectable } from 'kysely';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
+import type { TicketsTable } from '../../../../kernel/database/types';
 import { userIdFromActorStamp } from '../helpers/actor-stamp';
 
 // The SQL for the `tickets` and `ticket_notes` tables. Every query names the business as well as the id (defence in
@@ -64,15 +66,8 @@ export async function insertTicket(
     .execute();
 }
 
-/** One ticket of the business, or undefined when the id is unknown or belongs to another business. */
-export async function findTicketById(db: Db, accountId: string, ticketId: string): Promise<TicketRow | undefined> {
-  const row = await db
-    .selectFrom('tickets')
-    .selectAll()
-    .where('account_id', '=', accountId)
-    .where('id', '=', ticketId)
-    .executeTakeFirst();
-  if (!row) return undefined;
+/** Turns a database row of `tickets` into a TicketRow. */
+function toTicketRow(row: Selectable<TicketsTable>): TicketRow {
   return {
     id: row.id,
     contactId: row.contact_id,
@@ -88,6 +83,61 @@ export async function findTicketById(db: Db, accountId: string, ticketId: string
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+/** One ticket of the business, or undefined when the id is unknown or belongs to another business. */
+export async function findTicketById(db: Db, accountId: string, ticketId: string): Promise<TicketRow | undefined> {
+  const row = await db
+    .selectFrom('tickets')
+    .selectAll()
+    .where('account_id', '=', accountId)
+    .where('id', '=', ticketId)
+    .executeTakeFirst();
+  return row ? toTicketRow(row) : undefined;
+}
+
+/** Which tickets a list should hold. A filter that is left out does not narrow anything. */
+export interface TicketFilters {
+  accountId: string;
+  status?: TicketStatus | undefined;
+  /** Only tickets owned by this person. */
+  ownerUserId?: string | undefined;
+  /** Only tickets nobody owns. */
+  unassignedOnly?: boolean | undefined;
+  type?: TicketType | undefined;
+  priority?: TicketPriority | undefined;
+  contactId?: string | undefined;
+}
+
+/** The query every list read starts from: the business's tickets, narrowed by the filters. */
+function selectTicketRows(db: Db, filters: TicketFilters) {
+  let query = db.selectFrom('tickets').where('account_id', '=', filters.accountId);
+  if (filters.status) query = query.where('status', '=', filters.status);
+  if (filters.ownerUserId) query = query.where('owner_user_id', '=', filters.ownerUserId);
+  if (filters.unassignedOnly) query = query.where('owner_user_id', 'is', null);
+  if (filters.type) query = query.where('type', '=', filters.type);
+  if (filters.priority) query = query.where('priority', '=', filters.priority);
+  if (filters.contactId) query = query.where('contact_id', '=', filters.contactId);
+  return query;
+}
+
+/** One page of tickets, newest first, and how many tickets match in all. */
+export async function listTicketRows(
+  db: Db,
+  filters: TicketFilters,
+  paging: { limit: number; offset: number },
+): Promise<{ rows: TicketRow[]; total: number }> {
+  const rows = await selectTicketRows(db, filters)
+    .selectAll()
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(paging.limit)
+    .offset(paging.offset)
+    .execute();
+  const countRow = await selectTicketRows(db, filters)
+    .select((expression) => expression.fn.countAll<string>().as('total'))
+    .executeTakeFirstOrThrow();
+  return { rows: rows.map(toTicketRow), total: Number(countRow.total) };
 }
 
 /** The notes of one ticket, oldest first. */

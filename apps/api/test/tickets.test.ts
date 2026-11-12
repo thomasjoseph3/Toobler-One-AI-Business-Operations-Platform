@@ -297,3 +297,137 @@ describe('GET /api/v1/tickets/{id}', () => {
     expect((await getTicket(person, 'abc')).statusCode).toBe(400);
   });
 });
+
+/** Lists tickets as the person. `query` is the part after the `?`. */
+const listTickets = (person: SignedInPerson | null, query = '') =>
+  send(person, 'GET', `/tickets${query ? `?${query}` : ''}`);
+
+/** Adds a ticket through the real route and returns its id. */
+async function addTicketAndGetId(person: SignedInPerson, contactId: string, fields: object = {}): Promise<string> {
+  const response = await addTicket(person, { contactId, title: 'A ticket', ...fields });
+  expect(response.statusCode, response.body).toBe(201);
+  return response.json().id;
+}
+
+/** The ids of a list answer, in the order they came. */
+const idsOf = (body: { items: Array<{ id: string }> }) => body.items.map((item) => item.id);
+
+describe('GET /api/v1/tickets', () => {
+  it("lists the business's tickets newest first, each with its contact, and no notes", async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person, 'Anita Nair');
+    const first = await addTicketAndGetId(person, contactId, { title: 'First' });
+    const second = await addTicketAndGetId(person, contactId, { title: 'Second' });
+    const response = await listTickets(person);
+    expect(response.statusCode, response.body).toBe(200);
+    const body = response.json();
+    expect(idsOf(body)).toEqual([second, first]);
+    expect(body).toMatchObject({ total: 2, page: 1, limit: 25 });
+    expect(body.items[0]).toMatchObject({ title: 'Second', contact: { id: contactId, name: 'Anita Nair' } });
+    expect(body.items[0]).not.toHaveProperty('notes');
+  });
+
+  it('is empty for a new business', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await listTickets(person)).json()).toMatchObject({ items: [], total: 0 });
+  });
+
+  it("never shows another business's tickets", async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    await addTicketAndGetId(stranger, await addContact(stranger));
+    const mine = await addTicketAndGetId(person, await addContact(person));
+    expect(idsOf((await listTickets(person)).json())).toEqual([mine]);
+  });
+
+  it('filters by status', async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person);
+    const openTicket = await addTicketAndGetId(person, contactId);
+    const doneTicket = await addTicketAndGetId(person, contactId);
+    // Closing arrives in slice 4, so one ticket is closed directly in the database here.
+    await database.system
+      .updateTable('tickets')
+      .set({ status: 'done', closed_at: new Date() })
+      .where('id', '=', doneTicket)
+      .execute();
+    expect(idsOf((await listTickets(person, 'status=open')).json())).toEqual([openTicket]);
+    expect(idsOf((await listTickets(person, 'status=done')).json())).toEqual([doneTicket]);
+    expect((await listTickets(person)).json().total).toBe(2);
+  });
+
+  it('filters by owner: a person, me, and unassigned', async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person);
+    const mine = await addTicketAndGetId(person, contactId, { ownerUserId: person.profile.user.id });
+    const nobodys = await addTicketAndGetId(person, contactId);
+    expect(idsOf((await listTickets(person, `ownerUserId=${person.profile.user.id}`)).json())).toEqual([mine]);
+    expect(idsOf((await listTickets(person, 'ownerUserId=me')).json())).toEqual([mine]);
+    expect(idsOf((await listTickets(person, 'ownerUserId=unassigned')).json())).toEqual([nobodys]);
+  });
+
+  it('filters by type, priority and contact', async () => {
+    const person = await createSignedInPerson(app, database);
+    const priya = await addContact(person, 'Priya');
+    const rahul = await addContact(person, 'Rahul');
+    const complaint = await addTicketAndGetId(person, priya, { type: 'complaint', priority: 'urgent' });
+    const callback = await addTicketAndGetId(person, rahul, { type: 'callback', priority: 'low' });
+    expect(idsOf((await listTickets(person, 'type=complaint')).json())).toEqual([complaint]);
+    expect(idsOf((await listTickets(person, 'priority=low')).json())).toEqual([callback]);
+    expect(idsOf((await listTickets(person, `contactId=${rahul}`)).json())).toEqual([callback]);
+    expect((await listTickets(person, `contactId=${priya}&type=callback`)).json().total).toBe(0);
+  });
+
+  it('pages, and reports the full total', async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person);
+    const ids: string[] = [];
+    for (let count = 0; count < 3; count += 1) ids.push(await addTicketAndGetId(person, contactId));
+    const newestFirst = [...ids].reverse();
+    const firstPage = (await listTickets(person, 'limit=2&page=1')).json();
+    expect(idsOf(firstPage)).toEqual(newestFirst.slice(0, 2));
+    expect(firstPage).toMatchObject({ total: 3, page: 1, limit: 2 });
+    expect(idsOf((await listTickets(person, 'limit=2&page=2')).json())).toEqual(newestFirst.slice(2));
+    expect(idsOf((await listTickets(person, 'limit=2&page=3')).json())).toEqual([]);
+  });
+
+  it('shows a ticket whose contact was deleted, with no contact', async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person);
+    await addTicketAndGetId(person, contactId);
+    expect((await send(person, 'DELETE', `/contacts/${contactId}`)).statusCode).toBe(204);
+    const item = (await listTickets(person)).json().items[0];
+    expect(item).toMatchObject({ contactId, contact: null });
+  });
+
+  it('shows every ticket to every role, including tickets owned by someone else', async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person);
+    await addTicketAndGetId(person, contactId, { ownerUserId: person.profile.user.id });
+    await addTicketAndGetId(person, contactId);
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await listTickets(person)).json().total).toBe(2);
+    }
+  });
+
+  it('answers 401 with nobody signed in', async () => {
+    expect((await listTickets(null)).statusCode).toBe(401);
+  });
+
+  it('answers 400 for a bad filter or bad paging', async () => {
+    const person = await createSignedInPerson(app, database);
+    for (const query of [
+      'limit=0',
+      'limit=101',
+      'page=0',
+      'status=maybe',
+      'ownerUserId=abc',
+      'type=sale',
+      'priority=critical',
+      'contactId=abc',
+    ]) {
+      expect((await listTickets(person, query)).statusCode, query).toBe(400);
+    }
+  });
+});
