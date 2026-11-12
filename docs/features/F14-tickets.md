@@ -99,8 +99,7 @@ Known limits, recorded rather than hidden:
 - A disabled person can still be named as an owner (F02 adds disabling and the check).
 - A request with a malformed body is refused with 400 before the sign-in check, so a signed-out caller can learn the field names.
   This is how every route of the app behaves, and the field names are public in the API docs; recorded, not changed here.
-- There is no separate `test/isolation` suite yet (as for F06); the other-business 404 checks live in each route's tests and in the
-  journey "two businesses side by side".
+- The shared isolation suite now exists (R41, `apps/api/test/isolation.test.ts`): it holds an attempt for every ticket route, and fails if a route is added without one.
 - No alert is sent when a ticket is raised or assigned. The events are published; alerts are F23.
 
 ## Decisions and differences from the requirements

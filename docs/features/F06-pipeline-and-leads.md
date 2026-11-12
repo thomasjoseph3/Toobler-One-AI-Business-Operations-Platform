@@ -163,7 +163,7 @@ Defence in depth added by the database, not only the app: a lead's owner and the
 Known limits, recorded rather than hidden:
 - A disabled person can still be named as an owner or a round-robin person; the check arrives with the team feature (F02, which also adds disabling).
 - `LEAD_OPEN` and `LEAD_RECENTLY_LOST` name the other lead's id to a `staff_own` person even when it is not theirs. The id alone opens nothing (reading it is 404), and they need it to understand why they cannot add a lead.
-- There is no separate `test/isolation` suite yet (BACKEND.md names one); the other-business 404 checks live in each route's own tests and in the journey test "two businesses side by side". A shared suite across all modules is a follow-up.
+- The shared isolation suite was added on 12 Nov 2026 (R41, `apps/api/test/isolation.test.ts`); it holds an attempt for every leads and pipeline route.
 - `npm audit` shows moderate findings that were there before F06; F06 adds no package.
 
 ## Decisions and differences from the requirements
