@@ -172,10 +172,12 @@ export function createTicketsService({ database }: { database: Database }) {
     },
 
     /**
-     * Changes a ticket: assign it (or leave it with nobody), rename it, change its details, type or priority. Only the
-     * fields that really change are written; sending the values it already has changes nothing and writes no log line. A
-     * closed ticket cannot be changed (409 TICKET_CLOSED): reopen it first. An unknown ticket, another business's ticket
-     * and an owner from another business answer 404. Naming a new owner also publishes `ticket.assigned`.
+     * Changes a ticket: assign it (or leave it with nobody), rename it, change its details, type or priority, add a note,
+     * close it (`status: done`) or reopen it (`status: open`). Only what really changes is written; sending the values it
+     * already has changes nothing and writes no log line. A closed ticket accepts a note or a reopen; any other change to it
+     * answers 409 TICKET_CLOSED (send `status: open` together with the change to reopen and change it in one step). An
+     * unknown ticket, another business's ticket and an owner from another business answer 404.
+     * Events: ticket.updated, ticket.assigned (a new owner), ticket.note_added, ticket.closed, ticket.reopened.
      */
     async updateTicket(
       principal: Pick<Principal, 'accountId' | 'userId'>,
@@ -196,7 +198,17 @@ export function createTicketsService({ database }: { database: Database }) {
           }
           const current = await ticketsRepository.findTicketById(transaction, accountId, ticketId);
           if (!current) throw notFound('That ticket');
-          if (current.status === 'done') {
+
+          // A closed ticket takes a note or a reopen, but no other change unless it is reopened in the same step
+          const asksToChangeFields = [
+            request.title,
+            request.details,
+            request.type,
+            request.priority,
+            request.ownerUserId,
+          ].some((value) => value !== undefined);
+          const staysClosed = current.status === 'done' && request.status !== 'open';
+          if (staysClosed && asksToChangeFields) {
             throw conflict('TICKET_CLOSED', 'This ticket is closed. Reopen it before changing it.');
           }
 
@@ -212,21 +224,30 @@ export function createTicketsService({ database }: { database: Database }) {
             changes.ownerUserId = request.ownerUserId;
           }
           const changedFields = Object.keys(changes); // the names of the fields that really change
-          if (changedFields.length === 0) return readTicket(transaction, accountId, ticketId);
 
-          await ticketsRepository.updateTicket(transaction, { accountId, ticketId, changes, actor });
-          await writeActivityLog(transaction, {
-            accountId,
-            actor,
-            kind: 'tickets.updated',
-            // Which fields changed, never their values
-            details: { recordType: 'ticket', recordId: ticketId, fields: changedFields },
-          });
-          await publishEvent(transaction, {
-            accountId,
-            eventName: 'ticket.updated',
-            payload: { ticketId, fields: changedFields },
-          });
+          // Closing and reopening are not field edits: they have their own log lines and events
+          const newStatus =
+            request.status !== undefined && request.status !== current.status ? request.status : undefined;
+          if (newStatus === 'done') Object.assign(changes, { status: 'done', closedAt: new Date(), closedBy: actor });
+          if (newStatus === 'open') Object.assign(changes, { status: 'open', closedAt: null, closedBy: null });
+
+          if (Object.keys(changes).length > 0) {
+            await ticketsRepository.updateTicket(transaction, { accountId, ticketId, changes, actor });
+          }
+          if (changedFields.length > 0) {
+            await writeActivityLog(transaction, {
+              accountId,
+              actor,
+              kind: 'tickets.updated',
+              // Which fields changed, never their values
+              details: { recordType: 'ticket', recordId: ticketId, fields: changedFields },
+            });
+            await publishEvent(transaction, {
+              accountId,
+              eventName: 'ticket.updated',
+              payload: { ticketId, fields: changedFields },
+            });
+          }
           if ('ownerUserId' in changes) {
             await publishEvent(transaction, {
               accountId,
@@ -235,6 +256,48 @@ export function createTicketsService({ database }: { database: Database }) {
                 ticketId,
                 ownerUserId: changes.ownerUserId ?? null,
                 previousOwnerUserId: current.ownerUserId,
+              },
+            });
+          }
+
+          if (request.note !== undefined) {
+            const noteId = uuidv7();
+            await ticketsRepository.insertTicketNote(transaction, {
+              id: noteId,
+              accountId,
+              ticketId,
+              body: request.note,
+              actor,
+            });
+            // The note's words are never logged, only that a note was added
+            await writeActivityLog(transaction, {
+              accountId,
+              actor,
+              kind: 'tickets.note_added',
+              details: { recordType: 'ticket', recordId: ticketId, fields: ['note'] },
+            });
+            await publishEvent(transaction, {
+              accountId,
+              eventName: 'ticket.note_added',
+              payload: { ticketId, noteId },
+            });
+          }
+
+          if (newStatus !== undefined) {
+            const closing = newStatus === 'done';
+            await writeActivityLog(transaction, {
+              accountId,
+              actor,
+              kind: closing ? 'tickets.closed' : 'tickets.reopened',
+              details: { recordType: 'ticket', recordId: ticketId, fields: ['status'] },
+            });
+            await publishEvent(transaction, {
+              accountId,
+              eventName: closing ? 'ticket.closed' : 'ticket.reopened',
+              payload: {
+                ticketId,
+                contactId: current.contactId,
+                ownerUserId: changes.ownerUserId ?? current.ownerUserId,
               },
             });
           }

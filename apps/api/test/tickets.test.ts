@@ -608,15 +608,200 @@ describe('PATCH /api/v1/tickets/{id}', () => {
       { type: 'sale' },
       { priority: 'critical' },
       { ownerUserId: 'abc' },
-      { status: 'done' },
+      { status: 'maybe' },
+      { note: 'n'.repeat(2001) },
       { contactId: randomUUID() },
       { accountId: randomUUID() },
       { closedAt: '2026-01-01T00:00:00Z' },
+      { closedBy: 'someone' },
       { notes: ['x'] },
     ];
     for (const body of badBodies) {
       expect((await patchTicket(person, ticketId, body)).statusCode, JSON.stringify(body)).toBe(400);
     }
     expect((await patchTicket(person, 'abc', { title: 'x' })).statusCode).toBe(400);
+  });
+});
+
+/** The names of the events of one kind published for the business, oldest first. */
+async function eventsNamed(person: SignedInPerson, name: string) {
+  return database.system
+    .selectFrom('domain_events')
+    .selectAll()
+    .where('account_id', '=', person.profile.business.id)
+    .where('name', '=', name)
+    .orderBy('id', 'asc')
+    .execute();
+}
+
+describe('PATCH /api/v1/tickets/{id}: notes, closing and reopening', () => {
+  it('adds notes, oldest first, each remembering who wrote it', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    const first = await patchTicket(person, ticketId, { note: '  Called the customer.  ' });
+    expect(first.statusCode, first.body).toBe(200);
+    expect(first.json().status).toBe('open');
+    await patchTicket(person, ticketId, { note: 'Promised a refund by Friday.' });
+    const notes = (await getTicket(person, ticketId)).json().notes;
+    expect(notes).toMatchObject([
+      { body: 'Called the customer.', writtenByUserId: person.profile.user.id },
+      { body: 'Promised a refund by Friday.', writtenByUserId: person.profile.user.id },
+    ]);
+  });
+
+  it('logs that a note was added without its words, and publishes ticket.note_added', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    await patchTicket(person, ticketId, { note: 'Secret note words' });
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', ticketId)
+      .where('kind', '=', 'tickets.note_added')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.fields).toEqual(['note']);
+    const events = await eventsNamed(person, 'ticket.note_added');
+    expect(events).toHaveLength(1);
+    expect(JSON.stringify([lines, events])).not.toContain('Secret note words');
+  });
+
+  it('closes a ticket with a note in one step, remembering who closed it and when', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    const response = await patchTicket(person, ticketId, { status: 'done', note: 'Refund sent.' });
+    expect(response.statusCode, response.body).toBe(200);
+    const ticket = response.json();
+    expect(ticket).toMatchObject({ status: 'done', closedByUserId: person.profile.user.id });
+    expect(ticket.closedAt).not.toBeNull();
+    expect(ticket.notes).toMatchObject([{ body: 'Refund sent.' }]);
+    expect((await listTickets(person, 'status=done')).json().total).toBe(1);
+    expect((await listTickets(person, 'status=open')).json().total).toBe(0);
+  });
+
+  it('writes a closing log line and a ticket.closed event, and no field-edit line', async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person);
+    const ticketId = await addTicketAndGetId(person, contactId, { ownerUserId: person.profile.user.id });
+    await patchTicket(person, ticketId, { status: 'done' });
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('kind')
+      .where('record_id', '=', ticketId)
+      .execute();
+    expect(lines.map((line) => line.kind).sort()).toEqual(['tickets.closed', 'tickets.created']);
+    const events = await eventsNamed(person, 'ticket.closed');
+    expect(events.map((event) => event.payload)).toEqual([
+      { ticketId, contactId, ownerUserId: person.profile.user.id },
+    ]);
+  });
+
+  it('closes and edits in one step when the ticket is open', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    const response = await patchTicket(person, ticketId, { status: 'done', priority: 'low' });
+    expect(response.json()).toMatchObject({ status: 'done', priority: 'low' });
+  });
+
+  it('answers 200 and changes nothing when closing a closed ticket or opening an open one', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    expect((await patchTicket(person, ticketId, { status: 'open' })).statusCode).toBe(200);
+    await patchTicket(person, ticketId, { status: 'done' });
+    const closed = (await getTicket(person, ticketId)).json();
+    const again = await patchTicket(person, ticketId, { status: 'done' });
+    expect(again.statusCode).toBe(200);
+    expect(again.json().closedAt).toBe(closed.closedAt);
+    expect(await eventsNamed(person, 'ticket.closed')).toHaveLength(1);
+    expect(await eventsNamed(person, 'ticket.reopened')).toHaveLength(0);
+  });
+
+  it('still takes a note on a closed ticket, but refuses any other change with 409', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person), { title: 'Closed one' });
+    await patchTicket(person, ticketId, { status: 'done' });
+    const noted = await patchTicket(person, ticketId, { note: 'Customer thanked us.' });
+    expect(noted.statusCode, noted.body).toBe(200);
+    expect(noted.json()).toMatchObject({ status: 'done', notes: [{ body: 'Customer thanked us.' }] });
+    const refused = await patchTicket(person, ticketId, { title: 'Too late', note: 'Not saved either' });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.code).toBe('TICKET_CLOSED');
+    const ticket = (await getTicket(person, ticketId)).json();
+    expect(ticket.title).toBe('Closed one');
+    expect(ticket.notes).toHaveLength(1);
+  });
+
+  it('reopens a closed ticket, clearing who closed it and when, and keeping its notes', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    await patchTicket(person, ticketId, { status: 'done', note: 'Closed too soon' });
+    const response = await patchTicket(person, ticketId, { status: 'open' });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ status: 'open', closedAt: null, closedByUserId: null });
+    expect(response.json().notes).toHaveLength(1);
+    expect(await eventsNamed(person, 'ticket.reopened')).toHaveLength(1);
+    const row = await database.system
+      .selectFrom('tickets')
+      .selectAll()
+      .where('id', '=', ticketId)
+      .executeTakeFirstOrThrow();
+    expect(row.closed_at).toBeNull();
+    expect(row.closed_by).toBeNull();
+  });
+
+  it('reopens and changes the ticket in one step', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    await patchTicket(person, ticketId, { status: 'done' });
+    const response = await patchTicket(person, ticketId, {
+      status: 'open',
+      ownerUserId: person.profile.user.id,
+      note: 'Reopened and taken over',
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({
+      status: 'open',
+      ownerUserId: person.profile.user.id,
+      notes: [{ body: 'Reopened and taken over' }],
+    });
+  });
+
+  it('lets every role add notes and close tickets', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await patchTicket(person, ticketId, { note: `Note from ${role}` })).statusCode).toBe(200);
+    }
+    expect((await patchTicket(person, ticketId, { status: 'done' })).statusCode).toBe(200);
+  });
+
+  it('keeps notes inside their business: another business cannot add to or see them', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    expect((await patchTicket(stranger, ticketId, { note: 'Sneaky' })).statusCode).toBe(404);
+    expect((await patchTicket(stranger, ticketId, { status: 'done' })).statusCode).toBe(404);
+    const ticket = (await getTicket(person, ticketId)).json();
+    expect(ticket.notes).toEqual([]);
+    expect(ticket.status).toBe('open');
+  });
+
+  it('answers 400 for a status it does not know, a note that is too long, and a blank note on its own', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    expect((await patchTicket(person, ticketId, { status: 'maybe' })).statusCode).toBe(400);
+    expect((await patchTicket(person, ticketId, { note: 'n'.repeat(2001) })).statusCode).toBe(400);
+    const blank = await patchTicket(person, ticketId, { note: '   ' });
+    expect(blank.statusCode).toBe(400);
+    expect(blank.json().error.code).toBe('NOTHING_TO_CHANGE');
+  });
+
+  it('has a database rule that a ticket is done only when it has a closing time', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    await expect(
+      database.system.updateTable('tickets').set({ status: 'done' }).where('id', '=', ticketId).execute(),
+    ).rejects.toThrow();
   });
 });

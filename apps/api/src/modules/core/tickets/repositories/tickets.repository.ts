@@ -180,6 +180,10 @@ export interface TicketChanges {
   type?: TicketType;
   priority?: TicketPriority;
   ownerUserId?: string | null;
+  /** Closing sets `done`, `closedAt` and `closedBy` together; reopening sets `open` and clears the other two. */
+  status?: TicketStatus;
+  closedAt?: Date | null;
+  closedBy?: Actor | null;
 }
 
 /** Changes the fields named in `changes`. Fails with a foreign-key error when the owner does not work for the business. */
@@ -196,9 +200,31 @@ export async function updateTicket(
       ...(changes.type !== undefined ? { type: changes.type } : {}),
       ...(changes.priority !== undefined ? { priority: changes.priority } : {}),
       ...(changes.ownerUserId !== undefined ? { owner_user_id: changes.ownerUserId } : {}),
+      ...(changes.status !== undefined ? { status: changes.status } : {}),
+      ...(changes.closedAt !== undefined ? { closed_at: changes.closedAt } : {}),
+      ...(changes.closedBy !== undefined
+        ? { closed_by: changes.closedBy ? { kind: changes.closedBy.kind, id: changes.closedBy.id } : null }
+        : {}),
       updated_by: { kind: options.actor.kind, id: options.actor.id },
     })
     .where('account_id', '=', options.accountId)
     .where('id', '=', options.ticketId)
+    .execute();
+}
+
+/** Adds a note to a ticket of the business. Notes are written once and never edited. */
+export async function insertTicketNote(
+  db: Db,
+  note: { id: string; accountId: string; ticketId: string; body: string; actor: Actor },
+): Promise<void> {
+  await db
+    .insertInto('ticket_notes')
+    .values({
+      id: note.id,
+      account_id: note.accountId,
+      ticket_id: note.ticketId,
+      body: note.body,
+      created_by: { kind: note.actor.kind, id: note.actor.id },
+    })
     .execute();
 }

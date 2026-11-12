@@ -111,10 +111,10 @@ export type TicketsListResponse = z.infer<typeof ticketsListResponseSchema>;
 const clearIfBlank = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
 
 /**
- * What staff send to change a ticket: assign it, rename it, change its details, type or priority. Only the fields sent
- * change. `ownerUserId: null` leaves the ticket with nobody; blank `details` clears them. The title cannot be empty. The
- * status, the contact and the business are never changed here, so any other field is refused. (Notes and closing arrive in
- * the next slice.)
+ * What staff send to change a ticket: assign it, rename it, change its details, type or priority, add a note, close it
+ * (`status: "done"`) or reopen it (`status: "open"`). Only the fields sent change. `ownerUserId: null` leaves the ticket
+ * with nobody; blank `details` clear them; a blank `note` is ignored. The title cannot be empty. The contact and the
+ * business are never changed here, so any other field is refused.
  */
 export const updateTicketRequestSchema = z
   .object({
@@ -123,6 +123,10 @@ export const updateTicketRequestSchema = z
     type: ticketTypeSchema.optional(),
     priority: ticketPrioritySchema.optional(),
     ownerUserId: z.uuid().nullable().optional(),
+    /** A note to add to the ticket (it is added in the same step as any other change). */
+    note: z.preprocess(blankToNothing, z.string().trim().max(2000).optional()),
+    /** `done` closes the ticket; `open` reopens a closed one. */
+    status: ticketStatusSchema.optional(),
   })
   .strict();
 export type UpdateTicketRequest = z.infer<typeof updateTicketRequestSchema>;
