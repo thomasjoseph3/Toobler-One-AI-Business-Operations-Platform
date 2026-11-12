@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { ticketsRoutes } from './routes/tickets.routes';
 
 /**
  * Tickets: requests that are not sales (complaints, callbacks, questions). A core module: always on, so it has no switch.
@@ -9,7 +10,7 @@ export default defineModule({
   kind: 'core',
   // Every ticket is about a contact, and the contacts module shows who they are
   requires: ['core.contacts'],
-  routes: () => {
-    // Slice 1 adds the first two routes here.
+  routes: (app) => {
+    ticketsRoutes(app);
   },
 });

@@ -26,3 +26,59 @@ export type TicketNote = z.infer<typeof ticketNoteSchema>;
 
 /** The address part naming a ticket. */
 export const ticketIdParamsSchema = z.object({ id: z.uuid() });
+
+/** An empty or blank text means "nothing was given", so a form that sends "" for an untouched field works. */
+const blankToNothing = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? undefined : value);
+
+/** The few facts about the person that a ticket row or page needs. */
+export const ticketContactSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+});
+export type TicketContact = z.infer<typeof ticketContactSchema>;
+
+export const ticketSchema = z.object({
+  id: z.string(),
+  contactId: z.string(),
+  /** Null when the contact was deleted. */
+  contact: ticketContactSchema.nullable(),
+  /** A short line saying what the ticket is about. */
+  title: z.string(),
+  details: z.string().nullable(),
+  type: ticketTypeSchema,
+  priority: ticketPrioritySchema,
+  status: ticketStatusSchema,
+  /** Null while nobody owns the ticket. */
+  ownerUserId: z.string().nullable(),
+  /** Which conversation type raised it (set by the router later); null for tickets added by hand. */
+  conversationTypeKey: z.string().nullable(),
+  closedAt: z.string().nullable(),
+  /** The person who closed it (null while open, or if it was closed by the system). */
+  closedByUserId: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+export type Ticket = z.infer<typeof ticketSchema>;
+
+/** One ticket with its notes, oldest first. */
+export const ticketDetailSchema = ticketSchema.extend({ notes: z.array(ticketNoteSchema) });
+export type TicketDetail = z.infer<typeof ticketDetailSchema>;
+
+/**
+ * What staff send to add a ticket by hand. Only the contact and a title are needed. The ticket starts open; the type is
+ * `other` and the priority `normal` unless sent; it has no owner unless one is named. Anything else in the body is refused
+ * (the status, the business and who created it are never taken from the request).
+ */
+export const createTicketRequestSchema = z
+  .object({
+    contactId: z.uuid(),
+    title: z.string().trim().min(1, 'Say what the ticket is about').max(200),
+    details: z.preprocess(blankToNothing, z.string().trim().max(2000).optional()),
+    type: ticketTypeSchema.optional(),
+    priority: ticketPrioritySchema.optional(),
+    ownerUserId: z.uuid().optional(),
+  })
+  .strict();
+export type CreateTicketRequest = z.infer<typeof createTicketRequestSchema>;
