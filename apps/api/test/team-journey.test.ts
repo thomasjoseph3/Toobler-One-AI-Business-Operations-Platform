@@ -94,7 +94,44 @@ describe('journey: a busy day at Nair Stays', () => {
     let lastAnswer;
     for (const [key, value] of Object.entries(neededAnswers))
       lastAnswer = await anita.ok('PUT', `/knowledge/answers/${key}`, { value });
-    expect(lastAnswer.progress).toMatchObject({ readyToGoLive: true, neededToGoLiveStillMissing: [] });
+    // Seven answers are not enough: the business must also have something to sell
+    expect(lastAnswer.progress).toMatchObject({ readyToGoLive: false, neededToGoLiveStillMissing: ['offerings'] });
+    const familyRoom = await anita.ok(
+      'POST',
+      '/offerings',
+      {
+        name: 'Family room',
+        description: 'Two beds, sea view',
+        fromPricePaise: 450_000,
+        priceUnit: 'per night',
+        gstMode: 'plus',
+        includes: 'Breakfast for four',
+      },
+      201,
+    );
+    expect(familyRoom.priceInWords).toBe('from ₹4,500 a night plus GST');
+    const dayTour = await anita.ok('POST', '/offerings', { name: 'Day tour' }, 201); // a business that does not share this price
+    const winterSpecial = await anita.ok(
+      'POST',
+      '/offerings',
+      {
+        name: 'Winter special',
+        fromPricePaise: 1_200_000,
+        priceUnit: 'per package',
+        gstMode: 'included',
+        active: false,
+      },
+      201,
+    );
+    const festivalOffer = await anita.ok(
+      'POST',
+      '/offers',
+      { text: '10 percent off for stays over three nights', endsOn: '2099-12-31' },
+      201,
+    );
+    expect(festivalOffer.current).toBe(true);
+    const readyNow = await anita.ok('GET', '/knowledge/questions');
+    expect(readyNow.progress).toMatchObject({ readyToGoLive: true, neededToGoLiveStillMissing: [] });
     await anita.ok('PUT', '/knowledge/answers/hotel_pets', { value: { yes: true, detail: 'Small dogs only' } }); // a hotel's own question
     await anita.ok('PUT', '/knowledge/situations/discount_request', { choice: 'prices_are_fixed' });
     await anita.ok('PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
@@ -113,6 +150,17 @@ describe('journey: a busy day at Nair Stays', () => {
         questions.questions.find((question: { key: string }) => question.key === 'business_name').answer.value,
       ).toBe('Nair Stays');
       expect((await person.ok('GET', '/knowledge/settings')).defaultCountry).toBe('AE');
+      // Everybody reads what the business sells; the switched-off winter special is on the list, marked off
+      const offerings = await person.ok('GET', '/offerings');
+      expect(
+        offerings.items.map((item: { name: string }) => item.name),
+        person.name,
+      ).toEqual(['Family room', 'Day tour', 'Winter special']);
+      expect((await person.ok('GET', '/offerings?active=true')).items, person.name).toHaveLength(2);
+      expect(
+        (await person.ok('GET', '/offers')).items.map((offer: { text: string }) => offer.text),
+        person.name,
+      ).toEqual(['10 percent off for stays over three nights']);
       const discountHandling = (await person.ok('GET', '/knowledge/situations')).items.find(
         (situation: { key: string }) => situation.key === 'discount_request',
       );
@@ -129,6 +177,11 @@ describe('journey: a busy day at Nair Stays', () => {
         ['PUT', '/knowledge/settings', { defaultCountry: 'IN' }],
         ['POST', '/pipeline/stages', { name: 'Sneaky' }],
         ['PUT', '/lost-reasons', { reasons: ['Sneaky'] }],
+        ['POST', '/offerings', { name: 'Sneaky offering' }],
+        ['PATCH', `/offerings/${familyRoom.id}`, { name: 'Hacked' }],
+        ['DELETE', `/offerings/${familyRoom.id}`, {}],
+        ['POST', '/offerings/reorder', { offeringIds: [familyRoom.id] }],
+        ['POST', '/offers', { text: 'Sneaky offer', endsOn: '2099-12-31' }],
         ['PUT', '/assignment-rules', { mode: 'one_person', userId: person.userId }],
       ];
       for (const [method, url, body] of forbidden) {
@@ -308,6 +361,15 @@ describe('journey: a busy day at Nair Stays', () => {
     expect((await anita.ok('GET', `/contacts/${karthik}`)).lifecycleStage).toBe('new'); // his only lead is gone
     await meera.refused('GET', `/leads/${leadOfKarthik.id}`, undefined, 404);
     await anita.refused('GET', `/leads/${leadOfKarthik.id}`, undefined, 404);
+    // ...and tidies what the business sells: removes the winter special, puts the day tour first, extends the offer
+    await vikram.ok('DELETE', `/offerings/${winterSpecial.id}`, undefined, 204);
+    const reordered = await vikram.ok('POST', '/offerings/reorder', { offeringIds: [dayTour.id, familyRoom.id] });
+    expect(reordered.items.map((item: { name: string; sort: number }) => `${item.sort}:${item.name}`)).toEqual([
+      '0:Day tour',
+      '1:Family room',
+    ]);
+    await vikram.ok('PATCH', `/offers/${festivalOffer.id}`, { text: '15 percent off for stays over three nights' });
+    expect((await anita.ok('GET', '/offers')).items[0].text).toBe('15 percent off for stays over three nights');
     await vikram.ok('PUT', '/knowledge/situations/after_hours', { choice: 'call_at_opening_only' });
     expect(
       (await anita.ok('GET', '/knowledge/situations')).items.find(
@@ -355,7 +417,8 @@ describe('journey: a busy day at Nair Stays', () => {
 
     // ------------------------------------------------------ the end: the profile numbers match the database
     const final = await anita.ok('GET', '/knowledge/questions');
-    expect(final.progress.answeredQuestions).toBe(await countRows('business_answers', anita.businessId));
+    // Every answer row counts, plus "What do you sell?", which the offerings answer
+    expect(final.progress.answeredQuestions).toBe((await countRows('business_answers', anita.businessId)) + 1);
     expect(final.progress.readyToGoLive).toBe(true);
   });
 });

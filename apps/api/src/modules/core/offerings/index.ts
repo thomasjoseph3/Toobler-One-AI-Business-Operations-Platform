@@ -1,3 +1,3 @@
 // The public face of the offerings module: the only file other modules may import from it.
-// Nothing is shared yet; later slices add the counts the profile needs and the offering lookup that leads use.
-export {};
+// The business profile (knowledge) asks how many offerings are on, to know whether "What do you sell?" is answered.
+export { countActiveOfferingsOfBusiness } from './services/offering-counts.service';

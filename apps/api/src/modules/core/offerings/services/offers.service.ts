@@ -150,6 +150,26 @@ export function createOffersService({ database }: { database: Database }) {
         return toOffer(saved, now, principal.timeZone);
       });
     },
+
+    /**
+     * Removes an offer from view: a soft delete, the row stays. An unknown id, a removed one and another business's offer answer 404.
+     * Writes an activity-log line and the `offer.deleted` event (ids only).
+     */
+    async deleteOffer(principal: Pick<Principal, 'accountId' | 'userId'>, offerId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        if (!(await offersRepository.lockOfferForUpdate(transaction, accountId, offerId))) throw notFound('That offer');
+        await offersRepository.softDeleteOffer(transaction, { accountId, offerId, actor, now: new Date() });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'offers.deleted',
+          details: { recordType: 'offer', recordId: offerId },
+        });
+        await publishEvent(transaction, { accountId, eventName: 'offer.deleted', payload: { offerId } });
+      });
+    },
   };
 }
 

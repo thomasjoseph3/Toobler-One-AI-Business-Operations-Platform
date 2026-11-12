@@ -277,3 +277,15 @@ export async function setPositions(
       .execute();
   }
 }
+
+/** How many live offerings are switched on. */
+export async function countActiveOfferings(db: Db, accountId: string): Promise<number> {
+  const row = await db
+    .selectFrom('offerings')
+    .select((expression) => expression.fn.countAll<string>().as('total'))
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .where('active', '=', true)
+    .executeTakeFirstOrThrow();
+  return Number(row.total);
+}

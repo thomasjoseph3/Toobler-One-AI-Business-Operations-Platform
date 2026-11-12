@@ -126,8 +126,9 @@ export const GENERAL_QUESTIONS: readonly QuestionDefinition[] = [
     text: 'Do your prices include GST?',
     type: 'pick_one',
     options: ['Included', 'Plus GST', 'No GST'],
-    // Required once prices are given. Until the offerings feature (F17) can say whether they are, it is asked but not required.
+    // Each offering carries its own GST note (owner decision, F17), so the same fact is never in two places.
     neededToGoLive: false,
+    handledElsewhere: 'offerings',
     prefillFrom: ['website', 'uploads'],
   },
   {

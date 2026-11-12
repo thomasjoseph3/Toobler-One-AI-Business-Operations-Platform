@@ -282,6 +282,12 @@ const attempts: Attempt[] = [
     expectedStatus: 400,
   },
   {
+    route: 'DELETE /api/v1/offers/{id}',
+    what: "remove A's offer",
+    request: () => ({ method: 'DELETE', url: `/offers/${dataOfA.offerId}` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'PATCH /api/v1/offers/{id}',
     what: "change A's offer",
     request: () => ({ method: 'PATCH', url: `/offers/${dataOfA.offerId}`, payload: { text: 'Hacked' } }),

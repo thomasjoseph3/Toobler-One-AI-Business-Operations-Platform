@@ -67,6 +67,7 @@ describe('the question list', () => {
     expect(elsewhere).toEqual([
       'brochure_upload:documents',
       'offerings:offerings',
+      'prices_include_gst:offerings',
       'current_offers:offerings',
       'common_questions:faqs',
     ]);

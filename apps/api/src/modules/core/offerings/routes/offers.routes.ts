@@ -11,7 +11,7 @@ import {
 import { unauthorized } from '../../../../kernel/errors';
 import { createOffersService } from '../services/offers.service';
 
-/** Registers /api/v1/offers (add, list) and /offers/{id} (change). More routes arrive with the later slices. */
+/** Registers /api/v1/offers (add, list) and /offers/{id} (change, remove). More routes arrive with the later slices. */
 export function offersRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const offersService = createOffersService({ database: app.kernel.database });
@@ -50,6 +50,17 @@ export function offersRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return offersService.updateOffer(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // For managers only. A soft delete: the offer disappears from every list, its row is kept.
+  typedApp.delete(
+    '/offers/:id',
+    { config: { access: 'manager' }, schema: { params: offerIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await offersService.deleteOffer(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }

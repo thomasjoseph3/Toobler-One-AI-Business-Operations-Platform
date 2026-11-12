@@ -11,9 +11,11 @@ import type {
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
+import type { Db } from '../../../../kernel/database';
 import { ApiError, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
+import { countActiveOfferingsOfBusiness } from '../../offerings';
 import { checkAnswer } from '../helpers/answer-validation';
 import { computeProfileProgress } from '../helpers/completeness';
 import type { QuestionDefinition } from '../helpers/question-types';
@@ -22,8 +24,20 @@ import { sameJson } from '../helpers/same-json';
 import * as answersRepository from '../repositories/answers.repository';
 import type { AnswerRow } from '../repositories/answers.repository';
 
+/**
+ * Which questions answered in another feature that feature already reports on, and whether they are answered. Today only "What do you
+ * sell?" (the business has an offering switched on); FAQs and documents report from F18. Runs in the caller's fenced transaction.
+ */
+async function findAnswersGivenElsewhere(transaction: Db, accountId: string): Promise<Map<string, boolean>> {
+  return new Map([['offerings', (await countActiveOfferingsOfBusiness(transaction, accountId)) > 0]]);
+}
+
 /** Turns a question of the list, plus the business's answer to it (if any), into what the API answers with. */
-function toKnowledgeQuestion(question: QuestionDefinition, answer: AnswerRow | undefined): KnowledgeQuestion {
+function toKnowledgeQuestion(
+  question: QuestionDefinition,
+  answer: AnswerRow | undefined,
+  answeredElsewhere: ReadonlyMap<string, boolean>,
+): KnowledgeQuestion {
   return {
     key: question.key,
     section: question.section,
@@ -45,6 +59,13 @@ function toKnowledgeQuestion(question: QuestionDefinition, answer: AnswerRow | u
     maxRows: question.maxRows ?? null,
     neededToGoLive: question.neededToGoLive,
     handledElsewhere: question.handledElsewhere ?? null,
+    elsewhereStatus: question.handledElsewhere
+      ? answeredElsewhere.has(question.key)
+        ? answeredElsewhere.get(question.key)
+          ? 'done'
+          : 'not_done'
+        : 'not_tracked'
+      : null,
     usedFor: question.usedFor ?? null,
     answer: answer
       ? {
@@ -59,10 +80,15 @@ function toKnowledgeQuestion(question: QuestionDefinition, answer: AnswerRow | u
 }
 
 /** How complete the profile is, from the business's questions and answers. */
-function progressOf(questions: readonly QuestionDefinition[], answers: readonly AnswerRow[]): ProfileProgress {
+function progressOf(
+  questions: readonly QuestionDefinition[],
+  answers: readonly AnswerRow[],
+  answeredElsewhere: ReadonlyMap<string, boolean>,
+): ProfileProgress {
   return computeProfileProgress(
     questions,
     answers.map((answer) => ({ questionKey: answer.questionKey, status: answer.status })),
+    answeredElsewhere,
   );
 }
 
@@ -78,13 +104,19 @@ export function createKnowledgeService({ database }: { database: Database }) {
      */
     async listQuestions(principal: Pick<Principal, 'accountId' | 'industryId'>): Promise<KnowledgeQuestionsResponse> {
       const questions = getQuestionsForIndustry(principal.industryId);
-      const answers = await database.runInAccountTransaction(principal.accountId, (transaction) =>
-        answersRepository.listAnswers(transaction, principal.accountId),
+      const { answers, answeredElsewhere } = await database.runInAccountTransaction(
+        principal.accountId,
+        async (transaction) => ({
+          answers: await answersRepository.listAnswers(transaction, principal.accountId),
+          answeredElsewhere: await findAnswersGivenElsewhere(transaction, principal.accountId),
+        }),
       );
       const answerByKey = new Map(answers.map((answer) => [answer.questionKey, answer]));
       return {
-        questions: questions.map((question) => toKnowledgeQuestion(question, answerByKey.get(question.key))),
-        progress: progressOf(questions, answers),
+        questions: questions.map((question) =>
+          toKnowledgeQuestion(question, answerByKey.get(question.key), answeredElsewhere),
+        ),
+        progress: progressOf(questions, answers, answeredElsewhere),
       };
     },
 
@@ -136,10 +168,11 @@ export function createKnowledgeService({ database }: { database: Database }) {
           });
         }
         const answers = await answersRepository.listAnswers(transaction, accountId);
+        const answeredElsewhere = await findAnswersGivenElsewhere(transaction, accountId);
         const saved = answers.find((answer) => answer.questionKey === questionKey);
         return {
-          question: toKnowledgeQuestion(question, saved),
-          progress: progressOf(questions, answers),
+          question: toKnowledgeQuestion(question, saved, answeredElsewhere),
+          progress: progressOf(questions, answers, answeredElsewhere),
         };
       });
     },
@@ -186,7 +219,8 @@ export function createKnowledgeService({ database }: { database: Database }) {
           });
         }
         const answers = await answersRepository.listAnswers(transaction, accountId);
-        return { confirmed, progress: progressOf(questions, answers) };
+        const answeredElsewhere = await findAnswersGivenElsewhere(transaction, accountId);
+        return { confirmed, progress: progressOf(questions, answers, answeredElsewhere) };
       });
     },
   };

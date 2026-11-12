@@ -444,3 +444,84 @@ describe('PATCH /api/v1/offers/{id}', () => {
     expect((await listOffers(person)).json().items[0]).toMatchObject({ text: 'Changed words', endsOn });
   });
 });
+
+/** Removes an offer as the person. */
+const deleteOffer = (person: SignedInPerson | null, offerId: string, withCsrfHeaders = true) =>
+  send(person, 'DELETE', `/offers/${offerId}`, undefined, withCsrfHeaders);
+
+describe('DELETE /api/v1/offers/{id}', () => {
+  it('removes an offer from every list but keeps its row, even an ended one', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stays = await putOfferInDatabase(person, 'Stays', dateFromToday(5));
+    const ended = await putOfferInDatabase(person, 'Ended', dateFromToday(-5));
+    const removedNow = await putOfferInDatabase(person, 'Removed now', dateFromToday(8));
+    expect((await deleteOffer(person, removedNow)).statusCode).toBe(204);
+    expect((await deleteOffer(person, ended)).statusCode).toBe(204);
+    expect(textsOf((await listOffers(person, 'include=expired')).json())).toEqual(['Stays']);
+    const row = await database.system
+      .selectFrom('offers')
+      .selectAll()
+      .where('id', '=', removedNow)
+      .executeTakeFirstOrThrow();
+    expect(row.deleted_at).not.toBeNull();
+    expect(row.updated_by).toEqual({ kind: 'user', id: person.profile.user.id });
+    expect(stays).toBeTruthy();
+  });
+
+  it('writes a log line and an offer.deleted event with no words in them', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offerId = await putOfferInDatabase(person, 'Secret festival words', dateFromToday(5));
+    await deleteOffer(person, offerId);
+    const line = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', offerId)
+      .where('kind', '=', 'offers.deleted')
+      .executeTakeFirstOrThrow();
+    expect(line).toMatchObject({ record_type: 'offer', actor: { kind: 'user', id: person.profile.user.id } });
+    const event = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'offer.deleted')
+      .executeTakeFirstOrThrow();
+    expect(event.payload).toEqual({ offerId });
+    expect(JSON.stringify([line, event])).not.toContain('Secret festival words');
+  });
+
+  it("answers 404 for a second delete, an unknown id and another business's offer, and 400 for a bad id", async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const strangers = await putOfferInDatabase(stranger, 'Theirs', dateFromToday(5));
+    const offerId = await putOfferInDatabase(person, 'Mine', dateFromToday(5));
+    expect((await deleteOffer(person, offerId)).statusCode).toBe(204);
+    expect((await deleteOffer(person, offerId)).statusCode).toBe(404);
+    expect((await deleteOffer(person, randomUUID())).statusCode).toBe(404);
+    expect((await deleteOffer(person, strangers)).statusCode).toBe(404);
+    expect((await deleteOffer(person, 'abc')).statusCode).toBe(400);
+    expect(textsOf((await listOffers(stranger)).json())).toEqual(['Theirs']);
+  });
+
+  it('answers 403 to staff and to the "own leads only" role, 401 with nobody signed in, 403 without the web app headers, and removes nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offerId = await putOfferInDatabase(person, 'Stays', dateFromToday(5));
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await deleteOffer(person, offerId)).statusCode, role).toBe(403);
+    }
+    await setRole(person, 'manager');
+    expect((await deleteOffer(null, offerId)).statusCode).toBe(401);
+    expect((await deleteOffer(person, offerId, false)).statusCode).toBe(403);
+    expect(textsOf((await listOffers(person)).json())).toEqual(['Stays']);
+  });
+
+  it('never lets the app really delete a row', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offerId = await putOfferInDatabase(person, 'Stays', dateFromToday(5));
+    await expect(
+      database.runInAccountTransaction(person.profile.business.id, (transaction) =>
+        transaction.deleteFrom('offers').where('id', '=', offerId).execute(),
+      ),
+    ).rejects.toThrow();
+  });
+});

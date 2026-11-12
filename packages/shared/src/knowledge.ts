@@ -122,6 +122,11 @@ export const knowledgeQuestionSchema = z.object({
   neededToGoLive: z.boolean(),
   /** Set when the real answer lives in another feature: the question is shown but cannot be answered here. */
   handledElsewhere: handledElsewhereSchema.nullable(),
+  /**
+   * For a question answered in another feature: `done` when that feature says it is answered (for example the business has an offering
+   * switched on), `not_done` when it says not, `not_tracked` when the feature does not report yet. Null for ordinary questions.
+   */
+  elsewhereStatus: z.enum(['done', 'not_done', 'not_tracked']).nullable(),
   /** What the answer is used for, when more than the AI's knowledge; null otherwise. */
   usedFor: z.string().nullable(),
   /** Null until the question is answered. */

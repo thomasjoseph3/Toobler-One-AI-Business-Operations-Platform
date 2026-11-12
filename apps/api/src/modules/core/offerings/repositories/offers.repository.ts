@@ -104,3 +104,29 @@ export async function updateOffer(
     .where('deleted_at', 'is', null)
     .execute();
 }
+
+/** Removes an offer from view (a soft delete: the row stays). */
+export async function softDeleteOffer(
+  db: Db,
+  options: { accountId: string; offerId: string; actor: Actor; now: Date },
+): Promise<void> {
+  await db
+    .updateTable('offers')
+    .set({ deleted_at: options.now, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.offerId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}
+
+/** How many live offers are still on, that is, whose last day is today or later where the business is. */
+export async function countOffersEndingOnOrAfter(db: Db, accountId: string, earliestLastDay: string): Promise<number> {
+  const row = await db
+    .selectFrom('offers')
+    .select((expression) => expression.fn.countAll<string>().as('total'))
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .where('ends_on', '>=', earliestLastDay)
+    .executeTakeFirstOrThrow();
+  return Number(row.total);
+}

@@ -92,7 +92,7 @@ answer already carries the progress) and F31 (reading a website); they are not b
 | 2 | Edit (and switch on or off), remove | `PATCH /offerings/{id}`, `DELETE /offerings/{id}`; **built, owner test pending** |
 | 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers`; **built, owner test pending** |
 | 4 | List and edit offers | `GET /offers`, `PATCH /offers/{id}`; **built, owner test pending** |
-| 5 | Remove an offer; the link to F16 (the questions answered by this data, completeness and go-live count them) | `DELETE /offers/{id}` |
+| 5 | Remove an offer; the link to F16 (the questions answered by this data, completeness and go-live count them) | `DELETE /offers/{id}`; **built, owner test pending** |
 | 6 | Leads name an offering (migration `018`); the sharing-out mode "by offering" | `POST /leads`, `PATCH /leads/{id}` and `PUT /assignment-rules` change (no new addresses) |
 | 7 | The team journey grows a chapter, isolation entries, consistency rules, `api-security` review, Postman collection, hand-off | none |
 
@@ -134,6 +134,21 @@ answer already carries the progress) and F31 (reading a website); they are not b
 - `PATCH /offers/{id}` (manager) changes the words and/or the last day. A new last day must be today or later (400 `OFFER_ALREADY_ENDED`), which is also how an ended
   offer is brought back; the words of an ended offer can be edited without touching its last day. `{}` is 400 `NOTHING_TO_CHANGE`; the values it already has change nothing and write
   no log line; two managers changing different fields at once keep both changes. Log line `offers.updated` (field names) and event `offer.updated` (id and field names).
+
+## Slice 5 notes
+- `DELETE /offers/{id}` (manager): a soft delete (204); gone from every list, even with `include=expired`; a second delete, an unknown id and another business's offer are 404; the
+  app role still cannot really delete a row. Log line `offers.deleted` and event `offer.deleted` hold ids only.
+- **The link to the business profile (F16), as the owner chose (question 1):**
+  - "What do you sell?" (`offerings`) is now **counted and answered by the data**: it is answered exactly when the business has at least one offering that is switched on. It is still
+    needed to go live, so **a business cannot be `readyToGoLive` without an offering that is on.** `GET /knowledge/questions` shows it with `elsewhereStatus: done | not_done` (and
+    `not_tracked` for the questions whose feature does not report yet: FAQs, documents). The total number of counted questions is unchanged (one question came in, one went out).
+  - The GST question (`prices_include_gst`) is now **"answered in Offerings"** (each offering carries its own GST note), so `PUT /knowledge/answers/prices_include_gst` is 400
+    with "answered in offerings". An older answer to it, if a test business has one, is simply no longer shown as a profile answer that counts.
+  - "Do you have any offers running now?" (`current_offers`) stays **left out of the score**: having no offers is normal, so it can never be "unanswered".
+  - How: `core.knowledge` now `requires` `core.offerings` and asks it, through `index.ts`, how many offerings are on (`countActiveOfferingsOfBusiness`, run in the same fenced
+    transaction). The pure `computeProfileProgress` takes a map of "answered elsewhere" facts; it never reads a table.
+  - This changed earlier tests on purpose (the F16 ones that expected `readyToGoLive` after seven answers, and the GST answer), and the F16 Postman requests were updated to match.
+- The F16 Postman collection: "Pick one: do prices include GST?" became "about how many enquiries a month?", and the two go-live checks now allow only an offering to be missing.
 
 ## Reused from the hotel agent
 The "Port from" table has no row for F17. The old agent has hotel-specific tables (`hotel_room_types` with a base price, weekend price and rate overrides per
