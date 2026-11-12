@@ -106,3 +106,23 @@ export const ticketsListResponseSchema = z.object({
   limit: z.number().int(),
 });
 export type TicketsListResponse = z.infer<typeof ticketsListResponseSchema>;
+
+/** For an edit: a blank text, like an emptied form field, means "clear it". Leaving the key out means "leave it as it is". */
+const clearIfBlank = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
+
+/**
+ * What staff send to change a ticket: assign it, rename it, change its details, type or priority. Only the fields sent
+ * change. `ownerUserId: null` leaves the ticket with nobody; blank `details` clears them. The title cannot be empty. The
+ * status, the contact and the business are never changed here, so any other field is refused. (Notes and closing arrive in
+ * the next slice.)
+ */
+export const updateTicketRequestSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Say what the ticket is about').max(200).optional(),
+    details: z.preprocess(clearIfBlank, z.string().trim().max(2000).nullable().optional()),
+    type: ticketTypeSchema.optional(),
+    priority: ticketPrioritySchema.optional(),
+    ownerUserId: z.uuid().nullable().optional(),
+  })
+  .strict();
+export type UpdateTicketRequest = z.infer<typeof updateTicketRequestSchema>;

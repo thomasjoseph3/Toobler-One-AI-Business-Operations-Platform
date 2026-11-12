@@ -6,11 +6,12 @@ import {
   ticketDetailSchema,
   ticketIdParamsSchema,
   ticketsListResponseSchema,
+  updateTicketRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createTicketsService } from '../services/tickets.service';
 
-/** Registers /api/v1/tickets (add, list) and /tickets/{id} (read one). More routes arrive with the later slices. */
+/** Registers /api/v1/tickets (add, list) and /tickets/{id} (read one, change one). More routes arrive with the later slices. */
 export function ticketsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const ticketsService = createTicketsService({ database: app.kernel.database });
@@ -47,6 +48,20 @@ export function ticketsRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return ticketsService.getTicket(request.principal, request.params.id);
+    },
+  );
+
+  // For any signed-in, verified person, whatever their role. Only the fields sent change; the body may not name the status,
+  // the contact or anything else. A closed ticket answers 409.
+  typedApp.patch(
+    '/tickets/:id',
+    {
+      config: { access: 'staff' },
+      schema: { params: ticketIdParamsSchema, body: updateTicketRequestSchema, response: { 200: ticketDetailSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return ticketsService.updateTicket(request.principal, request.params.id, request.body);
     },
   );
 }

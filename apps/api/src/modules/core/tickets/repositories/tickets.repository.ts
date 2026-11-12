@@ -157,3 +157,48 @@ export async function listNotesForTicket(db: Db, accountId: string, ticketId: st
     createdAt: row.created_at,
   }));
 }
+
+/**
+ * Locks one ticket of the business until the end of the transaction, so two people changing it at the same moment take
+ * turns. Returns false when the ticket does not exist or belongs to another business.
+ */
+export async function lockTicketForUpdate(db: Db, accountId: string, ticketId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('tickets')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('id', '=', ticketId)
+    .forUpdate()
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/** The new values of a ticket. A key that is left out is not touched; `null` clears `details` or the owner. */
+export interface TicketChanges {
+  title?: string;
+  details?: string | null;
+  type?: TicketType;
+  priority?: TicketPriority;
+  ownerUserId?: string | null;
+}
+
+/** Changes the fields named in `changes`. Fails with a foreign-key error when the owner does not work for the business. */
+export async function updateTicket(
+  db: Db,
+  options: { accountId: string; ticketId: string; changes: TicketChanges; actor: Actor },
+): Promise<void> {
+  const { changes } = options;
+  await db
+    .updateTable('tickets')
+    .set({
+      ...(changes.title !== undefined ? { title: changes.title } : {}),
+      ...(changes.details !== undefined ? { details: changes.details } : {}),
+      ...(changes.type !== undefined ? { type: changes.type } : {}),
+      ...(changes.priority !== undefined ? { priority: changes.priority } : {}),
+      ...(changes.ownerUserId !== undefined ? { owner_user_id: changes.ownerUserId } : {}),
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.ticketId)
+    .execute();
+}

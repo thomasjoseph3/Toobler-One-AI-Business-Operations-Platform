@@ -4,18 +4,19 @@ import type {
   Ticket,
   TicketDetail,
   TicketsListResponse,
+  UpdateTicketRequest,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
-import { notFound } from '../../../../kernel/errors';
+import { ApiError, conflict, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { findContactSummaries } from '../../contacts';
 import type { ContactSummary } from '../../contacts';
 import * as ticketsRepository from '../repositories/tickets.repository';
-import type { TicketRow } from '../repositories/tickets.repository';
+import type { TicketChanges, TicketRow } from '../repositories/tickets.repository';
 
 // The database error code for "a foreign key points at nothing" (here: an owner who does not work for the business).
 const FOREIGN_KEY_VIOLATION = '23503';
@@ -168,6 +169,82 @@ export function createTicketsService({ database }: { database: Database }) {
           limit: query.limit,
         };
       });
+    },
+
+    /**
+     * Changes a ticket: assign it (or leave it with nobody), rename it, change its details, type or priority. Only the
+     * fields that really change are written; sending the values it already has changes nothing and writes no log line. A
+     * closed ticket cannot be changed (409 TICKET_CLOSED): reopen it first. An unknown ticket, another business's ticket
+     * and an owner from another business answer 404. Naming a new owner also publishes `ticket.assigned`.
+     */
+    async updateTicket(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      ticketId: string,
+      request: UpdateTicketRequest,
+    ): Promise<TicketDetail> {
+      if (Object.values(request).every((value) => value === undefined)) {
+        throw new ApiError(400, 'NOTHING_TO_CHANGE', 'Send at least one field to change.');
+      }
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      try {
+        return await database.runInAccountTransaction(accountId, async (transaction) => {
+          // Two people changing one ticket at the same moment take turns
+          if (!(await ticketsRepository.lockTicketForUpdate(transaction, accountId, ticketId))) {
+            throw notFound('That ticket');
+          }
+          const current = await ticketsRepository.findTicketById(transaction, accountId, ticketId);
+          if (!current) throw notFound('That ticket');
+          if (current.status === 'done') {
+            throw conflict('TICKET_CLOSED', 'This ticket is closed. Reopen it before changing it.');
+          }
+
+          // What the ticket would look like: a field not sent stays as it is, `null` clears details or the owner
+          const changes: TicketChanges = {};
+          if (request.title !== undefined && request.title !== current.title) changes.title = request.title;
+          if (request.details !== undefined && request.details !== current.details) changes.details = request.details;
+          if (request.type !== undefined && request.type !== current.type) changes.type = request.type;
+          if (request.priority !== undefined && request.priority !== current.priority) {
+            changes.priority = request.priority;
+          }
+          if (request.ownerUserId !== undefined && request.ownerUserId !== current.ownerUserId) {
+            changes.ownerUserId = request.ownerUserId;
+          }
+          const changedFields = Object.keys(changes); // the names of the fields that really change
+          if (changedFields.length === 0) return readTicket(transaction, accountId, ticketId);
+
+          await ticketsRepository.updateTicket(transaction, { accountId, ticketId, changes, actor });
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'tickets.updated',
+            // Which fields changed, never their values
+            details: { recordType: 'ticket', recordId: ticketId, fields: changedFields },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'ticket.updated',
+            payload: { ticketId, fields: changedFields },
+          });
+          if ('ownerUserId' in changes) {
+            await publishEvent(transaction, {
+              accountId,
+              eventName: 'ticket.assigned',
+              payload: {
+                ticketId,
+                ownerUserId: changes.ownerUserId ?? null,
+                previousOwnerUserId: current.ownerUserId,
+              },
+            });
+          }
+          return readTicket(transaction, accountId, ticketId);
+        });
+      } catch (error) {
+        // The owner is not a person of this business (the database checks the business): answer like any unknown id
+        if (isForeignKeyViolation(error)) throw notFound('That person');
+        throw error;
+      }
     },
 
     /** One ticket of the business with its notes. An unknown id and another business's ticket both answer 404. */

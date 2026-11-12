@@ -431,3 +431,192 @@ describe('GET /api/v1/tickets', () => {
     }
   });
 });
+
+/** Changes a ticket as the person. */
+const patchTicket = (person: SignedInPerson | null, ticketId: string, body: unknown, withCsrfHeaders = true) =>
+  send(person, 'PATCH', `/tickets/${ticketId}`, body, withCsrfHeaders);
+
+/** Closes a ticket directly in the database (the close route arrives in slice 4). */
+async function closeTicketInDatabase(ticketId: string) {
+  await database.system
+    .updateTable('tickets')
+    .set({ status: 'done', closed_at: new Date() })
+    .where('id', '=', ticketId)
+    .execute();
+}
+
+describe('PATCH /api/v1/tickets/{id}', () => {
+  it('changes the title, details, type and priority, and leaves the rest as it was', async () => {
+    const person = await createSignedInPerson(app, database);
+    const contactId = await addContact(person);
+    const ticketId = await addTicketAndGetId(person, contactId, { title: 'Old title', priority: 'low' });
+    const response = await patchTicket(person, ticketId, {
+      title: '  New title  ',
+      details: 'More words',
+      type: 'complaint',
+      priority: 'urgent',
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({
+      id: ticketId,
+      title: 'New title',
+      details: 'More words',
+      type: 'complaint',
+      priority: 'urgent',
+      status: 'open',
+      ownerUserId: null,
+      contactId,
+    });
+  });
+
+  it('assigns the ticket to a person of the business, and takes it away again with null', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    const assigned = await patchTicket(person, ticketId, { ownerUserId: person.profile.user.id });
+    expect(assigned.statusCode, assigned.body).toBe(200);
+    expect(assigned.json().ownerUserId).toBe(person.profile.user.id);
+    const unassigned = await patchTicket(person, ticketId, { ownerUserId: null });
+    expect(unassigned.json().ownerUserId).toBeNull();
+  });
+
+  it('clears the details with null or blank text, but not the title', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person), { details: 'Some details' });
+    expect((await patchTicket(person, ticketId, { details: null })).json().details).toBeNull();
+    await patchTicket(person, ticketId, { details: 'Again' });
+    expect((await patchTicket(person, ticketId, { details: '   ' })).json().details).toBeNull();
+    expect((await patchTicket(person, ticketId, { title: '   ' })).statusCode).toBe(400);
+  });
+
+  it('writes one activity-log line with the changed field names only, and a ticket.updated event', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    await patchTicket(person, ticketId, { title: 'Secret new title', priority: 'high' });
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', ticketId)
+      .where('kind', '=', 'tickets.updated')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect([...lines[0]!.fields].sort()).toEqual(['priority', 'title']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', 'in', ['ticket.updated', 'ticket.assigned'])
+      .execute();
+    expect(events.map((event) => event.name)).toEqual(['ticket.updated']);
+    expect(JSON.stringify([lines, events])).not.toContain('Secret new title');
+  });
+
+  it('publishes ticket.assigned when the owner changes, with the old and new owner', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    await patchTicket(person, ticketId, { ownerUserId: person.profile.user.id });
+    await patchTicket(person, ticketId, { ownerUserId: null });
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'ticket.assigned')
+      .orderBy('id', 'asc')
+      .execute();
+    expect(events.map((event) => event.payload)).toEqual([
+      { ticketId, ownerUserId: person.profile.user.id, previousOwnerUserId: null },
+      { ticketId, ownerUserId: null, previousOwnerUserId: person.profile.user.id },
+    ]);
+  });
+
+  it('writes nothing when the values sent are the ones it already has', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person), { title: 'Same', priority: 'high' });
+    const before = (await getTicket(person, ticketId)).json();
+    const response = await patchTicket(person, ticketId, { title: 'Same', priority: 'high', ownerUserId: null });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().updatedAt).toBe(before.updatedAt);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('record_id', '=', ticketId)
+      .where('kind', '=', 'tickets.updated')
+      .execute();
+    expect(lines).toHaveLength(0);
+  });
+
+  it('stamps who changed it last', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    await patchTicket(person, ticketId, { priority: 'low' });
+    const row = await database.system
+      .selectFrom('tickets')
+      .selectAll()
+      .where('id', '=', ticketId)
+      .executeTakeFirstOrThrow();
+    expect(row.updated_by).toEqual({ kind: 'user', id: person.profile.user.id });
+  });
+
+  it('answers 409 TICKET_CLOSED for a closed ticket, and changes nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person), { title: 'Closed one' });
+    await closeTicketInDatabase(ticketId);
+    const response = await patchTicket(person, ticketId, { title: 'Too late' });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('TICKET_CLOSED');
+    expect((await getTicket(person, ticketId)).json().title).toBe('Closed one');
+  });
+
+  it('lets every role change a ticket', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await patchTicket(person, ticketId, { title: `Changed by ${role}` })).statusCode).toBe(200);
+    }
+  });
+
+  it('answers 401 with nobody signed in and 403 without the web app headers, and changes nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person), { title: 'Untouched' });
+    expect((await patchTicket(null, ticketId, { title: 'x' })).statusCode).toBe(401);
+    expect((await patchTicket(person, ticketId, { title: 'x' }, false)).statusCode).toBe(403);
+    expect((await getTicket(person, ticketId)).json().title).toBe('Untouched');
+  });
+
+  it("answers 404 for an unknown ticket, another business's ticket, and an owner from another business", async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const strangersTicket = await addTicketAndGetId(stranger, await addContact(stranger), { title: 'Theirs' });
+    const ownTicket = await addTicketAndGetId(person, await addContact(person));
+    expect((await patchTicket(person, randomUUID(), { title: 'x' })).statusCode).toBe(404);
+    expect((await patchTicket(person, strangersTicket, { title: 'Mine now' })).statusCode).toBe(404);
+    expect((await getTicket(stranger, strangersTicket)).json().title).toBe('Theirs');
+    const wrongOwner = await patchTicket(person, ownTicket, { ownerUserId: stranger.profile.user.id });
+    expect(wrongOwner.statusCode, wrongOwner.body).toBe(404);
+    expect((await patchTicket(person, ownTicket, { ownerUserId: randomUUID() })).statusCode).toBe(404);
+  });
+
+  it('answers 400 for nothing to change, bad values, and fields it does not take', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ticketId = await addTicketAndGetId(person, await addContact(person));
+    const empty = await patchTicket(person, ticketId, {});
+    expect(empty.statusCode).toBe(400);
+    expect(empty.json().error.code).toBe('NOTHING_TO_CHANGE');
+    const badBodies: unknown[] = [
+      { title: 'x'.repeat(201) },
+      { details: 'y'.repeat(2001) },
+      { type: 'sale' },
+      { priority: 'critical' },
+      { ownerUserId: 'abc' },
+      { status: 'done' },
+      { contactId: randomUUID() },
+      { accountId: randomUUID() },
+      { closedAt: '2026-01-01T00:00:00Z' },
+      { notes: ['x'] },
+    ];
+    for (const body of badBodies) {
+      expect((await patchTicket(person, ticketId, body)).statusCode, JSON.stringify(body)).toBe(400);
+    }
+    expect((await patchTicket(person, 'abc', { title: 'x' })).statusCode).toBe(400);
+  });
+});
