@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { offeringsRoutes } from './routes/offerings.routes';
 
 /**
  * What the business sells (offerings) and its time-limited promotions (offers). A core module: always on, so it has no
@@ -8,7 +9,7 @@ import { defineModule } from '../../../kernel/module-system/define';
 export default defineModule({
   id: 'core.offerings',
   kind: 'core',
-  routes: () => {
-    // Slice 1 adds the first two routes here.
+  routes: (app) => {
+    offeringsRoutes(app);
   },
 });

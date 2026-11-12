@@ -88,13 +88,23 @@ answer already carries the progress) and F31 (reading a website); they are not b
 | Slice | What | Routes |
 | --- | --- | --- |
 | 0 | Migration `017`, table types, shared words and shapes, the pure functions (money in words, offer is current, what the AI may see) with unit tests, empty `core.offerings` module | none; **built, owner review pending** |
-| 1 | Add an offering, list offerings | `POST /offerings`, `GET /offerings` |
+| 1 | Add an offering, list offerings | `POST /offerings`, `GET /offerings`; **built, owner test pending** |
 | 2 | Edit (and switch on or off), remove | `PATCH /offerings/{id}`, `DELETE /offerings/{id}` |
 | 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers` |
 | 4 | List and edit offers | `GET /offers`, `PATCH /offers/{id}` |
 | 5 | Remove an offer; the link to F16 (the questions answered by this data, completeness and go-live count them) | `DELETE /offers/{id}` |
 | 6 | Leads name an offering (migration `018`); the sharing-out mode "by offering" | `POST /leads`, `PATCH /leads/{id}` and `PUT /assignment-rules` change (no new addresses) |
 | 7 | The team journey grows a chapter, isolation entries, consistency rules, `api-security` review, Postman collection, hand-off | none |
+
+## Slice 1 notes
+- `POST /offerings` (manager) needs only a `name`. A price comes with its unit and GST note, or none of the three (400 otherwise). The offering is added at the
+  **end of the list**, switched on unless `active: false`. A name that a live offering already has (ignoring capitals) is 409 `OFFERING_EXISTS`, naming it; more than
+  200 offerings is 409 `OFFERING_LIMIT`; an owner from another business is 404. The answer includes `priceInWords`, the sentence the AI will use ("from ₹4,500 a night plus GST").
+- `GET /offerings` (everyone signed in) lists the business's live offerings in order; `?active=true` or `?active=false` narrows it.
+- Adding takes a per-business advisory lock before it works out the next position, so eight simultaneous adds get eight different positions and eight simultaneous adds
+  of one name make one offering (both tested).
+- The log line holds field names only and the event holds the id and `active`: no names, descriptions or prices (tested).
+- Postman: collection *Toobler One - F17 offerings and offers (run in order)* with a random tag in the names, so reruns never clash. Offerings cannot be removed until slice 2.
 
 ## Reused from the hotel agent
 The "Port from" table has no row for F17. The old agent has hotel-specific tables (`hotel_room_types` with a base price, weekend price and rate overrides per

@@ -93,6 +93,13 @@ beforeAll(async () => {
   await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
   await sendOk(businessA, 'PUT', '/knowledge/situations/discount_request', { choice: 'tell_current_offer' });
   await sendOk(businessA, 'PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+  await sendOk(
+    businessA,
+    'POST',
+    '/offerings',
+    { name: `Offering ${secretWords}`, fromPricePaise: 450_000, priceUnit: 'per night', gstMode: 'plus' },
+    201,
+  );
   // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
   await database.system
     .insertInto('business_answers')
@@ -262,6 +269,27 @@ const attempts: Attempt[] = [
     }),
     expectedStatus: 200,
   },
+  // ---- offerings
+  {
+    route: 'POST /api/v1/offerings',
+    what: "add an offering owned by A's person",
+    request: () => ({
+      method: 'POST',
+      url: '/offerings',
+      payload: { name: 'Sneaky offering', ownerUserId: dataOfA.userId },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/offerings',
+    what: "add an offering of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/offerings',
+      payload: { name: 'Bob offering' },
+    }),
+    expectedStatus: 201,
+  },
   {
     route: 'PUT /api/v1/knowledge/settings',
     what: "change the time zone and country (B's own business only), and A's must stay as they were",
@@ -304,6 +332,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/questions', url: '/knowledge/questions' },
   { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
   { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
+  { route: 'GET /api/v1/offerings', url: '/offerings' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
 
@@ -339,6 +368,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/knowledge/questions': 'covered by the list check',
   'GET /api/v1/knowledge/situations': 'covered by the list check',
   'GET /api/v1/knowledge/settings': 'covered by the list check',
+  'GET /api/v1/offerings': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",
@@ -440,6 +470,12 @@ describe('isolation: business B tries to reach business A', () => {
     expect(await sendOk(businessA, 'GET', '/knowledge/settings')).toEqual({
       timeZone: 'Asia/Dubai',
       defaultCountry: 'AE',
+    });
+    const offeringsOfA = await sendOk(businessA, 'GET', '/offerings');
+    expect(offeringsOfA.items).toHaveLength(1);
+    expect(offeringsOfA.items[0]).toMatchObject({
+      name: `Offering ${dataOfA.secretWords}`,
+      priceInWords: 'from ₹4,500 a night plus GST',
     });
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager

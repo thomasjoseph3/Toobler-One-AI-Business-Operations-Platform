@@ -68,3 +68,55 @@ export const offerSchema = z.object({
   updatedAt: z.string(),
 });
 export type Offer = z.infer<typeof offerSchema>;
+
+/** An empty or blank text means "nothing was given", so a form that sends "" for an untouched field works. */
+const blankToNothing = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? undefined : value);
+
+/** The most offerings one business may have (a guard against runaway imports; far more than a small business needs). */
+export const MAX_OFFERINGS = 200;
+
+/** The address part naming an offering. */
+export const offeringIdParamsSchema = z.object({ id: z.uuid() });
+
+/** The highest "from" price accepted, in paise (1,000 crore rupees). */
+const MAX_PRICE_PAISE = 100_000_000_000;
+
+/**
+ * What a manager sends to add an offering. Only the name is needed. A price comes with its unit and its GST note, or none of the three
+ * (the business does not share a price). The offering goes to the end of the list and starts switched on. Anything else in the body is
+ * refused (the position, the business and who created it are never taken from the request).
+ */
+export const createOfferingRequestSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Give the offering a name').max(120),
+    description: z.preprocess(blankToNothing, z.string().trim().max(1000).optional()),
+    fromPricePaise: z.number().int('Use whole paise').min(0).max(MAX_PRICE_PAISE).optional(),
+    priceUnit: z.preprocess(blankToNothing, z.string().trim().min(1).max(40).optional()),
+    gstMode: gstModeSchema.optional(),
+    seasonNote: z.preprocess(blankToNothing, z.string().trim().max(300).optional()),
+    includes: z.preprocess(blankToNothing, z.string().trim().max(500).optional()),
+    details: z.array(offeringDetailSchema).max(MAX_OFFERING_DETAILS).optional(),
+    active: z.boolean().optional(),
+    ownerUserId: z.uuid().optional(),
+  })
+  .strict()
+  .refine(
+    (offering) => {
+      const given = [offering.fromPricePaise, offering.priceUnit, offering.gstMode].filter(
+        (value) => value !== undefined,
+      );
+      return given.length === 0 || given.length === 3;
+    },
+    {
+      message: 'A price needs its unit (per night...) and its GST note (included, plus or none)',
+      path: ['fromPricePaise'],
+    },
+  );
+export type CreateOfferingRequest = z.infer<typeof createOfferingRequestSchema>;
+
+/** The list of offerings. `active=true` gives only the ones that are switched on, `active=false` only the ones that are off. */
+export const listOfferingsQuerySchema = z.object({ active: z.enum(['true', 'false']).optional() });
+export type ListOfferingsQuery = z.infer<typeof listOfferingsQuerySchema>;
+
+export const offeringsResponseSchema = z.object({ items: z.array(offeringSchema) });
+export type OfferingsResponse = z.infer<typeof offeringsResponseSchema>;
