@@ -90,6 +90,7 @@ beforeAll(async () => {
   const lead = await sendOk(businessA, 'POST', '/leads', { contactId: contact.id, interest: secretWords }, 201);
   const ticket = await sendOk(businessA, 'POST', '/tickets', { contactId: contact.id, title: secretWords }, 201);
   const stage = await sendOk(businessA, 'POST', '/pipeline/stages', { name: `Stage ${secretWords}` }, 201);
+  await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
   dataOfA = {
     contactId: contact.id,
     leadId: lead.id,
@@ -227,6 +228,17 @@ const attempts: Attempt[] = [
     request: () => ({ method: 'POST', url: '/tickets', payload: { contactId: dataOfA.contactId, title: 'Sneaky' } }),
     expectedStatus: 404,
   },
+  // ---- the business profile (the question key is a code, not a business's record: B can only ever answer for B)
+  {
+    route: 'PUT /api/v1/knowledge/answers/{question_key}',
+    what: "answer the same question as A, and A's answer must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/answers/business_name',
+      payload: { value: 'Bob Business' },
+    }),
+    expectedStatus: 200,
+  },
   // ---- the platform (only a platform admin; B is an ordinary business)
   {
     route: 'POST /api/v1/platform/businesses/{id}/modules',
@@ -250,6 +262,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/lost-reasons', url: '/lost-reasons' },
   { route: 'GET /api/v1/assignment-rules', url: '/assignment-rules' },
   { route: 'GET /api/v1/modules', url: '/modules' },
+  { route: 'GET /api/v1/knowledge/questions', url: '/knowledge/questions' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
 
@@ -282,6 +295,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/lost-reasons': 'covered by the list check',
   'GET /api/v1/assignment-rules': 'covered by the list check',
   'GET /api/v1/modules': 'covered by the list check',
+  'GET /api/v1/knowledge/questions': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",
@@ -371,6 +385,9 @@ describe('isolation: business B tries to reach business A', () => {
     expect(pipeline.stages.find((stage: { id: string }) => stage.id === dataOfA.stageId).name).toBe(
       `Stage ${dataOfA.secretWords}`,
     );
+    const questions = await sendOk(businessA, 'GET', '/knowledge/questions');
+    const nameAnswer = questions.questions.find((question: { key: string }) => question.key === 'business_name').answer;
+    expect(nameAnswer.value).toBe(`Business ${dataOfA.secretWords}`);
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
     // B's own records are untouched too

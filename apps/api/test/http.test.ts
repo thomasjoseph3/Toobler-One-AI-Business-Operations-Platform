@@ -188,6 +188,7 @@ describe('route rules', () => {
       role,
       sessionId: newAccountId(),
       isPlatformAdmin: false,
+      industryId: 'general',
       emailVerified: true,
     });
     const staffApp = await buildTestApp(database, [rolesModule], { authenticate: authenticateAs('staff') });
@@ -215,6 +216,7 @@ describe('route rules', () => {
       role: 'manager' as const, // even a manager is refused unless the flag is on
       sessionId: newAccountId(),
       isPlatformAdmin,
+      industryId: 'general',
       emailVerified: true,
     });
 
@@ -247,6 +249,7 @@ describe('route rules', () => {
       role: 'manager' as const,
       sessionId: accountId,
       isPlatformAdmin: false,
+      industryId: 'general',
       emailVerified: true,
     });
     const appWithModuleOff = await buildTestApp(database, [leadsModule], { authenticate });

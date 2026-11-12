@@ -80,7 +80,7 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 | Slice | What | Routes |
 | --- | --- | --- |
 | 0 | Migration `014`, table types, shared words and shapes, the question set (general A to H + 7 industries) and the situations as code, answer validators (pure, unit-tested), empty `core.knowledge` module | none; **built, owner review pending** |
-| 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}` |
+| 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}`; **built, owner test pending** |
 | 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm` |
 | 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}` |
 | 4 | Time zone and default country (if agreed); contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings` |
@@ -100,6 +100,17 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 - The primary key of `business_answers` is `(account_id, question_key)` and of `situations` is `(account_id, situation_key)` (one row each), so
   there is no id column.
 - `situations` keeps only the chosen `choice` (no `custom_text`): the requirement lists choices only, and nothing needs free words yet.
+
+## Slice 1 notes
+- **The business's industry reaches the module through the signed-in person.** The knowledge module must not read the `accounts` table (the auth
+  module owns it), and `core.knowledge` cannot require `core.auth` (a later slice has contacts read the default country from knowledge, and
+  auth already requires leads, which requires contacts: that would be a loop). So `Principal` now carries `industryId`, loaded with the session
+  (one extra join in `findLivePrincipal`), and the extras of the question list follow it. Changing a business's industry takes effect on the
+  next request.
+- `PUT` answers `{ question, progress }` so the screen can show the new score without a second request.
+- A typed answer replaces the row (source `typed`, confirmed now, by the person); sending the stored answer again writes nothing.
+- Question keys in the address are codes, not business records, so there is no "other business's id" for `PUT`; `test/isolation.test.ts` has an
+  attempt (B answers the same question, A's answer must stay as it was) and a list check for `GET`.
 
 ## Reused from the hotel agent
 The "Port from" table in PHASE-1.md has no row for F16. The old agent has `locations.office_hours` (migration 014: `{ allDay: true }` or

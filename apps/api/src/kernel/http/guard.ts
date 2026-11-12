@@ -16,6 +16,8 @@ export interface Principal {
   role: 'manager' | 'staff' | 'staff_own';
   sessionId: string;
   isPlatformAdmin: boolean;
+  /** The kind of business this is (an id from the industries table). Decides, for example, which business questions it answers. */
+  industryId: string;
   /** Whether the person has proved they own their email. Until they have, they can only reach the routes marked `allowUnverified`. */
   emailVerified: boolean;
 }

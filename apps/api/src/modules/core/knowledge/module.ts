@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { knowledgeRoutes } from './routes/knowledge.routes';
 
 /**
  * The business profile and situations: the fixed business questions, the answers to them, and how the business wants common
@@ -8,7 +9,7 @@ import { defineModule } from '../../../kernel/module-system/define';
 export default defineModule({
   id: 'core.knowledge',
   kind: 'core',
-  routes: () => {
-    // Slice 1 adds the first two routes here.
+  routes: (app) => {
+    knowledgeRoutes(app);
   },
 });

@@ -271,7 +271,8 @@ export interface TicketNotesTable {
 export interface BusinessAnswersTable {
   account_id: string;
   question_key: string;
-  value: Json;
+  /** Any JSON (text, list or object). Read back already parsed; written as JSON text. */
+  value: ColumnType<unknown, string, string>;
   source: Generated<'typed' | 'website' | 'listing' | 'document'>;
   source_ref: string | null;
   status: Generated<'check' | 'confirmed'>;
