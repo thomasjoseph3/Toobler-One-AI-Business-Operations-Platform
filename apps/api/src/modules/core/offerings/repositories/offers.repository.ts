@@ -59,3 +59,48 @@ export async function findOfferById(db: Db, accountId: string, offerId: string):
     .executeTakeFirst();
   return row ? toOfferRow(row) : undefined;
 }
+
+/** All the business's live offers, the ones ending soonest first (expired ones included; the service filters). */
+export async function listOffers(db: Db, accountId: string): Promise<OfferRow[]> {
+  const rows = await db
+    .selectFrom('offers')
+    .selectAll()
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .orderBy('ends_on', 'asc')
+    .orderBy('id', 'asc')
+    .execute();
+  return rows.map(toOfferRow);
+}
+
+/** Locks one live offer until the end of the transaction. Returns false when the id is unknown, removed, or another business's. */
+export async function lockOfferForUpdate(db: Db, accountId: string, offerId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('offers')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('id', '=', offerId)
+    .where('deleted_at', 'is', null)
+    .forUpdate()
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/** Changes the words and/or the last day of one live offer. A key that is left out is not touched. */
+export async function updateOffer(
+  db: Db,
+  options: { accountId: string; offerId: string; changes: { text?: string; endsOn?: string }; actor: Actor },
+): Promise<void> {
+  const { changes } = options;
+  await db
+    .updateTable('offers')
+    .set({
+      ...(changes.text !== undefined ? { text: changes.text } : {}),
+      ...(changes.endsOn !== undefined ? { ends_on: changes.endsOn } : {}),
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.offerId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}

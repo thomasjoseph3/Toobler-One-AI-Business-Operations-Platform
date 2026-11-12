@@ -174,3 +174,22 @@ export const createOfferRequestSchema = z
   })
   .strict();
 export type CreateOfferRequest = z.infer<typeof createOfferRequestSchema>;
+
+/** The list of offers. By default only the ones still on; `include=expired` adds the ones whose last day has passed. */
+export const listOffersQuerySchema = z.object({ include: z.enum(['expired']).optional() });
+export type ListOffersQuery = z.infer<typeof listOffersQuerySchema>;
+
+export const offersResponseSchema = z.object({ items: z.array(offerSchema) });
+export type OffersResponse = z.infer<typeof offersResponseSchema>;
+
+/**
+ * What a manager sends to change an offer: the words and/or the last day. Only the fields sent change. A new last day must be today or
+ * later in the business's time zone (giving an ended offer a new last day brings it back). Anything else is refused.
+ */
+export const updateOfferRequestSchema = z
+  .object({
+    text: z.string().trim().min(1, 'Say what the offer is').max(300).optional(),
+    endsOn: calendarDateSchema.optional(),
+  })
+  .strict();
+export type UpdateOfferRequest = z.infer<typeof updateOfferRequestSchema>;

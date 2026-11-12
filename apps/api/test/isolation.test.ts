@@ -60,6 +60,7 @@ interface BusinessAData {
   ticketId: string;
   stageId: string;
   offeringId: string;
+  offerId: string;
   userId: string;
   secretWords: string;
 }
@@ -101,6 +102,7 @@ beforeAll(async () => {
     { name: `Offering ${secretWords}`, fromPricePaise: 450_000, priceUnit: 'per night', gstMode: 'plus' },
     201,
   );
+  const offer = await sendOk(businessA, 'POST', '/offers', { text: `Offer ${secretWords}`, endsOn: '2099-12-31' }, 201);
   // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
   await database.system
     .insertInto('business_answers')
@@ -118,6 +120,7 @@ beforeAll(async () => {
     ticketId: ticket.id,
     stageId: stage.id,
     offeringId: offering.id,
+    offerId: offer.id,
     userId: businessA.profile.user.id,
     secretWords,
   };
@@ -279,6 +282,12 @@ const attempts: Attempt[] = [
     expectedStatus: 400,
   },
   {
+    route: 'PATCH /api/v1/offers/{id}',
+    what: "change A's offer",
+    request: () => ({ method: 'PATCH', url: `/offers/${dataOfA.offerId}`, payload: { text: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/offers',
     what: "add an offer (B's own business only)",
     request: () => ({ method: 'POST', url: '/offers', payload: { text: 'Bob offer', endsOn: '2099-12-31' } }),
@@ -363,6 +372,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
   { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
   { route: 'GET /api/v1/offerings', url: '/offerings' },
+  { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
 
@@ -399,6 +409,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/knowledge/situations': 'covered by the list check',
   'GET /api/v1/knowledge/settings': 'covered by the list check',
   'GET /api/v1/offerings': 'covered by the list check',
+  'GET /api/v1/offers': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",
@@ -507,6 +518,9 @@ describe('isolation: business B tries to reach business A', () => {
       name: `Offering ${dataOfA.secretWords}`,
       priceInWords: 'from ₹4,500 a night plus GST',
     });
+    const offersOfA = await sendOk(businessA, 'GET', '/offers');
+    expect(offersOfA.items).toHaveLength(1);
+    expect(offersOfA.items[0].text).toBe(`Offer ${dataOfA.secretWords}`);
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
     // B's own records are untouched too

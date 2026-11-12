@@ -91,7 +91,7 @@ answer already carries the progress) and F31 (reading a website); they are not b
 | 1 | Add an offering, list offerings | `POST /offerings`, `GET /offerings`; **built, owner test pending** |
 | 2 | Edit (and switch on or off), remove | `PATCH /offerings/{id}`, `DELETE /offerings/{id}`; **built, owner test pending** |
 | 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers`; **built, owner test pending** |
-| 4 | List and edit offers | `GET /offers`, `PATCH /offers/{id}` |
+| 4 | List and edit offers | `GET /offers`, `PATCH /offers/{id}`; **built, owner test pending** |
 | 5 | Remove an offer; the link to F16 (the questions answered by this data, completeness and go-live count them) | `DELETE /offers/{id}` |
 | 6 | Leads name an offering (migration `018`); the sharing-out mode "by offering" | `POST /leads`, `PATCH /leads/{id}` and `PUT /assignment-rules` change (no new addresses) |
 | 7 | The team journey grows a chapter, isolation entries, consistency rules, `api-security` review, Postman collection, hand-off | none |
@@ -127,6 +127,13 @@ answer already carries the progress) and F31 (reading a website); they are not b
   because an offer that has ended is never shown to anyone. At most 200 live offers (409 `OFFER_LIMIT`). The answer has `current`, worked out when read in the business's
   time zone. Log line `offers.created` (field names) and event `offer.created` (id and end date, never the words).
 - `calendarDateSchema` (a real date like 2026-12-31) moved from being private to `packages/shared/src/leads.ts` to exported, so offers reuse leads' date check.
+
+## Slice 4 notes
+- `GET /offers` (everyone signed in) shows the offers that are **still on today in the business's time zone**, the ones ending soonest first; `?include=expired` adds the ended ones
+  (each says `current: false`). Removed offers never appear. "Still on" is worked out when the list is read, never by a job.
+- `PATCH /offers/{id}` (manager) changes the words and/or the last day. A new last day must be today or later (400 `OFFER_ALREADY_ENDED`), which is also how an ended
+  offer is brought back; the words of an ended offer can be edited without touching its last day. `{}` is 400 `NOTHING_TO_CHANGE`; the values it already has change nothing and write
+  no log line; two managers changing different fields at once keep both changes. Log line `offers.updated` (field names) and event `offer.updated` (id and field names).
 
 ## Reused from the hotel agent
 The "Port from" table has no row for F17. The old agent has hotel-specific tables (`hotel_room_types` with a base price, weekend price and rate overrides per

@@ -1,9 +1,15 @@
 import { MAX_OFFERS } from '@toobler-one/shared';
-import type { CreateOfferRequest, Offer } from '@toobler-one/shared';
+import type {
+  CreateOfferRequest,
+  ListOffersQuery,
+  Offer,
+  OffersResponse,
+  UpdateOfferRequest,
+} from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
-import { ApiError, conflict } from '../../../../kernel/errors';
+import { ApiError, conflict, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
@@ -73,6 +79,74 @@ export function createOffersService({ database }: { database: Database }) {
         });
         const saved = await offersRepository.findOfferById(transaction, accountId, offerId);
         if (!saved) throw new Error('The offer that was just saved cannot be read');
+        return toOffer(saved, now, principal.timeZone);
+      });
+    },
+
+    /**
+     * The business's offers, the ones ending soonest first. By default only the ones still on today in the business's time zone;
+     * `include=expired` also shows the ones whose last day has passed (each says `current: false`).
+     */
+    async listOffers(
+      principal: Pick<Principal, 'accountId' | 'timeZone'>,
+      query: ListOffersQuery,
+    ): Promise<OffersResponse> {
+      const now = new Date();
+      const rows = await database.runInAccountTransaction(principal.accountId, (transaction) =>
+        offersRepository.listOffers(transaction, principal.accountId),
+      );
+      const offers = rows.map((row) => toOffer(row, now, principal.timeZone));
+      return { items: query.include === 'expired' ? offers : offers.filter((offer) => offer.current) };
+    },
+
+    /**
+     * Changes an offer's words and/or last day. Only what really changes is written; sending the values it already has changes nothing
+     * and writes no log line. A new last day must be today or later in the business's time zone (400 OFFER_ALREADY_ENDED), which is
+     * also how an ended offer is brought back. Editing the words of an ended offer without touching its last day is allowed. An
+     * unknown, removed or other business's offer answers 404. Answers with the offer.
+     */
+    async updateOffer(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'timeZone'>,
+      offerId: string,
+      request: UpdateOfferRequest,
+    ): Promise<Offer> {
+      if (Object.values(request).every((value) => value === undefined)) {
+        throw new ApiError(400, 'NOTHING_TO_CHANGE', 'Send at least one field to change.');
+      }
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      const now = new Date();
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        if (!(await offersRepository.lockOfferForUpdate(transaction, accountId, offerId))) throw notFound('That offer');
+        const current = await offersRepository.findOfferById(transaction, accountId, offerId);
+        if (!current) throw notFound('That offer');
+
+        const changes: { text?: string; endsOn?: string } = {};
+        if (request.text !== undefined && request.text !== current.text) changes.text = request.text;
+        if (request.endsOn !== undefined && request.endsOn !== current.endsOn) {
+          if (request.endsOn < todayInTimeZone(now, principal.timeZone)) {
+            throw new ApiError(400, 'OFFER_ALREADY_ENDED', 'The last day of an offer must be today or later.');
+          }
+          changes.endsOn = request.endsOn;
+        }
+        const changedFields = Object.keys(changes); // the names of the fields that really change
+        if (changedFields.length > 0) {
+          await offersRepository.updateOffer(transaction, { accountId, offerId, changes, actor });
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'offers.updated',
+            // Which fields changed, never their values
+            details: { recordType: 'offer', recordId: offerId, fields: changedFields },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'offer.updated',
+            payload: { offerId, fields: changedFields },
+          });
+        }
+        const saved = await offersRepository.findOfferById(transaction, accountId, offerId);
+        if (!saved) throw new Error('The offer that was just changed cannot be read');
         return toOffer(saved, now, principal.timeZone);
       });
     },
