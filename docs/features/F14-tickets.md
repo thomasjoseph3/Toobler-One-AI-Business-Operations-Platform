@@ -2,7 +2,7 @@
 
 **Requirements:** `4-staff-workspace/06-tickets.md`; `requirements/API.md` (Tickets); docs/CONVERSATION-TYPES.md; docs/plan/PHASE-1.md (F14)
 **Depends on:** F00, F01, F04      **Module:** `core.tickets` (core: always on, no switch; requires `core.contacts`)
-**Status:** in review. Slices 0 to 5 are built; slices 1 to 3 were tested by the owner; slice 4 and the hand-off wait for the owner. Owner chose my four defaults on 12 Nov 2026 ("continue").
+**Status:** approved by the owner on 12 Nov 2026 (backend; the ticket screens wait for the designer). All slices tested by the owner in Postman.
 
 **Goal in one line:** a ticket is a request that is not a sale (a complaint, a question about a past order, a callback,
 something the AI cannot answer). Keeping these off the leads board keeps sales clean and makes sure an unhappy customer gets
@@ -43,8 +43,8 @@ an answer. Staff assign a ticket, add notes, and close it. The router (F15) and 
 | 1 | `POST /tickets`, `GET /tickets/{id}` | done; owner tested |
 | 2 | `GET /tickets` (filters and paging) | done; owner tested |
 | 3 | `PATCH /tickets/{id}`: assign, edit | done; owner tested |
-| 4 | `PATCH /tickets/{id}`: note, close, reopen | built; owner test pending |
-| 5 | Journey tests, security review, this hand-off | done |
+| 4 | `PATCH /tickets/{id}`: note, close, reopen | done; owner tested |
+| 5 | Journey tests, security review, this hand-off | done; owner approved 12 Nov 2026 |
 | UI | Tickets list and page, on the contact page | on hold (designer) |
 
 ## Screens (for when the designer delivers)
