@@ -94,6 +94,7 @@ agent (F19) will save every enquiry into.
 | 9 | `GET /assignment-rules`, `PUT /assignment-rules` (round-robin); migration `012` | built; owner test pending |
 | Journey | chained story test (`leads-journeys.test.ts`) | done |
 | Review | security review with the `api-security` skill; `staff_own` added | done |
+| Approval | owner approved the backend, 12 Nov 2026 (R37 confirmed) | done |
 | UI | Board (drag on computer, **Move** on phone), list, lead page, Settings → Pipeline | on hold (designer) |
 
 ## Screens (for when the designer delivers)
