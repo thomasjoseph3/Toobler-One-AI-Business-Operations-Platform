@@ -3,3 +3,4 @@ export * from './auth';
 export * from './industries';
 export * from './modules';
 export * from './contacts';
+export * from './pipeline';

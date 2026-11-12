@@ -152,6 +152,82 @@ export interface ContactsTable {
   updated_at: Generated<Date>;
 }
 
+/** The one pipeline of a business (its leads board). Fenced by account_id. */
+export interface PipelinesTable {
+  id: string;
+  account_id: string;
+  name: string;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** A column of the board. `kind` is open, won or lost. Fenced by account_id. */
+export interface PipelineStagesTable {
+  id: string;
+  account_id: string;
+  pipeline_id: string;
+  name: string;
+  sort: number;
+  kind: 'open' | 'won' | 'lost';
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** A reason a manager offers when a lead is lost. Fenced by account_id. */
+export interface LostReasonsTable {
+  id: string;
+  account_id: string;
+  label: string;
+  sort: number;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** How a business shares out new leads (one row per business). Fenced by account_id. */
+export interface AssignmentRulesTable {
+  account_id: string;
+  mode: Generated<'one_person' | 'round_robin'>;
+  user_id: string | null;
+  last_assigned_user_id: string | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One enquiry that might become a sale. Fenced by account_id. The columns are checked again when the lead routes arrive. */
+export interface LeadsTable {
+  id: string;
+  account_id: string;
+  contact_id: string;
+  stage_id: string;
+  temperature: Generated<'unscored' | 'hot' | 'warm' | 'cold'>;
+  interest: string | null;
+  date_from: string | null;
+  date_to: string | null;
+  party_size: number | null;
+  /** Money in paise. The database driver hands bigint back as text. */
+  budget_paise: string | null;
+  promise: string | null;
+  callback_at: Date | null;
+  owner_user_id: string | null;
+  first_channel: Generated<'manual' | 'web_chat' | 'whatsapp' | 'email' | 'phone'>;
+  last_activity_at: Generated<Date>;
+  lost_reason: string | null;
+  closed_at: Date | null;
+  deleted_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -166,4 +242,9 @@ export interface DB {
   login_attempts: LoginAttemptsTable;
   account_modules: AccountModulesTable;
   contacts: ContactsTable;
+  pipelines: PipelinesTable;
+  pipeline_stages: PipelineStagesTable;
+  lost_reasons: LostReasonsTable;
+  assignment_rules: AssignmentRulesTable;
+  leads: LeadsTable;
 }
