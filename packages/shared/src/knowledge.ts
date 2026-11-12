@@ -190,3 +190,47 @@ export const confirmAnswersResponseSchema = z.object({
   progress: profileProgressSchema,
 });
 export type ConfirmAnswersResponse = z.infer<typeof confirmAnswersResponseSchema>;
+
+/** The address part naming a situation (one of the seven keys; any other well-formed key answers 404). */
+export const situationKeyParamsSchema = z.object({
+  key: z
+    .string()
+    .max(60)
+    .regex(/^[a-z][a-z0-9_]{1,59}$/, 'That is not a situation key'),
+});
+
+/** One way of handling a situation. */
+export const situationChoiceSchema = z.object({ key: z.string(), label: z.string() });
+export type SituationChoiceInfo = z.infer<typeof situationChoiceSchema>;
+
+/** A situation, the ways it can be handled, and the way the business has chosen. */
+export const situationSchema = z.object({
+  key: situationKeySchema,
+  /** "When this happens", for example "A customer asks for a discount". */
+  text: z.string(),
+  /** True when the handling is fixed in Phase 1: it is shown, but cannot be changed. */
+  fixed: z.boolean(),
+  /** The ways to handle it, the ready-picked default first. */
+  choices: z.array(situationChoiceSchema),
+  /** The key of the chosen way. A business that has not chosen has the first one. */
+  selectedChoiceKey: z.string(),
+  /** True while the business has not chosen and the ready-picked default applies. */
+  isDefault: z.boolean(),
+  /** When the choice was last changed; null while the default applies. */
+  updatedAt: z.string().nullable(),
+});
+export type Situation = z.infer<typeof situationSchema>;
+
+export const situationsResponseSchema = z.object({ items: z.array(situationSchema) });
+export type SituationsResponse = z.infer<typeof situationsResponseSchema>;
+
+/** What a manager sends to choose how one situation is handled: the key of one of that situation's choices. */
+export const putSituationRequestSchema = z
+  .object({
+    choice: z
+      .string()
+      .max(80)
+      .regex(/^[a-z][a-z0-9_]{1,79}$/, 'That is not a choice key'),
+  })
+  .strict();
+export type PutSituationRequest = z.infer<typeof putSituationRequestSchema>;

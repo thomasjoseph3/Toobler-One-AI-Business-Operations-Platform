@@ -1,5 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { knowledgeRoutes } from './routes/knowledge.routes';
+import { situationsRoutes } from './routes/situations.routes';
 
 /**
  * The business profile and situations: the fixed business questions, the answers to them, and how the business wants common
@@ -11,5 +12,6 @@ export default defineModule({
   kind: 'core',
   routes: (app) => {
     knowledgeRoutes(app);
+    situationsRoutes(app);
   },
 });

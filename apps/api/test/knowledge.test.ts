@@ -590,3 +590,236 @@ describe('POST /api/v1/knowledge/answers/confirm', () => {
     ).toEqual(['address', 'business_name']);
   });
 });
+
+/** Reads the situations as the person. */
+const getSituations = (person: SignedInPerson | null) => send(person, 'GET', '/knowledge/situations');
+
+/** Chooses how a situation is handled, as the person. */
+const putSituation = (person: SignedInPerson | null, situationKey: string, choice: unknown, withCsrf = true) =>
+  send(person, 'PUT', `/knowledge/situations/${situationKey}`, { choice }, withCsrf);
+
+/** One situation of a list answer. */
+const situationNamed = (body: { items: Array<{ key: string }> }, key: string) =>
+  body.items.find((item) => item.key === key) as {
+    key: string;
+    fixed: boolean;
+    selectedChoiceKey: string;
+    isDefault: boolean;
+    updatedAt: string | null;
+    choices: Array<{ key: string; label: string }>;
+  };
+
+describe('GET /api/v1/knowledge/situations', () => {
+  it('gives a new business the seven situations, each with the ready-picked first choice', async () => {
+    const person = await createSignedInPerson(app, database);
+    const response = await getSituations(person);
+    expect(response.statusCode, response.body).toBe(200);
+    const body = response.json();
+    expect(body.items.map((item: { key: string }) => item.key)).toEqual([
+      'discount_request',
+      'not_available',
+      'speak_to_person',
+      'complaint',
+      'exact_price',
+      'unknown_answer',
+      'after_hours',
+    ]);
+    for (const item of body.items) {
+      expect(item).toMatchObject({ isDefault: true, updatedAt: null });
+      expect(item.selectedChoiceKey).toBe(item.choices[0].key);
+    }
+    expect(situationNamed(body, 'discount_request')).toMatchObject({
+      fixed: false,
+      selectedChoiceKey: 'staff_call_with_best_price',
+    });
+    expect(situationNamed(body, 'discount_request').choices.map((choice) => choice.label)).toEqual([
+      'Staff will call with the best price',
+      'Prices are fixed',
+      'Tell them our current offer',
+    ]);
+    expect(
+      body.items.filter((item: { fixed: boolean }) => item.fixed).map((item: { key: string }) => item.key),
+    ).toEqual(['complaint', 'exact_price', 'unknown_answer']);
+  });
+
+  it('shows the business its own choices, and another business none of them', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    await putSituation(person, 'discount_request', 'prices_are_fixed');
+    expect(situationNamed((await getSituations(person)).json(), 'discount_request')).toMatchObject({
+      selectedChoiceKey: 'prices_are_fixed',
+      isDefault: false,
+    });
+    expect(situationNamed((await getSituations(stranger)).json(), 'discount_request')).toMatchObject({
+      selectedChoiceKey: 'staff_call_with_best_price',
+      isDefault: true,
+    });
+  });
+
+  it('lets every role read it', async () => {
+    const person = await createSignedInPerson(app, database);
+    for (const role of ['staff', 'staff_own', 'manager'] as const) {
+      await setRole(person, role);
+      expect((await getSituations(person)).statusCode, role).toBe(200);
+    }
+  });
+
+  it('answers 401 with nobody signed in', async () => {
+    expect((await getSituations(null)).statusCode).toBe(401);
+  });
+});
+
+describe('PUT /api/v1/knowledge/situations/{key}', () => {
+  it('chooses another way of handling a situation, and remembers who and when', async () => {
+    const person = await createSignedInPerson(app, database);
+    const response = await putSituation(person, 'after_hours', 'call_at_opening_only');
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({
+      key: 'after_hours',
+      selectedChoiceKey: 'call_at_opening_only',
+      isDefault: false,
+      fixed: false,
+    });
+    expect(response.json().updatedAt).not.toBeNull();
+    const row = await database.system
+      .selectFrom('situations')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ situation_key: 'after_hours', choice: 'call_at_opening_only' });
+    expect(row.updated_by).toEqual({ kind: 'user', id: person.profile.user.id });
+  });
+
+  it('changes it again, and can go back to the ready-picked way; one row per situation', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putSituation(person, 'speak_to_person', 'always_promise_callback');
+    const back = await putSituation(person, 'speak_to_person', 'transfer_in_office_hours_else_callback');
+    expect(back.json().selectedChoiceKey).toBe('transfer_in_office_hours_else_callback');
+    const rows = await database.system
+      .selectFrom('situations')
+      .select('situation_key')
+      .where('account_id', '=', person.profile.business.id)
+      .execute();
+    expect(rows).toHaveLength(1);
+  });
+
+  it('writes one activity-log line with the situation key only, and a knowledge.situation_changed event', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putSituation(person, 'discount_request', 'tell_current_offer');
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'knowledge.situation_changed')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ record_type: 'situation', fields: ['discount_request'] });
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'knowledge.situation_changed')
+      .execute();
+    expect(events.map((event) => event.payload)).toEqual([
+      { situationKey: 'discount_request', choice: 'tell_current_offer' },
+    ]);
+  });
+
+  it('writes nothing when the way chosen is the one that already applies, default or saved', async () => {
+    const person = await createSignedInPerson(app, database);
+    const firstChoiceOfDefault = await putSituation(person, 'discount_request', 'staff_call_with_best_price');
+    expect(firstChoiceOfDefault.statusCode, firstChoiceOfDefault.body).toBe(200);
+    expect(firstChoiceOfDefault.json().isDefault).toBe(true);
+    await putSituation(person, 'not_available', 'suggest_something_similar');
+    await putSituation(person, 'not_available', 'suggest_something_similar');
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'knowledge.situation_changed')
+      .execute();
+    expect(lines).toHaveLength(1);
+  });
+
+  it('answers 400 SITUATION_FIXED for the three situations that are the same for everyone, and saves nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    const fixedChoices: Record<string, string> = {
+      complaint: 'apologise_pass_to_manager_raise_ticket',
+      exact_price: 'give_from_price_staff_confirm',
+      unknown_answer: 'say_team_will_call_back_and_log',
+    };
+    for (const [key, choice] of Object.entries(fixedChoices)) {
+      const response = await putSituation(person, key, choice);
+      expect(response.statusCode, key).toBe(400);
+      expect(response.json().error.code).toBe('SITUATION_FIXED');
+    }
+    const rows = await database.system
+      .selectFrom('situations')
+      .select('situation_key')
+      .where('account_id', '=', person.profile.business.id)
+      .execute();
+    expect(rows).toHaveLength(0);
+  });
+
+  it("answers 400 INVALID_CHOICE for a choice that is not one of the situation's own", async () => {
+    const person = await createSignedInPerson(app, database);
+    for (const choice of ['no_such_choice', 'call_at_opening_only']) {
+      const response = await putSituation(person, 'discount_request', choice);
+      expect(response.statusCode, choice).toBe(400);
+      expect(response.json().error.code).toBe('INVALID_CHOICE');
+    }
+    expect(situationNamed((await getSituations(person)).json(), 'discount_request').isDefault).toBe(true);
+  });
+
+  it('answers 404 for a situation that does not exist', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await putSituation(person, 'no_such_situation', 'x_y')).statusCode).toBe(404);
+  });
+
+  it('answers 403 to staff and to the "own leads only" role, and saves nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await putSituation(person, 'discount_request', 'prices_are_fixed')).statusCode, role).toBe(403);
+    }
+    await setRole(person, 'manager');
+    expect(situationNamed((await getSituations(person)).json(), 'discount_request').isDefault).toBe(true);
+  });
+
+  it('answers 401 with nobody signed in and 403 without the web app headers', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await putSituation(null, 'discount_request', 'prices_are_fixed')).statusCode).toBe(401);
+    expect((await putSituation(person, 'discount_request', 'prices_are_fixed', false)).statusCode).toBe(403);
+    expect(situationNamed((await getSituations(person)).json(), 'discount_request').isDefault).toBe(true);
+  });
+
+  it('answers 400 for a missing, wrong-shaped or extra field, and a key of the wrong shape', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await send(person, 'PUT', '/knowledge/situations/discount_request', {})).statusCode).toBe(400);
+    expect((await putSituation(person, 'discount_request', 42)).statusCode).toBe(400);
+    expect((await putSituation(person, 'discount_request', 'Prices Are Fixed')).statusCode).toBe(400);
+    expect(
+      (
+        await send(person, 'PUT', '/knowledge/situations/discount_request', {
+          choice: 'prices_are_fixed',
+          fixed: false,
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect((await putSituation(person, 'Discount-Request', 'prices_are_fixed')).statusCode).toBe(400);
+  });
+
+  it('keeps businesses apart: the same situation chosen by two businesses gives two choices', async () => {
+    const first = await createSignedInPerson(app, database);
+    const second = await createSignedInPerson(app, database);
+    await putSituation(first, 'after_hours', 'call_at_opening_only');
+    await putSituation(second, 'after_hours', 'call_at_opening_and_offer_whatsapp');
+    expect(situationNamed((await getSituations(first)).json(), 'after_hours').selectedChoiceKey).toBe(
+      'call_at_opening_only',
+    );
+    expect(situationNamed((await getSituations(second)).json(), 'after_hours')).toMatchObject({
+      selectedChoiceKey: 'call_at_opening_and_offer_whatsapp',
+      isDefault: true, // the same as the default, so nothing was saved
+    });
+  });
+});

@@ -82,7 +82,7 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 | 0 | Migration `014`, table types, shared words and shapes, the question set (general A to H + 7 industries) and the situations as code, answer validators (pure, unit-tested), empty `core.knowledge` module | none; **built, owner review pending** |
 | 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}`; **built, owner test pending** |
 | 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm`; **built, owner test pending** |
-| 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}` |
+| 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}`; **built, owner test pending** |
 | 4 | Time zone and default country (if agreed); contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings` |
 | 5 | Journey tests, an entry for every route in `test/isolation.test.ts`, `api-security` review, Postman collection, hand-off with the manual test script | none |
 
@@ -120,6 +120,18 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 - **Nothing creates a waiting answer yet** (the website reader is F31). The tests plant one directly in the database. In Postman, folder 6 of the F16
   collection has a one-line SQL snippet that plants a waiting answer (`minimum_order_or_advance`) for your business, so you can see a real confirm.
 - A manager who types an answer that is waiting for a check replaces it with a typed, confirmed one (slice 1).
+
+## Slice 3 notes
+- `GET /knowledge/situations` gives the seven situations in the fixed order, each with its words, its choices (the ready-picked first), `fixed`,
+  `selectedChoiceKey`, `isDefault` and `updatedAt`. A business that has never chosen has no row and gets the first choice, so nothing needs to be
+  set up and every new business already has sensible handling.
+- `PUT /knowledge/situations/{key}` takes `{ "choice": "<choice key>" }`. Unknown situation: 404. The three fixed ones (complaint, exact price, unknown
+  answer): 400 `SITUATION_FIXED`. A choice that is not one of that situation's own: 400 `INVALID_CHOICE`. Choosing the way that already applies
+  writes nothing (no row, no log line). Only managers may change; the log line holds the situation key, the event holds the key and the choice (both
+  codes, never free words).
+- A saved choice that a later version of the product removes falls back to the default (a tested rule), so the AI never reads a way of handling
+  that does not exist. `custom_text` from the plan is not built: the requirement lists choices only.
+- The Postman folder is created with the Postman tools one request at a time, so it sits after folder 6 as "7. Situations".
 
 ## Reused from the hotel agent
 The "Port from" table in PHASE-1.md has no row for F16. The old agent has `locations.office_hours` (migration 014: `{ allDay: true }` or
