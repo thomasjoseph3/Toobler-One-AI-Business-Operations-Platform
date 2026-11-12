@@ -87,11 +87,13 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 | 5 | Journey tests, an entry for every route in `test/isolation.test.ts`, `api-security` review, Postman collection, hand-off with the manual test script | none |
 
 ## Slice 0 notes (found while building)
-- **The seven industries and the industries table.** The requirement's seven example industries do not all exist in the industries table (it
-  has `general`, `hotel_resort`, `real_estate`, `clinic`, `education`, `services`, `retail`, `other`). Extras are keyed by industry id: the
-  sets for `hotel_resort`, `clinic`, `education` and `real_estate` apply today; the sets for `travel_agent`, `car_dealer` and
-  `wedding_planner` are written but take effect only when the platform adds those industries (a platform admin `POST /industries`). `services`,
-  `retail`, `general` and `other` have no extras (as "any other business" in the requirement).
+- **The seven industries and the industries table.** The requirement's seven example industries did not all exist in the industries table.
+  **Owner decision (12 Nov 2026): add common industries so a business can pick them at sign-up.** Migration `015_more_industries.sql` adds
+  `restaurant_cafe`, `travel_agent`, `wedding_planner`, `car_dealer`, `auto_service`, `salon_spa` and `gym_fitness`, so the table now has
+  15 (with `general`, `hotel_resort`, `real_estate`, `clinic`, `education`, `services`, `retail` and `other`). The extra questions apply to
+  `hotel_resort`, `travel_agent`, `clinic`, `car_dealer`, `education`, `wedding_planner` and `real_estate`; the rest get the general questions.
+  A test fails if an industry with extras is ever missing from the table. Extras for restaurant, auto service, salon and gym are not in the
+  requirement; they can be added later as data, with the owner's wording.
 - The question list is 26 general questions: 22 answerable here and 4 answered elsewhere (`offerings`, `current_offers`, `common_questions`,
   `brochure_upload`). Seven are needed to go live here (`has_website`, `business_name`, `business_summary`, `address`, `contact_details`,
   `opening_hours`, `customer_languages`); `offerings` is needed too but is left out of the check until F17.

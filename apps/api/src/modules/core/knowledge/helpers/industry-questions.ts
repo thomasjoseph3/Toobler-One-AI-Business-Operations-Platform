@@ -40,9 +40,9 @@ const namedList = (key: string, text: string, nameLabel: string): QuestionDefini
 });
 
 /**
- * The extra questions by industry id. The ids hotel_resort, clinic, education and real_estate exist in the industries table
- * today; travel_agent, car_dealer and wedding_planner will take effect when the platform adds those industries (the list is
- * data, so adding them later changes no code).
+ * The extra questions by industry id (hotel_resort, travel_agent, clinic, car_dealer, education, wedding_planner, real_estate).
+ * Every id here exists in the industries table (migrations 003 and 015). An industry with no entry gets the general questions
+ * only. The list is data, so adding an industry's extras later changes no other code.
  */
 export const INDUSTRY_QUESTIONS: Readonly<Record<string, readonly QuestionDefinition[]>> = {
   hotel_resort: [
