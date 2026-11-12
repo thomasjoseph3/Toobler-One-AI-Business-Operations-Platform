@@ -19,7 +19,13 @@ afterAll(async () => {
 });
 
 /** Sends a request as the person (or as nobody), with the headers the web app sends. */
-const send = (person: SignedInPerson | null, method: 'GET' | 'PUT', url: string, payload?: unknown, withCsrf = true) =>
+const send = (
+  person: SignedInPerson | null,
+  method: 'GET' | 'PUT' | 'POST',
+  url: string,
+  payload?: unknown,
+  withCsrf = true,
+) =>
   app.inject({
     method,
     url: `/api/v1${url}`,
@@ -386,5 +392,201 @@ describe('PUT /api/v1/knowledge/answers/{question_key}', () => {
         })
         .execute(),
     ).rejects.toThrow();
+  });
+});
+
+/** Confirms answers as the person. */
+const confirmAnswers = (person: SignedInPerson | null, questionKeys: unknown, withCsrf = true) =>
+  send(person, 'POST', '/knowledge/answers/confirm', { questionKeys }, withCsrf);
+
+/** Puts in an answer the way the system will fill one in from a website (F31): waiting for a manager's check. */
+async function putAnswerWaitingForCheck(person: SignedInPerson, questionKey: string, value: unknown) {
+  await database.system
+    .insertInto('business_answers')
+    .values({
+      account_id: person.profile.business.id,
+      question_key: questionKey,
+      value: JSON.stringify(value),
+      source: 'website',
+      source_ref: 'https://nairstays.example',
+      status: 'check',
+    })
+    .execute();
+}
+
+/** The status of one answer as the person reads it, or null when it is not answered. */
+async function statusOf(person: SignedInPerson, questionKey: string): Promise<string | null> {
+  const body = (await getQuestions(person)).json();
+  return body.questions.find((question: { key: string }) => question.key === questionKey).answer?.status ?? null;
+}
+
+describe('POST /api/v1/knowledge/answers/confirm', () => {
+  it('confirms answers that are waiting for a check, one or many, and moves the progress', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'business_name', 'Nair Stays');
+    await putAnswerWaitingForCheck(person, 'address', 'Beach Road');
+    await putAnswerWaitingForCheck(person, 'business_summary', 'A homestay');
+    expect((await getQuestions(person)).json().progress).toMatchObject({ answeredQuestions: 0, waitingForCheck: 3 });
+
+    const one = await confirmAnswers(person, ['business_name']);
+    expect(one.statusCode, one.body).toBe(200);
+    expect(one.json().confirmed).toEqual(['business_name']);
+    expect(one.json().progress).toMatchObject({ answeredQuestions: 1, waitingForCheck: 2 });
+
+    const many = await confirmAnswers(person, ['address', 'business_summary']);
+    expect(many.json().confirmed.sort()).toEqual(['address', 'business_summary']);
+    expect(many.json().progress).toMatchObject({ answeredQuestions: 3, waitingForCheck: 0 });
+  });
+
+  it('keeps where the answer came from, and records who confirmed it and when', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'business_name', 'Nair Stays');
+    await confirmAnswers(person, ['business_name']);
+    const row = await database.system
+      .selectFrom('business_answers')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ status: 'confirmed', source: 'website', source_ref: 'https://nairstays.example' });
+    expect(row.confirmed_by).toEqual({ kind: 'user', id: person.profile.user.id });
+    expect(row.confirmed_at).not.toBeNull();
+    const question = (await getQuestions(person))
+      .json()
+      .questions.find((candidate: { key: string }) => candidate.key === 'business_name');
+    expect(question.answer).toMatchObject({ value: 'Nair Stays', source: 'website', status: 'confirmed' });
+  });
+
+  it('leaves an answer that is already confirmed as it is, and says nothing was confirmed', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswer(person, 'business_name', 'Nair Stays');
+    const response = await confirmAnswers(person, ['business_name']);
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().confirmed).toEqual([]);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'knowledge.answers_confirmed')
+      .execute();
+    expect(lines).toHaveLength(0);
+  });
+
+  it('counts a key sent twice once', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'business_name', 'Nair Stays');
+    const response = await confirmAnswers(person, ['business_name', 'business_name']);
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().confirmed).toEqual(['business_name']);
+  });
+
+  it('writes one log line with the question keys only and one event with no answer words', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'address', 'Secret Lane 12');
+    await putAnswerWaitingForCheck(person, 'business_name', 'Secret Name');
+    await confirmAnswers(person, ['address', 'business_name']);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'knowledge.answers_confirmed')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect([...lines[0]!.fields].sort()).toEqual(['address', 'business_name']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'knowledge.answers_confirmed')
+      .execute();
+    expect(events).toHaveLength(1);
+    expect(JSON.stringify([lines, events])).not.toContain('Secret');
+  });
+
+  it('is all or none: one unknown question, or one with no answer, confirms nothing and answers 404', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'business_name', 'Nair Stays');
+    expect((await confirmAnswers(person, ['business_name', 'no_such_question'])).statusCode).toBe(404);
+    expect((await confirmAnswers(person, ['business_name', 'address'])).statusCode).toBe(404); // no answer to address yet
+    expect(await statusOf(person, 'business_name')).toBe('check');
+  });
+
+  it("answers 404 for another industry's extra question", async () => {
+    const person = await createSignedInPerson(app, database); // a hotel
+    await putAnswerWaitingForCheck(person, 'clinic_insurance', { yes: true });
+    expect((await confirmAnswers(person, ['clinic_insurance'])).statusCode).toBe(404);
+  });
+
+  it('answers 403 to staff and to the "own leads only" role, and confirms nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'business_name', 'Nair Stays');
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await confirmAnswers(person, ['business_name'])).statusCode, role).toBe(403);
+    }
+    await setRole(person, 'manager');
+    expect(await statusOf(person, 'business_name')).toBe('check');
+  });
+
+  it('answers 401 with nobody signed in and 403 without the web app headers', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'business_name', 'Nair Stays');
+    expect((await confirmAnswers(null, ['business_name'])).statusCode).toBe(401);
+    expect((await confirmAnswers(person, ['business_name'], false)).statusCode).toBe(403);
+    expect(await statusOf(person, 'business_name')).toBe('check');
+  });
+
+  it('answers 400 for no keys, too many keys, a key of the wrong shape, a body that is not a list, and fields it does not take', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await confirmAnswers(person, [])).statusCode).toBe(400);
+    expect(
+      (
+        await confirmAnswers(
+          person,
+          Array.from({ length: 101 }, (_, index) => `question_${index}`),
+        )
+      ).statusCode,
+    ).toBe(400);
+    expect((await confirmAnswers(person, ['Business-Name'])).statusCode).toBe(400);
+    expect((await confirmAnswers(person, 'business_name')).statusCode).toBe(400);
+    expect((await confirmAnswers(person, [42])).statusCode).toBe(400);
+    expect((await send(person, 'POST', '/knowledge/answers/confirm', {})).statusCode).toBe(400);
+    expect(
+      (await send(person, 'POST', '/knowledge/answers/confirm', { questionKeys: ['business_name'], all: true }))
+        .statusCode,
+    ).toBe(400);
+  });
+
+  it('keeps businesses apart: confirming in one business does not touch the same question in another', async () => {
+    const first = await createSignedInPerson(app, database);
+    const second = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(first, 'business_name', 'First Stays');
+    await putAnswerWaitingForCheck(second, 'business_name', 'Second Stays');
+    await confirmAnswers(first, ['business_name']);
+    expect(await statusOf(first, 'business_name')).toBe('confirmed');
+    expect(await statusOf(second, 'business_name')).toBe('check');
+  });
+
+  it("never lets an answer that is waiting for a check reach the AI's view of the business", async () => {
+    const { onlyConfirmedAnswers } = await import('../src/modules/core/knowledge/helpers/usable-answers');
+    const person = await createSignedInPerson(app, database);
+    await putAnswerWaitingForCheck(person, 'business_name', 'Nair Stays');
+    await putAnswer(person, 'address', 'Beach Road');
+    const rows = await database.system
+      .selectFrom('business_answers')
+      .select(['question_key', 'status'])
+      .where('account_id', '=', person.profile.business.id)
+      .execute();
+    expect(onlyConfirmedAnswers(rows).map((row) => row.question_key)).toEqual(['address']);
+    await confirmAnswers(person, ['business_name']);
+    const after = await database.system
+      .selectFrom('business_answers')
+      .select(['question_key', 'status'])
+      .where('account_id', '=', person.profile.business.id)
+      .execute();
+    expect(
+      onlyConfirmedAnswers(after)
+        .map((row) => row.question_key)
+        .sort(),
+    ).toEqual(['address', 'business_name']);
   });
 });

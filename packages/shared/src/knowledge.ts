@@ -164,3 +164,29 @@ export const putAnswerResponseSchema = z.object({
   progress: profileProgressSchema,
 });
 export type PutAnswerResponse = z.infer<typeof putAnswerResponseSchema>;
+
+/**
+ * What a manager sends to confirm answers that are waiting for a check (filled in by the system, not yet accepted): the keys
+ * of the questions, one or many. A key that is already confirmed is left as it is.
+ */
+export const confirmAnswersRequestSchema = z
+  .object({
+    questionKeys: z
+      .array(
+        z
+          .string()
+          .max(60)
+          .regex(/^[a-z][a-z0-9_]{1,59}$/, 'That is not a question key'),
+      )
+      .min(1, 'Name at least one question')
+      .max(100),
+  })
+  .strict();
+export type ConfirmAnswersRequest = z.infer<typeof confirmAnswersRequestSchema>;
+
+/** What confirming gives back: the keys that were really waiting and are now confirmed, and the new progress. */
+export const confirmAnswersResponseSchema = z.object({
+  confirmed: z.array(z.string()),
+  progress: profileProgressSchema,
+});
+export type ConfirmAnswersResponse = z.infer<typeof confirmAnswersResponseSchema>;

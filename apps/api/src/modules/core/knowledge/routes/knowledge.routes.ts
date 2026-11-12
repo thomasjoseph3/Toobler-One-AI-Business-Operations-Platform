@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  confirmAnswersRequestSchema,
+  confirmAnswersResponseSchema,
   knowledgeQuestionsResponseSchema,
   putAnswerRequestSchema,
   putAnswerResponseSchema,
@@ -9,7 +11,7 @@ import {
 import { unauthorized } from '../../../../kernel/errors';
 import { createKnowledgeService } from '../services/knowledge.service';
 
-/** Registers /api/v1/knowledge/questions (read the questions and answers) and /knowledge/answers/{question_key} (answer one). */
+/** Registers /api/v1/knowledge/questions (read the questions and answers), /knowledge/answers/{question_key} (answer one) and /knowledge/answers/confirm. */
 export function knowledgeRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const knowledgeService = createKnowledgeService({ database: app.kernel.database });
@@ -39,6 +41,20 @@ export function knowledgeRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return knowledgeService.answerQuestion(request.principal, request.params.question_key, request.body);
+    },
+  );
+
+  // For managers only (the guard answers 403 to staff). Accepts the answers waiting for a check. All or none: a key that is not
+  // one of this business's questions, or has no answer yet, answers 404 and confirms nothing.
+  typedApp.post(
+    '/knowledge/answers/confirm',
+    {
+      config: { access: 'manager' },
+      schema: { body: confirmAnswersRequestSchema, response: { 200: confirmAnswersResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return knowledgeService.confirmAnswers(request.principal, request.body);
     },
   );
 }

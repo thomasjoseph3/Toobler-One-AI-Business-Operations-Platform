@@ -1,5 +1,7 @@
 import type {
   AnswerType,
+  ConfirmAnswersRequest,
+  ConfirmAnswersResponse,
   KnowledgeQuestion,
   KnowledgeQuestionsResponse,
   ProfileProgress,
@@ -139,6 +141,52 @@ export function createKnowledgeService({ database }: { database: Database }) {
           question: toKnowledgeQuestion(question, saved),
           progress: progressOf(questions, answers),
         };
+      });
+    },
+
+    /**
+     * Confirms answers that are waiting for a check (filled in by the system, not yet accepted by a manager). All the keys must
+     * be questions of this business's own list and must already have an answer, or nothing is confirmed and the answer is 404
+     * (all or none). An answer that is already confirmed is left as it is. Writes one activity-log line and one event, only
+     * when something was really confirmed. Answers with the keys really confirmed, and the new progress.
+     */
+    async confirmAnswers(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'industryId'>,
+      request: ConfirmAnswersRequest,
+    ): Promise<ConfirmAnswersResponse> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      const questions = getQuestionsForIndustry(principal.industryId);
+      const knownKeys = new Set(questions.map((question) => question.key));
+      const questionKeys = [...new Set(request.questionKeys)];
+      if (questionKeys.some((questionKey) => !knownKeys.has(questionKey))) throw notFound('That question');
+
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const existing = await answersRepository.lockAnswersByKeys(transaction, accountId, questionKeys);
+        if (existing.length !== questionKeys.length) throw notFound('That answer');
+
+        const confirmed = await answersRepository.confirmWaitingAnswers(transaction, {
+          accountId,
+          questionKeys,
+          actor,
+          now: new Date(),
+        });
+        if (confirmed.length > 0) {
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'knowledge.answers_confirmed',
+            // Which questions were confirmed, never the answers
+            details: { recordType: 'business_answer', fields: confirmed },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'knowledge.answers_confirmed',
+            payload: { questionKeys: confirmed },
+          });
+        }
+        const answers = await answersRepository.listAnswers(transaction, accountId);
+        return { confirmed, progress: progressOf(questions, answers) };
       });
     },
   };

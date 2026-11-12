@@ -92,3 +92,45 @@ export async function saveTypedAnswer(
     )
     .execute();
 }
+
+/**
+ * Locks the business's answers to these questions until the end of the transaction, and returns the ones that exist. Two
+ * managers confirming at the same moment take turns.
+ */
+export async function lockAnswersByKeys(db: Db, accountId: string, questionKeys: string[]): Promise<AnswerRow[]> {
+  const rows = await db
+    .selectFrom('business_answers')
+    .select(['question_key', 'value', 'source', 'status', 'confirmed_at', 'updated_at'])
+    .where('account_id', '=', accountId)
+    .where('question_key', 'in', questionKeys)
+    .forUpdate()
+    .execute();
+  return rows.map((row) => ({
+    questionKey: row.question_key,
+    value: row.value,
+    source: row.source,
+    status: row.status,
+    confirmedAt: row.confirmed_at,
+    updatedAt: row.updated_at,
+  }));
+}
+
+/**
+ * Confirms the answers that are waiting for a check among these questions: marks them confirmed by this person, now. An
+ * answer that is already confirmed is not touched. Returns the keys that were really confirmed.
+ */
+export async function confirmWaitingAnswers(
+  db: Db,
+  options: { accountId: string; questionKeys: string[]; actor: Actor; now: Date },
+): Promise<string[]> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  const rows = await db
+    .updateTable('business_answers')
+    .set({ status: 'confirmed', confirmed_by: actorStamp, confirmed_at: options.now, updated_by: actorStamp })
+    .where('account_id', '=', options.accountId)
+    .where('question_key', 'in', options.questionKeys)
+    .where('status', '=', 'check')
+    .returning('question_key')
+    .execute();
+  return rows.map((row) => row.question_key);
+}

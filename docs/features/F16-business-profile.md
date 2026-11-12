@@ -81,7 +81,7 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 | --- | --- | --- |
 | 0 | Migration `014`, table types, shared words and shapes, the question set (general A to H + 7 industries) and the situations as code, answer validators (pure, unit-tested), empty `core.knowledge` module | none; **built, owner review pending** |
 | 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}`; **built, owner test pending** |
-| 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm` |
+| 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm`; **built, owner test pending** |
 | 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}` |
 | 4 | Time zone and default country (if agreed); contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings` |
 | 5 | Journey tests, an entry for every route in `test/isolation.test.ts`, `api-security` review, Postman collection, hand-off with the manual test script | none |
@@ -111,6 +111,15 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 - A typed answer replaces the row (source `typed`, confirmed now, by the person); sending the stored answer again writes nothing.
 - Question keys in the address are codes, not business records, so there is no "other business's id" for `PUT`; `test/isolation.test.ts` has an
   attempt (B answers the same question, A's answer must stay as it was) and a list check for `GET`.
+
+## Slice 2 notes
+- `POST /knowledge/answers/confirm` takes `{ "questionKeys": [ ... ] }` (1 to 100, each a question key) and is **all or none**: a key that is not one of the
+  business's questions, or that has no answer yet, answers 404 and confirms nothing. A key already confirmed is left as it is (200, and it is not in
+  `confirmed`). A key sent twice counts once. It answers `{ confirmed, progress }`, and writes one log line and one event only when something was
+  really confirmed (question keys only, never the answers). The answer keeps its source (`website`, ...) and gains who confirmed it and when.
+- **Nothing creates a waiting answer yet** (the website reader is F31). The tests plant one directly in the database. In Postman, folder 6 of the F16
+  collection has a one-line SQL snippet that plants a waiting answer (`minimum_order_or_advance`) for your business, so you can see a real confirm.
+- A manager who types an answer that is waiting for a check replaces it with a typed, confirmed one (slice 1).
 
 ## Reused from the hotel agent
 The "Port from" table in PHASE-1.md has no row for F16. The old agent has `locations.office_hours` (migration 014: `{ allDay: true }` or

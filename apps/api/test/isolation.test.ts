@@ -91,6 +91,17 @@ beforeAll(async () => {
   const ticket = await sendOk(businessA, 'POST', '/tickets', { contactId: contact.id, title: secretWords }, 201);
   const stage = await sendOk(businessA, 'POST', '/pipeline/stages', { name: `Stage ${secretWords}` }, 201);
   await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
+  // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
+  await database.system
+    .insertInto('business_answers')
+    .values({
+      account_id: businessA.profile.business.id,
+      question_key: 'address',
+      value: JSON.stringify(`Address ${secretWords}`),
+      source: 'website',
+      status: 'check',
+    })
+    .execute();
   dataOfA = {
     contactId: contact.id,
     leadId: lead.id,
@@ -238,6 +249,12 @@ const attempts: Attempt[] = [
       payload: { value: 'Bob Business' },
     }),
     expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/knowledge/answers/confirm',
+    what: "confirm A's answer that is waiting for a check (B has no such answer)",
+    request: () => ({ method: 'POST', url: '/knowledge/answers/confirm', payload: { questionKeys: ['address'] } }),
+    expectedStatus: 404,
   },
   // ---- the platform (only a platform admin; B is an ordinary business)
   {
@@ -388,6 +405,8 @@ describe('isolation: business B tries to reach business A', () => {
     const questions = await sendOk(businessA, 'GET', '/knowledge/questions');
     const nameAnswer = questions.questions.find((question: { key: string }) => question.key === 'business_name').answer;
     expect(nameAnswer.value).toBe(`Business ${dataOfA.secretWords}`);
+    const addressAnswer = questions.questions.find((question: { key: string }) => question.key === 'address').answer;
+    expect(addressAnswer).toMatchObject({ status: 'check', source: 'website' });
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
     // B's own records are untouched too
