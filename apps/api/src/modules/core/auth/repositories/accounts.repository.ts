@@ -25,3 +25,35 @@ export async function findAccountById(db: Db, accountId: string): Promise<Accoun
     .executeTakeFirst();
   return row ? { id: row.id, name: row.name, industry: row.industry, timeZone: row.time_zone } : undefined;
 }
+
+/** The business's settings that other modules may read and change through the auth module's index.ts. */
+export interface AccountSettings {
+  timeZone: string;
+  defaultCountry: string;
+}
+
+/** The business's settings, or undefined when there is no such business. */
+export async function findAccountSettings(db: Db, accountId: string): Promise<AccountSettings | undefined> {
+  const row = await db
+    .selectFrom('accounts')
+    .select(['time_zone', 'default_country'])
+    .where('id', '=', accountId)
+    .executeTakeFirst();
+  return row ? { timeZone: row.time_zone, defaultCountry: row.default_country } : undefined;
+}
+
+/** Changes the settings named in `changes`; a setting left out is not touched. */
+export async function updateAccountSettings(
+  db: Db,
+  accountId: string,
+  changes: { timeZone?: string; defaultCountry?: string },
+): Promise<void> {
+  await db
+    .updateTable('accounts')
+    .set({
+      ...(changes.timeZone !== undefined ? { time_zone: changes.timeZone } : {}),
+      ...(changes.defaultCountry !== undefined ? { default_country: changes.defaultCountry } : {}),
+    })
+    .where('id', '=', accountId)
+    .execute();
+}

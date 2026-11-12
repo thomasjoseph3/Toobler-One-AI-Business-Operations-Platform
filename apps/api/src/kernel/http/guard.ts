@@ -18,6 +18,10 @@ export interface Principal {
   isPlatformAdmin: boolean;
   /** The kind of business this is (an id from the industries table). Decides, for example, which business questions it answers. */
   industryId: string;
+  /** The business's time zone, an IANA name like Asia/Kolkata. Times are stored in UTC and shown in this zone. */
+  timeZone: string;
+  /** The country a phone number belongs to when typed without a country code, like IN. */
+  defaultCountry: string;
   /** Whether the person has proved they own their email. Until they have, they can only reach the routes marked `allowUnverified`. */
   emailVerified: boolean;
 }

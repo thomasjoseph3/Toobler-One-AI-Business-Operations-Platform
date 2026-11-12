@@ -189,6 +189,8 @@ describe('route rules', () => {
       sessionId: newAccountId(),
       isPlatformAdmin: false,
       industryId: 'general',
+      timeZone: 'Asia/Kolkata',
+      defaultCountry: 'IN',
       emailVerified: true,
     });
     const staffApp = await buildTestApp(database, [rolesModule], { authenticate: authenticateAs('staff') });
@@ -217,6 +219,8 @@ describe('route rules', () => {
       sessionId: newAccountId(),
       isPlatformAdmin,
       industryId: 'general',
+      timeZone: 'Asia/Kolkata',
+      defaultCountry: 'IN',
       emailVerified: true,
     });
 
@@ -250,6 +254,8 @@ describe('route rules', () => {
       sessionId: accountId,
       isPlatformAdmin: false,
       industryId: 'general',
+      timeZone: 'Asia/Kolkata',
+      defaultCountry: 'IN',
       emailVerified: true,
     });
     const appWithModuleOff = await buildTestApp(database, [leadsModule], { authenticate });

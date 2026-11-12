@@ -19,10 +19,6 @@ import { computeLifecycleStage } from '../helpers/lifecycle';
 import * as contactsRepository from '../repositories/contacts.repository';
 import type { ContactChanges } from '../repositories/contacts.repository';
 
-// The country a phone number belongs to when it is typed without a country code. India until each business has its own
-// setting (F16 business profile), and then it follows the business.
-const DEFAULT_COUNTRY: CountryCode = 'IN';
-
 // The database error code for "a unique rule was broken", and the names of the two unique indexes, so we know which one.
 const UNIQUE_VIOLATION = '23505';
 const PHONE_INDEX = 'contacts_phone_unique';
@@ -45,7 +41,7 @@ export function createContactsService({ database }: { database: Database }) {
      * rules decide, and the loser gets the same 409.
      */
     async createContact(
-      principal: Pick<Principal, 'accountId' | 'userId'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'defaultCountry'>,
       request: CreateContactRequest,
     ): Promise<Contact> {
       if (request.phone === undefined && request.email === undefined) {
@@ -53,7 +49,7 @@ export function createContactsService({ database }: { database: Database }) {
       }
       let phone: ReturnType<typeof parsePhone> = null;
       if (request.phone !== undefined) {
-        phone = parsePhone(request.phone, DEFAULT_COUNTRY);
+        phone = parsePhone(request.phone, principal.defaultCountry as CountryCode);
         if (!phone) throw new ApiError(400, 'INVALID_PHONE', 'Enter a valid phone number, like +91 98470 12345.');
       }
       const accountId = principal.accountId;
@@ -132,7 +128,7 @@ export function createContactsService({ database }: { database: Database }) {
      * contact; unmarking only affects a contact that was marked, and returns it to the stage its facts give.
      */
     async updateContact(
-      principal: Pick<Principal, 'accountId' | 'userId'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'defaultCountry'>,
       contactId: string,
       request: UpdateContactRequest,
     ): Promise<Contact> {
@@ -141,7 +137,7 @@ export function createContactsService({ database }: { database: Database }) {
       }
       let phone: ReturnType<typeof parsePhone> = null;
       if (typeof request.phone === 'string') {
-        phone = parsePhone(request.phone, DEFAULT_COUNTRY);
+        phone = parsePhone(request.phone, principal.defaultCountry as CountryCode);
         if (!phone) throw new ApiError(400, 'INVALID_PHONE', 'Enter a valid phone number, like +91 98470 12345.');
       }
       const accountId = principal.accountId;

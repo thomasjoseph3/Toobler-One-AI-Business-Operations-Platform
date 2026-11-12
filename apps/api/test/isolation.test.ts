@@ -92,6 +92,7 @@ beforeAll(async () => {
   const stage = await sendOk(businessA, 'POST', '/pipeline/stages', { name: `Stage ${secretWords}` }, 201);
   await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
   await sendOk(businessA, 'PUT', '/knowledge/situations/discount_request', { choice: 'tell_current_offer' });
+  await sendOk(businessA, 'PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
   // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
   await database.system
     .insertInto('business_answers')
@@ -262,6 +263,16 @@ const attempts: Attempt[] = [
     expectedStatus: 200,
   },
   {
+    route: 'PUT /api/v1/knowledge/settings',
+    what: "change the time zone and country (B's own business only), and A's must stay as they were",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/settings',
+      payload: { timeZone: 'Europe/London', defaultCountry: 'GB' },
+    }),
+    expectedStatus: 200,
+  },
+  {
     route: 'POST /api/v1/knowledge/answers/confirm',
     what: "confirm A's answer that is waiting for a check (B has no such answer)",
     request: () => ({ method: 'POST', url: '/knowledge/answers/confirm', payload: { questionKeys: ['address'] } }),
@@ -292,6 +303,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/modules', url: '/modules' },
   { route: 'GET /api/v1/knowledge/questions', url: '/knowledge/questions' },
   { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
+  { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
 
@@ -326,6 +338,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/modules': 'covered by the list check',
   'GET /api/v1/knowledge/questions': 'covered by the list check',
   'GET /api/v1/knowledge/situations': 'covered by the list check',
+  'GET /api/v1/knowledge/settings': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",
@@ -424,6 +437,10 @@ describe('isolation: business B tries to reach business A', () => {
     expect(situations.items.find((item: { key: string }) => item.key === 'discount_request').selectedChoiceKey).toBe(
       'tell_current_offer',
     );
+    expect(await sendOk(businessA, 'GET', '/knowledge/settings')).toEqual({
+      timeZone: 'Asia/Dubai',
+      defaultCountry: 'AE',
+    });
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
     // B's own records are untouched too

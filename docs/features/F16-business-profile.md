@@ -73,7 +73,7 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 - `business_answers`: `account_id`, `question_key`, `value` jsonb, `source`, `source_ref`, `status` (`check`, `confirmed`), `confirmed_by`, `confirmed_at`,
   actor stamps; one row per business and question (unique); RLS forced; the app role cannot delete.
 - `situations`: `account_id`, `situation_key`, `choice`, `custom_text`; one row per business and situation; RLS forced.
-- (slice 4) `business_settings`: `account_id` (one row), `time_zone`, `default_country`.
+- (slice 4) migration `016_business_default_country.sql` adds `accounts.default_country` (see the slice 4 notes: no separate settings table).
 - The question list itself is code, not a table (the requirement: "new questions are added by us, not by businesses"), so it can be tested and versioned.
 
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
@@ -83,7 +83,7 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 | 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}`; **built, owner test pending** |
 | 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm`; **built, owner test pending** |
 | 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}`; **built, owner test pending** |
-| 4 | Time zone and default country (if agreed); contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings` |
+| 4 | Time zone and default country; contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings`; **built, owner test pending** |
 | 5 | Journey tests, an entry for every route in `test/isolation.test.ts`, `api-security` review, Postman collection, hand-off with the manual test script | none |
 
 ## Slice 0 notes (found while building)
@@ -132,6 +132,24 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 - A saved choice that a later version of the product removes falls back to the default (a tested rule), so the AI never reads a way of handling
   that does not exist. `custom_text` from the plan is not built: the requirement lists choices only.
 - The Postman folder is created with the Postman tools one request at a time, so it sits after folder 6 as "7. Situations".
+
+## Slice 4 notes (a change from the plan, found while building)
+- **One home for each setting.** The plan said a new `business_settings` table owned by the knowledge module. But the business already has a time zone
+  (`accounts.time_zone`, from F01, shown by `GET /me`), so a second table would hold two time zones that can disagree. Instead the **default country
+  is added to the same table** (`accounts.default_country`, migration `016`, default `IN`), and both settings stay on the business, which the sign-in
+  module owns.
+- **How the other modules read them.** `Principal` now carries `timeZone` and `defaultCountry`, loaded with the session on every request (the same
+  trick as `industryId` in slice 1). Contacts read `principal.defaultCountry` instead of a fixed `IN` (decision R35), so **contacts need no
+  dependency on the knowledge module**. Changing the country takes effect on the next request.
+- **How they are changed.** `GET /knowledge/settings` (staff) and `PUT /knowledge/settings` (manager) live in the knowledge module, as agreed. The write
+  goes through `createBusinessSettingsService` exported from the auth module's `index.ts`; `core.knowledge` therefore `requires` `core.auth`. There is no
+  loop: nothing requires knowledge.
+- `PUT` takes `timeZone` (a real IANA name, else 400) and/or `defaultCountry` (two letters, small letters become capitals; a country phone numbers do not
+  exist for is 400 `INVALID_COUNTRY`). `{}` is 400 `NOTHING_TO_CHANGE`; sending the values already set writes nothing. One log line
+  (`business.settings_changed`, setting names only) and one event. Phone numbers already stored are not touched: the country only matters when a
+  number is typed without a country code.
+- Test: a number typed without a country code is stored with India's code for an Indian business and the UAE's for one set to AE, and a number with its
+  own code is the same for both.
 
 ## Reused from the hotel agent
 The "Port from" table in PHASE-1.md has no row for F16. The old agent has `locations.office_hours` (migration 014: `{ allDay: true }` or

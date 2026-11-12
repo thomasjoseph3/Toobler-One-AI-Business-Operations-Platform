@@ -1,5 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { knowledgeRoutes } from './routes/knowledge.routes';
+import { settingsRoutes } from './routes/settings.routes';
 import { situationsRoutes } from './routes/situations.routes';
 
 /**
@@ -10,8 +11,11 @@ import { situationsRoutes } from './routes/situations.routes';
 export default defineModule({
   id: 'core.knowledge',
   kind: 'core',
+  // The business's time zone and default country live on the business itself, which the sign-in module owns
+  requires: ['core.auth'],
   routes: (app) => {
     knowledgeRoutes(app);
     situationsRoutes(app);
+    settingsRoutes(app);
   },
 });

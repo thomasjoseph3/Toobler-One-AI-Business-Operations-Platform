@@ -234,3 +234,45 @@ export const putSituationRequestSchema = z
   })
   .strict();
 export type PutSituationRequest = z.infer<typeof putSituationRequestSchema>;
+
+/** True when the text is a real time zone name such as Asia/Kolkata. Never throws. */
+export function isRealTimeZone(name: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en', { timeZone: name });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The business's time zone and default country. */
+export const businessSettingsSchema = z.object({
+  /** An IANA name like Asia/Kolkata. Times are stored in UTC and shown in this zone. */
+  timeZone: z.string(),
+  /** Two capital letters like IN. A phone number typed without a country code belongs to this country. */
+  defaultCountry: z.string(),
+});
+export type BusinessSettings = z.infer<typeof businessSettingsSchema>;
+
+/**
+ * What a manager sends to change the business's time zone and/or default country. Only the fields sent change. A country
+ * is two letters (small letters are turned into capitals); the API checks it is a country phone numbers exist for.
+ */
+export const putBusinessSettingsRequestSchema = z
+  .object({
+    timeZone: z
+      .string()
+      .trim()
+      .min(1)
+      .max(64)
+      .refine(isRealTimeZone, 'That is not a time zone, try Asia/Kolkata')
+      .optional(),
+    defaultCountry: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z]{2}$/, 'Use two letters, like IN')
+      .optional(),
+  })
+  .strict();
+export type PutBusinessSettingsRequest = z.infer<typeof putBusinessSettingsRequestSchema>;

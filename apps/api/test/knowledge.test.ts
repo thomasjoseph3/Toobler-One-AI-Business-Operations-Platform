@@ -823,3 +823,152 @@ describe('PUT /api/v1/knowledge/situations/{key}', () => {
     });
   });
 });
+
+/** Reads the business settings (time zone and default country) as the person. */
+const getSettings = (person: SignedInPerson | null) => send(person, 'GET', '/knowledge/settings');
+
+/** Changes the business settings as the person. */
+const putSettings = (person: SignedInPerson | null, body: unknown, withCsrf = true) =>
+  send(person, 'PUT', '/knowledge/settings', body, withCsrf);
+
+/** Adds a contact with a phone typed the way a person would, and returns the response. */
+const addContactWithPhone = (person: SignedInPerson, phone: string) =>
+  send(person, 'POST' as 'PUT', '/contacts', { name: 'Priya Menon', phone });
+
+describe('GET /api/v1/knowledge/settings', () => {
+  it('gives a new business India and the India time zone', async () => {
+    const person = await createSignedInPerson(app, database);
+    const response = await getSettings(person);
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+  });
+
+  it('lets every role read it, and answers 401 with nobody signed in', async () => {
+    const person = await createSignedInPerson(app, database);
+    for (const role of ['staff', 'staff_own', 'manager'] as const) {
+      await setRole(person, role);
+      expect((await getSettings(person)).statusCode, role).toBe(200);
+    }
+    expect((await getSettings(null)).statusCode).toBe(401);
+  });
+});
+
+describe('PUT /api/v1/knowledge/settings', () => {
+  it('changes the time zone and the country, together or one at a time, and answers with both', async () => {
+    const person = await createSignedInPerson(app, database);
+    const both = await putSettings(person, { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+    expect(both.statusCode, both.body).toBe(200);
+    expect(both.json()).toEqual({ timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+    expect((await putSettings(person, { defaultCountry: 'IN' })).json()).toEqual({
+      timeZone: 'Asia/Dubai',
+      defaultCountry: 'IN',
+    });
+    expect((await putSettings(person, { timeZone: 'Asia/Kolkata' })).json()).toEqual({
+      timeZone: 'Asia/Kolkata',
+      defaultCountry: 'IN',
+    });
+    expect((await getSettings(person)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+  });
+
+  it('turns a small-letter country into capitals', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await putSettings(person, { defaultCountry: 'gb' })).json().defaultCountry).toBe('GB');
+  });
+
+  it('has one home for the time zone: the profile shows the new zone too', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putSettings(person, { timeZone: 'Europe/London' });
+    const profile = (await send(person, 'GET', '/me')).json();
+    expect(profile.business.timeZone).toBe('Europe/London');
+  });
+
+  it('writes one log line with the changed setting names only, and a business.settings_changed event', async () => {
+    const person = await createSignedInPerson(app, database);
+    await putSettings(person, { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'business.settings_changed')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect([...lines[0]!.fields].sort()).toEqual(['defaultCountry', 'timeZone']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'business.settings_changed')
+      .execute();
+    expect(events).toHaveLength(1);
+    expect(JSON.stringify([lines, events])).not.toContain('Dubai');
+  });
+
+  it('writes nothing when the values sent are the ones already set', async () => {
+    const person = await createSignedInPerson(app, database);
+    const response = await putSettings(person, { timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+    expect(response.statusCode, response.body).toBe(200);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'business.settings_changed')
+      .execute();
+    expect(lines).toHaveLength(0);
+  });
+
+  it('answers 400 for nothing to change, a time zone that does not exist, a country that is not one, and fields it does not take', async () => {
+    const person = await createSignedInPerson(app, database);
+    const empty = await putSettings(person, {});
+    expect(empty.statusCode).toBe(400);
+    expect(empty.json().error.code).toBe('NOTHING_TO_CHANGE');
+    expect((await putSettings(person, { timeZone: 'Mars/Olympus' })).statusCode).toBe(400);
+    expect((await putSettings(person, { timeZone: '' })).statusCode).toBe(400);
+    expect((await putSettings(person, { defaultCountry: 'INDIA' })).statusCode).toBe(400);
+    expect((await putSettings(person, { defaultCountry: '12' })).statusCode).toBe(400);
+    const notACountry = await putSettings(person, { defaultCountry: 'ZZ' });
+    expect(notACountry.statusCode).toBe(400);
+    expect(notACountry.json().error.code).toBe('INVALID_COUNTRY');
+    expect((await putSettings(person, { name: 'Hacked Stays' })).statusCode).toBe(400);
+    expect((await putSettings(person, { accountId: randomUUID(), timeZone: 'Asia/Dubai' })).statusCode).toBe(400);
+    expect((await getSettings(person)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+  });
+
+  it('answers 403 to staff and to the "own leads only" role, 401 with nobody signed in, and 403 without the web app headers', async () => {
+    const person = await createSignedInPerson(app, database);
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await putSettings(person, { defaultCountry: 'AE' })).statusCode, role).toBe(403);
+    }
+    await setRole(person, 'manager');
+    expect((await putSettings(null, { defaultCountry: 'AE' })).statusCode).toBe(401);
+    expect((await putSettings(person, { defaultCountry: 'AE' }, false)).statusCode).toBe(403);
+    expect((await getSettings(person)).json().defaultCountry).toBe('IN');
+  });
+
+  it('keeps businesses apart: changing one business leaves the other as it was', async () => {
+    const first = await createSignedInPerson(app, database);
+    const second = await createSignedInPerson(app, database);
+    await putSettings(first, { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+    expect((await getSettings(second)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+  });
+
+  it("makes a phone number typed without a country code follow the business's country", async () => {
+    const person = await createSignedInPerson(app, database);
+    const digits = String(Math.floor(Math.random() * 90_000_000) + 10_000_000);
+    const india = await addContactWithPhone(person, `98${digits.slice(0, 8)}`);
+    expect(india.statusCode, india.body).toBe(201);
+    expect(india.json().phone).toBe(`+9198${digits.slice(0, 8)}`);
+
+    await putSettings(person, { defaultCountry: 'AE' });
+    const emirates = await addContactWithPhone(person, `050${digits.slice(0, 7)}`);
+    expect(emirates.statusCode, emirates.body).toBe(201);
+    expect(emirates.json().phone).toBe(`+97150${digits.slice(0, 7)}`);
+
+    // A number with its own country code is the same whatever the business's country is
+    const withCode = await addContactWithPhone(
+      person,
+      `+9198${String(Math.floor(Math.random() * 90_000_000) + 10_000_000)}`,
+    );
+    expect(withCode.json().phone.startsWith('+9198')).toBe(true);
+  });
+});

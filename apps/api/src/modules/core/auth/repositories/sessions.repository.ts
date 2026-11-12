@@ -12,6 +12,8 @@ export interface LivePrincipal {
   sessionId: string;
   isPlatformAdmin: boolean;
   industryId: string;
+  timeZone: string;
+  defaultCountry: string;
   emailVerified: boolean;
 }
 
@@ -32,6 +34,8 @@ export async function findLivePrincipal(db: Db, sessionId: string, userId: strin
       'users.is_platform_admin',
       'users.email_verified_at',
       'accounts.industry',
+      'accounts.time_zone',
+      'accounts.default_country',
       'sessions.id as session_id',
     ])
     .where('sessions.id', '=', sessionId)
@@ -48,6 +52,8 @@ export async function findLivePrincipal(db: Db, sessionId: string, userId: strin
     sessionId: row.session_id,
     isPlatformAdmin: row.is_platform_admin,
     industryId: row.industry,
+    timeZone: row.time_zone,
+    defaultCountry: row.default_country,
     emailVerified: row.email_verified_at !== null,
   };
 }

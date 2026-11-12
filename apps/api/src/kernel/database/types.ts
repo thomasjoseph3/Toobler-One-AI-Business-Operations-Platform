@@ -53,6 +53,8 @@ export interface AccountsTable {
   name: string;
   industry: Generated<string>;
   time_zone: Generated<string>;
+  /** The country a phone number belongs to when typed without a country code, as two capital letters like IN. */
+  default_country: Generated<string>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
