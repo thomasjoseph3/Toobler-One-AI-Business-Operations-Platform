@@ -273,6 +273,18 @@ const attempts: Attempt[] = [
   },
   // ---- offerings
   {
+    route: 'POST /api/v1/offerings/reorder',
+    what: "reorder using A's offering id",
+    request: () => ({ method: 'POST', url: '/offerings/reorder', payload: { offeringIds: [dataOfA.offeringId] } }),
+    expectedStatus: 400,
+  },
+  {
+    route: 'POST /api/v1/offers',
+    what: "add an offer (B's own business only)",
+    request: () => ({ method: 'POST', url: '/offers', payload: { text: 'Bob offer', endsOn: '2099-12-31' } }),
+    expectedStatus: 201,
+  },
+  {
     route: 'PATCH /api/v1/offerings/{id}',
     what: "change A's offering",
     request: () => ({

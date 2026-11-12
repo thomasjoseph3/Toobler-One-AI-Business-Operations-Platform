@@ -1,5 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { offeringsRoutes } from './routes/offerings.routes';
+import { offersRoutes } from './routes/offers.routes';
 
 /**
  * What the business sells (offerings) and its time-limited promotions (offers). A core module: always on, so it has no
@@ -11,5 +12,6 @@ export default defineModule({
   kind: 'core',
   routes: (app) => {
     offeringsRoutes(app);
+    offersRoutes(app);
   },
 });

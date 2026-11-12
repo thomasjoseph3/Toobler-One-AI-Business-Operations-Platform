@@ -730,3 +730,128 @@ describe('DELETE /api/v1/offerings/{id}', () => {
     ).rejects.toThrow();
   });
 });
+
+/** Reorders the offerings as the person. */
+const reorderOfferings = (person: SignedInPerson | null, offeringIds: unknown, withCsrfHeaders = true) =>
+  send(person, 'POST', '/offerings/reorder', { offeringIds }, withCsrfHeaders);
+
+describe('POST /api/v1/offerings/reorder', () => {
+  it('puts the offerings, on and off, in the new order with positions 0, 1, 2...', async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = await addOfferingAndGetId(person, { name: 'First' });
+    const second = await addOfferingAndGetId(person, { name: 'Second', active: false });
+    const third = await addOfferingAndGetId(person, { name: 'Third' });
+    const response = await reorderOfferings(person, [third, first, second]);
+    expect(response.statusCode, response.body).toBe(200);
+    expect(namesOf(response.json())).toEqual(['Third', 'First', 'Second']);
+    expect(response.json().items.map((item: { sort: number }) => item.sort)).toEqual([0, 1, 2]);
+    expect(namesOf((await listOfferings(person)).json())).toEqual(['Third', 'First', 'Second']);
+    expect(namesOf((await listOfferings(person, 'active=true')).json())).toEqual(['Third', 'First']);
+  });
+
+  it('writes one log line and one offerings.reordered event with no names in them', async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = await addOfferingAndGetId(person, { name: 'Secret Suite' });
+    const second = await addOfferingAndGetId(person, { name: 'Other' });
+    await reorderOfferings(person, [second, first]);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'offerings.reordered')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.fields).toEqual(['order']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'offerings.reordered')
+      .execute();
+    expect(events.map((event) => event.payload)).toEqual([{ count: 2 }]);
+    expect(JSON.stringify([lines, events])).not.toContain('Secret Suite');
+  });
+
+  it('writes nothing when the order sent is the order it already has', async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = await addOfferingAndGetId(person, { name: 'First' });
+    const second = await addOfferingAndGetId(person, { name: 'Second' });
+    const response = await reorderOfferings(person, [first, second]);
+    expect(response.statusCode, response.body).toBe(200);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'offerings.reordered')
+      .execute();
+    expect(lines).toHaveLength(0);
+  });
+
+  it('tidies the gaps a removal leaves, even when the order is unchanged', async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = await addOfferingAndGetId(person, { name: 'First' });
+    const middle = await addOfferingAndGetId(person, { name: 'Middle' });
+    const last = await addOfferingAndGetId(person, { name: 'Last' });
+    await deleteOffering(person, middle);
+    expect((await listOfferings(person)).json().items.map((item: { sort: number }) => item.sort)).toEqual([0, 2]);
+    const response = await reorderOfferings(person, [first, last]);
+    expect(response.json().items.map((item: { sort: number }) => item.sort)).toEqual([0, 1]);
+  });
+
+  it('answers 400 OFFERINGS_MISMATCH unless every live offering is listed exactly once and nothing else', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const strangers = await addOfferingAndGetId(stranger, { name: 'Theirs' });
+    const first = await addOfferingAndGetId(person, { name: 'First' });
+    const second = await addOfferingAndGetId(person, { name: 'Second' });
+    const removed = await addOfferingAndGetId(person, { name: 'Removed' });
+    await deleteOffering(person, removed);
+    const bad: unknown[][] = [
+      [first],
+      [first, first],
+      [first, second, first],
+      [first, second, randomUUID()],
+      [first, second, strangers],
+      [first, second, removed],
+      [first, strangers],
+    ];
+    for (const ids of bad) {
+      const response = await reorderOfferings(person, ids);
+      expect(response.statusCode, JSON.stringify(ids)).toBe(400);
+      expect(response.json().error.code).toBe('OFFERINGS_MISMATCH');
+    }
+    expect(namesOf((await listOfferings(person)).json())).toEqual(['First', 'Second']);
+    expect(namesOf((await listOfferings(stranger)).json())).toEqual(['Theirs']);
+  });
+
+  it('answers 400 for an empty list, ids that are not UUIDs, and fields it does not take', async () => {
+    const person = await createSignedInPerson(app, database);
+    await addOfferingAndGetId(person, { name: 'First' });
+    expect((await reorderOfferings(person, [])).statusCode).toBe(400);
+    expect((await reorderOfferings(person, ['abc'])).statusCode).toBe(400);
+    expect((await reorderOfferings(person, 'abc')).statusCode).toBe(400);
+    expect((await send(person, 'POST', '/offerings/reorder', {})).statusCode).toBe(400);
+    expect(
+      (await send(person, 'POST', '/offerings/reorder', { offeringIds: [randomUUID()], sort: 1 })).statusCode,
+    ).toBe(400);
+  });
+
+  it('answers 403 to staff and to the "own leads only" role, 401 with nobody signed in, 403 without the web app headers, and changes nothing', async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = await addOfferingAndGetId(person, { name: 'First' });
+    const second = await addOfferingAndGetId(person, { name: 'Second' });
+    for (const role of ['staff', 'staff_own'] as const) {
+      await setRole(person, role);
+      expect((await reorderOfferings(person, [second, first])).statusCode, role).toBe(403);
+    }
+    await setRole(person, 'manager');
+    expect((await reorderOfferings(null, [second, first])).statusCode).toBe(401);
+    expect((await reorderOfferings(person, [second, first], false)).statusCode).toBe(403);
+    expect(namesOf((await listOfferings(person)).json())).toEqual(['First', 'Second']);
+  });
+
+  it('is not mistaken for an offering id: the address "reorder" is its own route', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await send(person, 'PATCH', '/offerings/reorder', { name: 'x' })).statusCode).toBe(400); // an id that is not a UUID
+  });
+});

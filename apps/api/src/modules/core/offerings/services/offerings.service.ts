@@ -4,6 +4,7 @@ import type {
   ListOfferingsQuery,
   Offering,
   OfferingsResponse,
+  ReorderOfferingsRequest,
   UpdateOfferingRequest,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
@@ -246,6 +247,60 @@ export function createOfferingsService({ database }: { database: Database }) {
           existing ? { offeringId: existing.id } : undefined,
         );
       }
+    },
+
+    /**
+     * Puts the offerings in a new order. The request must list every live offering of the business (on and off) exactly once and
+     * nothing else (no removed offering, no other business's, no repeats), otherwise 400 OFFERINGS_MISMATCH. Positions become 0, 1, 2...
+     * with no gaps. Sending the order it already has changes nothing and writes no log line. Answers with the list in its new order.
+     */
+    async reorderOfferings(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      request: ReorderOfferingsRequest,
+    ): Promise<OfferingsResponse> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        // Reordering works out positions from what is there, so it takes its turn with adding
+        await offeringsRepository.lockOfferingsOfBusiness(transaction, accountId);
+        const currentIds = await offeringsRepository.listLiveOfferingIdsInOrder(transaction, accountId);
+        const requestedIds = new Set(request.offeringIds);
+        const listsEveryOfferingOnce =
+          requestedIds.size === request.offeringIds.length &&
+          requestedIds.size === currentIds.length &&
+          currentIds.every((offeringId) => requestedIds.has(offeringId));
+        if (!listsEveryOfferingOnce) {
+          throw new ApiError(
+            400,
+            'OFFERINGS_MISMATCH',
+            'List every offering of the business exactly once, and nothing else.',
+            { expected: currentIds.length, received: request.offeringIds.length },
+          );
+        }
+        const alreadyInThatOrder = currentIds.every((offeringId, index) => request.offeringIds[index] === offeringId);
+        const positionsAlreadyTidy = (await offeringsRepository.listOfferings(transaction, accountId)).every(
+          (offering, index) => offering.sort === index,
+        );
+        if (!(alreadyInThatOrder && positionsAlreadyTidy)) {
+          await offeringsRepository.setPositions(transaction, {
+            accountId,
+            positions: request.offeringIds.map((offeringId, index) => ({ offeringId, sort: index })),
+            actor,
+          });
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'offerings.reordered',
+            details: { recordType: 'offering', fields: ['order'] },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'offerings.reordered',
+            payload: { count: request.offeringIds.length },
+          });
+        }
+        return { items: (await offeringsRepository.listOfferings(transaction, accountId)).map(toOffering) };
+      });
     },
 
     /**

@@ -90,7 +90,7 @@ answer already carries the progress) and F31 (reading a website); they are not b
 | 0 | Migration `017`, table types, shared words and shapes, the pure functions (money in words, offer is current, what the AI may see) with unit tests, empty `core.offerings` module | none; **built, owner review pending** |
 | 1 | Add an offering, list offerings | `POST /offerings`, `GET /offerings`; **built, owner test pending** |
 | 2 | Edit (and switch on or off), remove | `PATCH /offerings/{id}`, `DELETE /offerings/{id}`; **built, owner test pending** |
-| 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers` |
+| 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers`; **built, owner test pending** |
 | 4 | List and edit offers | `GET /offers`, `PATCH /offers/{id}` |
 | 5 | Remove an offer; the link to F16 (the questions answered by this data, completeness and go-live count them) | `DELETE /offers/{id}` |
 | 6 | Leads name an offering (migration `018`); the sharing-out mode "by offering" | `POST /leads`, `PATCH /leads/{id}` and `PUT /assignment-rules` change (no new addresses) |
@@ -117,6 +117,16 @@ answer already carries the progress) and F31 (reading a website); they are not b
   cannot really delete a row (tested). Positions are not renumbered after a removal; the reorder route (slice 3) tidies them.
 - Log lines (`offerings.updated`, `offerings.deleted`) hold field names and ids only; events (`offering.updated`, `offering.deleted`) hold ids and field names.
 - Postman: folders 3 (change) and 4 (remove, and clean up everything the run added with a script).
+
+## Slice 3 notes
+- `POST /offerings/reorder` (manager) takes `{ "offeringIds": [...] }`: **every live offering of the business (on and off) exactly once**, in the new order, or 400
+  `OFFERINGS_MISMATCH` (a missing, repeated, removed, unknown or other business's id). Positions become 0, 1, 2... with no gaps, so it also tidies the gaps removals leave.
+  The same order sent again writes nothing. It shares the per-business lock with adding, so a reorder and an add never read the same list. The route is declared before
+  `/offerings/{id}`, so "reorder" is never mistaken for an id. Log line `offerings.reordered` (field `order`) and event `offerings.reordered` (a count): no names.
+- `POST /offers` (manager) takes `{ "text", "endsOn" }`. `endsOn` is a real plain date and must be **today or later in the business's time zone** (400 `OFFER_ALREADY_ENDED`),
+  because an offer that has ended is never shown to anyone. At most 200 live offers (409 `OFFER_LIMIT`). The answer has `current`, worked out when read in the business's
+  time zone. Log line `offers.created` (field names) and event `offer.created` (id and end date, never the words).
+- `calendarDateSchema` (a real date like 2026-12-31) moved from being private to `packages/shared/src/leads.ts` to exported, so offers reuse leads' date check.
 
 ## Reused from the hotel agent
 The "Port from" table has no row for F17. The old agent has hotel-specific tables (`hotel_room_types` with a base price, weekend price and rate overrides per

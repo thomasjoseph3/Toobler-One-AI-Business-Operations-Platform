@@ -13,7 +13,7 @@ function isRealCalendarDate(value: string): boolean {
 }
 
 /** A calendar date written like 2026-12-20, and a real one (not 2026-02-31). */
-const calendarDateSchema = z
+export const calendarDateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use a date like 2026-12-20')
   .refine((value) => isRealCalendarDate(value), 'That date does not exist');

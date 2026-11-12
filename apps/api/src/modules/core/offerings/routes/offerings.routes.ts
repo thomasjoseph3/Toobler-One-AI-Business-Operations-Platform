@@ -6,12 +6,13 @@ import {
   offeringIdParamsSchema,
   offeringSchema,
   offeringsResponseSchema,
+  reorderOfferingsRequestSchema,
   updateOfferingRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createOfferingsService } from '../services/offerings.service';
 
-/** Registers /api/v1/offerings (add, list) and /offerings/{id} (change, remove). More routes arrive with the later slices. */
+/** Registers /api/v1/offerings (add, list), /offerings/reorder and /offerings/{id} (change, remove). More routes arrive with the later slices. */
 export function offeringsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const offeringsService = createOfferingsService({ database: app.kernel.database });
@@ -40,6 +41,19 @@ export function offeringsRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return offeringsService.listOfferings(request.principal, request.query);
+    },
+  );
+
+  // For managers only. Sends every offering's id once, in the new order. (Registered before /offerings/:id so "reorder" is never read as an id.)
+  typedApp.post(
+    '/offerings/reorder',
+    {
+      config: { access: 'manager' },
+      schema: { body: reorderOfferingsRequestSchema, response: { 200: offeringsResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return offeringsService.reorderOfferings(request.principal, request.body);
     },
   );
 

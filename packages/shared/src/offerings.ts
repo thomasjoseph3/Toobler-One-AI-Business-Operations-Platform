@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { calendarDateSchema } from './leads';
 
 // The words and shapes of offerings (what the business sells) and offers (time-limited promotions), between the API and the
 // web app. The request shapes are added with the slice that builds each route.
@@ -146,3 +147,30 @@ export const updateOfferingRequestSchema = z
   })
   .strict();
 export type UpdateOfferingRequest = z.infer<typeof updateOfferingRequestSchema>;
+
+/**
+ * What a manager sends to put the offerings in a new order: the ids of ALL the business's live offerings (on and off), each once, in
+ * the new order. The API checks the list is exactly the business's offerings.
+ */
+export const reorderOfferingsRequestSchema = z
+  .object({ offeringIds: z.array(z.uuid()).min(1).max(MAX_OFFERINGS) })
+  .strict();
+export type ReorderOfferingsRequest = z.infer<typeof reorderOfferingsRequestSchema>;
+
+/** The most live offers one business may have (a guard against runaway imports). */
+export const MAX_OFFERS = 200;
+
+/** The address part naming an offer. */
+export const offerIdParamsSchema = z.object({ id: z.uuid() });
+
+/**
+ * What a manager sends to add an offer: the words and the last day it is on (a plain date like 2026-12-31, today or later in the
+ * business's time zone). Anything else in the body is refused.
+ */
+export const createOfferRequestSchema = z
+  .object({
+    text: z.string().trim().min(1, 'Say what the offer is').max(300),
+    endsOn: calendarDateSchema,
+  })
+  .strict();
+export type CreateOfferRequest = z.infer<typeof createOfferRequestSchema>;

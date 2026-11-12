@@ -246,3 +246,34 @@ export async function softDeleteOffering(
     .where('deleted_at', 'is', null)
     .execute();
 }
+
+/** The ids of the business's live offerings in their current order. */
+export async function listLiveOfferingIdsInOrder(db: Db, accountId: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('offerings')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .orderBy('sort', 'asc')
+    .orderBy('id', 'asc')
+    .execute();
+  return rows.map((row) => row.id);
+}
+
+/** Gives each offering the position named, one update per offering whose position really changes. */
+export async function setPositions(
+  db: Db,
+  options: { accountId: string; positions: Array<{ offeringId: string; sort: number }>; actor: Actor },
+): Promise<void> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  for (const position of options.positions) {
+    await db
+      .updateTable('offerings')
+      .set({ sort: position.sort, updated_by: actorStamp })
+      .where('account_id', '=', options.accountId)
+      .where('id', '=', position.offeringId)
+      .where('deleted_at', 'is', null)
+      .where('sort', '<>', position.sort)
+      .execute();
+  }
+}
