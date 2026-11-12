@@ -237,6 +237,36 @@ export interface LeadsTable {
   updated_at: Generated<Date>;
 }
 
+/** A request that is not a sale (complaint, callback, question). Fenced by account_id. */
+export interface TicketsTable {
+  id: string;
+  account_id: string;
+  contact_id: string;
+  title: string;
+  details: string | null;
+  type: Generated<'callback' | 'question' | 'complaint' | 'existing_customer' | 'other'>;
+  priority: Generated<'low' | 'normal' | 'high' | 'urgent'>;
+  status: Generated<'open' | 'done'>;
+  owner_user_id: string | null;
+  conversation_type_key: string | null;
+  closed_at: Date | null;
+  closed_by: Json | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** A note on a ticket. Written once, never edited. Fenced by account_id. */
+export interface TicketNotesTable {
+  id: string;
+  account_id: string;
+  ticket_id: string;
+  body: string;
+  created_by: Json | null;
+  created_at: Generated<Date>;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -257,4 +287,6 @@ export interface DB {
   assignment_rules: AssignmentRulesTable;
   assignment_rule_people: AssignmentRulePeopleTable;
   leads: LeadsTable;
+  tickets: TicketsTable;
+  ticket_notes: TicketNotesTable;
 }
