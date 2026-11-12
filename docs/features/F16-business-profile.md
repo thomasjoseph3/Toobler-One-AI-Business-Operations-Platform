@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/09-business-questions.md`, `08-knowledge-base.md` (the Business profile and Situations parts); `requirements/API.md` (Knowledge base); docs/plan/PHASE-1.md (F16)
 **Depends on:** F00, F01     **Module:** `core.knowledge` (core: always on, no switch; later features F17, F18 and F19 add to it)
-**Status:** PLAN ONLY. Not started. The owner chose all four defaults on 12 Nov 2026 ("your defaults"); waiting for "go". (Merged: F14 is in `dev` as a2683f1.)
+**Status:** in progress. Slice 0 built (12 Nov 2026). The owner chose all four defaults ("your defaults") and said "go".
 
 **Goal in one line:** a fixed list of questions tells the system everything the AI agent must know about a business: what it does, where it
 is, when it opens, how it handles a discount request, a complaint, an after-hours call. The owner answers them (the form now, the setup
@@ -79,12 +79,25 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
 | Slice | What | Routes |
 | --- | --- | --- |
-| 0 | Migration `014`, table types, shared words and shapes, the question set (general A to H + 7 industries) and the situations as code, answer validators (pure, unit-tested), empty `core.knowledge` module | none |
+| 0 | Migration `014`, table types, shared words and shapes, the question set (general A to H + 7 industries) and the situations as code, answer validators (pure, unit-tested), empty `core.knowledge` module | none; **built, owner review pending** |
 | 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}` |
 | 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm` |
 | 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}` |
 | 4 | Time zone and default country (if agreed); contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings` |
 | 5 | Journey tests, an entry for every route in `test/isolation.test.ts`, `api-security` review, Postman collection, hand-off with the manual test script | none |
+
+## Slice 0 notes (found while building)
+- **The seven industries and the industries table.** The requirement's seven example industries do not all exist in the industries table (it
+  has `general`, `hotel_resort`, `real_estate`, `clinic`, `education`, `services`, `retail`, `other`). Extras are keyed by industry id: the
+  sets for `hotel_resort`, `clinic`, `education` and `real_estate` apply today; the sets for `travel_agent`, `car_dealer` and
+  `wedding_planner` are written but take effect only when the platform adds those industries (a platform admin `POST /industries`). `services`,
+  `retail`, `general` and `other` have no extras (as "any other business" in the requirement).
+- The question list is 26 general questions: 22 answerable here and 4 answered elsewhere (`offerings`, `current_offers`, `common_questions`,
+  `brochure_upload`). Seven are needed to go live here (`has_website`, `business_name`, `business_summary`, `address`, `contact_details`,
+  `opening_hours`, `customer_languages`); `offerings` is needed too but is left out of the check until F17.
+- The primary key of `business_answers` is `(account_id, question_key)` and of `situations` is `(account_id, situation_key)` (one row each), so
+  there is no id column.
+- `situations` keeps only the chosen `choice` (no `custom_text`): the requirement lists choices only, and nothing needs free words yet.
 
 ## Reused from the hotel agent
 The "Port from" table in PHASE-1.md has no row for F16. The old agent has `locations.office_hours` (migration 014: `{ allDay: true }` or

@@ -267,6 +267,33 @@ export interface TicketNotesTable {
   created_at: Generated<Date>;
 }
 
+/** One answer to one business question. Fenced by account_id; the primary key is (account_id, question_key). */
+export interface BusinessAnswersTable {
+  account_id: string;
+  question_key: string;
+  value: Json;
+  source: Generated<'typed' | 'website' | 'listing' | 'document'>;
+  source_ref: string | null;
+  status: Generated<'check' | 'confirmed'>;
+  confirmed_by: Json | null;
+  confirmed_at: Date | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** How the business wants one situation handled. Fenced by account_id; the primary key is (account_id, situation_key). */
+export interface SituationsTable {
+  account_id: string;
+  situation_key: string;
+  choice: string;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -289,4 +316,6 @@ export interface DB {
   leads: LeadsTable;
   tickets: TicketsTable;
   ticket_notes: TicketNotesTable;
+  business_answers: BusinessAnswersTable;
+  situations: SituationsTable;
 }
