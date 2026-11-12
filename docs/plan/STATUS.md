@@ -17,7 +17,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F03 | Modules: plug and play | approved | [brief](../features/F03-modules.md) | 2026-11-11 |
 | F04 | Contacts | approved | [brief](../features/F04-contacts.md) | 2026-11-11 |
 | F06 | Pipeline and leads board | approved | [brief](../features/F06-pipeline-and-leads.md) | 2026-11-12 |
-| F14 | Tickets | planned | | |
+| F14 | Tickets | in_progress | [brief](../features/F14-tickets.md) | |
 | F16 | Business profile, business questions and situations | planned | | |
 | F17 | Offerings and offers | planned | | |
 | F18 | Documents, FAQs, knowledge search and unanswered questions | planned | | |
