@@ -26,10 +26,17 @@ describe('GET /api/v1/industries', () => {
     expect(response.json().items.map((industry: { id: string }) => industry.id)).toEqual([
       'general',
       'hotel_resort',
+      'restaurant_cafe',
       'real_estate',
+      'travel_agent',
+      'wedding_planner',
       'clinic',
       'education',
+      'car_dealer',
+      'auto_service',
       'services',
+      'salon_spa',
+      'gym_fitness',
       'retail',
       'other',
     ]);
@@ -102,5 +109,15 @@ describe('the industries table', () => {
         .values({ id: randomUUID(), name: 'Orphan', industry: 'no_such_industry' })
         .execute(),
     ).rejects.toThrow(/foreign key/i);
+  });
+});
+
+describe('the industries that have their own extra business questions', () => {
+  it('all exist in the industries table (so a business can pick them at sign-up)', async () => {
+    const { INDUSTRY_QUESTIONS } = await import('../src/modules/core/knowledge/helpers/industry-questions');
+    const rows = await database.system.selectFrom('industries').select('id').where('is_active', '=', true).execute();
+    const existing = new Set(rows.map((row) => row.id));
+    const missing = Object.keys(INDUSTRY_QUESTIONS).filter((industryId) => !existing.has(industryId));
+    expect(missing).toEqual([]);
   });
 });

@@ -90,6 +90,20 @@ beforeAll(async () => {
   const lead = await sendOk(businessA, 'POST', '/leads', { contactId: contact.id, interest: secretWords }, 201);
   const ticket = await sendOk(businessA, 'POST', '/tickets', { contactId: contact.id, title: secretWords }, 201);
   const stage = await sendOk(businessA, 'POST', '/pipeline/stages', { name: `Stage ${secretWords}` }, 201);
+  await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
+  await sendOk(businessA, 'PUT', '/knowledge/situations/discount_request', { choice: 'tell_current_offer' });
+  await sendOk(businessA, 'PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+  // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
+  await database.system
+    .insertInto('business_answers')
+    .values({
+      account_id: businessA.profile.business.id,
+      question_key: 'address',
+      value: JSON.stringify(`Address ${secretWords}`),
+      source: 'website',
+      status: 'check',
+    })
+    .execute();
   dataOfA = {
     contactId: contact.id,
     leadId: lead.id,
@@ -227,6 +241,43 @@ const attempts: Attempt[] = [
     request: () => ({ method: 'POST', url: '/tickets', payload: { contactId: dataOfA.contactId, title: 'Sneaky' } }),
     expectedStatus: 404,
   },
+  // ---- the business profile (the question key is a code, not a business's record: B can only ever answer for B)
+  {
+    route: 'PUT /api/v1/knowledge/answers/{question_key}',
+    what: "answer the same question as A, and A's answer must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/answers/business_name',
+      payload: { value: 'Bob Business' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'PUT /api/v1/knowledge/situations/{key}',
+    what: "choose another way for the same situation as A, and A's choice must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/situations/discount_request',
+      payload: { choice: 'prices_are_fixed' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'PUT /api/v1/knowledge/settings',
+    what: "change the time zone and country (B's own business only), and A's must stay as they were",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/settings',
+      payload: { timeZone: 'Europe/London', defaultCountry: 'GB' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/knowledge/answers/confirm',
+    what: "confirm A's answer that is waiting for a check (B has no such answer)",
+    request: () => ({ method: 'POST', url: '/knowledge/answers/confirm', payload: { questionKeys: ['address'] } }),
+    expectedStatus: 404,
+  },
   // ---- the platform (only a platform admin; B is an ordinary business)
   {
     route: 'POST /api/v1/platform/businesses/{id}/modules',
@@ -250,6 +301,9 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/lost-reasons', url: '/lost-reasons' },
   { route: 'GET /api/v1/assignment-rules', url: '/assignment-rules' },
   { route: 'GET /api/v1/modules', url: '/modules' },
+  { route: 'GET /api/v1/knowledge/questions', url: '/knowledge/questions' },
+  { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
+  { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
 
@@ -282,6 +336,9 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/lost-reasons': 'covered by the list check',
   'GET /api/v1/assignment-rules': 'covered by the list check',
   'GET /api/v1/modules': 'covered by the list check',
+  'GET /api/v1/knowledge/questions': 'covered by the list check',
+  'GET /api/v1/knowledge/situations': 'covered by the list check',
+  'GET /api/v1/knowledge/settings': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",
@@ -371,6 +428,19 @@ describe('isolation: business B tries to reach business A', () => {
     expect(pipeline.stages.find((stage: { id: string }) => stage.id === dataOfA.stageId).name).toBe(
       `Stage ${dataOfA.secretWords}`,
     );
+    const questions = await sendOk(businessA, 'GET', '/knowledge/questions');
+    const nameAnswer = questions.questions.find((question: { key: string }) => question.key === 'business_name').answer;
+    expect(nameAnswer.value).toBe(`Business ${dataOfA.secretWords}`);
+    const addressAnswer = questions.questions.find((question: { key: string }) => question.key === 'address').answer;
+    expect(addressAnswer).toMatchObject({ status: 'check', source: 'website' });
+    const situations = await sendOk(businessA, 'GET', '/knowledge/situations');
+    expect(situations.items.find((item: { key: string }) => item.key === 'discount_request').selectedChoiceKey).toBe(
+      'tell_current_offer',
+    );
+    expect(await sendOk(businessA, 'GET', '/knowledge/settings')).toEqual({
+      timeZone: 'Asia/Dubai',
+      defaultCountry: 'AE',
+    });
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
     // B's own records are untouched too

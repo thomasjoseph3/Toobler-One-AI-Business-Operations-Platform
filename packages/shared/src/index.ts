@@ -8,3 +8,4 @@ export * from './lost-reasons';
 export * from './leads';
 export * from './assignment-rules';
 export * from './tickets';
+export * from './knowledge';
