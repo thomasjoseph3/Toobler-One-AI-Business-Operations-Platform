@@ -30,12 +30,18 @@ const isUniqueViolation = (error: unknown) =>
  */
 export function createPipelineService({ database }: { database: Database }) {
   return {
-    /** The business's pipeline with its stages in board order, each with its number of leads. */
-    async getPipeline(principal: Pick<Principal, 'accountId'>): Promise<Pipeline> {
+    /** The business's pipeline with its stages in board order, each with its number of leads (for "own leads only": its own). */
+    async getPipeline(principal: Pick<Principal, 'accountId' | 'userId' | 'role'>): Promise<Pipeline> {
       return database.runInAccountTransaction(principal.accountId, async (transaction) => {
         const pipeline = await pipelineRepository.findPipelineForAccount(transaction, principal.accountId);
         if (!pipeline) throw notFound('The pipeline');
-        const stages = await pipelineRepository.listStagesWithLeadCounts(transaction, principal.accountId, pipeline.id);
+        // The "own leads only" role sees the stages, but the counts only cover the leads it owns
+        const stages = await pipelineRepository.listStagesWithLeadCounts(
+          transaction,
+          principal.accountId,
+          pipeline.id,
+          principal.role === 'staff_own' ? principal.userId : undefined,
+        );
         return { id: pipeline.id, name: pipeline.name, stages };
       });
     },

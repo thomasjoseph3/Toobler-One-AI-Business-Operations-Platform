@@ -77,15 +77,27 @@ export async function lockPipelineForAccount(
     .executeTakeFirst();
 }
 
-/** Every stage of the pipeline in board order, each with the number of leads in it (deleted leads are not counted). */
+/**
+ * Every stage of the pipeline in board order, each with the number of leads in it (deleted leads are not counted). With
+ * `visibleToUserId` (the "own leads only" role) only the leads that person owns are counted.
+ */
 export async function listStagesWithLeadCounts(
   db: Db,
   accountId: string,
   pipelineId: string,
+  visibleToUserId?: string,
 ): Promise<PipelineStage[]> {
   const rows = await db
     .selectFrom('pipeline_stages as stage')
-    .leftJoin('leads as lead', (join) => join.onRef('lead.stage_id', '=', 'stage.id').on('lead.deleted_at', 'is', null))
+    .leftJoin('leads as lead', (join) => {
+      // The join names the business again, so a lead of another business can never be counted even if a stage id clashed
+      let joined = join
+        .onRef('lead.stage_id', '=', 'stage.id')
+        .onRef('lead.account_id', '=', 'stage.account_id')
+        .on('lead.deleted_at', 'is', null);
+      if (visibleToUserId) joined = joined.on('lead.owner_user_id', '=', visibleToUserId);
+      return joined;
+    })
     .select(['stage.id', 'stage.name', 'stage.kind', 'stage.sort'])
     .select((expression) => expression.fn.count<string>('lead.id').as('lead_count'))
     .where('stage.account_id', '=', accountId)

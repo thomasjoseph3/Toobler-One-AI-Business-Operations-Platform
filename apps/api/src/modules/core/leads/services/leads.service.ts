@@ -12,7 +12,7 @@ import type { AssignLeadRequest } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
-import { ApiError, conflict, notFound } from '../../../../kernel/errors';
+import { ApiError, conflict, forbidden, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
@@ -61,6 +61,14 @@ function toLead(row: LeadRow, contactsById: Map<string, ContactSummary>): Lead {
   };
 }
 
+/**
+ * The "own leads only" role (staff_own) sees and changes only the leads it owns; everyone else works with all of the
+ * business's leads. Returns the person's id for that role, and undefined for every other role.
+ */
+function ownLeadsOnlyUserId(principal: Pick<Principal, 'userId' | 'role'>): string | undefined {
+  return principal.role === 'staff_own' ? principal.userId : undefined;
+}
+
 /** Looks up the people the given leads are for, keyed by contact id. */
 async function loadContactsForLeads(transaction: Db, accountId: string, rows: LeadRow[]) {
   const contactIds = [...new Set(rows.map((row) => row.contactId))];
@@ -88,7 +96,10 @@ export function createLeadsService({ database }: { database: Database }) {
      * the lead. A contact that is missing, deleted or another business's, and an owner from another business, answer 404.
      * The contact's lifecycle stage is updated. Two requests at the same moment cannot give one contact two open leads.
      */
-    async createLead(principal: Pick<Principal, 'accountId' | 'userId'>, request: CreateLeadRequest): Promise<Lead> {
+    async createLead(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
+      request: CreateLeadRequest,
+    ): Promise<Lead> {
       const accountId = principal.accountId;
       const actor: Actor = { kind: 'user', id: principal.userId };
 
@@ -122,8 +133,15 @@ export function createLeadsService({ database }: { database: Database }) {
           if (!firstOpenStage) throw new Error('The business has no open pipeline stage');
 
           // The owner named in the request, or else whoever the business's sharing-out rule picks. Naming an owner does
-          // not use up anyone's turn in a round-robin.
-          const ownerUserId = request.ownerUserId ?? (await chooseOwnerForNewLead(transaction, { accountId, actor }));
+          // not use up anyone's turn in a round-robin. The "own leads only" role can only add leads that are its own: it
+          // may not name anyone else, and the sharing-out rule is not used for it.
+          let ownerUserId: string | null;
+          if (principal.role === 'staff_own') {
+            if (request.ownerUserId !== undefined && request.ownerUserId !== principal.userId) throw forbidden();
+            ownerUserId = principal.userId;
+          } else {
+            ownerUserId = request.ownerUserId ?? (await chooseOwnerForNewLead(transaction, { accountId, actor }));
+          }
 
           const leadId = uuidv7();
           await leadsRepository.insertLead(transaction, {
@@ -188,9 +206,14 @@ export function createLeadsService({ database }: { database: Database }) {
     },
 
     /** One lead of the business. A deleted lead, an unknown id and another business's lead all answer 404. */
-    async getLead(principal: Pick<Principal, 'accountId'>, leadId: string): Promise<Lead> {
+    async getLead(principal: Pick<Principal, 'accountId' | 'userId' | 'role'>, leadId: string): Promise<Lead> {
       return database.runInAccountTransaction(principal.accountId, async (transaction) => {
-        const row = await leadsRepository.findLeadById(transaction, principal.accountId, leadId);
+        const row = await leadsRepository.findLeadById(
+          transaction,
+          principal.accountId,
+          leadId,
+          ownLeadsOnlyUserId(principal),
+        );
         if (!row) throw notFound('That lead');
         return toLead(row, await loadContactsForLeads(transaction, principal.accountId, [row]));
       });
@@ -203,7 +226,7 @@ export function createLeadsService({ database }: { database: Database }) {
      * routes. "Last activity" does not move: editing is not contact with the customer.
      */
     async updateLead(
-      principal: Pick<Principal, 'accountId' | 'userId'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       leadId: string,
       request: UpdateLeadRequest,
     ): Promise<Lead> {
@@ -214,8 +237,11 @@ export function createLeadsService({ database }: { database: Database }) {
       const actor: Actor = { kind: 'user', id: principal.userId };
 
       return database.runInAccountTransaction(accountId, async (transaction) => {
-        if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId))) throw notFound('That lead');
-        const current = await leadsRepository.findLeadById(transaction, accountId, leadId);
+        const visibleToUserId = ownLeadsOnlyUserId(principal);
+        if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId, visibleToUserId))) {
+          throw notFound('That lead');
+        }
+        const current = await leadsRepository.findLeadById(transaction, accountId, leadId, visibleToUserId);
         if (!current) throw notFound('That lead');
 
         // What the lead would look like: a field not sent stays as it is, `null` clears it
@@ -271,7 +297,7 @@ export function createLeadsService({ database }: { database: Database }) {
      * The stage must belong to the business (404). The contact's lifecycle stage is updated.
      */
     async moveLead(
-      principal: Pick<Principal, 'accountId' | 'userId'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       leadId: string,
       request: MoveLeadRequest,
     ): Promise<Lead> {
@@ -280,8 +306,11 @@ export function createLeadsService({ database }: { database: Database }) {
 
       try {
         return await database.runInAccountTransaction(accountId, async (transaction) => {
-          if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId))) throw notFound('That lead');
-          const current = await leadsRepository.findLeadById(transaction, accountId, leadId);
+          const visibleToUserId = ownLeadsOnlyUserId(principal);
+          if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId, visibleToUserId))) {
+            throw notFound('That lead');
+          }
+          const current = await leadsRepository.findLeadById(transaction, accountId, leadId, visibleToUserId);
           if (!current) throw notFound('That lead');
           const targetStage = await pipelineRepository.findStageById(transaction, accountId, request.stageId);
           if (!targetStage) throw notFound('That stage');
@@ -381,7 +410,7 @@ export function createLeadsService({ database }: { database: Database }) {
      * (the database checks it). Giving the lead to its current owner changes nothing.
      */
     async assignLead(
-      principal: Pick<Principal, 'accountId' | 'userId'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       leadId: string,
       request: AssignLeadRequest,
     ): Promise<Lead> {
@@ -390,8 +419,11 @@ export function createLeadsService({ database }: { database: Database }) {
 
       try {
         return await database.runInAccountTransaction(accountId, async (transaction) => {
-          if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId))) throw notFound('That lead');
-          const current = await leadsRepository.findLeadById(transaction, accountId, leadId);
+          const visibleToUserId = ownLeadsOnlyUserId(principal);
+          if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId, visibleToUserId))) {
+            throw notFound('That lead');
+          }
+          const current = await leadsRepository.findLeadById(transaction, accountId, leadId, visibleToUserId);
           if (!current) throw notFound('That lead');
           if (current.ownerUserId === request.ownerUserId) {
             return toLead(current, await loadContactsForLeads(transaction, accountId, [current]));
@@ -428,14 +460,17 @@ export function createLeadsService({ database }: { database: Database }) {
      * counts. Another business's lead, a lead already deleted and an unknown id all answer 404. The contact's lifecycle
      * stage is worked out again without the lead, and the contact can be given a new lead.
      */
-    async deleteLead(principal: Pick<Principal, 'accountId' | 'userId'>, leadId: string): Promise<void> {
+    async deleteLead(principal: Pick<Principal, 'accountId' | 'userId' | 'role'>, leadId: string): Promise<void> {
       const accountId = principal.accountId;
       const actor: Actor = { kind: 'user', id: principal.userId };
 
       await database.runInAccountTransaction(accountId, async (transaction) => {
         // Lock the row first, so two deletes at the same moment cannot both succeed
-        if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId))) throw notFound('That lead');
-        const current = await leadsRepository.findLeadById(transaction, accountId, leadId);
+        const visibleToUserId = ownLeadsOnlyUserId(principal);
+        if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId, visibleToUserId))) {
+          throw notFound('That lead');
+        }
+        const current = await leadsRepository.findLeadById(transaction, accountId, leadId, visibleToUserId);
         if (!current) throw notFound('That lead');
         const deleted = await leadsRepository.softDeleteLead(transaction, { accountId, leadId, actor });
         if (!deleted) throw notFound('That lead');
@@ -468,13 +503,14 @@ export function createLeadsService({ database }: { database: Database }) {
 
     /** The leads as a list (one page, newest activity first) or as a board (a column per stage), narrowed by the filters. */
     async listLeads(
-      principal: Pick<Principal, 'accountId'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       query: ListLeadsQuery,
     ): Promise<LeadsListResponse | LeadsBoardResponse> {
       const accountId = principal.accountId;
       return database.runInAccountTransaction(accountId, async (transaction) => {
+        const visibleToUserId = ownLeadsOnlyUserId(principal);
         if (query.view === 'board') {
-          return readBoard(transaction, accountId, query);
+          return readBoard(transaction, accountId, query, visibleToUserId);
         }
         const { rows, total } = await leadsRepository.listLeadRows(
           transaction,
@@ -484,6 +520,7 @@ export function createLeadsService({ database }: { database: Database }) {
             ownerUserId: query.ownerUserId,
             contactId: query.contactId,
             status: query.status,
+            visibleToUserId,
           },
           { limit: query.limit, offset: (query.page - 1) * query.limit },
         );
@@ -501,7 +538,12 @@ export function createLeadsService({ database }: { database: Database }) {
 }
 
 /** The board: every stage in order, each with its newest leads (the owner and contact filters apply, the others do not). */
-async function readBoard(transaction: Db, accountId: string, query: ListLeadsQuery): Promise<LeadsBoardResponse> {
+async function readBoard(
+  transaction: Db,
+  accountId: string,
+  query: ListLeadsQuery,
+  visibleToUserId: string | undefined,
+): Promise<LeadsBoardResponse> {
   const pipeline = await pipelineRepository.findPipelineForAccount(transaction, accountId);
   if (!pipeline) throw notFound('The pipeline');
   const stages = await pipelineRepository.listStagesInOrder(transaction, accountId, pipeline.id);
@@ -510,7 +552,7 @@ async function readBoard(transaction: Db, accountId: string, query: ListLeadsQue
   for (const stage of stages) {
     const { rows, total } = await leadsRepository.listLeadRows(
       transaction,
-      { accountId, stageId: stage.id, ownerUserId: query.ownerUserId, contactId: query.contactId },
+      { accountId, stageId: stage.id, ownerUserId: query.ownerUserId, contactId: query.contactId, visibleToUserId },
       { limit: BOARD_COLUMN_LIMIT, offset: 0 },
     );
     columnsWithRows.push({ stage, rows, total });

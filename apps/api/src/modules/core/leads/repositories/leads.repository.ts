@@ -71,6 +71,8 @@ export interface LeadFilters {
   contactId?: string | undefined;
   /** `open` = not closed; `closed` = won or lost. */
   status?: 'open' | 'closed' | undefined;
+  /** For the "own leads only" role: only the leads this person owns. Left out, every lead of the business. */
+  visibleToUserId?: string | undefined;
 }
 
 /** The query every lead read starts from: live leads of the business, each joined to its stage, narrowed by the filters. */
@@ -83,6 +85,7 @@ function selectLeadRows(db: Db, filters: LeadFilters) {
   if (filters.stageId) query = query.where('lead.stage_id', '=', filters.stageId);
   if (filters.ownerUserId) query = query.where('lead.owner_user_id', '=', filters.ownerUserId);
   if (filters.contactId) query = query.where('lead.contact_id', '=', filters.contactId);
+  if (filters.visibleToUserId) query = query.where('lead.owner_user_id', '=', filters.visibleToUserId);
   if (filters.status === 'open') query = query.where('lead.closed_at', 'is', null);
   if (filters.status === 'closed') query = query.where('lead.closed_at', 'is not', null);
   return query;
@@ -201,9 +204,17 @@ export async function insertLead(
     .execute();
 }
 
-/** One live lead of the business, or undefined (also for a deleted lead or another business's lead). */
-export async function findLeadById(db: Db, accountId: string, leadId: string): Promise<LeadRow | undefined> {
-  const row = await selectLeadRows(db, { accountId })
+/**
+ * One live lead of the business, or undefined (also for a deleted lead or another business's lead). With `visibleToUserId`
+ * (the "own leads only" role) a lead owned by someone else is undefined too.
+ */
+export async function findLeadById(
+  db: Db,
+  accountId: string,
+  leadId: string,
+  visibleToUserId?: string,
+): Promise<LeadRow | undefined> {
+  const row = await selectLeadRows(db, { accountId, visibleToUserId })
     .select(LEAD_COLUMNS)
     .where('lead.id', '=', leadId)
     .executeTakeFirst();
@@ -273,18 +284,25 @@ export async function countOpenAndWonLeadsForContact(
 
 /**
  * Locks one live lead of the business until the transaction ends, so two edits at once take turns instead of overwriting
- * each other. Returns false if there is no such live lead (also for another business's lead). Only the lead row is locked,
+ * each other. Returns false if there is no such live lead (also for another business's lead, or, with `visibleToUserId`, one
+ * owned by someone else). Only the lead row is locked,
  * not its stage, so edits to other leads of the same stage are not held up.
  */
-export async function lockLeadForUpdate(db: Db, accountId: string, leadId: string): Promise<boolean> {
-  const row = await db
+export async function lockLeadForUpdate(
+  db: Db,
+  accountId: string,
+  leadId: string,
+  visibleToUserId?: string,
+): Promise<boolean> {
+  let query = db
     .selectFrom('leads')
     .select('id')
     .where('account_id', '=', accountId)
     .where('id', '=', leadId)
-    .where('deleted_at', 'is', null)
-    .forUpdate()
-    .executeTakeFirst();
+    .where('deleted_at', 'is', null);
+  // The "own leads only" role can only lock (and so only change) leads it owns
+  if (visibleToUserId) query = query.where('owner_user_id', '=', visibleToUserId);
+  const row = await query.forUpdate().executeTakeFirst();
   return row !== undefined;
 }
 

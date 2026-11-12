@@ -1317,3 +1317,122 @@ describe('DELETE /api/v1/leads/{id}', () => {
     expect((await getLead(person, lead.id)).statusCode).toBe(200);
   });
 });
+
+describe('the "own leads only" role (staff_own)', () => {
+  /** Adds a second person to the business straight into the database (the team screens come with F02). */
+  async function addColleague(person: SignedInPerson): Promise<string> {
+    const userId = randomUUID();
+    await database.system
+      .insertInto('users')
+      .values({
+        id: userId,
+        account_id: person.profile.business.id,
+        email: `colleague-${userId.slice(0, 8)}@example.com`,
+        name: 'Rahul Kumar',
+        mobile_e164: null,
+        mobile_key: null,
+        role: 'staff',
+      })
+      .execute();
+    return userId;
+  }
+
+  /** Changes the person's role (it is read from the database on every request). */
+  async function setRole(person: SignedInPerson, role: 'manager' | 'staff' | 'staff_own') {
+    await database.system.updateTable('users').set({ role }).where('id', '=', person.profile.user.id).execute();
+  }
+
+  /** Sets up a business with three leads: one owned by the person, one by a colleague, one by nobody. */
+  async function setUp() {
+    const person = await createSignedInPerson(app, database);
+    const colleagueId = await addColleague(person);
+    const own = await addContactAndLead(person); // the sharing-out rule gives it to the person
+    const colleaguesLead = await addContactAndLead(person);
+    await assignLead(person, colleaguesLead.id, { ownerUserId: colleagueId });
+    const unassignedLead = await addContactAndLead(person);
+    await assignLead(person, unassignedLead.id, { ownerUserId: null });
+    return { person, colleagueId, own, colleaguesLead, unassignedLead };
+  }
+
+  it('lists, counts and shows only the leads the person owns', async () => {
+    const { person, own, colleaguesLead } = await setUp();
+    expect((await listLeads(person)).json().total).toBe(3); // as a manager: all three
+    await setRole(person, 'staff_own');
+
+    const list = (await listLeads(person)).json();
+    expect(list.total).toBe(1);
+    expect(list.items.map((lead: { id: string }) => lead.id)).toEqual([own.id]);
+
+    const board = (await listLeads(person, 'view=board')).json();
+    expect(board.columns[0].leadCount).toBe(1);
+    expect(board.columns[0].leads.map((lead: { id: string }) => lead.id)).toEqual([own.id]);
+
+    const pipeline = (await send(person, 'GET', '/pipeline')).json();
+    expect(pipeline.stages.find((stage: { name: string }) => stage.name === 'New').leadCount).toBe(1);
+
+    // Asking for someone else's leads, or for a colleague's contact, finds nothing
+    expect((await listLeads(person, `ownerUserId=${randomUUID()}`)).json().total).toBe(0);
+    expect((await listLeads(person, `contactId=${colleaguesLead.contactId}`)).json().total).toBe(0);
+  });
+
+  it("answers 404 to everything that names another person's lead or an unowned lead, even by typed URL", async () => {
+    const { person, colleaguesLead, unassignedLead, own } = await setUp();
+    await setRole(person, 'staff_own');
+    const contactedId = await stageIdNamed(person, 'Contacted');
+    for (const lead of [colleaguesLead, unassignedLead]) {
+      expect((await getLead(person, lead.id)).statusCode, 'read').toBe(404);
+      expect((await patchLead(person, lead.id, { interest: 'Taken over' })).statusCode, 'edit').toBe(404);
+      expect((await moveLead(person, lead.id, { stageId: contactedId })).statusCode, 'move').toBe(404);
+      expect((await assignLead(person, lead.id, { ownerUserId: person.profile.user.id })).statusCode, 'take over').toBe(
+        404,
+      );
+    }
+    // ...and the lead was not touched
+    await setRole(person, 'manager');
+    expect((await getLead(person, colleaguesLead.id)).json()).toMatchObject({
+      stage: { name: 'New' },
+      interest: colleaguesLead.interest,
+    });
+    expect((await getLead(person, unassignedLead.id)).json().ownerUserId).toBeNull();
+
+    // Their own lead works as normal
+    await setRole(person, 'staff_own');
+    expect((await getLead(person, own.id)).statusCode).toBe(200);
+    expect((await patchLead(person, own.id, { interest: 'Mine' })).statusCode).toBe(200);
+    expect((await moveLead(person, own.id, { stageId: contactedId })).statusCode).toBe(200);
+  });
+
+  it('adds leads only in their own name', async () => {
+    const { person, colleagueId } = await setUp();
+    await setRole(person, 'staff_own');
+    const mine = await addLead(person, { contactId: await addContact(person) });
+    expect(mine.statusCode, mine.body).toBe(201);
+    expect(mine.json().ownerUserId).toBe(person.profile.user.id);
+    const forSomeoneElse = await addLead(person, { contactId: await addContact(person), ownerUserId: colleagueId });
+    expect(forSomeoneElse.statusCode).toBe(403);
+    const namingThemselves = await addLead(person, {
+      contactId: await addContact(person),
+      ownerUserId: person.profile.user.id,
+    });
+    expect(namingThemselves.statusCode).toBe(201);
+  });
+
+  it('loses sight of a lead they give to someone else, and cannot delete leads at all', async () => {
+    const { person, colleagueId, own } = await setUp();
+    await setRole(person, 'staff_own');
+    expect((await deleteLead(person, own.id)).statusCode).toBe(403);
+    expect((await assignLead(person, own.id, { ownerUserId: colleagueId })).statusCode).toBe(200);
+    expect((await getLead(person, own.id)).statusCode).toBe(404);
+    expect((await listLeads(person)).json().total).toBe(0);
+    // The manager still sees it, now owned by the colleague
+    await setRole(person, 'manager');
+    expect((await getLead(person, own.id)).json().ownerUserId).toBe(colleagueId);
+  });
+
+  it("does not change what staff and managers see: all of the business's leads", async () => {
+    const { person } = await setUp();
+    await setRole(person, 'staff');
+    expect((await listLeads(person)).json().total).toBe(3);
+    expect((await listLeads(person, 'view=board')).json().columns[0].leadCount).toBe(3);
+  });
+});

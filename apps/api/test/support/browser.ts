@@ -5,7 +5,7 @@ import { unsafeRequestHeaders } from './app';
 export interface PretendBrowser {
   /** Sends a request the way our web app would: the right headers, plus whichever cookies the browser would attach. */
   send(
-    method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     url: string,
     payload?: object,
   ): Promise<Awaited<ReturnType<FastifyInstance['inject']>>>;

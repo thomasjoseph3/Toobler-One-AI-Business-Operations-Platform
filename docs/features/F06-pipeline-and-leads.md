@@ -25,7 +25,7 @@ agent (F19) will save every enquiry into.
   the contact lifecycle update (`lead` on a new lead, `customer` on first Won, `repeat_customer` on later ones); activity log
   and events.
 - Out: the screens (designer), the AI's `save_lead` tool (F19), the timeline (F07), tasks for callbacks (F08), companies,
-  custom fields, scoring, teams, offerings, the "own leads only" filter (F02/F11; for now every staff member sees all leads),
+  custom fields, scoring, teams, offerings, the team and role screens (F02),
   industry presets (the general preset only, as at sign-up).
 
 ## Rules
@@ -92,7 +92,8 @@ agent (F19) will save every enquiry into.
 | 7 | `POST /leads/{id}/move`, `POST /leads/{id}/assign`; the "not a fit" lifecycle fix | done; owner tested |
 | 8 | `DELETE /leads/{id}` | done; owner tested |
 | 9 | `GET /assignment-rules`, `PUT /assignment-rules` (round-robin); migration `012` | built; owner test pending |
-| Journey | chained story test | planned |
+| Journey | chained story test (`leads-journeys.test.ts`) | done |
+| Review | security review with the `api-security` skill; `staff_own` added | done |
 | UI | Board (drag on computer, **Move** on phone), list, lead page, Settings → Pipeline | on hold (designer) |
 
 ## Screens (for when the designer delivers)
@@ -115,10 +116,54 @@ agent (F19) will save every enquiry into.
 - Journey test: the life of a lead from New to Won, and from New to Lost and back.
 
 ## Manual test script
-Written slice by slice (each slice's hand-off gives the exact Postman steps); the full script is assembled at the end.
+The screens are parked for the designer, so F06 is tested through the API. Two ways, the same checks:
+
+**A. Postman (recommended).** In Postman, My Workspace: collection *Toobler One - F06 leads and pipeline (run in order)* and environment *Toobler One - local dev*.
+1. Start the API (`npm run dev`) and apply the migrations (`npm run db:migrate`: 010, 011 and 012 must be applied).
+2. In the environment, set `email` and `password` (current values) to a MANAGER of a verified test business.
+3. Run the collection with the Runner, folders 0 to 7 in order. Every request checks its answer; all must pass. It leaves the business as it found it (the test lead and contact are soft-deleted).
+
+**B. By hand, the main path** (each step: what you send, what you should see):
+1. Sign in, `GET /pipeline` → New, Contacted, Quoted, Won, Lost with `sort` 0 to 4.
+2. `POST /pipeline/stages` `{"name":"Site visit"}` → 201, it sits before Won. Same name in capitals → 409 `STAGE_EXISTS`.
+3. `PATCH /pipeline/stages/{id}` rename; `POST /pipeline/stages/reorder` with all open ids → new order; leave one out → 400 `STAGES_MISMATCH`.
+4. `DELETE` Won → 409 `CLOSING_STAGE_CANNOT_BE_REMOVED`.
+5. `PUT /lost-reasons` `{"reasons":["Price too high","Chose a competitor"]}` → the list; the same reason twice → 400.
+6. `POST /contacts`, then `POST /leads` `{"contactId":"…","interest":"3 nights in December","partySize":4,"budgetPaise":4500000}` → 201 in the first stage, owner you; again → 409 `LEAD_OPEN`. The contact is now `lead`.
+7. `GET /leads`, `GET /leads?view=board`, `GET /leads/{id}`, `PATCH /leads/{id}` (end date before start → 400 `INVALID_DATES`).
+8. `POST /leads/{id}/move` to Lost without a reason → 400 `LOST_REASON_REQUIRED`; with one → closed, contact back to `new`; adding another lead for her → 409 `LEAD_RECENTLY_LOST`; move back to an open stage → reopened; to Won → contact `customer`.
+9. Move the lead into Site visit, `DELETE /pipeline/stages/{id}` → 409 `STAGE_HAS_LEADS`; with `?move_to=<another open stage>` → 200, the lead moved.
+10. `POST /leads/{id}/assign` `{"ownerUserId":null}` then your own id → 200; a made-up id → 404.
+11. `GET/PUT /assignment-rules` round-robin with your id, then back to one person.
+12. `DELETE /leads/{id}` → 204, then 404 on read; the contact goes back to `new`.
+13. Fence checks: signed out → 401 on every route; role `staff` → 403 on stage changes, lost-reason changes, assignment rules and deleting a lead, but 200 on reading and working leads; a second business's token → 404 on the first one's lead and stage ids.
+14. Unmark "not a fit" on a contact that has an open lead (`PATCH /contacts/{id}` `{"notAFit":false}`): the answer says `new`, and about a second later the contact reads `lead`.
 
 ## Security checklist
-Ticked at hand-off with the `api-security` skill.
+Reviewed with the `api-security` skill on 12 Nov 2026 (the whole F06 diff: 14 routes, 5 tables, migrations 010 to 012).
+
+- [x] Every new table has account_id, RLS enabled + forced, and the schema test passes (`pipelines`, `pipeline_stages`, `lost_reasons`, `assignment_rules`, `assignment_rule_people`, `leads`).
+- [x] Every new route: role guard on the route; tests for works / 401 / 403 wrong role / 404 other business / 400 bad input. Reads are `staff`; stage changes, lost reasons, deleting a lead and the sharing-out rule are `manager`. Routes with no id in them (`GET /pipeline`, `POST /pipeline/stages`, the reorder, lost reasons, assignment rules) have no "other business's id" to try; the nearest case (a stranger's stage or person named in the body) is tested and answers 404 or 400.
+- [x] Every list, search and export respects staff_own. **Found in this review and fixed:** the guard lets `staff_own` through every `staff` route, so the leads service now limits that role to the leads it owns (list, board, stage counts, read, edit, move, assign), answers 404 for any other lead even by typed URL, and lets it add leads only in its own name (naming someone else is 403). Tested in `leads.test.ts` ("the own leads only role"). Contacts' own `staff_own` filter is still F04's open item (F02/F11); a lead shows only its own contact's name, phone and email.
+- [x] No business id taken from body, query, params or tool arguments. The business always comes from the session; every body schema is `.strict()`, so an `accountId` is refused with 400 (tested).
+- [x] All input validated with zod, with max lengths; no SQL built from strings. The only raw SQL is two fixed fragments (`lower(label)`, `nulls first`) with the user's text passed as a parameter.
+- [x] New public route? None added.
+- [x] New webhook? None added.
+- [x] New agent/assistant tool? None added (the AI's `save_lead` is F19).
+- [x] New outside call with a user-given URL? None.
+- [x] New file upload? None.
+- [x] Nothing new logged that is personal data or a secret. Activity-log lines and events carry ids and field names only; tested for lead text, lost reasons, stage names and contact details. `process.env` is read only in `kernel/config.ts`.
+- [x] Deletes ask first in the UI (UI is parked for the designer: the "Are you sure?" naming the stage or lead is in its list); deletes and setting changes write the activity log (tested).
+- [x] Secrets encrypted at rest and shown only as previews: no secrets in F06.
+- [ ] `npm run verify` passes: to be run at hand-off (the e2e part waits for the screens).
+
+Defence in depth added by the database, not only the app: a lead's owner and the sharing-out people must work for the same business (composite foreign keys); a contact has at most one open lead (unique index); the app role cannot delete leads, pipelines or sharing-out rules; the stage lead-count join repeats the business.
+
+Known limits, recorded rather than hidden:
+- A disabled person can still be named as an owner or a round-robin person; the check arrives with the team feature (F02, which also adds disabling).
+- `LEAD_OPEN` and `LEAD_RECENTLY_LOST` name the other lead's id to a `staff_own` person even when it is not theirs. The id alone opens nothing (reading it is 404), and they need it to understand why they cannot add a lead.
+- There is no separate `test/isolation` suite yet (BACKEND.md names one); the other-business 404 checks live in each route's own tests and in the journey test "two businesses side by side". A shared suite across all modules is a follow-up.
+- `npm audit` shows moderate findings that were there before F06; F06 adds no package.
 
 ## Decisions and differences from the requirements
 - R6 filled in as above (the requirement is silent on a lead closed less than 60 days ago).
