@@ -20,3 +20,16 @@ export async function insertOnePersonRule(
     })
     .execute();
 }
+
+/** How the business shares out new leads, or undefined if it has no rule. */
+export async function findAssignmentRule(
+  db: Db,
+  accountId: string,
+): Promise<{ mode: 'one_person' | 'round_robin'; userId: string | null } | undefined> {
+  const row = await db
+    .selectFrom('assignment_rules')
+    .select(['mode', 'user_id'])
+    .where('account_id', '=', accountId)
+    .executeTakeFirst();
+  return row ? { mode: row.mode, userId: row.user_id } : undefined;
+}

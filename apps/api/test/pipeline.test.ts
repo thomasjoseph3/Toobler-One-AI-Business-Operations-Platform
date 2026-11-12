@@ -85,25 +85,26 @@ describe('GET /api/v1/pipeline', () => {
   it('counts the leads in each stage and ignores deleted leads', async () => {
     const person = await createSignedInPerson(app, database);
     const accountId = person.profile.business.id;
-    const contactId = randomUUID();
-    await database.system
-      .insertInto('contacts')
-      .values({
-        id: contactId,
-        account_id: accountId,
-        name: 'Priya',
-        phone: null,
-        email: `${contactId}@example.com`,
-        language: null,
-      })
-      .execute();
     const newStage = await database.system
       .selectFrom('pipeline_stages')
       .select('id')
       .where('account_id', '=', accountId)
       .where('name', '=', 'New')
       .executeTakeFirstOrThrow();
+    // One person has at most one open lead, so each lead gets its own contact
     for (const deleted of [false, false, true]) {
+      const contactId = randomUUID();
+      await database.system
+        .insertInto('contacts')
+        .values({
+          id: contactId,
+          account_id: accountId,
+          name: 'Priya',
+          phone: null,
+          email: `${contactId}@example.com`,
+          language: null,
+        })
+        .execute();
       await database.system
         .insertInto('leads')
         .values({

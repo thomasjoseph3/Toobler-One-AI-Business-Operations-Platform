@@ -70,8 +70,8 @@ agent (F19) will save every enquiry into.
 | PATCH | `/pipeline/stages/{id}` | Manager | Rename any stage; Won and Lost keep their meaning ("Booked" is still Won) |
 | POST | `/pipeline/stages/reorder` | Manager | The open stages in a new order |
 | DELETE | `/pipeline/stages/{id}?move_to=` | Manager | Remove an open stage, moving its leads (409 `STAGE_HAS_LEADS` without `move_to`; never Won, Lost or the last open stage) |
-| GET, PUT | `/lost-reasons` | Staff read, manager replace | The list the Lost dialog offers |
-| POST | `/leads` | Staff | Add a lead by hand (409 `LEAD_OPEN` if the contact has one) |
+| GET, PUT | `/lost-reasons` | Staff read, manager replace | The list the Lost dialog offers (1 to 20 reasons, no repeats ignoring capitals) |
+| POST | `/leads` | Staff | Add a lead by hand (409 `LEAD_OPEN` if the contact has an open lead; 409 `LEAD_RECENTLY_LOST` if one was lost under 60 days ago) |
 | GET | `/leads` | Staff | List, or `?view=board` for the board; filter by stage, owner, contact, open/closed |
 | GET | `/leads/{id}` | Staff | One lead with its contact and stage |
 | PATCH | `/leads/{id}` | Staff | Edit the details (not the stage or owner) |
@@ -86,10 +86,10 @@ agent (F19) will save every enquiry into.
 | 0 | This brief and migration `010` | done; owner reviewed |
 | 1 | `GET /pipeline`, `POST /pipeline/stages` (and the sign-up hook that gives a new business its pipeline) | done; owner tested |
 | 2 | `PATCH /pipeline/stages/{id}`, `POST /pipeline/stages/reorder` | done; owner tested |
-| 3 | `DELETE /pipeline/stages/{id}?move_to=` | built; owner test pending |
-| 4 | `GET /lost-reasons`, `PUT /lost-reasons` | planned |
-| 5 | `POST /leads`, `GET /leads` (list and board); the open-lead rule | planned |
-| 6 | `GET /leads/{id}`, `PATCH /leads/{id}` | planned |
+| 3 | `DELETE /pipeline/stages/{id}?move_to=` | done; owner tested |
+| 4 | `GET /lost-reasons`, `PUT /lost-reasons` | done; owner tested |
+| 5 | `POST /leads`, `GET /leads` (list and board); the open-lead rule; migration `011` | done; owner tested |
+| 6 | `GET /leads/{id}`, `PATCH /leads/{id}` | built; owner test pending |
 | 7 | `POST /leads/{id}/move`, `POST /leads/{id}/assign` | planned |
 | 8 | `DELETE /leads/{id}` | planned |
 | 9 | `GET /assignment-rules`, `PUT /assignment-rules` (round-robin) | planned |
@@ -130,3 +130,12 @@ Ticked at hand-off with the `api-security` skill.
 - Round-robin is over all active staff until teams (F02).
 - Removing a stage moves its leads (deleted ones too, since they still point at the stage) without changing their last-activity time: a board tidy-up is not contact with the customer. One activity-log line and one event (`pipeline.stage_removed`, counts and ids only) record it; per-lead timeline lines are not written (F07 can read the event).
 - The last open stage cannot be removed, so the board always has somewhere for new leads.
+- Replacing the lost reasons deletes and re-adds them, so their ids change on every save. That is safe because a lead stores the words, not the id. Concurrent saves take turns through a lock on the business's pipeline row.
+- **Slice 5, migration `011`.** Two rules are enforced by the database as well as the app: a lead's owner must work for the same business (a composite foreign key on `users (account_id, id)`, because the leads module may not read the users table and auth already requires leads), and a contact has at most one open lead (a partial unique index, so two simultaneous adds cannot both win).
+- **Adding a lead by hand and R6.** Open lead: 409 `LEAD_OPEN`. Lost under 60 days ago: 409 `LEAD_RECENTLY_LOST` pointing at that lead, because reopening belongs to the move route (slice 7). Won under 60 days ago: a new lead is created (staff adding by hand is a new purchase). The AI agent (F19) will use the same pure function `decideWhatToDoWithEnquiry` to attach, reopen, or ask the conversation type.
+- **Board.** Every stage is a column with up to 50 newest leads and the full `leadCount`; `hasMore` says when there are more. The board honours the owner and contact filters, and ignores `stageId`, `status`, `page` and `limit`.
+- **Owner on a new lead** is the named person, otherwise the "one person" rule's person. Round-robin arrives in slice 9. The owner's name is not in the answer yet (the team list is F02); the card shows `ownerUserId`.
+- **Contact lifecycle.** A new lead moves the contact to `lead` (through `contacts/index.ts`). Known gap from F04: un-marking "not a fit" still computes the stage as if the contact had no leads. It will be fixed in slice 7 (when leads can be won) with an event, so contacts never have to import leads.
+- A made-up `/leads` route in `http.test.ts` (a test of the module switch) was renamed so it does not clash with the real route.
+- **Slice 6, editing a lead.** `PATCH /leads/{id}` changes interest, dates, party size, budget, promise and callback. The stage, owner, contact and temperature are refused (400): they have their own routes or features. It follows the contacts edit rules: an empty body is 400 `NOTHING_TO_CHANGE`, blank text or `null` clears a field, and sending what is already stored changes nothing (no log line, no event). The end date is checked against what the lead will hold after the change (400 `INVALID_DATES`). Two edits at once take turns on a lock on the lead row, so neither overwrites the other. "Last activity" does not move on an edit.
+- The test app's app-wide rate limit (300 a minute) is raised in `buildTestApp`, like the per-route limits already were; `http.test.ts` still tests the limit itself.

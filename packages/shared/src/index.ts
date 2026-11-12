@@ -4,3 +4,5 @@ export * from './industries';
 export * from './modules';
 export * from './contacts';
 export * from './pipeline';
+export * from './lost-reasons';
+export * from './leads';

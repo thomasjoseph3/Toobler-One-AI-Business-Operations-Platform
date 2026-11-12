@@ -201,7 +201,7 @@ export interface AssignmentRulesTable {
   updated_at: Generated<Date>;
 }
 
-/** One enquiry that might become a sale. Fenced by account_id. The columns are checked again when the lead routes arrive. */
+/** One enquiry that might become a sale. Fenced by account_id. Dates come back as text like 2026-12-20. */
 export interface LeadsTable {
   id: string;
   account_id: string;
@@ -212,8 +212,8 @@ export interface LeadsTable {
   date_from: string | null;
   date_to: string | null;
   party_size: number | null;
-  /** Money in paise. The database driver hands bigint back as text. */
-  budget_paise: string | null;
+  /** Money in paise (whole numbers). Our database setup hands bigint back as a number. */
+  budget_paise: number | null;
   promise: string | null;
   callback_at: Date | null;
   owner_user_id: string | null;

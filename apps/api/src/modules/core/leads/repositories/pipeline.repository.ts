@@ -235,3 +235,35 @@ export async function listOpenStageIdsExcept(
   const openStageIds = await listOpenStageIds(db, accountId, pipelineId);
   return openStageIds.filter((stageId) => stageId !== exceptStageId);
 }
+
+/** The first open stage of the pipeline (where a new lead starts), or undefined if there is none. */
+export async function findFirstOpenStage(
+  db: Db,
+  accountId: string,
+  pipelineId: string,
+): Promise<{ id: string } | undefined> {
+  return db
+    .selectFrom('pipeline_stages')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('pipeline_id', '=', pipelineId)
+    .where('kind', '=', 'open')
+    .orderBy('sort')
+    .limit(1)
+    .executeTakeFirst();
+}
+
+/** Every stage of the pipeline in board order (no lead counts). */
+export async function listStagesInOrder(
+  db: Db,
+  accountId: string,
+  pipelineId: string,
+): Promise<Array<{ id: string; name: string; kind: StageKind; sort: number }>> {
+  return db
+    .selectFrom('pipeline_stages')
+    .select(['id', 'name', 'kind', 'sort'])
+    .where('account_id', '=', accountId)
+    .where('pipeline_id', '=', pipelineId)
+    .orderBy('sort')
+    .execute();
+}

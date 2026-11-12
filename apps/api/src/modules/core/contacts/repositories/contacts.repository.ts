@@ -212,3 +212,16 @@ export async function softDeleteContact(db: Db, accountId: string, contactId: st
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** The live contacts among these ids, in no particular order. Deleted contacts and other businesses' contacts are left out. */
+export async function findContactsByIds(db: Db, accountId: string, contactIds: string[]): Promise<Contact[]> {
+  if (contactIds.length === 0) return [];
+  const rows = await db
+    .selectFrom('contacts')
+    .select(CONTACT_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', 'in', contactIds)
+    .where('deleted_at', 'is', null)
+    .execute();
+  return rows.map(toContact);
+}

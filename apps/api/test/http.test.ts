@@ -238,7 +238,8 @@ describe('route rules', () => {
     const leadsModule = defineModule({
       id: 'engine.leads',
       kind: 'engine',
-      routes: (app) => void app.get('/leads', { config: { access: 'staff' } }, async () => ({ leads: [] })),
+      // A made-up route name, so it does not clash with the real /leads route of the leads module
+      routes: (app) => void app.get('/engine-sample', { config: { access: 'staff' } }, async () => ({ leads: [] })),
     });
     const authenticate = async () => ({
       accountId,
@@ -249,7 +250,7 @@ describe('route rules', () => {
       emailVerified: true,
     });
     const appWithModuleOff = await buildTestApp(database, [leadsModule], { authenticate });
-    const response = await appWithModuleOff.inject('/api/v1/leads');
+    const response = await appWithModuleOff.inject('/api/v1/engine-sample');
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('NOT_FOUND');
     await appWithModuleOff.close();
@@ -261,7 +262,7 @@ describe('route rules', () => {
           moduleId === 'engine.leads' || coreOnlyGate(registry).isActive(checkedAccountId, moduleId),
       },
     });
-    expect((await appWithModuleOn.inject('/api/v1/leads')).json()).toEqual({ leads: [] });
+    expect((await appWithModuleOn.inject('/api/v1/engine-sample')).json()).toEqual({ leads: [] });
     await appWithModuleOn.close();
   });
 });
