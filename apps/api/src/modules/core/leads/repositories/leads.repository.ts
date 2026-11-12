@@ -322,3 +322,67 @@ export async function updateLeadDetails(
     .where('deleted_at', 'is', null)
     .execute();
 }
+
+/**
+ * Puts a live lead in another stage. Winning or losing closes it (`closedAt` set; `lostReason` is the reason's words for a
+ * lost lead); moving to an open stage reopens it (both cleared). A move counts as activity on the lead.
+ */
+export async function moveLeadToStage(
+  db: Db,
+  options: {
+    accountId: string;
+    leadId: string;
+    stageId: string;
+    closedAt: Date | null;
+    lostReason: string | null;
+    movedAt: Date;
+    actor: Actor;
+  },
+): Promise<void> {
+  await db
+    .updateTable('leads')
+    .set({
+      stage_id: options.stageId,
+      closed_at: options.closedAt,
+      lost_reason: options.lostReason,
+      last_activity_at: options.movedAt,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.leadId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}
+
+/** Gives a live lead a new owner (or no owner) and stamps who did it. Assigning is not activity on the lead, so "last activity" stays. */
+export async function setLeadOwner(
+  db: Db,
+  options: { accountId: string; leadId: string; ownerUserId: string | null; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('leads')
+    .set({
+      owner_user_id: options.ownerUserId,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.leadId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}
+
+/** Hides a live lead (the row stays) and stamps who did it. Returns false if there is no such live lead. */
+export async function softDeleteLead(
+  db: Db,
+  options: { accountId: string; leadId: string; actor: Actor },
+): Promise<boolean> {
+  const row = await db
+    .updateTable('leads')
+    .set({ deleted_at: new Date(), updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.leadId)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}

@@ -5,8 +5,10 @@ import type {
   LeadsBoardResponse,
   LeadsListResponse,
   ListLeadsQuery,
+  MoveLeadRequest,
   UpdateLeadRequest,
 } from '@toobler-one/shared';
+import type { AssignLeadRequest } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
@@ -17,8 +19,9 @@ import { uuidv7 } from '../../../../kernel/ids';
 import { applyLeadFactsToContact, findContactSummaries } from '../../contacts';
 import type { ContactSummary } from '../../contacts';
 import { decideWhatToDoWithEnquiry } from '../helpers/open-lead-rule';
-import * as assignmentRulesRepository from '../repositories/assignment-rules.repository';
+import { chooseOwnerForNewLead } from './assignment-rules.service';
 import * as leadsRepository from '../repositories/leads.repository';
+import * as lostReasonsRepository from '../repositories/lost-reasons.repository';
 import type { LeadDetailChanges, LeadRow } from '../repositories/leads.repository';
 import * as pipelineRepository from '../repositories/pipeline.repository';
 
@@ -118,10 +121,9 @@ export function createLeadsService({ database }: { database: Database }) {
             : undefined;
           if (!firstOpenStage) throw new Error('The business has no open pipeline stage');
 
-          // Round-robin arrives in a later slice; until a business can choose it, "one person" is the only rule.
-          const assignmentRule = await assignmentRulesRepository.findAssignmentRule(transaction, accountId);
-          const ownerUserId =
-            request.ownerUserId ?? (assignmentRule?.mode === 'one_person' ? assignmentRule.userId : null);
+          // The owner named in the request, or else whoever the business's sharing-out rule picks. Naming an owner does
+          // not use up anyone's turn in a round-robin.
+          const ownerUserId = request.ownerUserId ?? (await chooseOwnerForNewLead(transaction, { accountId, actor }));
 
           const leadId = uuidv7();
           await leadsRepository.insertLead(transaction, {
@@ -258,6 +260,209 @@ export function createLeadsService({ database }: { database: Database }) {
           payload: { leadId, fields: changedFields },
         });
         return readLead(transaction, accountId, leadId);
+      });
+    },
+
+    /**
+     * Moves a lead to another stage. Moving to Lost needs `lostReason`, one of the business's lost reasons (400
+     * LOST_REASON_REQUIRED or INVALID_LOST_REASON); a reason sent to any other stage is refused (400
+     * LOST_REASON_NOT_ALLOWED). Won and Lost close the lead; moving a closed lead to an open stage reopens it, which is refused
+     * with 409 LEAD_OPEN when the person already has another open lead. Moving a lead where it already is changes nothing.
+     * The stage must belong to the business (404). The contact's lifecycle stage is updated.
+     */
+    async moveLead(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      leadId: string,
+      request: MoveLeadRequest,
+    ): Promise<Lead> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      try {
+        return await database.runInAccountTransaction(accountId, async (transaction) => {
+          if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId))) throw notFound('That lead');
+          const current = await leadsRepository.findLeadById(transaction, accountId, leadId);
+          if (!current) throw notFound('That lead');
+          const targetStage = await pipelineRepository.findStageById(transaction, accountId, request.stageId);
+          if (!targetStage) throw notFound('That stage');
+
+          if (targetStage.id === current.stageId) {
+            return toLead(current, await loadContactsForLeads(transaction, accountId, [current]));
+          }
+
+          // Lost always needs a reason, written the way the business wrote it; no other stage takes one.
+          let lostReason: string | null = null;
+          if (targetStage.kind === 'lost') {
+            if (request.lostReason === undefined) {
+              throw new ApiError(400, 'LOST_REASON_REQUIRED', 'Choose a reason for losing this lead.');
+            }
+            const label = await lostReasonsRepository.findLostReasonLabel(transaction, accountId, request.lostReason);
+            if (!label) {
+              throw new ApiError(400, 'INVALID_LOST_REASON', 'Choose one of the lost reasons on the list.');
+            }
+            lostReason = label;
+          } else if (request.lostReason !== undefined) {
+            throw new ApiError(400, 'LOST_REASON_NOT_ALLOWED', 'A reason is only for moving a lead to Lost.');
+          }
+
+          const closing = targetStage.kind !== 'open';
+          const reopening = !closing && current.closedAt !== null;
+          const movedAt = new Date();
+          await leadsRepository.moveLeadToStage(transaction, {
+            accountId,
+            leadId,
+            stageId: targetStage.id,
+            closedAt: closing ? movedAt : null,
+            lostReason,
+            movedAt,
+            actor,
+          });
+
+          const leadFacts = await leadsRepository.countOpenAndWonLeadsForContact(
+            transaction,
+            accountId,
+            current.contactId,
+          );
+          await applyLeadFactsToContact(transaction, {
+            accountId,
+            contactId: current.contactId,
+            openLeads: leadFacts.openLeads,
+            wonLeads: leadFacts.wonLeads,
+            actor,
+          });
+
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'leads.moved',
+            details: {
+              recordType: 'lead',
+              recordId: leadId,
+              fields: lostReason === null ? ['stageId'] : ['stageId', 'lostReason'],
+            },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'lead.moved',
+            payload: { leadId, fromStageId: current.stageId, toStageId: targetStage.id },
+          });
+          // Closing or reopening is news in its own right (a won lead, a lost lead, a lead that came back)
+          if (targetStage.kind === 'won' || targetStage.kind === 'lost') {
+            await publishEvent(transaction, {
+              accountId,
+              eventName: targetStage.kind === 'won' ? 'lead.won' : 'lead.lost',
+              payload: { leadId, contactId: current.contactId },
+            });
+          } else if (reopening) {
+            await publishEvent(transaction, {
+              accountId,
+              eventName: 'lead.reopened',
+              payload: { leadId, contactId: current.contactId },
+            });
+          }
+          return readLead(transaction, accountId, leadId);
+        });
+      } catch (error) {
+        if (!isDatabaseError(error, UNIQUE_VIOLATION)) throw error;
+        // Reopening would give the person two open leads. The failed transaction is gone, so look in a new one.
+        const otherLead = await database.runInAccountTransaction(accountId, async (transaction) => {
+          const row = await leadsRepository.findLeadById(transaction, accountId, leadId);
+          return row ? leadsRepository.findLatestLeadForContact(transaction, accountId, row.contactId) : undefined;
+        });
+        if (otherLead && otherLead.id !== leadId) {
+          throw conflict('LEAD_OPEN', 'This person already has another open lead.', { leadId: otherLead.id });
+        }
+        throw error;
+      }
+    },
+
+    /**
+     * Changes who owns a lead, or leaves it with nobody (`null`). The person must work for the same business, otherwise 404
+     * (the database checks it). Giving the lead to its current owner changes nothing.
+     */
+    async assignLead(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      leadId: string,
+      request: AssignLeadRequest,
+    ): Promise<Lead> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      try {
+        return await database.runInAccountTransaction(accountId, async (transaction) => {
+          if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId))) throw notFound('That lead');
+          const current = await leadsRepository.findLeadById(transaction, accountId, leadId);
+          if (!current) throw notFound('That lead');
+          if (current.ownerUserId === request.ownerUserId) {
+            return toLead(current, await loadContactsForLeads(transaction, accountId, [current]));
+          }
+
+          await leadsRepository.setLeadOwner(transaction, {
+            accountId,
+            leadId,
+            ownerUserId: request.ownerUserId,
+            actor,
+          });
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'leads.assigned',
+            details: { recordType: 'lead', recordId: leadId, fields: ['ownerUserId'] },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'lead.assigned',
+            payload: { leadId, ownerUserId: request.ownerUserId, previousOwnerUserId: current.ownerUserId },
+          });
+          return readLead(transaction, accountId, leadId);
+        });
+      } catch (error) {
+        // The person is not someone who works for this business: answer like any unknown id
+        if (isDatabaseError(error, FOREIGN_KEY_VIOLATION)) throw notFound('That person');
+        throw error;
+      }
+    },
+
+    /**
+     * Deletes a lead for managers: a soft delete, the row stays but disappears from the board, the lists and the stage
+     * counts. Another business's lead, a lead already deleted and an unknown id all answer 404. The contact's lifecycle
+     * stage is worked out again without the lead, and the contact can be given a new lead.
+     */
+    async deleteLead(principal: Pick<Principal, 'accountId' | 'userId'>, leadId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        // Lock the row first, so two deletes at the same moment cannot both succeed
+        if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId))) throw notFound('That lead');
+        const current = await leadsRepository.findLeadById(transaction, accountId, leadId);
+        if (!current) throw notFound('That lead');
+        const deleted = await leadsRepository.softDeleteLead(transaction, { accountId, leadId, actor });
+        if (!deleted) throw notFound('That lead');
+
+        const leadFacts = await leadsRepository.countOpenAndWonLeadsForContact(
+          transaction,
+          accountId,
+          current.contactId,
+        );
+        await applyLeadFactsToContact(transaction, {
+          accountId,
+          contactId: current.contactId,
+          openLeads: leadFacts.openLeads,
+          wonLeads: leadFacts.wonLeads,
+          actor,
+        });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'leads.deleted',
+          details: { recordType: 'lead', recordId: leadId },
+        });
+        await publishEvent(transaction, {
+          accountId,
+          eventName: 'lead.deleted',
+          payload: { leadId, contactId: current.contactId },
+        });
       });
     },
 

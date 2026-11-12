@@ -1,4 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { assignmentRulesRoutes } from './routes/assignment-rules.routes';
+import { handleContactUnmarkedNotAFit } from './services/lifecycle-events.service';
 import { leadsRoutes } from './routes/leads.routes';
 import { lostReasonsRoutes } from './routes/lost-reasons.routes';
 import { pipelineRoutes } from './routes/pipeline.routes';
@@ -12,9 +14,12 @@ export default defineModule({
   kind: 'core',
   // Shows who a lead is for, and keeps a contact's lifecycle stage in step with its leads, through the contacts module
   requires: ['core.contacts'],
+  // When staff take the "not a fit" mark off a contact, its stage is worked out again from its leads
+  events: { 'contact.unmarked_not_a_fit': handleContactUnmarkedNotAFit },
   routes: (app) => {
     pipelineRoutes(app);
     lostReasonsRoutes(app);
     leadsRoutes(app);
+    assignmentRulesRoutes(app);
   },
 });

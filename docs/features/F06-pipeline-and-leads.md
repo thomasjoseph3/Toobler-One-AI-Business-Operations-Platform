@@ -13,8 +13,7 @@ agent (F19) will save every enquiry into.
    (a new purchase starts a new lead, a question about the purchase becomes an `existing_customer` ticket, F14/F15); closed
    60 days or more ago: a new lead. F06 builds the rule as a pure function; the agent wires it in at F19.
 2. **Left out until their feature** (each is one small migration): `team_id` (F02), `company_id` (F05), `offering_id` (F17),
-   custom fields (F09), `temperature_reason` (F10). Until teams exist, **round-robin rotates over all active staff of the
-   business**; "by offering" waits for F17.
+   custom fields (F09), `temperature_reason` (F10). Until teams exist, **round-robin rotates over the people the manager names** (changed in slice 9, see R37); "by offering" waits for F17.
 3. **Every lead's temperature is `unscored`** until F10.
 4. **"Rahul moved this to Quoted"**: the timeline is F07, so until then the line goes to the activity log and an event
    (`lead.moved`); F07 reads them.
@@ -89,10 +88,10 @@ agent (F19) will save every enquiry into.
 | 3 | `DELETE /pipeline/stages/{id}?move_to=` | done; owner tested |
 | 4 | `GET /lost-reasons`, `PUT /lost-reasons` | done; owner tested |
 | 5 | `POST /leads`, `GET /leads` (list and board); the open-lead rule; migration `011` | done; owner tested |
-| 6 | `GET /leads/{id}`, `PATCH /leads/{id}` | built; owner test pending |
-| 7 | `POST /leads/{id}/move`, `POST /leads/{id}/assign` | planned |
-| 8 | `DELETE /leads/{id}` | planned |
-| 9 | `GET /assignment-rules`, `PUT /assignment-rules` (round-robin) | planned |
+| 6 | `GET /leads/{id}`, `PATCH /leads/{id}` | done; owner tested |
+| 7 | `POST /leads/{id}/move`, `POST /leads/{id}/assign`; the "not a fit" lifecycle fix | done; owner tested |
+| 8 | `DELETE /leads/{id}` | done; owner tested |
+| 9 | `GET /assignment-rules`, `PUT /assignment-rules` (round-robin); migration `012` | built; owner test pending |
 | Journey | chained story test | planned |
 | UI | Board (drag on computer, **Move** on phone), list, lead page, Settings → Pipeline | on hold (designer) |
 
@@ -139,3 +138,10 @@ Ticked at hand-off with the `api-security` skill.
 - A made-up `/leads` route in `http.test.ts` (a test of the module switch) was renamed so it does not clash with the real route.
 - **Slice 6, editing a lead.** `PATCH /leads/{id}` changes interest, dates, party size, budget, promise and callback. The stage, owner, contact and temperature are refused (400): they have their own routes or features. It follows the contacts edit rules: an empty body is 400 `NOTHING_TO_CHANGE`, blank text or `null` clears a field, and sending what is already stored changes nothing (no log line, no event). The end date is checked against what the lead will hold after the change (400 `INVALID_DATES`). Two edits at once take turns on a lock on the lead row, so neither overwrites the other. "Last activity" does not move on an edit.
 - The test app's app-wide rate limit (300 a minute) is raised in `buildTestApp`, like the per-route limits already were; `http.test.ts` still tests the limit itself.
+- **Slice 7, moving a lead.** `POST /leads/{id}/move` takes `stageId` (and `lostReason` for Lost). Lost needs one of the business's reasons, matched ignoring capitals and stored as the business wrote it (400 `LOST_REASON_REQUIRED` / `INVALID_LOST_REASON`); a reason sent to any other stage is 400 `LOST_REASON_NOT_ALLOWED`. Won and Lost set `closed_at`; moving a closed lead to an open stage clears `closed_at` and the reason (reopen) and publishes `lead.reopened`, which is how R6's "reopen a lead lost under 60 days ago, and tell the owner" is carried out (the notification itself is F23). Reopening while the person has another open lead is 409 `LEAD_OPEN`. A move counts as activity on the lead (`last_activity_at` moves). Events: `lead.moved` always, plus `lead.won`, `lead.lost` or `lead.reopened`; ids only.
+- **Assigning.** `POST /leads/{id}/assign` takes `ownerUserId` (a person, or `null` for nobody). The person must work for the business (404 otherwise; the database enforces it). Assigning does not move "last activity". "Disabled" people cannot be refused yet: the status check arrives with the team feature (F02).
+- **Contact lifecycle on every move**: won leads make a customer (two or more, a repeat customer), an open lead a lead, otherwise new; "not a fit" is never overwritten.
+- **The F04 "not a fit" gap is closed.** Taking the mark off a contact now publishes `contact.unmarked_not_a_fit`; the leads module reacts by working the stage out again from the contact's real leads. The route's answer still says `new` straight away; the correct stage shows a moment later (the event dispatcher runs about once a second).
+- **Slice 8, deleting a lead.** `DELETE /leads/{id}` is manager-only and answers 204. It is a soft delete (the row stays). The lead disappears from the board, the lists and the stage counts; the contact's lifecycle stage is worked out again without it (a lead goes back to new, a customer whose only won lead was deleted goes back to new), and the contact can be given a new lead. A second delete, another business's lead and an unknown id answer 404; two deletes at once let one succeed.
+- **Slice 9, sharing out new leads (R37).** `GET /assignment-rules` and `PUT /assignment-rules` are manager-only. The rule is either `one_person` (with `userId`) or `round_robin` (with `userIds`, in turn order, 1 to 50, no repeats). The brief had planned to rotate over all staff, but the leads module cannot read the users table (auth owns it and already requires leads), so the manager names the people instead; they are kept in `assignment_rule_people` (migration `012`) and the database checks they work for the business. F02 will turn this list into a team. A new lead takes the named owner if the request names one (this does not use up a turn), otherwise the rule picks: the one person, or the next person after the one who got the last lead, wrapping round. Changing the rule starts the rotation from the first person. The rule row is locked while a lead picks its owner, so leads added at the same moment get different people, and a lead that fails to save does not use up a turn. Migration `012` also makes the rule's own people check the business (they only had to exist before).
+- Not built, by design: "by offering" (F17), and refusing disabled people (F02).

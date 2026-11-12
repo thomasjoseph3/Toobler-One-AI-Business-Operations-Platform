@@ -146,3 +146,20 @@ export const updateLeadRequestSchema = z
   })
   .strict();
 export type UpdateLeadRequest = z.infer<typeof updateLeadRequestSchema>;
+
+/**
+ * What staff send to move a lead to another stage. Moving to the Lost stage needs `lostReason`, one of the business's lost
+ * reasons (GET /lost-reasons); sending one to any other stage is refused. Moving a closed lead (Won or Lost) back to an
+ * open stage reopens it.
+ */
+export const moveLeadRequestSchema = z
+  .object({
+    stageId: z.uuid(),
+    lostReason: z.preprocess(blankToNothing, z.string().trim().max(80).optional()),
+  })
+  .strict();
+export type MoveLeadRequest = z.infer<typeof moveLeadRequestSchema>;
+
+/** What staff send to change a lead's owner. `null` leaves the lead with nobody. The person must work for the business. */
+export const assignLeadRequestSchema = z.object({ ownerUserId: z.uuid().nullable() }).strict();
+export type AssignLeadRequest = z.infer<typeof assignLeadRequestSchema>;

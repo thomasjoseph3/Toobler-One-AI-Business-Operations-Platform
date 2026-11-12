@@ -201,6 +201,15 @@ export interface AssignmentRulesTable {
   updated_at: Generated<Date>;
 }
 
+/** The people who take turns when new leads are shared round-robin. Fenced by account_id. */
+export interface AssignmentRulePeopleTable {
+  account_id: string;
+  user_id: string;
+  sort: number;
+  created_by: Json | null;
+  created_at: Generated<Date>;
+}
+
 /** One enquiry that might become a sale. Fenced by account_id. Dates come back as text like 2026-12-20. */
 export interface LeadsTable {
   id: string;
@@ -246,5 +255,6 @@ export interface DB {
   pipeline_stages: PipelineStagesTable;
   lost_reasons: LostReasonsTable;
   assignment_rules: AssignmentRulesTable;
+  assignment_rule_people: AssignmentRulePeopleTable;
   leads: LeadsTable;
 }

@@ -2,9 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
+import { pino } from 'pino';
+import { createContextFactory } from '../src/kernel/context';
+import { createEventDispatcher } from '../src/kernel/events/dispatcher';
+import { createRegistry } from '../src/kernel/module-system/registry';
+import { modules } from '../src/modules';
 import { buildTestApp, unsafeRequestHeaders } from './support/app';
 import { createSignedInPerson, type SignedInPerson } from './support/auth';
-import { openTestDatabase } from './support/harness';
+import { openTestDatabase, waitFor } from './support/harness';
 
 let database: Database;
 let app: FastifyInstance;
@@ -21,7 +26,7 @@ afterAll(async () => {
 /** Sends a request as the person (or as nobody), with the headers the web app sends. */
 const send = (
   person: SignedInPerson | null,
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   url: string,
   payload?: unknown,
   withCsrfHeaders = true,
@@ -783,5 +788,532 @@ describe('PATCH /api/v1/leads/{id}', () => {
       expect((await patchLead(person, lead.id, body)).statusCode, JSON.stringify(body)).toBe(400);
     }
     expect((await getLead(person, lead.id)).json().interest).toBe('Untouched');
+  });
+});
+
+/** Moves a lead as the person. */
+const moveLead = (person: SignedInPerson | null, leadId: string, body: unknown, withCsrfHeaders = true) =>
+  send(person, 'POST', `/leads/${leadId}/move`, body, withCsrfHeaders);
+
+/** Changes a lead's owner as the person. */
+const assignLead = (person: SignedInPerson | null, leadId: string, body: unknown, withCsrfHeaders = true) =>
+  send(person, 'POST', `/leads/${leadId}/assign`, body, withCsrfHeaders);
+
+/** The contact's lifecycle stage, read through the real route. */
+async function lifecycleStageOf(person: SignedInPerson, contactId: string): Promise<string> {
+  return (await send(person, 'GET', `/contacts/${contactId}`)).json().lifecycleStage;
+}
+
+describe('POST /api/v1/leads/{id}/move', () => {
+  it('moves a lead between open stages and counts the move as activity', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const response = await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Contacted') });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({
+      stage: { name: 'Contacted', kind: 'open' },
+      closedAt: null,
+      lostReason: null,
+    });
+    expect(new Date(response.json().lastActivityAt).getTime()).toBeGreaterThan(new Date(lead.lastActivityAt).getTime());
+    const board = (await listLeads(person, 'view=board')).json();
+    expect(board.columns.map((column: { leadCount: number }) => column.leadCount)).toEqual([0, 1, 0, 0, 0]);
+  });
+
+  it('closes a lead that is won, and makes its contact a customer', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const response = await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Won') });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ stage: { kind: 'won' }, lostReason: null });
+    expect(response.json().closedAt).not.toBeNull();
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('customer');
+  });
+
+  it('makes a contact with two won leads a repeat customer', async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = await addContactAndLead(person);
+    await moveLead(person, first.id, { stageId: await stageIdNamed(person, 'Won') });
+    const second = (await addLead(person, { contactId: first.contactId })).json();
+    await moveLead(person, second.id, { stageId: await stageIdNamed(person, 'Won') });
+    expect(await lifecycleStageOf(person, first.contactId)).toBe('repeat_customer');
+  });
+
+  it('needs a reason to move a lead to Lost, and stores it as the business wrote it', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const lostStageId = await stageIdNamed(person, 'Lost');
+
+    const missing = await moveLead(person, lead.id, { stageId: lostStageId });
+    expect(missing.statusCode).toBe(400);
+    expect(missing.json().error.code).toBe('LOST_REASON_REQUIRED');
+    const unknown = await moveLead(person, lead.id, { stageId: lostStageId, lostReason: 'Bad weather' });
+    expect(unknown.statusCode).toBe(400);
+    expect(unknown.json().error.code).toBe('INVALID_LOST_REASON');
+    expect((await getLead(person, lead.id)).json().stage.name).toBe('New');
+
+    const response = await moveLead(person, lead.id, { stageId: lostStageId, lostReason: '  TOO COSTLY ' });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ stage: { kind: 'lost' }, lostReason: 'Too costly' });
+    expect(response.json().closedAt).not.toBeNull();
+    // A lost lead is not an open lead, and nothing was won: the contact is just new again
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('new');
+  });
+
+  it('refuses a lost reason for any other stage', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const response = await moveLead(person, lead.id, {
+      stageId: await stageIdNamed(person, 'Contacted'),
+      lostReason: 'Too costly',
+    });
+    expect(response.statusCode).toBe(400);
+    expect(response.json().error.code).toBe('LOST_REASON_NOT_ALLOWED');
+  });
+
+  it('keeps the words a lead was lost with when the business later changes its reasons', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Lost'), lostReason: 'No reply' });
+    await send(person, 'PUT', '/lost-reasons', { reasons: ['Something else'] });
+    expect((await getLead(person, lead.id)).json().lostReason).toBe('No reply');
+  });
+
+  it('reopens a closed lead when it is moved to an open stage', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Lost'), lostReason: 'No reply' });
+    const response = await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'New') });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ stage: { name: 'New' }, closedAt: null, lostReason: null });
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('lead');
+    const reopenedEvents = await database.system
+      .selectFrom('domain_events')
+      .select('payload')
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'lead.reopened')
+      .execute();
+    expect(reopenedEvents.map((event) => event.payload)).toEqual([{ leadId: lead.id, contactId: lead.contactId }]);
+  });
+
+  it('can change a won lead to lost, with a reason', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Won') });
+    const response = await moveLead(person, lead.id, {
+      stageId: await stageIdNamed(person, 'Lost'),
+      lostReason: 'Other',
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().stage.kind).toBe('lost');
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('new');
+  });
+
+  it('refuses to reopen a lead when the person has another open lead, naming that lead', async () => {
+    const person = await createSignedInPerson(app, database);
+    const oldLead = await addContactAndLead(person);
+    await closeLead(person, oldLead.id, 'Lost', 61);
+    const newLead = (await addLead(person, { contactId: oldLead.contactId })).json();
+    const response = await moveLead(person, oldLead.id, { stageId: await stageIdNamed(person, 'Contacted') });
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error).toMatchObject({ code: 'LEAD_OPEN', details: { leadId: newLead.id } });
+    expect((await getLead(person, oldLead.id)).json().stage.kind).toBe('lost');
+  });
+
+  it('changes nothing when the lead is moved to the stage it is already in', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const response = await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'New') });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toEqual(lead);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('record_id', '=', lead.id)
+      .where('kind', '=', 'leads.moved')
+      .execute();
+    expect(lines).toHaveLength(0);
+  });
+
+  it('records who did it: the log line names the fields, the events carry ids only', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const newStageId = await stageIdNamed(person, 'New');
+    const lostStageId = await stageIdNamed(person, 'Lost');
+    await moveLead(person, lead.id, { stageId: lostStageId, lostReason: 'Went elsewhere' });
+    const logLine = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', lead.id)
+      .where('kind', '=', 'leads.moved')
+      .executeTakeFirstOrThrow();
+    expect(logLine.actor).toEqual({ kind: 'user', id: person.profile.user.id });
+    expect([...logLine.fields].sort()).toEqual(['lostReason', 'stageId']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .select(['name', 'payload'])
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', 'in', ['lead.moved', 'lead.lost', 'lead.won', 'lead.reopened'])
+      .execute();
+    expect(events.map((event) => event.name).sort()).toEqual(['lead.lost', 'lead.moved']);
+    expect(events.find((event) => event.name === 'lead.moved')?.payload).toEqual({
+      leadId: lead.id,
+      fromStageId: newStageId,
+      toStageId: lostStageId,
+    });
+    expect(JSON.stringify(events) + JSON.stringify(logLine)).not.toContain('Went elsewhere');
+    const stored = await database.system
+      .selectFrom('leads')
+      .select('updated_by')
+      .where('id', '=', lead.id)
+      .executeTakeFirstOrThrow();
+    expect(stored.updated_by).toEqual({ kind: 'user', id: person.profile.user.id });
+  });
+
+  it('takes turns when two moves arrive at the same moment', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const contactedId = await stageIdNamed(person, 'Contacted');
+    const quotedId = await stageIdNamed(person, 'Quoted');
+    const responses = await Promise.all([
+      moveLead(person, lead.id, { stageId: contactedId }),
+      moveLead(person, lead.id, { stageId: quotedId }),
+    ]);
+    expect(responses.map((response) => response.statusCode)).toEqual([200, 200]);
+    expect([contactedId, quotedId]).toContain((await getLead(person, lead.id)).json().stage.id);
+  });
+
+  it("answers 404 for another business's lead or stage, a deleted lead, and unknown ids; changes nothing", async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const strangersLead = await addContactAndLead(stranger);
+    const contactedId = await stageIdNamed(person, 'Contacted');
+    expect((await moveLead(stranger, lead.id, { stageId: await stageIdNamed(stranger, 'Contacted') })).statusCode).toBe(
+      404,
+    );
+    expect((await moveLead(person, lead.id, { stageId: await stageIdNamed(stranger, 'Contacted') })).statusCode).toBe(
+      404,
+    );
+    expect((await moveLead(person, lead.id, { stageId: randomUUID() })).statusCode).toBe(404);
+    expect((await moveLead(person, randomUUID(), { stageId: contactedId })).statusCode).toBe(404);
+    expect((await getLead(person, lead.id)).json().stage.name).toBe('New');
+    expect((await getLead(stranger, strangersLead.id)).json().stage.name).toBe('New');
+    await database.system.updateTable('leads').set({ deleted_at: new Date() }).where('id', '=', lead.id).execute();
+    expect((await moveLead(person, lead.id, { stageId: contactedId })).statusCode).toBe(404);
+  });
+
+  it('lets ordinary staff move leads', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await makeStaff(person);
+    expect((await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Contacted') })).statusCode).toBe(
+      200,
+    );
+  });
+
+  it('answers 401 with nobody signed in and 403 without the web app headers', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const body = { stageId: await stageIdNamed(person, 'Contacted') };
+    expect((await moveLead(null, lead.id, body)).statusCode).toBe(401);
+    expect((await moveLead(person, lead.id, body, false)).statusCode).toBe(403);
+    expect((await getLead(person, lead.id)).json().stage.name).toBe('New');
+  });
+
+  it('answers 400 for a missing or bad stage id, a bad lead id, a too long reason, or an unknown field', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const lostStageId = await stageIdNamed(person, 'Lost');
+    const badBodies: unknown[] = [
+      {},
+      { stageId: 'abc' },
+      { stageId: lostStageId, lostReason: 'x'.repeat(81) },
+      { stageId: lostStageId, lostReason: 5 },
+      { stageId: lostStageId, lostReason: 'No reply', closedAt: '2026-01-01T00:00:00Z' },
+      { stageId: lostStageId, lostReason: 'No reply', ownerUserId: randomUUID() },
+    ];
+    for (const body of badBodies) {
+      expect((await moveLead(person, lead.id, body)).statusCode, JSON.stringify(body)).toBe(400);
+    }
+    expect((await moveLead(person, 'abc', { stageId: lostStageId })).statusCode).toBe(400);
+    expect((await getLead(person, lead.id)).json().stage.name).toBe('New');
+  });
+});
+
+describe('POST /api/v1/leads/{id}/assign', () => {
+  /** Adds a second person to the business straight into the database (the team screens come with F02). */
+  async function addColleague(person: SignedInPerson): Promise<string> {
+    const userId = randomUUID();
+    await database.system
+      .insertInto('users')
+      .values({
+        id: userId,
+        account_id: person.profile.business.id,
+        email: `colleague-${userId.slice(0, 8)}@example.com`,
+        name: 'Rahul Kumar',
+        mobile_e164: null,
+        mobile_key: null,
+        role: 'staff',
+      })
+      .execute();
+    return userId;
+  }
+
+  it('gives the lead to a colleague and back, and leaves the last-activity time alone', async () => {
+    const person = await createSignedInPerson(app, database);
+    const colleagueId = await addColleague(person);
+    const lead = await addContactAndLead(person);
+    const response = await assignLead(person, lead.id, { ownerUserId: colleagueId });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ ownerUserId: colleagueId, lastActivityAt: lead.lastActivityAt });
+    const mine = await listLeads(person, `ownerUserId=${colleagueId}`);
+    expect(mine.json().total).toBe(1);
+    const back = await assignLead(person, lead.id, { ownerUserId: person.profile.user.id });
+    expect(back.json().ownerUserId).toBe(person.profile.user.id);
+  });
+
+  it('can leave a lead with nobody', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const response = await assignLead(person, lead.id, { ownerUserId: null });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().ownerUserId).toBeNull();
+  });
+
+  it('changes nothing, with no log line or event, when the owner is already that person', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const response = await assignLead(person, lead.id, { ownerUserId: person.profile.user.id });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toEqual(lead);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('record_id', '=', lead.id)
+      .where('kind', '=', 'leads.assigned')
+      .execute();
+    expect(lines).toHaveLength(0);
+  });
+
+  it('answers 404 for a person from another business or an unknown person, and the owner stays', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    for (const ownerUserId of [stranger.profile.user.id, randomUUID()]) {
+      expect((await assignLead(person, lead.id, { ownerUserId })).statusCode, ownerUserId).toBe(404);
+    }
+    expect((await getLead(person, lead.id)).json().ownerUserId).toBe(person.profile.user.id);
+  });
+
+  it("answers 404 for another business's lead and a deleted lead", async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    expect((await assignLead(stranger, lead.id, { ownerUserId: null })).statusCode).toBe(404);
+    expect((await assignLead(person, randomUUID(), { ownerUserId: null })).statusCode).toBe(404);
+    expect((await getLead(person, lead.id)).json().ownerUserId).toBe(person.profile.user.id);
+    await database.system.updateTable('leads').set({ deleted_at: new Date() }).where('id', '=', lead.id).execute();
+    expect((await assignLead(person, lead.id, { ownerUserId: null })).statusCode).toBe(404);
+  });
+
+  it('records who did it, with ids only', async () => {
+    const person = await createSignedInPerson(app, database);
+    const colleagueId = await addColleague(person);
+    const lead = await addContactAndLead(person);
+    await assignLead(person, lead.id, { ownerUserId: colleagueId });
+    const logLine = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', lead.id)
+      .where('kind', '=', 'leads.assigned')
+      .executeTakeFirstOrThrow();
+    expect(logLine).toMatchObject({ fields: ['ownerUserId'], actor: { kind: 'user', id: person.profile.user.id } });
+    const event = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'lead.assigned')
+      .executeTakeFirstOrThrow();
+    expect(event.payload).toEqual({
+      leadId: lead.id,
+      ownerUserId: colleagueId,
+      previousOwnerUserId: person.profile.user.id,
+    });
+  });
+
+  it('lets ordinary staff assign', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await makeStaff(person);
+    expect((await assignLead(person, lead.id, { ownerUserId: null })).statusCode).toBe(200);
+  });
+
+  it('answers 401 with nobody signed in and 403 without the web app headers', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    expect((await assignLead(null, lead.id, { ownerUserId: null })).statusCode).toBe(401);
+    expect((await assignLead(person, lead.id, { ownerUserId: null }, false)).statusCode).toBe(403);
+    expect((await getLead(person, lead.id)).json().ownerUserId).toBe(person.profile.user.id);
+  });
+
+  it('answers 400 for a missing or bad owner, a bad lead id, or an unknown field', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const badBodies: unknown[] = [
+      {},
+      { ownerUserId: 'abc' },
+      { ownerUserId: 5 },
+      { ownerUserId: null, stageId: randomUUID() },
+    ];
+    for (const body of badBodies) {
+      expect((await assignLead(person, lead.id, body)).statusCode, JSON.stringify(body)).toBe(400);
+    }
+    expect((await assignLead(person, 'abc', { ownerUserId: null })).statusCode).toBe(400);
+  });
+});
+
+describe('taking the "not a fit" mark off a contact that has leads', () => {
+  /** Runs the event dispatcher until the given condition holds (the leads module reacts to the event a moment later). */
+  async function dispatchUntil(condition: () => Promise<boolean>) {
+    const dispatcher = createEventDispatcher({
+      database,
+      registry: createRegistry(modules),
+      gate: { isActive: async () => true },
+      contextFor: createContextFactory(database),
+      logger: pino({ level: 'silent' }),
+    });
+    await waitFor(async () => {
+      await dispatcher.dispatchPendingEventsOnce();
+      return condition();
+    });
+  }
+
+  /** Marks or unmarks a contact as "not a fit" through the real route. */
+  const setNotAFit = (person: SignedInPerson, contactId: string, notAFit: boolean) =>
+    app.inject({
+      method: 'PATCH',
+      url: `/api/v1/contacts/${contactId}`,
+      headers: { ...unsafeRequestHeaders, cookie: person.cookieHeader },
+      payload: { notAFit },
+    });
+
+  it('puts the contact back to lead once the leads module has looked at its leads', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    expect((await setNotAFit(person, lead.contactId, true)).json().lifecycleStage).toBe('not_a_fit');
+    // The answer comes straight away with the plain result; the leads module corrects it from the event
+    expect((await setNotAFit(person, lead.contactId, false)).json().lifecycleStage).toBe('new');
+    await dispatchUntil(async () => (await lifecycleStageOf(person, lead.contactId)) === 'lead');
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('lead');
+  });
+
+  it('puts the contact back to customer when it has a won lead', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Won') });
+    await setNotAFit(person, lead.contactId, true);
+    await setNotAFit(person, lead.contactId, false);
+    await dispatchUntil(async () => (await lifecycleStageOf(person, lead.contactId)) === 'customer');
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('customer');
+  });
+});
+
+/** Deletes a lead as the person. */
+const deleteLead = (person: SignedInPerson | null, leadId: string, withCsrfHeaders = true) =>
+  send(person, 'DELETE', `/leads/${leadId}`, undefined, withCsrfHeaders);
+
+describe('DELETE /api/v1/leads/{id}', () => {
+  it('hides the lead everywhere but keeps its row', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const response = await deleteLead(person, lead.id);
+    expect(response.statusCode, response.body).toBe(204);
+    expect(response.body).toBe('');
+
+    expect((await getLead(person, lead.id)).statusCode).toBe(404);
+    expect((await listLeads(person)).json().total).toBe(0);
+    expect((await listLeads(person, 'view=board')).json().columns[0].leadCount).toBe(0);
+    const pipeline = (await send(person, 'GET', '/pipeline')).json();
+    expect(pipeline.stages.find((stage: { name: string }) => stage.name === 'New').leadCount).toBe(0);
+
+    const row = await database.system
+      .selectFrom('leads')
+      .select(['deleted_at', 'updated_by'])
+      .where('id', '=', lead.id)
+      .executeTakeFirstOrThrow();
+    expect(row.deleted_at).not.toBeNull();
+    expect(row.updated_by).toEqual({ kind: 'user', id: person.profile.user.id });
+  });
+
+  it("works the contact's stage out again without the lead, and lets the contact have a new lead", async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('lead');
+    await deleteLead(person, lead.id);
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('new');
+    const newLead = await addLead(person, { contactId: lead.contactId });
+    expect(newLead.statusCode, newLead.body).toBe(201);
+    expect(newLead.json().id).not.toBe(lead.id);
+  });
+
+  it('takes a customer back to new when its only won lead is deleted', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    await moveLead(person, lead.id, { stageId: await stageIdNamed(person, 'Won') });
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('customer');
+    await deleteLead(person, lead.id);
+    expect(await lifecycleStageOf(person, lead.contactId)).toBe('new');
+  });
+
+  it('answers 404 the second time, for another business, and for an unknown id', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    expect((await deleteLead(stranger, lead.id)).statusCode).toBe(404);
+    expect((await getLead(person, lead.id)).statusCode).toBe(200);
+    expect((await deleteLead(person, randomUUID())).statusCode).toBe(404);
+    expect((await deleteLead(person, lead.id)).statusCode).toBe(204);
+    expect((await deleteLead(person, lead.id)).statusCode).toBe(404);
+  });
+
+  it('lets only one of two simultaneous deletes succeed', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    const responses = await Promise.all([deleteLead(person, lead.id), deleteLead(person, lead.id)]);
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([204, 404]);
+  });
+
+  it('records who did it, with ids only', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person, { interest: 'Secret-interest-words' });
+    await deleteLead(person, lead.id);
+    const logLine = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', lead.id)
+      .where('kind', '=', 'leads.deleted')
+      .executeTakeFirstOrThrow();
+    expect(logLine.actor).toEqual({ kind: 'user', id: person.profile.user.id });
+    const event = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'lead.deleted')
+      .executeTakeFirstOrThrow();
+    expect(event.payload).toEqual({ leadId: lead.id, contactId: lead.contactId });
+    expect(JSON.stringify(logLine) + JSON.stringify(event)).not.toContain('Secret-interest-words');
+  });
+
+  it('answers 401 with nobody signed in, 403 to staff and without the web app headers, 400 for a bad id', async () => {
+    const person = await createSignedInPerson(app, database);
+    const lead = await addContactAndLead(person);
+    expect((await deleteLead(null, lead.id)).statusCode).toBe(401);
+    expect((await deleteLead(person, lead.id, false)).statusCode).toBe(403);
+    expect((await deleteLead(person, 'abc')).statusCode).toBe(400);
+    await makeStaff(person);
+    expect((await deleteLead(person, lead.id)).statusCode).toBe(403);
+    expect((await getLead(person, lead.id)).statusCode).toBe(200);
   });
 });
