@@ -21,7 +21,7 @@ afterAll(async () => {
 /** Sends a request as the person (or as nobody), with the headers the web app sends. */
 const send = (
   person: SignedInPerson | null,
-  method: 'GET' | 'PUT' | 'POST',
+  method: 'GET' | 'PUT' | 'POST' | 'PATCH' | 'DELETE',
   url: string,
   payload?: unknown,
   withCsrf = true,
@@ -83,7 +83,7 @@ describe('GET /api/v1/knowledge/questions', () => {
       waitingForCheck: 0,
       percentComplete: 0,
       readyToGoLive: false,
-      neededToGoLiveStillMissing: Object.keys(GOOD_ANSWERS_NEEDED_TO_GO_LIVE),
+      neededToGoLiveStillMissing: [...Object.keys(GOOD_ANSWERS_NEEDED_TO_GO_LIVE), 'offerings'],
     });
     expect(body.progress.totalQuestions).toBe(32 - 4);
   });
@@ -154,6 +154,67 @@ describe('GET /api/v1/knowledge/questions', () => {
   });
 });
 
+describe('"What do you sell?" is answered by the offerings', () => {
+  /** The "what do you sell" question as the person reads it. */
+  async function sellQuestionOf(person: SignedInPerson) {
+    const body = (await getQuestions(person)).json();
+    return {
+      question: body.questions.find((candidate: { key: string }) => candidate.key === 'offerings'),
+      progress: body.progress,
+    };
+  }
+
+  it('is not done until the business has an offering that is switched on', async () => {
+    const person = await createSignedInPerson(app, database);
+    const before = await sellQuestionOf(person);
+    expect(before.question).toMatchObject({
+      handledElsewhere: 'offerings',
+      elsewhereStatus: 'not_done',
+      answer: null,
+      neededToGoLive: true,
+    });
+    expect(before.progress.neededToGoLiveStillMissing).toContain('offerings');
+    expect(before.progress.stillToAnswer[before.progress.stillToAnswer.length - 1]).not.toBe('offerings'); // needed ones come first
+
+    const offering = (await send(person, 'POST', '/offerings', { name: 'Family room', active: false })).json();
+    expect((await sellQuestionOf(person)).question.elsewhereStatus).toBe('not_done'); // an offering that is off does not count
+
+    await send(person, 'PATCH', `/offerings/${offering.id}`, { active: true });
+    const after = await sellQuestionOf(person);
+    expect(after.question.elsewhereStatus).toBe('done');
+    expect(after.progress.neededToGoLiveStillMissing).not.toContain('offerings');
+    expect(after.progress.answeredQuestions).toBe(before.progress.answeredQuestions + 1);
+    expect(after.progress.totalQuestions).toBe(before.progress.totalQuestions);
+  });
+
+  it('goes back to not done when the last offering is switched off or removed', async () => {
+    const person = await createSignedInPerson(app, database);
+    const offering = (await send(person, 'POST', '/offerings', { name: 'Family room' })).json();
+    expect((await sellQuestionOf(person)).question.elsewhereStatus).toBe('done');
+    await send(person, 'PATCH', `/offerings/${offering.id}`, { active: false });
+    expect((await sellQuestionOf(person)).question.elsewhereStatus).toBe('not_done');
+    await send(person, 'PATCH', `/offerings/${offering.id}`, { active: true });
+    await send(person, 'DELETE', `/offerings/${offering.id}`);
+    expect((await sellQuestionOf(person)).question.elsewhereStatus).toBe('not_done');
+  });
+
+  it('counts only the business\'s own offerings, and says "not tracked" for the questions whose feature does not report yet', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    await send(stranger, 'POST', '/offerings', { name: 'Their room' });
+    const { question } = await sellQuestionOf(person);
+    expect(question.elsewhereStatus).toBe('not_done');
+    const body = (await getQuestions(person)).json();
+    const elsewhereStatusOf = (key: string) =>
+      body.questions.find((candidate: { key: string }) => candidate.key === key).elsewhereStatus;
+    expect(elsewhereStatusOf('common_questions')).toBe('not_tracked');
+    expect(elsewhereStatusOf('brochure_upload')).toBe('not_tracked');
+    expect(elsewhereStatusOf('prices_include_gst')).toBe('not_tracked'); // each offering carries its own GST note
+    expect(elsewhereStatusOf('current_offers')).toBe('not_tracked');
+    expect(elsewhereStatusOf('business_name')).toBeNull();
+  });
+});
+
 describe('PUT /api/v1/knowledge/answers/{question_key}', () => {
   it('saves a typed answer, confirmed at once, and shows it with the new progress', async () => {
     const person = await createSignedInPerson(app, database);
@@ -192,7 +253,7 @@ describe('PUT /api/v1/knowledge/answers/{question_key}', () => {
     const answers: Record<string, unknown> = {
       ...GOOD_ANSWERS_NEEDED_TO_GO_LIVE,
       payment_methods: { choices: ['UPI', 'Cash'] },
-      prices_include_gst: { choice: 'Plus GST' },
+      monthly_enquiries: { choice: '200 to 1,000' },
       usual_customers: { choices: ['Families', 'Other'], otherText: 'Pilgrims' },
       opening_hours: { days: { mon: { open: '09:00', close: '21:00' }, sun: { open: '10:00', close: '14:00' } } },
       seasonal_prices: { yes: true, detail: 'Higher in Dec to Jan' },
@@ -220,12 +281,16 @@ describe('PUT /api/v1/knowledge/answers/{question_key}', () => {
     const person = await createSignedInPerson(app, database);
     const entries = Object.entries(GOOD_ANSWERS_NEEDED_TO_GO_LIVE);
     let last;
-    for (const [index, [key, value]] of entries.entries()) {
+    for (const [key, value] of entries) {
       last = (await putAnswer(person, key, value)).json();
-      expect(last.progress.readyToGoLive, `after ${key}`).toBe(index === entries.length - 1);
+      expect(last.progress.readyToGoLive, `after ${key}`).toBe(false);
     }
-    expect(last.progress.neededToGoLiveStillMissing).toEqual([]);
-    expect(last.progress.percentComplete).toBeGreaterThan(0);
+    // All seven are answered, but a business also needs something to sell: at least one offering that is switched on
+    expect(last.progress.neededToGoLiveStillMissing).toEqual(['offerings']);
+    expect((await send(person, 'POST', '/offerings', { name: 'Family room' })).statusCode).toBe(201);
+    const ready = (await getQuestions(person)).json().progress;
+    expect(ready).toMatchObject({ readyToGoLive: true, neededToGoLiveStillMissing: [] });
+    expect(ready.percentComplete).toBeGreaterThan(0);
   });
 
   it('writes one activity-log line with only the question key, and a knowledge.answer_saved event with no answer', async () => {
@@ -317,7 +382,7 @@ describe('PUT /api/v1/knowledge/answers/{question_key}', () => {
       ['business_name', 42, /./],
       ['has_website', { yes: true }, /needed/i],
       ['has_website', { yes: true, detail: 'not a link' }, /full link/i],
-      ['prices_include_gst', { choice: 'Maybe' }, /pick one of/i],
+      ['monthly_enquiries', { choice: 'Maybe' }, /pick one of/i],
       ['payment_methods', { choices: ['Bitcoin'] }, /not one of/i],
       [
         'top_priorities',
@@ -833,7 +898,7 @@ const putSettings = (person: SignedInPerson | null, body: unknown, withCsrf = tr
 
 /** Adds a contact with a phone typed the way a person would, and returns the response. */
 const addContactWithPhone = (person: SignedInPerson, phone: string) =>
-  send(person, 'POST' as 'PUT', '/contacts', { name: 'Priya Menon', phone });
+  send(person, 'POST', '/contacts', { name: 'Priya Menon', phone });
 
 describe('GET /api/v1/knowledge/settings', () => {
   it('gives a new business India and the India time zone', async () => {

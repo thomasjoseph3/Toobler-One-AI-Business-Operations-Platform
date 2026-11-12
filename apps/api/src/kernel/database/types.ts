@@ -194,7 +194,7 @@ export interface LostReasonsTable {
 /** How a business shares out new leads (one row per business). Fenced by account_id. */
 export interface AssignmentRulesTable {
   account_id: string;
-  mode: Generated<'one_person' | 'round_robin'>;
+  mode: Generated<'one_person' | 'round_robin' | 'by_offering'>;
   user_id: string | null;
   last_assigned_user_id: string | null;
   created_by: Json | null;
@@ -228,6 +228,8 @@ export interface LeadsTable {
   promise: string | null;
   callback_at: Date | null;
   owner_user_id: string | null;
+  /** The offering the lead is about (an offering of the same business), or null. */
+  offering_id: string | null;
   first_channel: Generated<'manual' | 'web_chat' | 'whatsapp' | 'email' | 'phone'>;
   last_activity_at: Generated<Date>;
   lost_reason: string | null;
@@ -297,6 +299,43 @@ export interface SituationsTable {
   updated_at: Generated<Date>;
 }
 
+/** Something the business sells. Fenced by account_id. Money in paise; dates come back as text. */
+export interface OfferingsTable {
+  id: string;
+  account_id: string;
+  name: string;
+  description: string | null;
+  /** Money in paise (whole numbers). Our database setup hands bigint back as a number. */
+  from_price_paise: number | null;
+  price_unit: string | null;
+  gst_mode: 'included' | 'plus' | 'none' | null;
+  season_note: string | null;
+  includes: string | null;
+  /** A list of { label, value } pairs. Read back already parsed; written as JSON text. */
+  details: ColumnType<unknown, string | undefined, string>;
+  active: Generated<boolean>;
+  sort: number;
+  owner_user_id: string | null;
+  deleted_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** A time-limited promotion. Fenced by account_id. `ends_on` is a plain date like 2026-12-31. */
+export interface OffersTable {
+  id: string;
+  account_id: string;
+  text: string;
+  ends_on: string;
+  deleted_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -321,4 +360,6 @@ export interface DB {
   ticket_notes: TicketNotesTable;
   business_answers: BusinessAnswersTable;
   situations: SituationsTable;
+  offerings: OfferingsTable;
+  offers: OffersTable;
 }

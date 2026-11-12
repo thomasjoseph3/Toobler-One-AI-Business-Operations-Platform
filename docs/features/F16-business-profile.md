@@ -151,6 +151,10 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 - Test: a number typed without a country code is stored with India's code for an Indian business and the UAE's for one set to AE, and a number with its
   own code is the same for both.
 
+## Changes made later by F17 (12 Nov 2026, owner's choice)
+"What do you sell?" now counts and is answered by the offerings (a business needs one that is switched on to be ready to go live); the GST question
+moved to "answered in Offerings"; `GET /knowledge/questions` gained `elsewhereStatus` on each question. See the F17 brief, slice 5.
+
 ## Reused from the hotel agent
 The "Port from" table in PHASE-1.md has no row for F16. The old agent has `locations.office_hours` (migration 014: `{ allDay: true }` or
 per-day open and close, `NULL` when not set up, and the agent says nothing about hours). I reuse that shape for the weekly-hours answer (B5).

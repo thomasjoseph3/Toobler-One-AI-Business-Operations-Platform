@@ -54,11 +54,11 @@ describe('the GST number', () => {
 
 describe('pick one', () => {
   it('accepts one of the options and refuses anything else', () => {
-    expect(accepted('prices_include_gst', { choice: 'Plus GST' })).toEqual({ choice: 'Plus GST' });
-    expect(refusal('prices_include_gst', { choice: 'Maybe' })).toMatch(/pick one of/i);
-    expect(refusal('prices_include_gst', 'Plus GST')).toBeTruthy();
-    expect(refusal('prices_include_gst', { choice: 'Plus GST', extra: 1 })).toBeTruthy();
-    expect(refusal('prices_include_gst', { choice: 'Plus GST', otherText: 'words' })).toMatch(/only "other"/i);
+    expect(accepted('monthly_enquiries', { choice: '50 to 200' })).toEqual({ choice: '50 to 200' });
+    expect(refusal('monthly_enquiries', { choice: 'Maybe' })).toMatch(/pick one of/i);
+    expect(refusal('monthly_enquiries', '50 to 200')).toBeTruthy();
+    expect(refusal('monthly_enquiries', { choice: '50 to 200', extra: 1 })).toBeTruthy();
+    expect(refusal('monthly_enquiries', { choice: '50 to 200', otherText: 'words' })).toMatch(/only "other"/i);
   });
 });
 
@@ -180,6 +180,7 @@ describe('questions that cannot be answered here', () => {
   it('refuses a question that is answered in another feature, whatever is sent', () => {
     expect(refusal('offerings', { rows: [{ name: 'Room' }] })).toMatch(/answered in offerings/i);
     expect(refusal('common_questions', { rows: [] })).toMatch(/answered in faqs/i);
+    expect(refusal('prices_include_gst', { choice: 'Plus GST' })).toMatch(/answered in offerings/i);
     expect(refusal('brochure_upload', 'file.pdf')).toMatch(/answered in documents/i);
   });
 });

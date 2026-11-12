@@ -94,7 +94,44 @@ describe('journey: a busy day at Nair Stays', () => {
     let lastAnswer;
     for (const [key, value] of Object.entries(neededAnswers))
       lastAnswer = await anita.ok('PUT', `/knowledge/answers/${key}`, { value });
-    expect(lastAnswer.progress).toMatchObject({ readyToGoLive: true, neededToGoLiveStillMissing: [] });
+    // Seven answers are not enough: the business must also have something to sell
+    expect(lastAnswer.progress).toMatchObject({ readyToGoLive: false, neededToGoLiveStillMissing: ['offerings'] });
+    const familyRoom = await anita.ok(
+      'POST',
+      '/offerings',
+      {
+        name: 'Family room',
+        description: 'Two beds, sea view',
+        fromPricePaise: 450_000,
+        priceUnit: 'per night',
+        gstMode: 'plus',
+        includes: 'Breakfast for four',
+      },
+      201,
+    );
+    expect(familyRoom.priceInWords).toBe('from ₹4,500 a night plus GST');
+    const dayTour = await anita.ok('POST', '/offerings', { name: 'Day tour' }, 201); // a business that does not share this price
+    const winterSpecial = await anita.ok(
+      'POST',
+      '/offerings',
+      {
+        name: 'Winter special',
+        fromPricePaise: 1_200_000,
+        priceUnit: 'per package',
+        gstMode: 'included',
+        active: false,
+      },
+      201,
+    );
+    const festivalOffer = await anita.ok(
+      'POST',
+      '/offers',
+      { text: '10 percent off for stays over three nights', endsOn: '2099-12-31' },
+      201,
+    );
+    expect(festivalOffer.current).toBe(true);
+    const readyNow = await anita.ok('GET', '/knowledge/questions');
+    expect(readyNow.progress).toMatchObject({ readyToGoLive: true, neededToGoLiveStillMissing: [] });
     await anita.ok('PUT', '/knowledge/answers/hotel_pets', { value: { yes: true, detail: 'Small dogs only' } }); // a hotel's own question
     await anita.ok('PUT', '/knowledge/situations/discount_request', { choice: 'prices_are_fixed' });
     await anita.ok('PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
@@ -113,6 +150,17 @@ describe('journey: a busy day at Nair Stays', () => {
         questions.questions.find((question: { key: string }) => question.key === 'business_name').answer.value,
       ).toBe('Nair Stays');
       expect((await person.ok('GET', '/knowledge/settings')).defaultCountry).toBe('AE');
+      // Everybody reads what the business sells; the switched-off winter special is on the list, marked off
+      const offerings = await person.ok('GET', '/offerings');
+      expect(
+        offerings.items.map((item: { name: string }) => item.name),
+        person.name,
+      ).toEqual(['Family room', 'Day tour', 'Winter special']);
+      expect((await person.ok('GET', '/offerings?active=true')).items, person.name).toHaveLength(2);
+      expect(
+        (await person.ok('GET', '/offers')).items.map((offer: { text: string }) => offer.text),
+        person.name,
+      ).toEqual(['10 percent off for stays over three nights']);
       const discountHandling = (await person.ok('GET', '/knowledge/situations')).items.find(
         (situation: { key: string }) => situation.key === 'discount_request',
       );
@@ -129,6 +177,11 @@ describe('journey: a busy day at Nair Stays', () => {
         ['PUT', '/knowledge/settings', { defaultCountry: 'IN' }],
         ['POST', '/pipeline/stages', { name: 'Sneaky' }],
         ['PUT', '/lost-reasons', { reasons: ['Sneaky'] }],
+        ['POST', '/offerings', { name: 'Sneaky offering' }],
+        ['PATCH', `/offerings/${familyRoom.id}`, { name: 'Hacked' }],
+        ['DELETE', `/offerings/${familyRoom.id}`, {}],
+        ['POST', '/offerings/reorder', { offeringIds: [familyRoom.id] }],
+        ['POST', '/offers', { text: 'Sneaky offer', endsOn: '2099-12-31' }],
         ['PUT', '/assignment-rules', { mode: 'one_person', userId: person.userId }],
       ];
       for (const [method, url, body] of forbidden) {
@@ -308,6 +361,15 @@ describe('journey: a busy day at Nair Stays', () => {
     expect((await anita.ok('GET', `/contacts/${karthik}`)).lifecycleStage).toBe('new'); // his only lead is gone
     await meera.refused('GET', `/leads/${leadOfKarthik.id}`, undefined, 404);
     await anita.refused('GET', `/leads/${leadOfKarthik.id}`, undefined, 404);
+    // ...and tidies what the business sells: removes the winter special, puts the day tour first, extends the offer
+    await vikram.ok('DELETE', `/offerings/${winterSpecial.id}`, undefined, 204);
+    const reordered = await vikram.ok('POST', '/offerings/reorder', { offeringIds: [dayTour.id, familyRoom.id] });
+    expect(reordered.items.map((item: { name: string; sort: number }) => `${item.sort}:${item.name}`)).toEqual([
+      '0:Day tour',
+      '1:Family room',
+    ]);
+    await vikram.ok('PATCH', `/offers/${festivalOffer.id}`, { text: '15 percent off for stays over three nights' });
+    expect((await anita.ok('GET', '/offers')).items[0].text).toBe('15 percent off for stays over three nights');
     await vikram.ok('PUT', '/knowledge/situations/after_hours', { choice: 'call_at_opening_only' });
     expect(
       (await anita.ok('GET', '/knowledge/situations')).items.find(
@@ -317,6 +379,41 @@ describe('journey: a busy day at Nair Stays', () => {
     // Arjun's enquiry is over: his lead goes first, then his contact (see the note on R46 in the test below)
     await vikram.ok('DELETE', `/leads/${leadOfArjun.id}`, undefined, 204);
     await vikram.ok('DELETE', `/contacts/${arjun}`, undefined, 204);
+    expect(await problemsOf(anita)).toEqual([]);
+
+    // ------------------------------------- chapter 5b: leads about an offering are shared out by the offering's person
+    await vikram.ok('PATCH', `/offerings/${familyRoom.id}`, { ownerUserId: rahul.userId });
+    await vikram.ok('PATCH', `/offerings/${dayTour.id}`, { ownerUserId: meera.userId });
+    await vikram.ok('PUT', '/assignment-rules', { mode: 'by_offering', fallbackUserId: vikram.userId });
+    expect(
+      await rahul.refused('PUT', '/assignment-rules', { mode: 'by_offering', fallbackUserId: rahul.userId }, 403),
+    ).toBeTruthy();
+    const nikhil = await addContact(rahul, 'Nikhil Varma');
+    const asha = await addContact(rahul, 'Asha Thomas');
+    const leo = await addContact(rahul, 'Leo Joseph');
+    const aboutTheRoom = await rahul.ok(
+      'POST',
+      '/leads',
+      { contactId: nikhil, offeringId: familyRoom.id, interest: 'Two nights' },
+      201,
+    );
+    const aboutTheTour = await rahul.ok('POST', '/leads', { contactId: asha, offeringId: dayTour.id }, 201);
+    const aboutNothing = await rahul.ok('POST', '/leads', { contactId: leo }, 201);
+    expect([aboutTheRoom.ownerUserId, aboutTheTour.ownerUserId, aboutNothing.ownerUserId]).toEqual([
+      rahul.userId, // looks after the family room
+      meera.userId, // looks after the day tour
+      vikram.userId, // the fallback: this lead names no offering
+    ]);
+    expect(aboutTheRoom.offering).toEqual({ id: familyRoom.id, name: 'Family room' });
+    // Meera sees only hers, and can filter them by the offering
+    expect(
+      (await meera.ok('GET', `/leads?offeringId=${dayTour.id}`)).items.map((lead: { id: string }) => lead.id),
+    ).toEqual([aboutTheTour.id]);
+    await meera.refused('GET', `/leads/${aboutTheRoom.id}`, undefined, 404);
+    expect((await anita.ok('GET', `/leads?offeringId=${familyRoom.id}`)).total).toBe(1);
+    // An offering that is removed later still shows on the lead that was about it
+    await vikram.ok('PATCH', `/leads/${aboutNothing.id}`, { offeringId: dayTour.id });
+    expect((await vikram.ok('GET', `/leads/${aboutNothing.id}`)).ownerUserId).toBe(vikram.userId); // naming it does not reassign
     expect(await problemsOf(anita)).toEqual([]);
 
     // ---------------------------------------------------- chapter 6: an outsider sees nothing of Nair Stays
@@ -355,7 +452,8 @@ describe('journey: a busy day at Nair Stays', () => {
 
     // ------------------------------------------------------ the end: the profile numbers match the database
     const final = await anita.ok('GET', '/knowledge/questions');
-    expect(final.progress.answeredQuestions).toBe(await countRows('business_answers', anita.businessId));
+    // Every answer row counts, plus "What do you sell?", which the offerings answer
+    expect(final.progress.answeredQuestions).toBe((await countRows('business_answers', anita.businessId)) + 1);
     expect(final.progress.readyToGoLive).toBe(true);
   });
 });
@@ -379,7 +477,47 @@ describe('the consistency checker itself', () => {
   it("notices damage done behind the app's back, naming the rule that is broken", async () => {
     const { owner, contactId, lead, ticket } = await buildSmallBusiness();
     const businessId = owner.businessId;
+    const firstOffering = await owner.ok('POST', '/offerings', { name: 'Family room suite' }, 201);
+    await owner.ok('POST', '/offerings', { name: 'Day tour package' }, 201);
     const damage: Array<{ what: string; expectInReport: string; apply: () => Promise<void> }> = [
+      {
+        what: 'two offerings sharing one position',
+        expectInReport: '[offerings and offers are in order]',
+        apply: async () => {
+          await database.system
+            .updateTable('offerings')
+            .set({ sort: 0 })
+            .where('account_id', '=', businessId)
+            .execute();
+        },
+      },
+      {
+        what: 'an offering whose creation log line was removed',
+        expectInReport: '[every creation is logged and announced once]',
+        apply: async () => {
+          await database.system
+            .deleteFrom('activity_log')
+            .where('record_id', '=', firstOffering.id)
+            .where('kind', '=', 'offerings.created')
+            .execute();
+        },
+      },
+      {
+        what: 'the words of an offering written into the log',
+        expectInReport: '[no personal data in the log or events]',
+        apply: async () => {
+          await database.system
+            .insertInto('activity_log')
+            .values({
+              id: crypto.randomUUID(),
+              account_id: businessId,
+              actor: { kind: 'system', id: 'test' },
+              kind: 'offerings.updated',
+              fields: ['Family room suite'],
+            })
+            .execute();
+        },
+      },
       {
         what: 'a contact whose stage does not match its leads',
         expectInReport: '[contact stages match their leads]',

@@ -55,6 +55,7 @@ export interface LeadRow {
   promise: string | null;
   callbackAt: Date | null;
   ownerUserId: string | null;
+  offeringId: string | null;
   firstChannel: 'manual' | 'web_chat' | 'whatsapp' | 'email' | 'phone';
   lastActivityAt: Date;
   lostReason: string | null;
@@ -69,6 +70,7 @@ export interface LeadFilters {
   stageId?: string | undefined;
   ownerUserId?: string | undefined;
   contactId?: string | undefined;
+  offeringId?: string | undefined;
   /** `open` = not closed; `closed` = won or lost. */
   status?: 'open' | 'closed' | undefined;
   /** For the "own leads only" role: only the leads this person owns. Left out, every lead of the business. */
@@ -85,6 +87,7 @@ function selectLeadRows(db: Db, filters: LeadFilters) {
   if (filters.stageId) query = query.where('lead.stage_id', '=', filters.stageId);
   if (filters.ownerUserId) query = query.where('lead.owner_user_id', '=', filters.ownerUserId);
   if (filters.contactId) query = query.where('lead.contact_id', '=', filters.contactId);
+  if (filters.offeringId) query = query.where('lead.offering_id', '=', filters.offeringId);
   if (filters.visibleToUserId) query = query.where('lead.owner_user_id', '=', filters.visibleToUserId);
   if (filters.status === 'open') query = query.where('lead.closed_at', 'is', null);
   if (filters.status === 'closed') query = query.where('lead.closed_at', 'is not', null);
@@ -107,6 +110,7 @@ const LEAD_COLUMNS = [
   'lead.promise',
   'lead.callback_at',
   'lead.owner_user_id',
+  'lead.offering_id',
   'lead.first_channel',
   'lead.last_activity_at',
   'lead.lost_reason',
@@ -131,6 +135,7 @@ function toLeadRow(row: {
   promise: string | null;
   callback_at: Date | null;
   owner_user_id: string | null;
+  offering_id: string | null;
   first_channel: LeadRow['firstChannel'];
   last_activity_at: Date;
   lost_reason: string | null;
@@ -153,6 +158,7 @@ function toLeadRow(row: {
     promise: row.promise,
     callbackAt: row.callback_at,
     ownerUserId: row.owner_user_id,
+    offeringId: row.offering_id,
     firstChannel: row.first_channel,
     lastActivityAt: row.last_activity_at,
     lostReason: row.lost_reason,
@@ -178,6 +184,7 @@ export async function insertLead(
     promise: string | null;
     callbackAt: Date | null;
     ownerUserId: string | null;
+    offeringId: string | null;
     actor: Actor;
   },
 ): Promise<void> {
@@ -197,6 +204,7 @@ export async function insertLead(
       promise: lead.promise,
       callback_at: lead.callbackAt,
       owner_user_id: lead.ownerUserId,
+      offering_id: lead.offeringId,
       first_channel: 'manual',
       created_by: actorStamp,
       updated_by: actorStamp,
@@ -315,6 +323,7 @@ export interface LeadDetailChanges {
   budgetPaise?: number | null;
   promise?: string | null;
   callbackAt?: Date | null;
+  offeringId?: string | null;
 }
 
 /** Changes the listed details of a live lead and stamps who did it. "Last activity" is left alone: editing is not contact with the customer. */
@@ -333,6 +342,7 @@ export async function updateLeadDetails(
       ...(changes.budgetPaise !== undefined ? { budget_paise: changes.budgetPaise } : {}),
       ...(changes.promise !== undefined ? { promise: changes.promise } : {}),
       ...(changes.callbackAt !== undefined ? { callback_at: changes.callbackAt } : {}),
+      ...(changes.offeringId !== undefined ? { offering_id: changes.offeringId } : {}),
       updated_by: { kind: options.actor.kind, id: options.actor.id },
     })
     .where('account_id', '=', options.accountId)

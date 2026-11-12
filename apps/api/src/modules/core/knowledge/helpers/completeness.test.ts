@@ -30,10 +30,40 @@ describe('computeProfileProgress', () => {
 
   it('leaves out the questions answered in other features (offerings, FAQs, documents) everywhere', () => {
     const progress = computeProfileProgress(GENERAL_QUESTIONS, []);
-    expect(progress.totalQuestions).toBe(GENERAL_QUESTIONS.length - 4);
-    for (const key of ['offerings', 'current_offers', 'common_questions', 'brochure_upload']) {
+    expect(progress.totalQuestions).toBe(GENERAL_QUESTIONS.length - 5);
+    for (const key of ['offerings', 'prices_include_gst', 'current_offers', 'common_questions', 'brochure_upload']) {
       expect(progress.stillToAnswer).not.toContain(key);
     }
+  });
+
+  it('counts a question answered in another feature once that feature reports on it, answered exactly when it says so', () => {
+    const notYet = computeProfileProgress(
+      GENERAL_QUESTIONS,
+      NEEDED_HERE.map(confirmed),
+      new Map([['offerings', false]]),
+    );
+    expect(notYet.totalQuestions).toBe(GENERAL_QUESTIONS.length - 4); // "What do you sell?" now counts
+    expect(notYet.readyToGoLive).toBe(false);
+    expect(notYet.neededToGoLiveStillMissing).toEqual(['offerings']); // needed to go live, and not answered
+    expect(notYet.stillToAnswer[0]).toBe('offerings');
+
+    const done = computeProfileProgress(GENERAL_QUESTIONS, NEEDED_HERE.map(confirmed), new Map([['offerings', true]]));
+    expect(done.readyToGoLive).toBe(true);
+    expect(done.neededToGoLiveStillMissing).toEqual([]);
+    expect(done.answeredQuestions).toBe(notYet.answeredQuestions + 1);
+  });
+
+  it('ignores what another feature says about a question that is not handled elsewhere, and about questions it was not asked', () => {
+    const progress = computeProfileProgress(
+      GENERAL_QUESTIONS,
+      [],
+      new Map([
+        ['business_name', true],
+        ['no_such_question', true],
+      ]),
+    );
+    expect(progress.answeredQuestions).toBe(0);
+    expect(progress.totalQuestions).toBe(GENERAL_QUESTIONS.length - 5);
   });
 
   it('is ready to go live exactly when every needed question has a confirmed answer', () => {

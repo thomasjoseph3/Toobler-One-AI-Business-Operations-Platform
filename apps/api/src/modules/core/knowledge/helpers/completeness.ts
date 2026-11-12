@@ -26,20 +26,35 @@ export interface ProfileProgress {
   neededToGoLiveStillMissing: string[];
 }
 
-/** Works out how complete the business's profile is. Only confirmed answers count. */
+/**
+ * Works out how complete the business's profile is. Only confirmed answers count.
+ *
+ * A question whose real answer lives in another feature (offerings, FAQs, documents) is left out, unless `answeredElsewhere` has an
+ * entry for it: then it counts, and it is answered exactly when the entry says true (for example "What do you sell?" is answered
+ * when the business has an offering switched on). The other feature decides; this function only reads the facts it is given.
+ */
 export function computeProfileProgress(
   questions: readonly QuestionDefinition[],
   answers: readonly AnswerSummary[],
+  answeredElsewhere: ReadonlyMap<string, boolean> = new Map(),
 ): ProfileProgress {
-  const countedQuestions = questions.filter((question) => !question.handledElsewhere);
+  const countedQuestions = questions.filter(
+    (question) => !question.handledElsewhere || answeredElsewhere.has(question.key),
+  );
   const statusByKey = new Map(answers.map((answer) => [answer.questionKey, answer.status]));
+  const isAnswered = (question: QuestionDefinition) =>
+    question.handledElsewhere
+      ? answeredElsewhere.get(question.key) === true
+      : statusByKey.get(question.key) === 'confirmed';
 
-  const unanswered = countedQuestions.filter((question) => statusByKey.get(question.key) !== 'confirmed');
+  const unanswered = countedQuestions.filter((question) => !isAnswered(question));
   const neededMissing = unanswered.filter((question) => question.neededToGoLive);
   const otherMissing = unanswered.filter((question) => !question.neededToGoLive);
 
   const answeredQuestions = countedQuestions.length - unanswered.length;
-  const waitingForCheck = countedQuestions.filter((question) => statusByKey.get(question.key) === 'check').length;
+  const waitingForCheck = countedQuestions.filter(
+    (question) => !question.handledElsewhere && statusByKey.get(question.key) === 'check',
+  ).length;
   return {
     totalQuestions: countedQuestions.length,
     answeredQuestions,

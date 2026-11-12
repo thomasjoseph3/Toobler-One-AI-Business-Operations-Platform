@@ -134,6 +134,7 @@ describe('POST /api/v1/leads', () => {
         'interest',
         'lastActivityAt',
         'lostReason',
+        'offering',
         'ownerUserId',
         'partySize',
         'promise',
@@ -277,7 +278,12 @@ describe('POST /api/v1/leads', () => {
       .where('account_id', '=', person.profile.business.id)
       .where('name', '=', 'lead.created')
       .executeTakeFirstOrThrow();
-    expect(event.payload).toEqual({ leadId: lead.id, contactId, ownerUserId: person.profile.user.id });
+    expect(event.payload).toEqual({
+      leadId: lead.id,
+      contactId,
+      ownerUserId: person.profile.user.id,
+      offeringId: null,
+    });
     expect(JSON.stringify(logLine) + JSON.stringify(event)).not.toContain('Secret-interest-words');
     const stored = await database.system
       .selectFrom('leads')

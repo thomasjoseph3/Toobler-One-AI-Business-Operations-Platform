@@ -11,8 +11,9 @@ import { situationsRoutes } from './routes/situations.routes';
 export default defineModule({
   id: 'core.knowledge',
   kind: 'core',
-  // The business's time zone and default country live on the business itself, which the sign-in module owns
-  requires: ['core.auth'],
+  // The business's time zone and default country live on the business itself, which the sign-in module owns; "What do you sell?"
+  // is answered by the offerings module's data
+  requires: ['core.auth', 'core.offerings'],
   routes: (app) => {
     knowledgeRoutes(app);
     situationsRoutes(app);

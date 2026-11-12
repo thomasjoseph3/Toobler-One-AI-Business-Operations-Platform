@@ -59,6 +59,8 @@ interface BusinessAData {
   leadId: string;
   ticketId: string;
   stageId: string;
+  offeringId: string;
+  offerId: string;
   userId: string;
   secretWords: string;
 }
@@ -66,6 +68,8 @@ interface BusinessAData {
 /** What B owns, for the attempts that mix B's own records with A's ids. */
 interface BusinessBData {
   contactId: string;
+  /** A contact of B's with no lead, for the attempts that add one. */
+  spareContactId: string;
   leadId: string;
   stageId: string;
 }
@@ -93,6 +97,14 @@ beforeAll(async () => {
   await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
   await sendOk(businessA, 'PUT', '/knowledge/situations/discount_request', { choice: 'tell_current_offer' });
   await sendOk(businessA, 'PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+  const offering = await sendOk(
+    businessA,
+    'POST',
+    '/offerings',
+    { name: `Offering ${secretWords}`, fromPricePaise: 450_000, priceUnit: 'per night', gstMode: 'plus' },
+    201,
+  );
+  const offer = await sendOk(businessA, 'POST', '/offers', { text: `Offer ${secretWords}`, endsOn: '2099-12-31' }, 201);
   // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
   await database.system
     .insertInto('business_answers')
@@ -109,6 +121,8 @@ beforeAll(async () => {
     leadId: lead.id,
     ticketId: ticket.id,
     stageId: stage.id,
+    offeringId: offering.id,
+    offerId: offer.id,
     userId: businessA.profile.user.id,
     secretWords,
   };
@@ -116,7 +130,8 @@ beforeAll(async () => {
   const bContact = await sendOk(businessB, 'POST', '/contacts', { name: 'Bob', phone: uniqueUaeNumber() }, 201);
   const bLead = await sendOk(businessB, 'POST', '/leads', { contactId: bContact.id }, 201);
   const bStage = await sendOk(businessB, 'POST', '/pipeline/stages', { name: 'Bob stage' }, 201);
-  dataOfB = { contactId: bContact.id, leadId: bLead.id, stageId: bStage.id };
+  const spareContact = await sendOk(businessB, 'POST', '/contacts', { name: 'Spare', phone: uniqueUaeNumber() }, 201);
+  dataOfB = { spareContactId: spareContact.id, contactId: bContact.id, leadId: bLead.id, stageId: bStage.id };
 });
 
 /** One thing business B tries against A's data, and what it must be told. */
@@ -262,6 +277,94 @@ const attempts: Attempt[] = [
     }),
     expectedStatus: 200,
   },
+  // ---- leads about an offering, and sharing out by offering
+  {
+    route: 'POST /api/v1/leads',
+    what: "add a lead about A's offering",
+    request: () => ({
+      method: 'POST',
+      url: '/leads',
+      payload: { contactId: dataOfB.spareContactId, offeringId: dataOfA.offeringId },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/leads/{id}',
+    what: "point B's own lead at A's offering",
+    request: () => ({ method: 'PATCH', url: `/leads/${dataOfB.leadId}`, payload: { offeringId: dataOfA.offeringId } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PUT /api/v1/assignment-rules',
+    what: "share out by offering with A's person as the fallback",
+    request: () => ({
+      method: 'PUT',
+      url: '/assignment-rules',
+      payload: { mode: 'by_offering', fallbackUserId: dataOfA.userId },
+    }),
+    expectedStatus: 404,
+  },
+  // ---- offerings
+  {
+    route: 'POST /api/v1/offerings/reorder',
+    what: "reorder using A's offering id",
+    request: () => ({ method: 'POST', url: '/offerings/reorder', payload: { offeringIds: [dataOfA.offeringId] } }),
+    expectedStatus: 400,
+  },
+  {
+    route: 'DELETE /api/v1/offers/{id}',
+    what: "remove A's offer",
+    request: () => ({ method: 'DELETE', url: `/offers/${dataOfA.offerId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/offers/{id}',
+    what: "change A's offer",
+    request: () => ({ method: 'PATCH', url: `/offers/${dataOfA.offerId}`, payload: { text: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/offers',
+    what: "add an offer (B's own business only)",
+    request: () => ({ method: 'POST', url: '/offers', payload: { text: 'Bob offer', endsOn: '2099-12-31' } }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'PATCH /api/v1/offerings/{id}',
+    what: "change A's offering",
+    request: () => ({
+      method: 'PATCH',
+      url: `/offerings/${dataOfA.offeringId}`,
+      payload: { name: 'Hacked', active: false },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/offerings/{id}',
+    what: "remove A's offering",
+    request: () => ({ method: 'DELETE', url: `/offerings/${dataOfA.offeringId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/offerings',
+    what: "add an offering owned by A's person",
+    request: () => ({
+      method: 'POST',
+      url: '/offerings',
+      payload: { name: 'Sneaky offering', ownerUserId: dataOfA.userId },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/offerings',
+    what: "add an offering of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/offerings',
+      payload: { name: 'Bob offering' },
+    }),
+    expectedStatus: 201,
+  },
   {
     route: 'PUT /api/v1/knowledge/settings',
     what: "change the time zone and country (B's own business only), and A's must stay as they were",
@@ -304,6 +407,8 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/questions', url: '/knowledge/questions' },
   { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
   { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
+  { route: 'GET /api/v1/offerings', url: '/offerings' },
+  { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
 
@@ -339,6 +444,8 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/knowledge/questions': 'covered by the list check',
   'GET /api/v1/knowledge/situations': 'covered by the list check',
   'GET /api/v1/knowledge/settings': 'covered by the list check',
+  'GET /api/v1/offerings': 'covered by the list check',
+  'GET /api/v1/offers': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",
@@ -441,6 +548,15 @@ describe('isolation: business B tries to reach business A', () => {
       timeZone: 'Asia/Dubai',
       defaultCountry: 'AE',
     });
+    const offeringsOfA = await sendOk(businessA, 'GET', '/offerings');
+    expect(offeringsOfA.items).toHaveLength(1);
+    expect(offeringsOfA.items[0]).toMatchObject({
+      name: `Offering ${dataOfA.secretWords}`,
+      priceInWords: 'from ₹4,500 a night plus GST',
+    });
+    const offersOfA = await sendOk(businessA, 'GET', '/offers');
+    expect(offersOfA.items).toHaveLength(1);
+    expect(offersOfA.items[0].text).toBe(`Offer ${dataOfA.secretWords}`);
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
     // B's own records are untouched too
