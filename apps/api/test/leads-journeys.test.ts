@@ -399,7 +399,7 @@ describe('journey: staff, managers and the sharing-out of new leads', () => {
     // Share new leads in turn between the two of them: every second lead goes to the same person, and the turns are even
     const turns = [person.userId, colleagueId];
     const rule = await sendOk(person, 'PUT', '/assignment-rules', { mode: 'round_robin', userIds: turns });
-    expect(rule).toEqual({ mode: 'round_robin', userId: null, roundRobinUserIds: turns });
+    expect(rule).toEqual({ mode: 'round_robin', userId: null, fallbackUserId: null, roundRobinUserIds: turns });
     const owners: Array<string | null> = [];
     for (let count = 0; count < 6; count += 1) {
       const newLead = await sendOk(

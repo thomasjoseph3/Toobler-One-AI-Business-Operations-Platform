@@ -194,7 +194,7 @@ export interface LostReasonsTable {
 /** How a business shares out new leads (one row per business). Fenced by account_id. */
 export interface AssignmentRulesTable {
   account_id: string;
-  mode: Generated<'one_person' | 'round_robin'>;
+  mode: Generated<'one_person' | 'round_robin' | 'by_offering'>;
   user_id: string | null;
   last_assigned_user_id: string | null;
   created_by: Json | null;
@@ -228,6 +228,8 @@ export interface LeadsTable {
   promise: string | null;
   callback_at: Date | null;
   owner_user_id: string | null;
+  /** The offering the lead is about (an offering of the same business), or null. */
+  offering_id: string | null;
   first_channel: Generated<'manual' | 'web_chat' | 'whatsapp' | 'email' | 'phone'>;
   last_activity_at: Generated<Date>;
   lost_reason: string | null;

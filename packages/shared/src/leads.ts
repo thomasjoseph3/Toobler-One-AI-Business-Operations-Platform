@@ -52,6 +52,8 @@ export const leadSchema = z.object({
   promise: z.string().nullable(),
   callbackAt: z.string().nullable(),
   ownerUserId: z.string().nullable(),
+  /** The offering the lead is about, with its name (kept even if the offering was removed later); null when it names none. */
+  offering: z.object({ id: z.string(), name: z.string() }).nullable(),
   firstChannel: leadChannelSchema,
   lastActivityAt: z.string(),
   lostReason: z.string().nullable(),
@@ -77,6 +79,7 @@ export const createLeadRequestSchema = z
     promise: z.preprocess(blankToNothing, z.string().trim().max(500).optional()),
     callbackAt: z.preprocess(blankToNothing, z.iso.datetime({ offset: true }).optional()),
     ownerUserId: z.uuid().optional(),
+    offeringId: z.uuid().optional(),
   })
   .strict()
   .refine((lead) => !lead.dateFrom || !lead.dateTo || lead.dateTo >= lead.dateFrom, {
@@ -91,6 +94,7 @@ export const listLeadsQuerySchema = z.object({
   stageId: z.uuid().optional(),
   ownerUserId: z.uuid().optional(),
   contactId: z.uuid().optional(),
+  offeringId: z.uuid().optional(),
   /** `open` = still in progress; `closed` = won or lost. */
   status: z.enum(['open', 'closed']).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -143,6 +147,8 @@ export const updateLeadRequestSchema = z
     budgetPaise: z.number().int().min(0).max(1_000_000_000_000).nullable().optional(),
     promise: z.preprocess(clearIfBlank, z.string().trim().max(500).nullable().optional()),
     callbackAt: z.preprocess(clearIfBlank, z.iso.datetime({ offset: true }).nullable().optional()),
+    /** The offering the lead is about; null takes it away. Changing it does not hand the lead to someone else. */
+    offeringId: z.uuid().nullable().optional(),
   })
   .strict();
 export type UpdateLeadRequest = z.infer<typeof updateLeadRequestSchema>;

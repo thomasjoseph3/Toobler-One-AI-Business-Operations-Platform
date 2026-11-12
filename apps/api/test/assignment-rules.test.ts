@@ -79,7 +79,12 @@ describe('GET /api/v1/assignment-rules', () => {
     const person = await createSignedInPerson(app, database);
     const response = await getRules(person);
     expect(response.statusCode, response.body).toBe(200);
-    expect(response.json()).toEqual({ mode: 'one_person', userId: person.profile.user.id, roundRobinUserIds: [] });
+    expect(response.json()).toEqual({
+      mode: 'one_person',
+      userId: person.profile.user.id,
+      fallbackUserId: null,
+      roundRobinUserIds: [],
+    });
   });
 
   it("never shows another business's rule", async () => {
@@ -103,7 +108,12 @@ describe('PUT /api/v1/assignment-rules', () => {
     const colleagueId = await addColleague(person);
     const response = await putRules(person, { mode: 'one_person', userId: colleagueId });
     expect(response.statusCode, response.body).toBe(200);
-    expect(response.json()).toEqual({ mode: 'one_person', userId: colleagueId, roundRobinUserIds: [] });
+    expect(response.json()).toEqual({
+      mode: 'one_person',
+      userId: colleagueId,
+      fallbackUserId: null,
+      roundRobinUserIds: [],
+    });
     expect(await addLeadAndReadOwner(person)).toBe(colleagueId);
     expect(await addLeadAndReadOwner(person)).toBe(colleagueId);
   });
@@ -114,7 +124,12 @@ describe('PUT /api/v1/assignment-rules', () => {
     const turns = [colleagueId, person.profile.user.id];
     const response = await putRules(person, { mode: 'round_robin', userIds: turns });
     expect(response.statusCode, response.body).toBe(200);
-    expect(response.json()).toEqual({ mode: 'round_robin', userId: null, roundRobinUserIds: turns });
+    expect(response.json()).toEqual({
+      mode: 'round_robin',
+      userId: null,
+      fallbackUserId: null,
+      roundRobinUserIds: turns,
+    });
     expect((await getRules(person)).json().roundRobinUserIds).toEqual(turns);
   });
 
@@ -185,7 +200,12 @@ describe('PUT /api/v1/assignment-rules', () => {
     const colleagueId = await addColleague(person);
     await putRules(person, { mode: 'round_robin', userIds: [person.profile.user.id, colleagueId] });
     const response = await putRules(person, { mode: 'one_person', userId: person.profile.user.id });
-    expect(response.json()).toEqual({ mode: 'one_person', userId: person.profile.user.id, roundRobinUserIds: [] });
+    expect(response.json()).toEqual({
+      mode: 'one_person',
+      userId: person.profile.user.id,
+      fallbackUserId: null,
+      roundRobinUserIds: [],
+    });
     expect(await addLeadAndReadOwner(person)).toBe(person.profile.user.id);
   });
 
@@ -202,6 +222,7 @@ describe('PUT /api/v1/assignment-rules', () => {
     expect((await getRules(person)).json()).toEqual({
       mode: 'one_person',
       userId: person.profile.user.id,
+      fallbackUserId: null,
       roundRobinUserIds: [],
     });
   });
@@ -241,6 +262,9 @@ describe('PUT /api/v1/assignment-rules', () => {
     const badBodies: unknown[] = [
       {},
       { mode: 'by_offering' },
+      { mode: 'by_offering', fallbackUserId: 'abc' },
+      { mode: 'by_offering', userId: me },
+      { mode: 'by_offering', fallbackUserId: me, userIds: [me] },
       { mode: 'one_person' },
       { mode: 'one_person', userId: 'abc' },
       { mode: 'one_person', userId: me, userIds: [me] },

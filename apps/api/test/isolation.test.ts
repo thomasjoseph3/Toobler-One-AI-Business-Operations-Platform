@@ -68,6 +68,8 @@ interface BusinessAData {
 /** What B owns, for the attempts that mix B's own records with A's ids. */
 interface BusinessBData {
   contactId: string;
+  /** A contact of B's with no lead, for the attempts that add one. */
+  spareContactId: string;
   leadId: string;
   stageId: string;
 }
@@ -128,7 +130,8 @@ beforeAll(async () => {
   const bContact = await sendOk(businessB, 'POST', '/contacts', { name: 'Bob', phone: uniqueUaeNumber() }, 201);
   const bLead = await sendOk(businessB, 'POST', '/leads', { contactId: bContact.id }, 201);
   const bStage = await sendOk(businessB, 'POST', '/pipeline/stages', { name: 'Bob stage' }, 201);
-  dataOfB = { contactId: bContact.id, leadId: bLead.id, stageId: bStage.id };
+  const spareContact = await sendOk(businessB, 'POST', '/contacts', { name: 'Spare', phone: uniqueUaeNumber() }, 201);
+  dataOfB = { spareContactId: spareContact.id, contactId: bContact.id, leadId: bLead.id, stageId: bStage.id };
 });
 
 /** One thing business B tries against A's data, and what it must be told. */
@@ -273,6 +276,33 @@ const attempts: Attempt[] = [
       payload: { choice: 'prices_are_fixed' },
     }),
     expectedStatus: 200,
+  },
+  // ---- leads about an offering, and sharing out by offering
+  {
+    route: 'POST /api/v1/leads',
+    what: "add a lead about A's offering",
+    request: () => ({
+      method: 'POST',
+      url: '/leads',
+      payload: { contactId: dataOfB.spareContactId, offeringId: dataOfA.offeringId },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/leads/{id}',
+    what: "point B's own lead at A's offering",
+    request: () => ({ method: 'PATCH', url: `/leads/${dataOfB.leadId}`, payload: { offeringId: dataOfA.offeringId } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PUT /api/v1/assignment-rules',
+    what: "share out by offering with A's person as the fallback",
+    request: () => ({
+      method: 'PUT',
+      url: '/assignment-rules',
+      payload: { mode: 'by_offering', fallbackUserId: dataOfA.userId },
+    }),
+    expectedStatus: 404,
   },
   // ---- offerings
   {

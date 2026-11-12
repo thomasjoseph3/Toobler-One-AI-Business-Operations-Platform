@@ -289,3 +289,32 @@ export async function countActiveOfferings(db: Db, accountId: string): Promise<n
     .executeTakeFirstOrThrow();
   return Number(row.total);
 }
+
+/** What another module may know about an offering: its id, name, who looks after it, and whether it was removed. */
+export interface OfferingSummaryRow {
+  id: string;
+  name: string;
+  ownerUserId: string | null;
+  removed: boolean;
+}
+
+/** The business's offerings with these ids, removed ones included (a lead keeps pointing at an offering that was removed later). */
+export async function findOfferingSummariesByIds(
+  db: Db,
+  accountId: string,
+  offeringIds: string[],
+): Promise<OfferingSummaryRow[]> {
+  if (offeringIds.length === 0) return [];
+  const rows = await db
+    .selectFrom('offerings')
+    .select(['id', 'name', 'owner_user_id', 'deleted_at'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', offeringIds)
+    .execute();
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    ownerUserId: row.owner_user_id,
+    removed: row.deleted_at !== null,
+  }));
+}

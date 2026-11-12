@@ -381,6 +381,41 @@ describe('journey: a busy day at Nair Stays', () => {
     await vikram.ok('DELETE', `/contacts/${arjun}`, undefined, 204);
     expect(await problemsOf(anita)).toEqual([]);
 
+    // ------------------------------------- chapter 5b: leads about an offering are shared out by the offering's person
+    await vikram.ok('PATCH', `/offerings/${familyRoom.id}`, { ownerUserId: rahul.userId });
+    await vikram.ok('PATCH', `/offerings/${dayTour.id}`, { ownerUserId: meera.userId });
+    await vikram.ok('PUT', '/assignment-rules', { mode: 'by_offering', fallbackUserId: vikram.userId });
+    expect(
+      await rahul.refused('PUT', '/assignment-rules', { mode: 'by_offering', fallbackUserId: rahul.userId }, 403),
+    ).toBeTruthy();
+    const nikhil = await addContact(rahul, 'Nikhil Varma');
+    const asha = await addContact(rahul, 'Asha Thomas');
+    const leo = await addContact(rahul, 'Leo Joseph');
+    const aboutTheRoom = await rahul.ok(
+      'POST',
+      '/leads',
+      { contactId: nikhil, offeringId: familyRoom.id, interest: 'Two nights' },
+      201,
+    );
+    const aboutTheTour = await rahul.ok('POST', '/leads', { contactId: asha, offeringId: dayTour.id }, 201);
+    const aboutNothing = await rahul.ok('POST', '/leads', { contactId: leo }, 201);
+    expect([aboutTheRoom.ownerUserId, aboutTheTour.ownerUserId, aboutNothing.ownerUserId]).toEqual([
+      rahul.userId, // looks after the family room
+      meera.userId, // looks after the day tour
+      vikram.userId, // the fallback: this lead names no offering
+    ]);
+    expect(aboutTheRoom.offering).toEqual({ id: familyRoom.id, name: 'Family room' });
+    // Meera sees only hers, and can filter them by the offering
+    expect(
+      (await meera.ok('GET', `/leads?offeringId=${dayTour.id}`)).items.map((lead: { id: string }) => lead.id),
+    ).toEqual([aboutTheTour.id]);
+    await meera.refused('GET', `/leads/${aboutTheRoom.id}`, undefined, 404);
+    expect((await anita.ok('GET', `/leads?offeringId=${familyRoom.id}`)).total).toBe(1);
+    // An offering that is removed later still shows on the lead that was about it
+    await vikram.ok('PATCH', `/leads/${aboutNothing.id}`, { offeringId: dayTour.id });
+    expect((await vikram.ok('GET', `/leads/${aboutNothing.id}`)).ownerUserId).toBe(vikram.userId); // naming it does not reassign
+    expect(await problemsOf(anita)).toEqual([]);
+
     // ---------------------------------------------------- chapter 6: an outsider sees nothing of Nair Stays
     const bob = await signUpOwner(app, database);
     for (const url of ['/leads', '/tickets', '/contacts']) expect((await bob.ok('GET', url)).total, url).toBe(0);
@@ -442,7 +477,47 @@ describe('the consistency checker itself', () => {
   it("notices damage done behind the app's back, naming the rule that is broken", async () => {
     const { owner, contactId, lead, ticket } = await buildSmallBusiness();
     const businessId = owner.businessId;
+    const firstOffering = await owner.ok('POST', '/offerings', { name: 'Family room suite' }, 201);
+    await owner.ok('POST', '/offerings', { name: 'Day tour package' }, 201);
     const damage: Array<{ what: string; expectInReport: string; apply: () => Promise<void> }> = [
+      {
+        what: 'two offerings sharing one position',
+        expectInReport: '[offerings and offers are in order]',
+        apply: async () => {
+          await database.system
+            .updateTable('offerings')
+            .set({ sort: 0 })
+            .where('account_id', '=', businessId)
+            .execute();
+        },
+      },
+      {
+        what: 'an offering whose creation log line was removed',
+        expectInReport: '[every creation is logged and announced once]',
+        apply: async () => {
+          await database.system
+            .deleteFrom('activity_log')
+            .where('record_id', '=', firstOffering.id)
+            .where('kind', '=', 'offerings.created')
+            .execute();
+        },
+      },
+      {
+        what: 'the words of an offering written into the log',
+        expectInReport: '[no personal data in the log or events]',
+        apply: async () => {
+          await database.system
+            .insertInto('activity_log')
+            .values({
+              id: crypto.randomUUID(),
+              account_id: businessId,
+              actor: { kind: 'system', id: 'test' },
+              kind: 'offerings.updated',
+              fields: ['Family room suite'],
+            })
+            .execute();
+        },
+      },
       {
         what: 'a contact whose stage does not match its leads',
         expectInReport: '[contact stages match their leads]',

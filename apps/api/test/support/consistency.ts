@@ -201,6 +201,58 @@ const ticketsAreInOrder: Check = async (database, accountId) => {
   return problems;
 };
 
+// ----------------------------------------------------------------------------------------- offerings and offers
+
+const offeringsAndOffersAreInOrder: Check = async (database, accountId) => {
+  const problems: string[] = [];
+  const duplicateNames = await rowsOf<{ name: string; total: number }>(
+    database,
+    sql`select lower(name) as name, count(*)::int as total from app.offerings
+        where account_id = ${accountId} and deleted_at is null group by lower(name) having count(*) > 1`,
+  );
+  problems.push(...duplicateNames.map((row) => `${row.total} live offerings are called "${row.name}"`));
+
+  const sharedPositions = await rowsOf<{ sort: number; total: number }>(
+    database,
+    sql`select sort, count(*)::int as total from app.offerings
+        where account_id = ${accountId} and deleted_at is null group by sort having count(*) > 1`,
+  );
+  problems.push(...sharedPositions.map((row) => `${row.total} live offerings share the position ${row.sort}`));
+
+  const halfPrices = await rowsOf<{ id: string }>(
+    database,
+    sql`select id from app.offerings where account_id = ${accountId}
+        and ((from_price_paise is null) <> (price_unit is null) or (from_price_paise is null) <> (gst_mode is null))`,
+  );
+  problems.push(...halfPrices.map((row) => `offering ${row.id} has a half-described price`));
+
+  const tooManyDetails = await rowsOf<{ id: string }>(
+    database,
+    sql`select id from app.offerings where account_id = ${accountId} and jsonb_array_length(details) > 10`,
+  );
+  problems.push(...tooManyDetails.map((row) => `offering ${row.id} has more than 10 details`));
+
+  const crossBusiness = await rowsOf<{ id: string; what: string }>(
+    database,
+    sql`select o.id, 'owner' as what from app.offerings o join app.users u on u.id = o.owner_user_id
+          where o.account_id = ${accountId} and u.account_id <> o.account_id
+        union all
+        select l.id, 'offering' from app.leads l join app.offerings o on o.id = l.offering_id
+          where l.account_id = ${accountId} and o.account_id <> l.account_id`,
+  );
+  problems.push(...crossBusiness.map((row) => `${row.id} points at an ${row.what} of another business`));
+
+  const rule = await rowsOf<{ mode: string; user_id: string | null }>(
+    database,
+    sql`select mode, user_id from app.assignment_rules where account_id = ${accountId}`,
+  );
+  for (const row of rule) {
+    if (row.mode !== 'round_robin' && row.user_id === null)
+      problems.push(`the sharing-out rule is "${row.mode}" but names nobody`);
+  }
+  return problems;
+};
+
 // ---------------------------------------------------------------------------------------- business profile, settings
 
 const profileAnswersAreForRealQuestions: Check = async (database, accountId) => {
@@ -252,7 +304,16 @@ const profileAnswersAreForRealQuestions: Check = async (database, accountId) => 
 // ------------------------------------------------------------------------------------- who did it, and what is written
 
 const everyStampNamesSomeoneOfTheBusiness: Check = async (database, accountId) => {
-  const tables = ['contacts', 'leads', 'tickets', 'pipelines', 'business_answers', 'situations'] as const;
+  const tables = [
+    'contacts',
+    'leads',
+    'tickets',
+    'pipelines',
+    'business_answers',
+    'situations',
+    'offerings',
+    'offers',
+  ] as const;
   const problems: string[] = [];
   for (const table of tables) {
     for (const stamp of ['created_by', 'updated_by'] as const) {
@@ -277,6 +338,8 @@ const everyCreationIsLoggedOnce: Check = async (database, accountId) => {
     { table: 'contacts', logKind: 'contacts.created', eventName: 'contact.created', eventKey: 'contactId' },
     { table: 'leads', logKind: 'leads.created', eventName: 'lead.created', eventKey: 'leadId' },
     { table: 'tickets', logKind: 'tickets.created', eventName: 'ticket.created', eventKey: 'ticketId' },
+    { table: 'offerings', logKind: 'offerings.created', eventName: 'offering.created', eventKey: 'offeringId' },
+    { table: 'offers', logKind: 'offers.created', eventName: 'offer.created', eventKey: 'offerId' },
   ] as const;
   for (const thing of things) {
     const rows = await rowsOf<{ id: string; log_lines: number; events: number }>(
@@ -310,7 +373,7 @@ const logLinesNameAPersonOfTheBusiness: Check = async (database, accountId) => {
 
 /**
  * No personal data in the log or the events: the names, phone numbers and email addresses of the business's contacts and
- * people (long enough to be meaningful) must appear in no log line and no event of the business.
+ * people, and the words of its offerings and offers (long enough to be meaningful), must appear in no log line and no event.
  */
 const noPersonalDataInTheLogOrEvents: Check = async (database, accountId) => {
   const people = await rowsOf<{ text: string }>(
@@ -319,7 +382,10 @@ const noPersonalDataInTheLogOrEvents: Check = async (database, accountId) => {
         union all select phone from app.contacts where account_id = ${accountId} and phone is not null
         union all select email from app.contacts where account_id = ${accountId} and email is not null
         union all select name from app.users where account_id = ${accountId}
-        union all select email from app.users where account_id = ${accountId}`,
+        union all select email from app.users where account_id = ${accountId}
+        union all select name from app.offerings where account_id = ${accountId}
+        union all select description from app.offerings where account_id = ${accountId} and description is not null
+        union all select text from app.offers where account_id = ${accountId}`,
   );
   const needles = [...new Set(people.map((row) => row.text.toLowerCase()).filter((text) => text.length >= 6))];
   if (needles.length === 0) return [];
@@ -342,6 +408,7 @@ const checks: ReadonlyArray<readonly [string, Check]> = [
   ['leads are in order', leadsAreInOrder],
   ["sharing out points at the business's own people", sharingOutPointsAtThePeopleOfTheBusiness],
   ['tickets are in order', ticketsAreInOrder],
+  ['offerings and offers are in order', offeringsAndOffersAreInOrder],
   ['the profile and settings are valid', profileAnswersAreForRealQuestions],
   ['every stamp names someone of the business', everyStampNamesSomeoneOfTheBusiness],
   ['every creation is logged and announced once', everyCreationIsLoggedOnce],

@@ -16,21 +16,30 @@ async function readAssignmentRules(transaction: Db, accountId: string): Promise<
   const rule = await assignmentRulesRepository.findAssignmentRule(transaction, accountId);
   if (!rule) throw notFound('The sharing-out rule');
   const roundRobinUserIds = await assignmentRulesRepository.listRoundRobinUserIds(transaction, accountId);
-  return { mode: rule.mode, userId: rule.userId, roundRobinUserIds };
+  // For sharing out by offering the stored person is the fallback, not "the one person"
+  return {
+    mode: rule.mode,
+    userId: rule.mode === 'one_person' ? rule.userId : null,
+    fallbackUserId: rule.mode === 'by_offering' ? rule.userId : null,
+    roundRobinUserIds,
+  };
 }
 
 /**
- * Picks who owns a new lead according to the business's rule: the one person, or the next person in the round-robin turn
- * (and remembers who it was). Call it inside the transaction that adds the lead. The rule row is locked until the
- * transaction ends, so leads added at the same moment get different people in turn. Returns null when nobody can be picked.
+ * Picks who owns a new lead according to the business's rule: the one person, the person who looks after the lead's offering (or the
+ * fallback person when the lead names no offering or nobody looks after it), or the next person in the round-robin turn (and
+ * remembers who it was). Call it inside the transaction that adds the lead. The rule row is locked until the transaction ends, so
+ * leads added at the same moment get different people in turn. Returns null when nobody can be picked.
+ * `offeringOwnerUserId` is who looks after the offering the lead is about (null when it names none, or nobody looks after it).
  */
 export async function chooseOwnerForNewLead(
   transaction: Db,
-  options: { accountId: string; actor: Actor },
+  options: { accountId: string; actor: Actor; offeringOwnerUserId?: string | null },
 ): Promise<string | null> {
   const rule = await assignmentRulesRepository.lockAssignmentRule(transaction, options.accountId);
   if (!rule) return null;
   if (rule.mode === 'one_person') return rule.userId;
+  if (rule.mode === 'by_offering') return options.offeringOwnerUserId ?? rule.userId;
 
   const userIds = await assignmentRulesRepository.listRoundRobinUserIds(transaction, options.accountId);
   const nextUserId = pickNextPerson({ userIds, lastAssignedUserId: rule.lastAssignedUserId });
@@ -58,7 +67,8 @@ export function createAssignmentRulesService({ database }: { database: Database 
     },
 
     /**
-     * Changes the rule: every new lead goes to one person, or the listed people take turns. Every person must work for the
+     * Changes the rule: every new lead goes to one person, the listed people take turns, or a lead goes to the person who looks after
+     * its offering (with one fallback person). Every person must work for the
      * business (404 otherwise; the database checks it). A new round-robin starts from its first person. Answers with the new
      * rule.
      */
@@ -76,6 +86,13 @@ export function createAssignmentRulesService({ database }: { database: Database 
             throw notFound('The sharing-out rule');
           }
           const roundRobinUserIds = request.mode === 'round_robin' ? request.userIds : [];
+          // The one person, or for sharing out by offering the fallback person, is kept in the rule's person column
+          const personOfTheRule =
+            request.mode === 'one_person'
+              ? request.userId
+              : request.mode === 'by_offering'
+                ? request.fallbackUserId
+                : null;
           // The people go in first: if one does not work for the business, nothing else is saved
           await assignmentRulesRepository.replaceRoundRobinUserIds(transaction, {
             accountId,
@@ -85,7 +102,7 @@ export function createAssignmentRulesService({ database }: { database: Database 
           await assignmentRulesRepository.updateAssignmentRule(transaction, {
             accountId,
             mode: request.mode,
-            userId: request.mode === 'one_person' ? request.userId : null,
+            userId: personOfTheRule,
             lastAssignedUserId: null,
             actor,
           });
@@ -95,7 +112,12 @@ export function createAssignmentRulesService({ database }: { database: Database 
             kind: 'assignment_rules.replaced',
             details: {
               recordType: 'assignment_rules',
-              fields: request.mode === 'one_person' ? ['mode', 'userId'] : ['mode', 'userIds'],
+              fields:
+                request.mode === 'one_person'
+                  ? ['mode', 'userId']
+                  : request.mode === 'by_offering'
+                    ? ['mode', 'fallbackUserId']
+                    : ['mode', 'userIds'],
             },
           });
           await publishEvent(transaction, {

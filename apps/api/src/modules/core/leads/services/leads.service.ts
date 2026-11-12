@@ -17,7 +17,9 @@ import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { applyLeadFactsToContact, findContactSummaries } from '../../contacts';
+import { findOfferingForLead, findOfferingSummaries } from '../../offerings';
 import type { ContactSummary } from '../../contacts';
+import type { OfferingSummary } from '../../offerings';
 import { decideWhatToDoWithEnquiry } from '../helpers/open-lead-rule';
 import { chooseOwnerForNewLead } from './assignment-rules.service';
 import * as leadsRepository from '../repositories/leads.repository';
@@ -36,12 +38,19 @@ const BOARD_COLUMN_LIMIT = 50;
 const isDatabaseError = (error: unknown, code: string) =>
   error instanceof Error && 'code' in error && error.code === code;
 
-/** Turns a database row plus the person it is for into the Lead the API answers with. */
-function toLead(row: LeadRow, contactsById: Map<string, ContactSummary>): Lead {
+/** The people and offerings that leads point at, looked up once for a whole page of leads. */
+interface LeadRelations {
+  contactsById: Map<string, ContactSummary>;
+  offeringsById: Map<string, OfferingSummary>;
+}
+
+/** Turns a database row plus the person and offering it is about into the Lead the API answers with. */
+function toLead(row: LeadRow, related: LeadRelations): Lead {
+  const offering = row.offeringId ? related.offeringsById.get(row.offeringId) : undefined;
   return {
     id: row.id,
     contactId: row.contactId,
-    contact: contactsById.get(row.contactId) ?? null,
+    contact: related.contactsById.get(row.contactId) ?? null,
     stage: { id: row.stageId, name: row.stageName, kind: row.stageKind },
     temperature: row.temperature,
     interest: row.interest,
@@ -52,6 +61,8 @@ function toLead(row: LeadRow, contactsById: Map<string, ContactSummary>): Lead {
     promise: row.promise,
     callbackAt: row.callbackAt?.toISOString() ?? null,
     ownerUserId: row.ownerUserId,
+    // The name is kept even if the offering was removed later: the lead was about it
+    offering: offering ? { id: offering.id, name: offering.name } : null,
     firstChannel: row.firstChannel,
     lastActivityAt: row.lastActivityAt.toISOString(),
     lostReason: row.lostReason,
@@ -69,11 +80,16 @@ function ownLeadsOnlyUserId(principal: Pick<Principal, 'userId' | 'role'>): stri
   return principal.role === 'staff_own' ? principal.userId : undefined;
 }
 
-/** Looks up the people the given leads are for, keyed by contact id. */
-async function loadContactsForLeads(transaction: Db, accountId: string, rows: LeadRow[]) {
+/** Looks up the people the given leads are for and the offerings they are about, each keyed by id. */
+async function loadRelatedForLeads(transaction: Db, accountId: string, rows: LeadRow[]): Promise<LeadRelations> {
   const contactIds = [...new Set(rows.map((row) => row.contactId))];
-  const summaries = await findContactSummaries(transaction, { accountId, contactIds });
-  return new Map(summaries.map((summary) => [summary.id, summary]));
+  const offeringIds = [...new Set(rows.flatMap((row) => (row.offeringId ? [row.offeringId] : [])))];
+  const contacts = await findContactSummaries(transaction, { accountId, contactIds });
+  const offerings = await findOfferingSummaries(transaction, { accountId, offeringIds });
+  return {
+    contactsById: new Map(contacts.map((summary) => [summary.id, summary])),
+    offeringsById: new Map(offerings.map((summary) => [summary.id, summary])),
+  };
 }
 
 /**
@@ -85,7 +101,7 @@ export function createLeadsService({ database }: { database: Database }) {
   async function readLead(transaction: Db, accountId: string, leadId: string): Promise<Lead> {
     const row = await leadsRepository.findLeadById(transaction, accountId, leadId);
     if (!row) throw new Error('The lead that was just saved cannot be read');
-    return toLead(row, await loadContactsForLeads(transaction, accountId, [row]));
+    return toLead(row, await loadRelatedForLeads(transaction, accountId, [row]));
   }
 
   return {
@@ -132,6 +148,13 @@ export function createLeadsService({ database }: { database: Database }) {
             : undefined;
           if (!firstOpenStage) throw new Error('The business has no open pipeline stage');
 
+          // The offering the lead is about must be one of this business's own (and not removed); a switched-off one is fine
+          let offering: OfferingSummary | undefined;
+          if (request.offeringId) {
+            offering = await findOfferingForLead(transaction, { accountId, offeringId: request.offeringId });
+            if (!offering) throw notFound('That offering');
+          }
+
           // The owner named in the request, or else whoever the business's sharing-out rule picks. Naming an owner does
           // not use up anyone's turn in a round-robin. The "own leads only" role can only add leads that are its own: it
           // may not name anyone else, and the sharing-out rule is not used for it.
@@ -140,7 +163,13 @@ export function createLeadsService({ database }: { database: Database }) {
             if (request.ownerUserId !== undefined && request.ownerUserId !== principal.userId) throw forbidden();
             ownerUserId = principal.userId;
           } else {
-            ownerUserId = request.ownerUserId ?? (await chooseOwnerForNewLead(transaction, { accountId, actor }));
+            ownerUserId =
+              request.ownerUserId ??
+              (await chooseOwnerForNewLead(transaction, {
+                accountId,
+                actor,
+                offeringOwnerUserId: offering?.ownerUserId ?? null,
+              }));
           }
 
           const leadId = uuidv7();
@@ -157,6 +186,7 @@ export function createLeadsService({ database }: { database: Database }) {
             promise: request.promise ?? null,
             callbackAt: request.callbackAt ? new Date(request.callbackAt) : null,
             ownerUserId,
+            offeringId: offering?.id ?? null,
             actor,
           });
 
@@ -187,7 +217,7 @@ export function createLeadsService({ database }: { database: Database }) {
           await publishEvent(transaction, {
             accountId,
             eventName: 'lead.created',
-            payload: { leadId, contactId: request.contactId, ownerUserId },
+            payload: { leadId, contactId: request.contactId, ownerUserId, offeringId: offering?.id ?? null },
           });
           return readLead(transaction, accountId, leadId);
         });
@@ -215,7 +245,7 @@ export function createLeadsService({ database }: { database: Database }) {
           ownLeadsOnlyUserId(principal),
         );
         if (!row) throw notFound('That lead');
-        return toLead(row, await loadContactsForLeads(transaction, principal.accountId, [row]));
+        return toLead(row, await loadRelatedForLeads(transaction, principal.accountId, [row]));
       });
     },
 
@@ -262,9 +292,16 @@ export function createLeadsService({ database }: { database: Database }) {
           const newCallbackAt = request.callbackAt === null ? null : new Date(request.callbackAt);
           if (newCallbackAt?.getTime() !== current.callbackAt?.getTime()) changes.callbackAt = newCallbackAt;
         }
+        if (request.offeringId !== undefined && request.offeringId !== current.offeringId) {
+          if (request.offeringId !== null) {
+            const offering = await findOfferingForLead(transaction, { accountId, offeringId: request.offeringId });
+            if (!offering) throw notFound('That offering');
+          }
+          changes.offeringId = request.offeringId;
+        }
         const changedFields = Object.keys(changes); // the names of the fields that really change
         if (changedFields.length === 0)
-          return toLead(current, await loadContactsForLeads(transaction, accountId, [current]));
+          return toLead(current, await loadRelatedForLeads(transaction, accountId, [current]));
 
         const dateFromAfter = 'dateFrom' in changes ? changes.dateFrom : current.dateFrom;
         const dateToAfter = 'dateTo' in changes ? changes.dateTo : current.dateTo;
@@ -316,7 +353,7 @@ export function createLeadsService({ database }: { database: Database }) {
           if (!targetStage) throw notFound('That stage');
 
           if (targetStage.id === current.stageId) {
-            return toLead(current, await loadContactsForLeads(transaction, accountId, [current]));
+            return toLead(current, await loadRelatedForLeads(transaction, accountId, [current]));
           }
 
           // Lost always needs a reason, written the way the business wrote it; no other stage takes one.
@@ -426,7 +463,7 @@ export function createLeadsService({ database }: { database: Database }) {
           const current = await leadsRepository.findLeadById(transaction, accountId, leadId, visibleToUserId);
           if (!current) throw notFound('That lead');
           if (current.ownerUserId === request.ownerUserId) {
-            return toLead(current, await loadContactsForLeads(transaction, accountId, [current]));
+            return toLead(current, await loadRelatedForLeads(transaction, accountId, [current]));
           }
 
           await leadsRepository.setLeadOwner(transaction, {
@@ -519,15 +556,16 @@ export function createLeadsService({ database }: { database: Database }) {
             stageId: query.stageId,
             ownerUserId: query.ownerUserId,
             contactId: query.contactId,
+            offeringId: query.offeringId,
             status: query.status,
             visibleToUserId,
           },
           { limit: query.limit, offset: (query.page - 1) * query.limit },
         );
-        const contactsById = await loadContactsForLeads(transaction, accountId, rows);
+        const related = await loadRelatedForLeads(transaction, accountId, rows);
         return {
           view: 'list' as const,
-          items: rows.map((row) => toLead(row, contactsById)),
+          items: rows.map((row) => toLead(row, related)),
           total,
           page: query.page,
           limit: query.limit,
@@ -552,13 +590,20 @@ async function readBoard(
   for (const stage of stages) {
     const { rows, total } = await leadsRepository.listLeadRows(
       transaction,
-      { accountId, stageId: stage.id, ownerUserId: query.ownerUserId, contactId: query.contactId, visibleToUserId },
+      {
+        accountId,
+        stageId: stage.id,
+        ownerUserId: query.ownerUserId,
+        contactId: query.contactId,
+        offeringId: query.offeringId,
+        visibleToUserId,
+      },
       { limit: BOARD_COLUMN_LIMIT, offset: 0 },
     );
     columnsWithRows.push({ stage, rows, total });
   }
 
-  const contactsById = await loadContactsForLeads(
+  const related = await loadRelatedForLeads(
     transaction,
     accountId,
     columnsWithRows.flatMap((column) => column.rows),
@@ -566,7 +611,7 @@ async function readBoard(
   const columns: BoardColumn[] = columnsWithRows.map((column) => ({
     stage: column.stage,
     leadCount: column.total,
-    leads: column.rows.map((row) => toLead(row, contactsById)),
+    leads: column.rows.map((row) => toLead(row, related)),
     hasMore: column.total > column.rows.length,
   }));
   return { view: 'board', columns };

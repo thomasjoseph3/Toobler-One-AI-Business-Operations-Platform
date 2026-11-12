@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/01-business-info-and-offerings.md`; `requirements/API.md` (Business info and offerings); `2-crm-core/03-leads-and-pipeline-board.md` ("sharing out new leads: by offering"); docs/plan/PHASE-1.md (F17)
 **Depends on:** F00, F01, F04, F06, F16      **Module:** `core.offerings` (core: always on, no switch)
-**Status:** in progress. The owner chose all five defaults and said "continue" on 12 Nov 2026. (F16 is merged into `dev` as c19cb16.)
+**Status:** in review (12 Nov 2026). Slices 0 to 7 are built. The owner lifted the "one slice at a time" rule for slices 6 and 7 (built together) and asked for the full verification and the merge into `dev`; the owner's "approved" is still to come after the Postman test.
 
 **Goal in one line:** what the business sells, written down once so the AI can answer "how much is a family room, and what is included?" correctly: each
 **offering** has a name, a description, a "from" price in paise, a unit (per night, per person...), a GST note, what is included and a few details; each
@@ -93,8 +93,8 @@ answer already carries the progress) and F31 (reading a website); they are not b
 | 3 | Reorder; add an offer | `POST /offerings/reorder`, `POST /offers`; **built, owner test pending** |
 | 4 | List and edit offers | `GET /offers`, `PATCH /offers/{id}`; **built, owner test pending** |
 | 5 | Remove an offer; the link to F16 (the questions answered by this data, completeness and go-live count them) | `DELETE /offers/{id}`; **built, owner test pending** |
-| 6 | Leads name an offering (migration `018`); the sharing-out mode "by offering" | `POST /leads`, `PATCH /leads/{id}` and `PUT /assignment-rules` change (no new addresses) |
-| 7 | The team journey grows a chapter, isolation entries, consistency rules, `api-security` review, Postman collection, hand-off | none |
+| 6 | Leads name an offering (migration `018`); the sharing-out mode "by offering" | `POST /leads`, `PATCH /leads/{id}` and `PUT /assignment-rules` change (no new addresses); built with slice 7 |
+| 7 | The team journey grows a chapter, isolation entries, consistency rules, `api-security` review, Postman collection, hand-off | none; built, full verification run |
 
 ## Slice 1 notes
 - `POST /offerings` (manager) needs only a `name`. A price comes with its unit and GST note, or none of the three (400 otherwise). The offering is added at the
@@ -169,4 +169,68 @@ quotes, availability). Nothing is ported; what is reused is the idea of an offer
 ## Known limits to watch (R39 to R46)
 R39 (disabled owners) also applies to an offering's owner until F02. R46 (a deleted contact's open lead) is unrelated. R44 (npm audit) is checked at the start.
 
-## Security checklist (to fill in at hand-off)
+## Slice 6 notes: leads about an offering, and sharing out by offering
+- **Migration `018`:** `leads.offering_id` with a composite foreign key to `offerings (account_id, id)` (a lead can only point at its own business's offering; the app role
+  gets column grants to set and change it), and the rule mode `by_offering`. The fallback person is kept in the rule's existing `user_id` column (the same idea as
+  `one_person`), and a new database check says a rule other than round-robin always names its person.
+- `POST /leads` and `PATCH /leads/{id}` take an optional `offeringId` (`null` on PATCH takes it away). It must be an offering of the business that is not removed (a switched-off one is
+  fine), otherwise 404. **Naming or changing the offering never hands the lead to someone else.** Every lead answer has `offering: { id, name } | null`; the name stays on the lead even if the
+  offering is removed later. `GET /leads?offeringId=...` lists the leads about one offering (the board honours it too; the "own leads only" person still sees only theirs).
+- `PUT /assignment-rules` takes a third shape, `{ "mode": "by_offering", "fallbackUserId": "..." }`. A new lead goes to: the person named in the request, else (in this mode) **the person who
+  looks after the lead's offering, else the fallback person**. The "own leads only" role still gets only its own leads. `GET /assignment-rules` answers `fallbackUserId` (and `userId` null) in this mode.
+  A fallback person from another business or an unknown one is 404, and none is 400. One person, round-robin and by-offering never interfere with each other (tested).
+- **How the modules talk:** `core.leads` now `requires` `core.offerings` and reaches it only through its `index.ts` (`findOfferingForLead`, `findOfferingSummaries`); `core.offerings` requires nothing,
+  so there is no loop. The offering lookup runs in the same fenced transaction as the lead.
+
+## Slice 7 notes: the safety net
+- `test/support/consistency.ts` gained the rule **"offerings and offers are in order"**: no two live offerings with one name or one position, no half-described price, at most 10 details, no offering owner or
+  lead offering from another business, a non-round-robin sharing rule always names its person. Offerings and offers join "every creation is logged and announced exactly once" and "every stamp names someone of
+  the business", and the words of offerings and offers are scanned for in the log and events (we promised ids and field names only). Three new "damage" cases prove the checker notices them.
+- The team journey has a new chapter (5b): the business switches to sharing out by offering and the leads go to the offering's person, the other offering's person, and the fallback.
+- `test/isolation.test.ts` has an attempt for every new route and for the three changed ones (a lead about another business's offering, B's lead pointed at it, a fallback person from another business).
+
+## Security checklist
+Reviewed with the `api-security` skill on 12 Nov 2026 (the whole F17 diff: 9 new routes, 3 changed routes, 2 tables, migrations 017 and 018, and the knowledge and leads changes).
+
+- [x] Every new table has account_id, RLS enabled + forced, and the schema test passes (`offerings`, `offers`). `leads` gained a column; the app role has column grants only.
+- [x] Every new route: role guard (reads `staff`, every write `manager`) and tests for works / 401 / 403 wrong role (including the "own leads only" role) / 404 other business / 400 bad input.
+- [x] staff_own: offerings and offers are business-wide for every role to read (they are what the AI says to customers). The leads changes keep the "own leads only" filter (tested).
+- [x] No business id taken from body, query or params; the business and its time zone come from the session; every body is `.strict()`; positions, removal state and the creator can never be sent.
+- [x] All input validated with zod with maximum lengths; money is whole paise; dates are real dates; the offerings module has one fixed raw SQL (the advisory lock) and one bound `lower(name)` comparison; no SQL is built from strings.
+- [x] No public route, webhook, tool, outside call or upload added.
+- [x] Nothing personal in the log or events: only ids, field names and the end date of an offer; the consistency checker scans the whole log for the names, descriptions and offer words.
+- [x] The AI can read only what `selectWhatTheAgentMaySee` returns: off, removed and ended items never reach it (unit-tested); prices are only "from" prices in words, never a total.
+- [x] Cross-module access only through `index.ts`: knowledge and leads call offerings; offerings calls nothing. No requires loop.
+- [x] Simultaneous requests: adding and reordering take a per-business lock; row locks serialise edits; tested with `Promise.all`.
+- [x] `process.env` is read only in `kernel/config.ts`; `npm audit --audit-level=high` shows no high or critical finding (10 moderate, as before F17; F17 adds no package).
+- [x] Full verification (gate, format, lint, typecheck, all tests, browser tests): see the hand-off message.
+
+Known limits (tracked in docs/REQUIREMENTS-REVIEW.md R39 to R46): a disabled person can still be an offering's owner or the fallback person (R39, arrives with F02); R42 and R46 are not touched by F17.
+Not built, by design: the offering photo (F18 uploads), reading offerings from a website or rate card (F31), the AI's `list_offerings` tool (F19; its pure data function is ready), exact prices and quotes (Phase 2).
+
+## Decisions and differences from the requirements
+- Owner defaults (12 Nov 2026): each offering carries its own GST mode; a price is optional; sharing out by offering is in F17; an offer's end date is required; details are up to 10 label/value pairs.
+- `core.offerings` is a shared core module: the Phase 2 sales engine extends the same offerings instead of creating a second product list.
+- The F16 profile changed with it: "What do you sell?" counts when an offering is on, and the GST question is answered per offering (see slice 5).
+- `API.md` lists `GET /business`, `GET /business/completeness` and `POST /business/fill-from-website`: covered by F16 (`/knowledge/questions`) and F31, not built here.
+
+## Manual test script
+The screens are parked for the designer, so F17 is tested through the API.
+
+**A. Postman (recommended).** Collection *Toobler One - F17 offerings and offers (run in order)* and environment *Toobler One - local dev* (a verified **manager**).
+1. `npm run db:migrate` (017 and 018 must be applied), restart `npm run dev`.
+2. Run the collection with the Runner, folders 0 to 10 in order. Every request checks its answer; all must pass. The folders clean up after themselves, except the two offers folder 6 adds (offers
+   end by themselves; folder 8 removes one). Folder 10 puts the sharing rule back to "every new lead goes to me".
+3. Also run the F16 collection once more: its checks were updated for the new go-live rule.
+
+**B. By hand, the main path.**
+1. `POST /offerings` `{"name":"Family room","fromPricePaise":450000,"priceUnit":"per night","gstMode":"plus"}` → 201, `priceInWords: "from ₹4,500 a night plus GST"`. Add one with no price, and one with `"active":false`.
+2. `GET /offerings` in order; `?active=true` hides the one that is off. `PATCH` a name, the price (only the number), `{"fromPricePaise":null}` to take the whole price away. `POST /offerings/reorder` with all ids.
+3. `DELETE` one: gone from the list, its name free again. Duplicate name (any capitals): 409.
+4. `POST /offers` `{"text":"10 percent off","endsOn":"<a date 30 days away>"}`; an old date → 400 `OFFER_ALREADY_ENDED`; `GET /offers` lists it; `PATCH` it; `DELETE` it.
+5. `GET /knowledge/questions`: "What do you sell?" says `elsewhereStatus: done` while an offering is on, and `readyToGoLive` needs it.
+6. `POST /leads` with `offeringId`: the lead shows `offering.name`; `GET /leads?offeringId=...` lists it. `PATCH /leads/{id}` `{"offeringId":null}` clears it.
+7. `PUT /assignment-rules` `{"mode":"by_offering","fallbackUserId":"<you>"}`; name an offering's owner with `PATCH /offerings/{id}` `{"ownerUserId":"..."}` and add leads about it. Put the rule back.
+8. As **staff**: every offering, offer and rule write is 403, every read is 200. Signed out: 401.
+
+**C. The whole story:** `npx vitest run team-journey isolation leads-offerings` shows the busy day with offerings and sharing out by offering, and the database checked afterwards.

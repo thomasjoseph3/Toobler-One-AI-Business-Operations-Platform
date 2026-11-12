@@ -12,8 +12,9 @@ import { pipelineRoutes } from './routes/pipeline.routes';
 export default defineModule({
   id: 'core.leads',
   kind: 'core',
-  // Shows who a lead is for, and keeps a contact's lifecycle stage in step with its leads, through the contacts module
-  requires: ['core.contacts'],
+  // Shows who a lead is for, and keeps a contact's lifecycle stage in step with its leads, through the contacts module; shows which
+  // offering a lead is about and who looks after it (for sharing out by offering), through the offerings module
+  requires: ['core.contacts', 'core.offerings'],
   // When staff take the "not a fit" mark off a contact, its stage is worked out again from its leads
   events: { 'contact.unmarked_not_a_fit': handleContactUnmarkedNotAFit },
   routes: (app) => {

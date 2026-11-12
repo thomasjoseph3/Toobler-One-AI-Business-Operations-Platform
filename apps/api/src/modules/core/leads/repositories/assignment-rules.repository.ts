@@ -23,7 +23,7 @@ export async function insertOnePersonRule(
 
 /** The rule as it is stored. */
 export interface AssignmentRuleRow {
-  mode: 'one_person' | 'round_robin';
+  mode: 'one_person' | 'round_robin' | 'by_offering';
   userId: string | null;
   lastAssignedUserId: string | null;
 }
@@ -87,7 +87,7 @@ export async function updateAssignmentRule(
   db: Db,
   options: {
     accountId: string;
-    mode: 'one_person' | 'round_robin';
+    mode: 'one_person' | 'round_robin' | 'by_offering';
     userId: string | null;
     lastAssignedUserId: string | null;
     actor: Actor;
