@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/09-business-questions.md`, `08-knowledge-base.md` (the Business profile and Situations parts); `requirements/API.md` (Knowledge base); docs/plan/PHASE-1.md (F16)
 **Depends on:** F00, F01     **Module:** `core.knowledge` (core: always on, no switch; later features F17, F18 and F19 add to it)
-**Status:** in review (12 Nov 2026). Slices 0 to 5 are built; the owner tested slices 1 to 3 in Postman; slice 4 and the hand-off wait for the owner.
+**Status:** approved by the owner on 12 Nov 2026 (backend; the profile and situations screens wait for the designer). All slices tested by the owner in Postman.
 
 **Goal in one line:** a fixed list of questions tells the system everything the AI agent must know about a business: what it does, where it
 is, when it opens, how it handles a discount request, a complaint, an after-hours call. The owner answers them (the form now, the setup
@@ -79,12 +79,12 @@ matters. Knowledge base → **Situations**: seven moments (discount, full, speak
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
 | Slice | What | Routes |
 | --- | --- | --- |
-| 0 | Migration `014`, table types, shared words and shapes, the question set (general A to H + 7 industries) and the situations as code, answer validators (pure, unit-tested), empty `core.knowledge` module | none; **built, owner review pending** |
-| 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}`; **built, owner test pending** |
-| 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm`; **built, owner test pending** |
-| 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}`; **built, owner test pending** |
-| 4 | Time zone and default country; contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings`; **built, owner test pending** |
-| 5 | Team journey (several real people, every feature so far), the consistency checker, simultaneous-request tests, `api-security` review, hand-off with the manual test script | none; **built** |
+| 0 | Migration `014`, table types, shared words and shapes, the question set (general A to H + 7 industries) and the situations as code, answer validators (pure, unit-tested), empty `core.knowledge` module | none; done |
+| 1 | Read the questions with score and readiness; answer one | `GET /knowledge/questions`, `PUT /knowledge/answers/{question_key}`; done, owner tested |
+| 2 | Confirm answers (for the system-filled ones that will come in F31) | `POST /knowledge/answers/confirm`; done, owner tested |
+| 3 | Situations | `GET /knowledge/situations`, `PUT /knowledge/situations/{key}`; done, owner tested |
+| 4 | Time zone and default country; contacts use the country | `GET /knowledge/settings`, `PUT /knowledge/settings`; done, owner tested |
+| 5 | Team journey (several real people, every feature so far), the consistency checker, simultaneous-request tests, `api-security` review, hand-off with the manual test script | none; done, owner approved 12 Nov 2026 |
 
 ## Slice 0 notes (found while building)
 - **The seven industries and the industries table.** The requirement's seven example industries did not all exist in the industries table.
