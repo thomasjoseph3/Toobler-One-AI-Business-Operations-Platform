@@ -56,6 +56,9 @@ export async function buildTestApp(
     database,
     registry,
     strictRouteLimits: false,
+    // The app-wide limit (300 a minute) is far out of reach for real people but not for a long test file; a test that checks
+    // the limit itself passes its own `rateLimit`.
+    rateLimit: { max: 100_000, timeWindow: '1 minute' },
     ...overrides,
     mailSender,
     publicRoutes,

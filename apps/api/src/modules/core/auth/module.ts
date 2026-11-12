@@ -15,8 +15,8 @@ export default defineModule({
   id: 'core.auth',
   kind: 'core',
   // Sign-up checks the chosen industry against the industries module and gives the new business its starting modules
-  // through the module-switches module (both through their index.ts only)
-  requires: ['core.industries', 'core.module_switches'],
+  // through the module-switches module, and its starting pipeline through the leads module (all through their index.ts only)
+  requires: ['core.industries', 'core.module_switches', 'core.leads'],
   // The kernel uses this to know who is signed in on every request that needs a signed-in person
   authenticator: createSessionAuthenticator,
   routes: (app) => {

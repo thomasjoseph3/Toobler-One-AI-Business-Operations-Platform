@@ -161,8 +161,10 @@ export function createContactsService({ database }: { database: Database }) {
           if (request.phone === null && current.phone !== null) changes.phone = null;
           if (phone && phone.e164 !== current.phone) changes.phone = phone.e164;
           if (request.notAFit === true && current.lifecycleStage !== 'not_a_fit') changes.lifecycleStage = 'not_a_fit';
-          if (request.notAFit === false && current.lifecycleStage === 'not_a_fit') {
-            // Until leads exist (F06) there are no facts, so the contact goes back to `new`
+          const takingOffNotAFitMark = request.notAFit === false && current.lifecycleStage === 'not_a_fit';
+          if (takingOffNotAFitMark) {
+            // Contacts do not know about leads, so the contact goes back to `new` here; the event published below lets the
+            // leads module set the stage its leads give (lead, customer, repeat customer) a moment later.
             changes.lifecycleStage = computeLifecycleStage({ markedNotAFit: false, openLeads: 0, wonLeads: 0 });
           }
           const changedFields = Object.keys(changes); // the names of the fields that really change
@@ -197,6 +199,13 @@ export function createContactsService({ database }: { database: Database }) {
             eventName: 'contact.updated',
             payload: { contactId, fields: changedFields },
           });
+          if (takingOffNotAFitMark) {
+            await publishEvent(transaction, {
+              accountId,
+              eventName: 'contact.unmarked_not_a_fit',
+              payload: { contactId },
+            });
+          }
           return updated;
         });
       } catch (error) {
