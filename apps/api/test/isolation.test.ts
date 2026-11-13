@@ -61,6 +61,7 @@ interface BusinessAData {
   stageId: string;
   offeringId: string;
   offerId: string;
+  faqId: string;
   userId: string;
   secretWords: string;
 }
@@ -105,6 +106,13 @@ beforeAll(async () => {
     201,
   );
   const offer = await sendOk(businessA, 'POST', '/offers', { text: `Offer ${secretWords}`, endsOn: '2099-12-31' }, 201);
+  const faq = await sendOk(
+    businessA,
+    'POST',
+    '/knowledge/faqs',
+    { question: `Question ${secretWords}`, answer: `Answer ${secretWords}` },
+    201,
+  );
   // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
   await database.system
     .insertInto('business_answers')
@@ -123,6 +131,7 @@ beforeAll(async () => {
     stageId: stage.id,
     offeringId: offering.id,
     offerId: offer.id,
+    faqId: faq.id,
     userId: businessA.profile.user.id,
     secretWords,
   };
@@ -366,6 +375,28 @@ const attempts: Attempt[] = [
     expectedStatus: 201,
   },
   {
+    route: 'PATCH /api/v1/knowledge/faqs/{id}',
+    what: "change A's FAQ",
+    request: () => ({ method: 'PATCH', url: `/knowledge/faqs/${dataOfA.faqId}`, payload: { answer: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/knowledge/faqs/{id}',
+    what: "remove A's FAQ",
+    request: () => ({ method: 'DELETE', url: `/knowledge/faqs/${dataOfA.faqId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/knowledge/faqs',
+    what: "add an FAQ of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/knowledge/faqs',
+      payload: { question: 'Bob question', answer: 'Bob answer' },
+    }),
+    expectedStatus: 201,
+  },
+  {
     route: 'PUT /api/v1/knowledge/settings',
     what: "change the time zone and country (B's own business only), and A's must stay as they were",
     request: () => ({
@@ -408,6 +439,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
   { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
   { route: 'GET /api/v1/offerings', url: '/offerings' },
+  { route: 'GET /api/v1/knowledge/faqs', url: '/knowledge/faqs' },
   { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
@@ -446,6 +478,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/knowledge/settings': 'covered by the list check',
   'GET /api/v1/offerings': 'covered by the list check',
   'GET /api/v1/offers': 'covered by the list check',
+  'GET /api/v1/knowledge/faqs': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",

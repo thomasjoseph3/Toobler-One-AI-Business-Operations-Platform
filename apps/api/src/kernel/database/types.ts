@@ -323,6 +323,21 @@ export interface OfferingsTable {
   updated_at: Generated<Date>;
 }
 
+/** A question and answer the AI may use. Fenced by account_id. Only `confirmed`, live rows are ever searched. */
+export interface FaqsTable {
+  id: string;
+  account_id: string;
+  question: string;
+  answer: string;
+  status: Generated<'confirmed' | 'check'>;
+  source: Generated<'typed' | 'website' | 'unanswered'>;
+  deleted_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** A time-limited promotion. Fenced by account_id. `ends_on` is a plain date like 2026-12-31. */
 export interface OffersTable {
   id: string;
@@ -362,4 +377,5 @@ export interface DB {
   situations: SituationsTable;
   offerings: OfferingsTable;
   offers: OffersTable;
+  faqs: FaqsTable;
 }

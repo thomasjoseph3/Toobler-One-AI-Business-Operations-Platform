@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { faqsRoutes } from './routes/faqs.routes';
 import { knowledgeRoutes } from './routes/knowledge.routes';
 import { settingsRoutes } from './routes/settings.routes';
 import { situationsRoutes } from './routes/situations.routes';
@@ -18,5 +19,6 @@ export default defineModule({
     knowledgeRoutes(app);
     situationsRoutes(app);
     settingsRoutes(app);
+    faqsRoutes(app);
   },
 });
