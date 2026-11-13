@@ -115,7 +115,7 @@ test.describe('shell (as in the Figma frame)', () => {
     await expect(sidebar.getByText('Anita Nair', { exact: true })).toBeVisible();
     await sidebar.getByRole('button', { name: 'Collapse the sidebar' }).click();
     await expect(sidebar.getByText('CRM', { exact: true })).toBeHidden();
-    expect((await sidebar.boundingBox())?.width).toBeCloseTo(72, 0);
+    expect((await sidebar.boundingBox())?.width).toBeCloseTo(68, 0);
     await sidebar.getByRole('button', { name: 'Expand the sidebar' }).click();
     expect((await sidebar.boundingBox())?.width).toBeCloseTo(256, 0);
   });
@@ -218,5 +218,60 @@ test.describe('sidebar height', () => {
       (element) => (element as HTMLElement).offsetWidth - element.clientWidth,
     );
     expect(scrollbarWidth).toBe(0);
+  });
+});
+
+test.describe('collapsed sidebar (Figma "Sidebar Minimised")', () => {
+  test('on a tablet it is 68 px wide, icon only, every link keeps its name, and the account menu opens in full', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'Uses the desktop browser at a tablet width');
+    await page.setViewportSize({ width: 900, height: 700 });
+    await page.goto('/leads');
+    const sidebar = page.getByRole('navigation', { name: 'Main navigation' });
+    await expect(sidebar).toBeVisible();
+    expect((await sidebar.boundingBox())?.width).toBeCloseTo(68, 0);
+    // Icon only: no words on screen, but each link has its name for screen readers and a tooltip
+    await expect(sidebar.getByText('CRM', { exact: true })).toBeHidden();
+    for (const name of [
+      'Today',
+      'Reports',
+      'Leads',
+      'Contacts',
+      'Companies',
+      'Inbox',
+      'Tasks',
+      'Tickets',
+      'Settings',
+    ]) {
+      await expect(sidebar.getByRole('link', { name })).toBeVisible();
+    }
+    await expect(sidebar.getByRole('link', { name: 'Leads' })).toHaveAttribute('aria-current', 'page');
+    // No expand button where the full sidebar would not fit
+    await expect(sidebar.getByRole('button', { name: 'Expand the sidebar' })).toHaveCount(0);
+    // The account button has a name, and its menu opens beside the sidebar instead of being cut off by it
+    const account = sidebar.getByRole('button', { name: /Anita Nair Nair Stays, Account menu/ });
+    await account.click();
+    const signOut = page.getByRole('menuitem', { name: 'Sign out' });
+    await expect(signOut).toBeVisible();
+    const box = (await signOut.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(68);
+    expect(box.x + box.width).toBeLessThanOrEqual(900);
+    await page.keyboard.press('Escape');
+    await expect(signOut).toHaveCount(0);
+  });
+
+  test('on a desktop the collapse button makes it the same icon-only sidebar, and Expand brings the full one back', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The sidebar is not shown on a phone');
+    await page.goto('/leads');
+    await page.getByRole('button', { name: 'Collapse the sidebar' }).click();
+    const sidebar = page.getByRole('navigation', { name: 'Main navigation' });
+    await expect(sidebar.getByRole('link', { name: 'Contacts' })).toBeVisible();
+    await expect(sidebar.getByText('CRM', { exact: true })).toBeHidden();
+    await sidebar.getByRole('button', { name: 'Expand the sidebar' }).click();
+    await expect(sidebar.getByText('CRM', { exact: true })).toBeVisible();
+    expect((await sidebar.boundingBox())?.width).toBeCloseTo(256, 0);
   });
 });

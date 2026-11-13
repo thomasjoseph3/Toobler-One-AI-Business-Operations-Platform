@@ -1,12 +1,22 @@
 import { Icon, type IconProps } from './Icon';
 
-/** Window with three bars of different heights (Toolbar: Pipeline view). Drawn exactly as in the Figma frame; the colour comes from the surrounding text colour. */
+/** Rounded square with three bars (Toolbar: Pipeline view; updated Figma, 13 Nov 2026) (Toolbar: Pipeline view). Drawn exactly as in the Figma frame; the colour comes from the surrounding text colour. */
 export function PipelineViewIcon(props: IconProps) {
   return (
-    <Icon viewBox="0 0 11 11" defaultWidth={11} defaultHeight={11} {...props}>
+    <Icon viewBox="0 0 12 12" defaultWidth={12} defaultHeight={12} {...props}>
       <path
-        d="M2.44444 8.55556H3.66667V2.44444H2.44444V8.55556ZM7.33333 7.33333H8.55556V2.44444H7.33333V7.33333ZM4.88889 5.5H6.11111V2.44444H4.88889V5.5ZM1.22222 11C0.886111 11 0.59838 10.8803 0.359028 10.641C0.119676 10.4016 0 10.1139 0 9.77778V1.22222C0 0.886111 0.119676 0.59838 0.359028 0.359028C0.59838 0.119676 0.886111 0 1.22222 0H9.77778C10.1139 0 10.4016 0.119676 10.641 0.359028C10.8803 0.59838 11 0.886111 11 1.22222V9.77778C11 10.1139 10.8803 10.4016 10.641 10.641C10.4016 10.8803 10.1139 11 9.77778 11H1.22222ZM1.22222 9.77778H9.77778V1.22222H1.22222V9.77778Z"
-        fill="currentColor"
+        d="M1.5 6C1.5 7.87485 1.5 8.8123 1.97746 9.46945C2.13166 9.6817 2.3183 9.86835 2.53053 10.0225C3.1877 10.5 4.12513 10.5 6 10.5C7.87485 10.5 8.8123 10.5 9.46945 10.0225C9.6817 9.86835 9.86835 9.6817 10.0225 9.46945C10.5 8.8123 10.5 7.87485 10.5 6C10.5 4.12513 10.5 3.1877 10.0225 2.53053C9.86835 2.3183 9.6817 2.13166 9.46945 1.97746C8.8123 1.5 7.87485 1.5 6 1.5C4.12513 1.5 3.1877 1.5 2.53053 1.97746C2.3183 2.13166 2.13166 2.3183 1.97746 2.53053C1.5 3.1877 1.5 4.12513 1.5 6Z"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        stroke="currentColor"
+      />
+      <path
+        d="M6 3.5V5.5M8.5 3.5V8.5M3.5 3.5V7"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        stroke="currentColor"
       />
     </Icon>
   );

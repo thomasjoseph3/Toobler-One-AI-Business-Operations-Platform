@@ -16,6 +16,7 @@ export { ImportIcon } from './ImportIcon';
 export { LeadsIcon } from './LeadsIcon';
 export { ListViewIcon } from './ListViewIcon';
 export { LogoOne } from './LogoOne';
+export { LogoOneMark } from './LogoOneMark';
 export { ManageColumnsIcon } from './ManageColumnsIcon';
 export { MoonIcon } from './MoonIcon';
 export { MoreIcon } from './MoreIcon';

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { joinClassNames, MoreIcon, useDismissOnOutsidePress } from '@toobler-one/ui';
 import { useSession } from '../../auth/session';
@@ -25,10 +25,47 @@ export interface UserMenuProps {
 export function UserMenu({ variant, isCompact = false }: UserMenuProps) {
   const { sessionState, signOut } = useSession();
   const [isOpen, setIsOpen] = useState(false);
+  // Where the menu is drawn on the screen: fixed to the window, so the sidebar's own scroll box cannot cut it off
+  const [menuPlace, setMenuPlace] = useState<{ left?: number; right?: number; top?: number; bottom?: number } | null>(
+    null,
+  );
   const containerRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => setIsOpen(false), []);
   useDismissOnOutsidePress(containerRef, isOpen, close);
+
+  // Scrolling or resizing while the menu is open closes it, because the button it belongs to moves away
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [isOpen, close]);
+
+  // Opens or closes the menu. On opening it works out from the button's place where to draw it: above the card, beside the
+  // narrow collapsed card, or under the avatar in the phone's top bar.
+  const toggle = () => {
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+    const buttonPlace = containerRef.current?.getBoundingClientRect();
+    if (buttonPlace) {
+      if (variant === 'avatar') {
+        setMenuPlace({ right: window.innerWidth - buttonPlace.right, top: buttonPlace.bottom + 8 });
+      } else if (isCompact) {
+        // Beside the collapsed sidebar, clear of its edge (not just clear of the small card)
+        const sidebarRight = containerRef.current?.closest('nav')?.getBoundingClientRect().right ?? buttonPlace.right;
+        setMenuPlace({ left: sidebarRight + 8, bottom: window.innerHeight - buttonPlace.bottom });
+      } else {
+        setMenuPlace({ left: buttonPlace.left, bottom: window.innerHeight - buttonPlace.top + 8 });
+      }
+    }
+    setIsOpen(true);
+  };
 
   if (sessionState.status !== 'signedIn') return null;
   const { user, business } = sessionState.profile;
@@ -48,16 +85,19 @@ export function UserMenu({ variant, isCompact = false }: UserMenuProps) {
         type="button"
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((wasOpen) => !wasOpen)}
+        onClick={toggle}
         className={joinClassNames(
           variant === 'card'
-            ? 'flex w-full items-center gap-3 rounded-md bg-sidebar-item-active-bg p-2 text-left'
+            ? joinClassNames(
+                'flex items-center rounded-lg bg-sidebar-item-active-bg text-left',
+                isCompact ? 'p-1' : 'w-full gap-3 rounded-md p-2',
+              )
             : 'flex size-10 items-center justify-center rounded-full bg-sidebar',
         )}
       >
         {avatar}
         {/* The button's name comes from its content: the person, the business and what the button opens. */}
-        {variant === 'avatar' ? (
+        {variant === 'avatar' || isCompact ? (
           <span className="sr-only">
             {user.name} {business.name}, {t('userMenu.open')}
           </span>
@@ -73,13 +113,11 @@ export function UserMenu({ variant, isCompact = false }: UserMenuProps) {
           </>
         ) : null}
       </button>
-      {isOpen ? (
+      {isOpen && menuPlace ? (
         <div
           role="menu"
-          className={joinClassNames(
-            'absolute z-20 min-w-48 rounded-lg border border-border-default bg-surface p-1 shadow-md',
-            variant === 'card' ? 'bottom-full left-0 mb-2' : 'top-full right-0 mt-2',
-          )}
+          style={menuPlace}
+          className="fixed z-30 min-w-48 rounded-lg border border-border-default bg-surface p-1 shadow-md"
         >
           <button
             type="button"
