@@ -1,8 +1,10 @@
 // Developer-only page (/dev/ui): every design-system piece in one place. Use the theme switch in the top bar to see
 // both themes. It is not part of the product, so its text is written directly instead of going through t().
+import { useState } from 'react';
 import { Sparkles, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -15,6 +17,7 @@ import {
   Pagination,
   Popover,
   SelectField,
+  SidePanel,
   Table,
   TableBody,
   TableCell,
@@ -22,6 +25,7 @@ import {
   TableHeaderCell,
   TableRow,
   Tag,
+  TextAreaField,
   TextField,
   ActivitiesIcon,
   ActivityIcon,
@@ -170,6 +174,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 /** Shows every component and token of the design system on one page. */
 export function UiGallery() {
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
   return (
     <>
       <p className="text-body-md mb-6 text-text-secondary">
@@ -339,6 +344,26 @@ export function UiGallery() {
             <SelectField label="Sort by" options={[{ value: 'a', label: 'Date added' }]} />
           </Popover>
         </div>
+      </Section>
+
+      <Section title="Alerts, text area and side panel">
+        <div className="flex max-w-xl flex-col gap-3">
+          <Alert tone="error">The email or password is not right.</Alert>
+          <Alert tone="success">Lead created for Priya Menon.</Alert>
+          <TextAreaField label="What do they want?" requirementLabel="Optional" placeholder="Family room, 3 nights" />
+          <div>
+            <Button onClick={() => setIsSidePanelOpen(true)}>Open the side panel</Button>
+          </div>
+        </div>
+        <SidePanel
+          isOpen={isSidePanelOpen}
+          onClose={() => setIsSidePanelOpen(false)}
+          title="Example panel"
+          closeLabel="Close"
+          footer={<Button onClick={() => setIsSidePanelOpen(false)}>Cancel</Button>}
+        >
+          <p className="text-body-md text-text-secondary">A form goes here. On a phone this fills the screen.</p>
+        </SidePanel>
       </Section>
 
       <Section title="Checkboxes">

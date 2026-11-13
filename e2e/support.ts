@@ -40,7 +40,20 @@ export interface PretendApi {
   leadsFail: boolean;
   /** The query part (`?status=open&...`) of every `GET /leads` the page made, so a test can see what was asked for. */
   leadQueries: string[];
+  /** The bodies the page sent to `POST /contacts` and `POST /leads`. */
+  postedContacts: Array<Record<string, unknown>>;
+  postedLeads: Array<Record<string, unknown>>;
+  /** When set, `POST /contacts` (or `POST /leads`) is refused with this status and code. */
+  contactCreateRefusal: { status: number; code: string; message: string } | null;
+  leadCreateRefusal: { status: number; code: string; message: string } | null;
 }
+
+/** The people the pretend contact search can find. */
+const PRETEND_CONTACTS = [
+  { id: 'contact-priya', name: 'Priya Menon', phone: '+919847011201', email: 'priya.menon@example.com' },
+  { id: 'contact-arjun', name: 'Arjun Nair', phone: '+919895022302', email: null },
+  { id: 'contact-caller', name: null, phone: '+919847012312', email: null },
+];
 
 /** The ids of the pretend stages (real-looking ids, because the page only accepts ids of that shape in the address). */
 export const PRETEND_STAGE_IDS = {
@@ -128,6 +141,10 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         leadCount: 3,
         leadsFail: false,
         leadQueries: [],
+        postedContacts: [],
+        postedLeads: [],
+        contactCreateRefusal: null,
+        leadCreateRefusal: null,
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -139,6 +156,39 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, PRETEND_PROFILE) : unauthorized,
           );
+        }
+        if (path === '/contacts' && request.method() === 'GET') {
+          const searchText = (new URL(request.url()).searchParams.get('q') ?? '').toLowerCase();
+          const items = PRETEND_CONTACTS.filter((contact) =>
+            [contact.name, contact.phone, contact.email].some((value) => value?.toLowerCase().includes(searchText)),
+          );
+          return route.fulfill(json(200, { items, total: items.length, page: 1, limit: 5 }));
+        }
+        if (path === '/contacts' && request.method() === 'POST') {
+          const body = request.postDataJSON() as Record<string, unknown>;
+          pretendApi.postedContacts.push(body);
+          if (pretendApi.contactCreateRefusal) {
+            const { status, code, message } = pretendApi.contactCreateRefusal;
+            return route.fulfill(json(status, { error: { code, message } }));
+          }
+          return route.fulfill(
+            json(201, {
+              id: 'contact-new',
+              name: body.name ?? null,
+              phone: body.phone ?? null,
+              email: body.email ?? null,
+            }),
+          );
+        }
+        if (path === '/leads' && request.method() === 'POST') {
+          const body = request.postDataJSON() as Record<string, unknown>;
+          pretendApi.postedLeads.push(body);
+          if (pretendApi.leadCreateRefusal) {
+            const { status, code, message } = pretendApi.leadCreateRefusal;
+            return route.fulfill(json(status, { error: { code, message } }));
+          }
+          pretendApi.leadCount += 1;
+          return route.fulfill(json(201, { ...pretendLead(0), contactId: body.contactId }));
         }
         if (path === '/pipeline' || path === '/leads') {
           if (pretendApi.leadsFail) return route.fulfill(json(500, { error: { code: 'BROKEN', message: 'Broken.' } }));

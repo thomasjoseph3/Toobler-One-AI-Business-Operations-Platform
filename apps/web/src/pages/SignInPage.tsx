@@ -1,8 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { TriangleAlert } from 'lucide-react';
 import { Navigate, useLocation } from 'react-router';
 import { signInRequestSchema } from '@toobler-one/shared';
-import { Button, Card, TextField } from '@toobler-one/ui';
+import { Alert, Button, Card, TextField } from '@toobler-one/ui';
 import { ApiRequestError } from '../api/client';
 import { t, type MessageKey } from '../app/i18n';
 import { useSession } from '../auth/session';
@@ -67,12 +66,7 @@ export function SignInPage() {
       <h1 className="text-heading-2xl text-text-primary">{t('signIn.title')}</h1>
       <p className="text-body-md mt-1 text-text-secondary">{t('signIn.description')}</p>
       <form onSubmit={(event) => void handleSubmit(event)} noValidate className="mt-6 flex flex-col gap-4">
-        {formProblem ? (
-          <p role="alert" className="text-body-md flex items-start gap-2 rounded-md bg-error-bg p-3 text-error">
-            <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
-            <span>{formProblem}</span>
-          </p>
-        ) : null}
+        {formProblem ? <Alert tone="error">{formProblem}</Alert> : null}
         <TextField
           label={t('signIn.email')}
           type="email"

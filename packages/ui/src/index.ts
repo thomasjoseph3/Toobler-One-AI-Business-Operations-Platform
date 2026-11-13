@@ -24,6 +24,9 @@ export {
   type SegmentedControlProps,
 } from './components/SegmentedControl';
 export { TextField, type TextFieldProps } from './components/TextField';
+export { TextAreaField, type TextAreaFieldProps } from './components/TextAreaField';
+export { SidePanel, type SidePanelProps } from './components/SidePanel';
+export { Alert, type AlertProps } from './components/Alert';
 export {
   EmptyState,
   ErrorState,

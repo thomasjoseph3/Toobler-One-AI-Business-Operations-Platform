@@ -38,10 +38,12 @@ export interface LeadsToolbarProps {
   stages: readonly PipelineStage[];
   /** Changes part of the view (a filter, the sort, the page). Any change other than the page starts again at page 1. */
   onChangeView: (changes: Partial<LeadsView>) => void;
+  /** Opens the Create lead form. */
+  onCreateLead: () => void;
 }
 
 /** The Filter panel: which leads to show (open or closed, one stage, only mine). It applies as soon as a choice is made. */
-function FilterPanel({ view, stages, onChangeView }: LeadsToolbarProps) {
+function FilterPanel({ view, stages, onChangeView }: Pick<LeadsToolbarProps, 'view' | 'stages' | 'onChangeView'>) {
   const stageChoices = findStageChoices(stages, view.status);
   const filtersAreOn = countActiveFilters(view) > 0;
   return (
@@ -122,10 +124,10 @@ function SortPanel({ view, onChangeView }: Pick<LeadsToolbarProps, 'view' | 'onC
 
 /**
  * The row of controls above the leads (Figma toolbar): Filter, Sort and the List / Split view switch on the left; Import,
- * Export and Create lead on the right. Filter and Sort work. The rest are drawn exactly as designed and do nothing yet: Create
- * lead has its API (its screen is the next slice), Import and Export wait for F12, and Split view has no description yet.
+ * Export and Create lead on the right. Filter, Sort and Create lead work. The rest are drawn exactly as designed and do nothing
+ * yet: Import and Export wait for F12, and Split view has no description yet.
  */
-export function LeadsToolbar({ view, stages, onChangeView }: LeadsToolbarProps) {
+export function LeadsToolbar({ view, stages, onChangeView, onCreateLead }: LeadsToolbarProps) {
   const [chosenView, setChosenView] = useState<'list' | 'split'>('list');
   const activeFilterCount = countActiveFilters(view);
   return (
@@ -194,7 +196,7 @@ export function LeadsToolbar({ view, stages, onChangeView }: LeadsToolbarProps) 
         <Button size="compact" leadingIcon={<ExportIcon size={15} />} {...notWorkingYet}>
           {t('leads.toolbar.export')}
         </Button>
-        <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} {...notWorkingYet}>
+        <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} onClick={onCreateLead}>
           {t('leads.toolbar.create')}
         </Button>
       </div>

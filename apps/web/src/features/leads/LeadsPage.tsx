@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import type { LeadsListResponse, Pipeline } from '@toobler-one/shared';
-import { Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
+import { Alert, Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { describeShownRange } from './lead-display';
+import { CreateLeadPanel } from './CreateLeadPanel';
 import { LeadCards, LeadsTable } from './LeadsTable';
 import { LeadsToolbar } from './LeadsToolbar';
 import {
@@ -28,6 +29,10 @@ export function LeadsPage() {
   const { sessionState } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedLeadIds, setSelectedLeadIds] = useState<ReadonlySet<string>>(new Set());
+  // The Create lead panel: open or shut, a counter so each opening starts with an empty form, and the confirmation after a lead is created
+  const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
+  const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
+  const [createdLeadName, setCreatedLeadName] = useState<string | null>(null);
   const view = readLeadsView(searchParams);
   const signedInUserId = sessionState.status === 'signedIn' ? sessionState.profile.user.id : '';
   const leadsResource = useApiResource<LeadsListResponse>(buildLeadsPath(view, signedInUserId));
@@ -54,7 +59,42 @@ export function LeadsPage() {
   };
 
   const stages = pipelineResource.state.status === 'ready' ? pipelineResource.state.data.stages : [];
-  const toolbar = <LeadsToolbar view={view} stages={stages} onChangeView={changeView} />;
+  const openCreatePanel = () => {
+    setCreatedLeadName(null);
+    setCreatePanelOpenCount((count) => count + 1);
+    setIsCreatePanelOpen(true);
+  };
+  // After a lead is created: close the panel, say so, and load the list again so the new lead shows
+  const handleLeadCreated = (displayName: string) => {
+    setIsCreatePanelOpen(false);
+    setCreatedLeadName(displayName);
+    leadsResource.reload();
+  };
+  const toolbar = (
+    <>
+      {createdLeadName !== null ? (
+        <Alert
+          tone="success"
+          className="mb-4"
+          action={
+            <Button variant="link" onClick={() => setCreatedLeadName(null)}>
+              {t('leadForm.dismiss')}
+            </Button>
+          }
+        >
+          {formatMessage('leadForm.created', { name: createdLeadName })}
+        </Alert>
+      ) : null}
+      <LeadsToolbar view={view} stages={stages} onChangeView={changeView} onCreateLead={openCreatePanel} />
+      <CreateLeadPanel
+        key={createPanelOpenCount}
+        isOpen={isCreatePanelOpen}
+        onClose={() => setIsCreatePanelOpen(false)}
+        timeZone={business.timeZone}
+        onCreated={handleLeadCreated}
+      />
+    </>
+  );
 
   if (leadsResource.state.status === 'loading' || pipelineResource.state.status === 'loading') {
     return (
