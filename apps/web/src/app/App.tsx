@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { LeadsPage } from '../features/leads/LeadsPage';
 import { RequireSignIn } from '../auth/RequireSignIn';
 import { SessionProvider } from '../auth/session';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -29,7 +30,11 @@ export function App() {
             <Route element={<RequireSignIn />}>
               <Route element={<Shell />}>
                 {NAVIGATION_ITEMS.map((item) => (
-                  <Route key={item.id} path={item.path} element={<PlaceholderPage item={item} />} />
+                  <Route
+                    key={item.id}
+                    path={item.path}
+                    element={item.id === 'leads' ? <LeadsPage /> : <PlaceholderPage item={item} />}
+                  />
                 ))}
                 {UiGallery ? (
                   <Route

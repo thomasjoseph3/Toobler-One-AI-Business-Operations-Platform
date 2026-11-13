@@ -150,6 +150,7 @@ agent (F19) will save every enquiry into.
 | Journey | chained story test (`leads-journeys.test.ts`) | done |
 | Review | security review with the `api-security` skill; `staff_own` added | done |
 | Approval | owner approved the backend, 12 Nov 2026 (R37 confirmed) | done |
+| UI 4 | **Leads list screen** (`apps/web/src/features/leads/`): the open leads as a table (tablet, desktop) or cards (phone), 25 to a page, tags coloured by stage kind and place, owner as You / Team member / Unassigned, callback date chip, row ticks, loading, empty and error states. Uses `GET /leads?status=open` and `GET /pipeline` only. | built, waiting for the owner's check |
 | Sort | `sort` and `order` on `GET /leads` (added 13 Nov 2026 for the Leads list screen; tested in `leads.test.ts`) | done |
 | UI | Board (drag on computer, **Move** on phone), list, lead page, Settings → Pipeline | **in progress** from 13 Nov 2026: the designer delivered only the Leads list frame, so we build the screens ourselves in that style (see "Leads list screen" below) |
 
@@ -163,7 +164,7 @@ The designer's frame (`docs/design/screens/leads-list-desktop.png`) is the only 
 | Status (tag) | `stage.name`, `stage.kind` | **Have.** Stage names are the business's own. The tag colour comes from the stage's kind and position, never its name. |
 | Lead Source | `firstChannel`: `manual`, `web_chat`, `whatsapp`, `email`, `phone` | **Have the five channels only.** Shown as plain words. "Meta Ad" and "Referral" in the frame do not exist yet; sources like them are added later (owner, 13 Nov 2026). |
 | Lead Owner | `ownerUserId` (an id, no name) | **Missing the name.** The leads module cannot read the users table, and the team list is F02. Until then the column shows "You" for the signed-in person and "Team member" for anyone else. The name comes with F02. |
-| Next Activity | `callbackAt` | **Partly.** Only a callback date exists. Real next activities arrive with tasks (F08) and notes (F07). Shown as "Next activity". |
+| Next Activity | `callbackAt` | **Partly.** "Next activity" is the next thing to do for a lead: a meeting, a call or a note (owner, 13 Nov 2026). Only a callback date exists today and is shown as the date chip. **The designer is making the screen for adding these**, so we do not design it; it arrives with tasks (F08), notes (F07) and follow-ups (F27). The two hover icons in the row (log an activity, add a note) are drawn and do nothing until then. |
 | Sort | `sort`, `order` on `GET /leads` | **Added 13 Nov 2026.** By newest activity, date added, next callback (leads without one last) and stage. **Not yet:** sorting by name, email or phone, which belong to the contacts module (a later change). |
 | Filter | `stageId`, `ownerUserId`, `status` on `GET /leads` | Have. |
 | Showing 5 of 28 open leads, Previous and Next | `total`, `page`, `limit` | Have. |

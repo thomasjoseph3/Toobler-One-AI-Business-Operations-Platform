@@ -6,7 +6,7 @@ import { joinClassNames } from '../join-class-names';
  * Stage names are the business's own, so the screen that uses a Tag chooses the tone (for example from the stage's kind
  * and position), never from the stage's name.
  */
-export type TagTone = 'new' | 'contacted' | 'qualified' | 'rate-sent' | 'won' | 'lost';
+export type TagTone = 'new' | 'contacted' | 'qualified' | 'rate-sent' | 'won' | 'lost' | 'neutral';
 
 export interface TagProps {
   tone: TagTone;
@@ -22,6 +22,8 @@ const TONE_CLASSES: Record<TagTone, string> = {
   'rate-sent': 'bg-tag-stage-rate-sent text-text-secondary',
   won: 'bg-tag-stage-won text-link-hover',
   lost: 'bg-tag-stage-lost text-link-hover',
+  /** For stages the designer gave no tone to (a business can add more stages than the frame shows). */
+  neutral: 'bg-hover text-text-secondary',
 };
 
 /** A small square-cornered pill with a stage word on a tinted background (Figma "Tag / stage"). Badge is for counts and statuses. */

@@ -34,6 +34,62 @@ export interface PretendApi {
   calls: string[];
   /** The headers of the last sign-in call. */
   lastSignInHeaders: Record<string, string>;
+  /** How many open leads the pretend API has in all (it serves them 25 to a page). */
+  leadCount: number;
+  /** When true, the leads calls fail with a server error (the rest of the app still works). */
+  leadsFail: boolean;
+}
+
+/** The business's pipeline as the pretend API gives it: three open stages, then Won and Lost. */
+const PRETEND_PIPELINE = {
+  id: 'pipeline-1',
+  name: 'Sales',
+  stages: [
+    { id: 'stage-new', name: 'New', kind: 'open', sort: 0, leadCount: 0 },
+    { id: 'stage-contacted', name: 'Contacted', kind: 'open', sort: 1, leadCount: 0 },
+    { id: 'stage-quoted', name: 'Quoted', kind: 'open', sort: 2, leadCount: 0 },
+    { id: 'stage-won', name: 'Won', kind: 'won', sort: 3, leadCount: 0 },
+    { id: 'stage-lost', name: 'Lost', kind: 'lost', sort: 4, leadCount: 0 },
+  ],
+};
+
+/**
+ * The open lead at this place in the list. They come in three shapes, repeating, so a test can see all the display rules:
+ * a named person with a callback and the signed-in person as owner; a caller with only a phone and an owner who is someone else;
+ * a person with only an email and no owner.
+ */
+function pretendLead(index: number) {
+  const shape = index % 3;
+  const stageNames = ['New', 'Contacted', 'Quoted'];
+  const channels = ['whatsapp', 'web_chat', 'email'];
+  return {
+    id: `lead-${index}`,
+    contactId: `contact-${index}`,
+    contact: {
+      id: `contact-${index}`,
+      name: shape === 0 ? `Priya Menon ${index}` : null,
+      phone: shape === 2 ? null : `+9198470${String(10000 + index)}`,
+      email: shape === 1 ? null : `person${index}@example.com`,
+    },
+    stage: { id: `stage-${stageNames[shape]!.toLowerCase()}`, name: stageNames[shape], kind: 'open' },
+    temperature: 'unscored',
+    interest: null,
+    dateFrom: null,
+    dateTo: null,
+    partySize: null,
+    budgetPaise: null,
+    promise: null,
+    // 22 Nov 10:00 UTC is 22 Nov in India too
+    callbackAt: shape === 0 ? '2026-11-22T10:00:00.000Z' : null,
+    ownerUserId: shape === 0 ? PRETEND_PROFILE.user.id : shape === 1 ? 'someone-else' : null,
+    offering: null,
+    firstChannel: channels[shape],
+    lastActivityAt: '2026-11-13T09:00:00.000Z',
+    lostReason: null,
+    closedAt: null,
+    createdAt: '2026-11-13T09:00:00.000Z',
+    updatedAt: '2026-11-13T09:00:00.000Z',
+  };
 }
 
 /** Answers a call with a JSON body. */
@@ -57,6 +113,8 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         serverDown: false,
         calls: [],
         lastSignInHeaders: {},
+        leadCount: 3,
+        leadsFail: false,
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -67,6 +125,21 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         if (path === '/me') {
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, PRETEND_PROFILE) : unauthorized,
+          );
+        }
+        if (path === '/pipeline' || path === '/leads') {
+          if (pretendApi.leadsFail) return route.fulfill(json(500, { error: { code: 'BROKEN', message: 'Broken.' } }));
+          if (!pretendApi.signedIn || pretendApi.accessExpired) return route.fulfill(unauthorized);
+          if (path === '/pipeline') return route.fulfill(json(200, PRETEND_PIPELINE));
+          const query = new URL(request.url()).searchParams;
+          const pageNumber = Number(query.get('page') ?? '1');
+          const limit = Number(query.get('limit') ?? '25');
+          const firstIndex = (pageNumber - 1) * limit;
+          const lastIndex = Math.min(firstIndex + limit, pretendApi.leadCount);
+          const items = [];
+          for (let index = firstIndex; index < lastIndex; index += 1) items.push(pretendLead(index));
+          return route.fulfill(
+            json(200, { view: 'list', items, total: pretendApi.leadCount, page: pageNumber, limit }),
           );
         }
         if (path === '/auth/login') {

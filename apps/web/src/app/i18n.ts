@@ -25,6 +25,46 @@ const englishMessages = {
   'theme.dark': 'Dark',
   'theme.system': 'System',
   'page.today.description': 'What needs you today: callbacks, new leads and tasks that are due.',
+  'leads.column.name': 'Lead name',
+  'leads.column.email': 'Email',
+  'leads.column.phone': 'Phone',
+  'leads.column.status': 'Status',
+  'leads.column.source': 'Lead source',
+  'leads.column.owner': 'Lead owner',
+  'leads.column.nextActivity': 'Next activity',
+  'leads.selectAll': 'Select all leads on this page',
+  'leads.selectOne': 'Select {name}',
+  'leads.unknownPerson': 'Unknown contact',
+  'leads.contactRemoved': 'Contact removed',
+  'leads.owner.you': 'You',
+  'leads.owner.teamMember': 'Team member',
+  'leads.owner.nobody': 'Unassigned',
+  'leads.source.manual': 'Added by hand',
+  'leads.source.web_chat': 'Web chat',
+  'leads.source.whatsapp': 'WhatsApp',
+  'leads.source.email': 'Email',
+  'leads.source.phone': 'Phone call',
+  'leads.toolbar.filter': 'Filter',
+  'leads.toolbar.sort': 'Sort',
+  'leads.toolbar.viewLabel': 'Leads view',
+  'leads.toolbar.list': 'List',
+  'leads.toolbar.splitView': 'Split view',
+  'leads.toolbar.import': 'Import',
+  'leads.toolbar.export': 'Export',
+  'leads.toolbar.create': 'Create lead',
+  'leads.notYet': 'Not available yet',
+  'leads.chooseColumns': 'Choose columns',
+  'leads.row.logActivity': 'Log an activity',
+  'leads.row.addNote': 'Add a note',
+  'leads.row.more': 'More actions for {name}',
+  'leads.loading': 'Loading leads',
+  'leads.loadError.title': 'We could not load your leads',
+  'leads.loadError.description': 'Check your connection and try again. Your leads are safe.',
+  'leads.showing': 'Showing {shown} of {total} open leads',
+  'leads.showingNone': 'No open leads',
+  'leads.previous': 'Previous',
+  'leads.next': 'Next',
+  'leads.pagination': 'Leads pages',
   'page.leads.description': 'Every enquiry the AI agents and your team have picked up.',
   'page.contacts.description': 'The people who have called, messaged or emailed your business.',
   'page.companies.description': 'The businesses your contacts work for.',
@@ -150,4 +190,11 @@ export type PageId =
 /** Returns the text for a message key. */
 export function t(messageKey: MessageKey): string {
   return englishMessages[messageKey];
+}
+
+/** Returns the text for a message key with each `{name}` in it replaced by the value given for it ("Showing {shown} of {total}"). */
+export function formatMessage(messageKey: MessageKey, values: Record<string, string | number>): string {
+  return englishMessages[messageKey].replace(/\{(\w+)\}/g, (placeholder, valueName: string) =>
+    valueName in values ? String(values[valueName]) : placeholder,
+  );
 }

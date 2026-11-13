@@ -7,8 +7,8 @@ export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive'
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Primary is for the one main action of an area; the others support it (design system 3.1). */
   variant?: ButtonVariant;
-  /** `touch` is 44 px high, for phone layouts. `standard` is 40 px. */
-  size?: 'standard' | 'touch';
+  /** `touch` is 44 px high, for phone layouts. `standard` is 40 px. `compact` is 32 px, for dense toolbars and table footers. */
+  size?: 'standard' | 'touch' | 'compact';
   /** Shows a spinner, keeps the label, and ignores clicks while something is happening. */
   isLoading?: boolean;
   /** An icon shown before the label. */
@@ -42,7 +42,7 @@ export function Button({
       aria-busy={isLoading || undefined}
       className={joinClassNames(
         'text-body-md-semibold inline-flex items-center justify-center gap-2 rounded-md px-4',
-        size === 'touch' ? 'h-11' : 'h-10',
+        size === 'touch' ? 'h-11' : size === 'compact' ? 'text-body-xs !h-8 !px-3' : 'h-10',
         VARIANT_CLASSES[variant],
         'disabled:cursor-not-allowed disabled:border-border-default disabled:bg-surface-subtle disabled:text-text-disabled',
         className,

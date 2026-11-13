@@ -6,6 +6,21 @@ export { Card, type CardProps } from './components/Card';
 export { Badge, type BadgeProps, type BadgeTone } from './components/Badge';
 export { Tag, type TagProps, type TagTone } from './components/Tag';
 export { Checkbox, type CheckboxProps } from './components/Checkbox';
+export {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  type TableRowProps,
+} from './components/Table';
+export { Pagination, type PaginationProps } from './components/Pagination';
+export {
+  SegmentedControl,
+  type SegmentedControlOption,
+  type SegmentedControlProps,
+} from './components/SegmentedControl';
 export { TextField, type TextFieldProps } from './components/TextField';
 export {
   EmptyState,

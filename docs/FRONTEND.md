@@ -82,6 +82,7 @@ Destructive means the error outline or tint, and always sits inside `ConfirmDial
 | Component | Notes |
 | --- | --- |
 | `AppShell`, `SideNav`, `BottomBar`, `TopBar`, `BusinessSwitcher`, `GlobalSearch` | Dark sidebar: active item changes text, icon and row (`sidebar-item-active`, `sidebar-item-active-bg`). Badges only for actionable counts. Search opens a full-screen sheet on a phone. |
+| `Table` (with `TableHead`, `TableBody`, `TableRow`, `TableHeaderCell`, `TableCell`), `Pagination`, `Checkbox`, `Tag` | **Built (13 Nov 2026)** from the Figma Leads list: 48 px rows, 13 px text, selected row has a background as well as the tick, the table scrolls sideways inside its box, the footer has the summary and Previous / Next. On a phone a screen shows stacked cards instead of the table (see `features/leads/`). |
 | `Card`, `Section`, `Tabs`, `FilterChips`, `ViewTabs` | Page structure; no nested cards. The page title is the **top bar's h1** (as in the Figma frame); a screen has no title of its own, only its toolbar (Filter, Sort, view switch, Import, Export, the main action). `PageHeader` was removed on 13 Nov 2026. |
 | `DataList` | One component: table on desktop and tablet, stacked records on phone; chosen columns, sorting, sticky header |
 | `LeadCard` | Name, interest, dates, temperature, owner, time since last activity; draggable on the board; **Move** button on a phone |

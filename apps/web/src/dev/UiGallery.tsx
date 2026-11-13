@@ -12,6 +12,13 @@ import {
   IconButton,
   LoadingState,
   LogoOne,
+  Pagination,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
   Tag,
   TextField,
   ActivitiesIcon,
@@ -252,6 +259,59 @@ export function UiGallery() {
           <Tag tone="rate-sent">Rate sent</Tag>
           <Tag tone="won">Won</Tag>
           <Tag tone="lost">Lost</Tag>
+        </div>
+      </Section>
+
+      <Section title="Table and pagination">
+        <Card isFlush>
+          <Table>
+            <TableHead>
+              <tr>
+                <TableHeaderCell className="w-12">
+                  <Checkbox label="Select all" isLabelHidden />
+                </TableHeaderCell>
+                <TableHeaderCell>Lead name</TableHeaderCell>
+                <TableHeaderCell>Phone</TableHeaderCell>
+                <TableHeaderCell>Status</TableHeaderCell>
+              </tr>
+            </TableHead>
+            <TableBody>
+              <TableRow isSelected>
+                <TableCell>
+                  <Checkbox label="Select Priya Menon" isLabelHidden defaultChecked />
+                </TableCell>
+                <TableCell className="text-text-primary">Priya Menon (selected row)</TableCell>
+                <TableCell>+91 98470 11201</TableCell>
+                <TableCell>
+                  <Tag tone="new">New</Tag>
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>
+                  <Checkbox label="Select Arjun Nair" isLabelHidden />
+                </TableCell>
+                <TableCell className="text-text-primary">Arjun Nair</TableCell>
+                <TableCell>+91 98950 22302</TableCell>
+                <TableCell>
+                  <Tag tone="contacted">Contacted</Tag>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+          <Pagination
+            summary="Showing 1–2 of 28 open leads"
+            previousLabel="Previous"
+            nextLabel="Next"
+            ariaLabel="Example pages"
+            hasPrevious={false}
+            hasNext
+            onPrevious={() => undefined}
+            onNext={() => undefined}
+          />
+        </Card>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Tag tone="neutral">Neutral tag (extra stage)</Tag>
+          <Button size="compact">Compact button</Button>
         </div>
       </Section>
 
