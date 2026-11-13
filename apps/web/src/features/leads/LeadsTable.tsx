@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { Lead } from '@toobler-one/shared';
 import {
   ActivityIcon,
@@ -7,7 +8,6 @@ import {
   Checkbox,
   IconButton,
   ManageColumnsIcon,
-  MoreIcon,
   Table,
   TableBody,
   TableCell,
@@ -34,6 +34,8 @@ export interface LeadsTableProps {
   selectedLeadIds: ReadonlySet<string>;
   onToggleLead: (leadId: string) => void;
   onToggleAllLeads: () => void;
+  /** Draws the "…" menu of one lead (the page knows the stages, the signed-in person and what each action does). */
+  renderRowMenu: (lead: Lead, displayName: string) => ReactNode;
 }
 
 /** The small green chip with the callback date (Figma "Next activity"); the calendar icon and the date both show. */
@@ -55,10 +57,11 @@ export function LeadsTable({
   selectedLeadIds,
   onToggleLead,
   onToggleAllLeads,
+  renderRowMenu,
 }: LeadsTableProps) {
   const areAllSelected = leads.length > 0 && leads.every((lead) => selectedLeadIds.has(lead.id));
   return (
-    <Table className="min-w-[940px]">
+    <Table className="min-w-[940px]" containerClassName="min-h-0 flex-1 overflow-auto">
       <TableHead>
         <tr>
           <TableHeaderCell className="w-12">
@@ -130,15 +133,7 @@ export function LeadsTable({
                   </div>
                 )}
               </TableCell>
-              <TableCell className="w-12">
-                <IconButton
-                  label={formatMessage('leads.row.more', { name: displayName })}
-                  size="compact"
-                  icon={<MoreIcon size={20} />}
-                  aria-disabled
-                  title={t('leads.notYet')}
-                />
-              </TableCell>
+              <TableCell className="w-12">{renderRowMenu(lead, displayName)}</TableCell>
             </TableRow>
           );
         })}
@@ -153,7 +148,8 @@ export function LeadCards({
   openStageIdsInOrder,
   signedInUserId,
   timeZone,
-}: Pick<LeadsTableProps, 'leads' | 'openStageIdsInOrder' | 'signedInUserId' | 'timeZone'>) {
+  renderRowMenu,
+}: Pick<LeadsTableProps, 'leads' | 'openStageIdsInOrder' | 'signedInUserId' | 'timeZone' | 'renderRowMenu'>) {
   return (
     <ul className="flex flex-col gap-3">
       {leads.map((lead) => {
@@ -163,7 +159,10 @@ export function LeadCards({
             <Card isCompact className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-body-md-semibold min-w-0 text-text-primary">{findLeadDisplayName(lead.contact)}</p>
-                <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
+                  {renderRowMenu(lead, findLeadDisplayName(lead.contact))}
+                </div>
               </div>
               {lead.contact?.phone ? <p className="text-body-sm text-text-secondary">{lead.contact.phone}</p> : null}
               {lead.contact?.email ? <p className="text-body-sm text-text-secondary">{lead.contact.email}</p> : null}

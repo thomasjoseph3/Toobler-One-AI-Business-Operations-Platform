@@ -195,3 +195,28 @@ test.describe('developer gallery', () => {
     await expect(page.getByRole('heading', { name: 'Badges' })).toBeVisible();
   });
 });
+
+test.describe('sidebar height', () => {
+  test('fits a short window without a scrollbar, and still scrolls if it ever has more than fits', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The sidebar is not shown on a phone');
+    for (const height of [640, 720, 900]) {
+      await page.setViewportSize({ width: 1280, height });
+      await page.goto('/leads');
+      const sidebarInLoop = page.getByRole('navigation', { name: 'Main navigation' });
+      await expect(sidebarInLoop).toBeVisible();
+      const overflow = await sidebarInLoop.evaluate((element) => element.scrollHeight - element.clientHeight);
+      expect(overflow, `the sidebar overflows by ${overflow}px at a window height of ${height}px`).toBeLessThanOrEqual(
+        0,
+      );
+    }
+    // Even when it does overflow (a very short window) there is no visible scrollbar: its scrollbar is hidden
+    await page.setViewportSize({ width: 1280, height: 420 });
+    const sidebar = page.getByRole('navigation', { name: 'Main navigation' });
+    const scrollbarWidth = await sidebar.evaluate(
+      (element) => (element as HTMLElement).offsetWidth - element.clientWidth,
+    );
+    expect(scrollbarWidth).toBe(0);
+  });
+});

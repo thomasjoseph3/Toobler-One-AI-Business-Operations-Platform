@@ -88,6 +88,14 @@
   font: 700 32px/40px var(--font-heading);
 }
 
+/* A scrolling area with no visible scrollbar (the dark sidebar): it still scrolls with the wheel, touch and keyboard focus. */
+@utility scrollbar-hidden {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer base {
   html {
     background-color: var(--color-canvas);

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { LogOut } from 'lucide-react';
-import { joinClassNames, MoreIcon } from '@toobler-one/ui';
+import { joinClassNames, MoreIcon, useDismissOnOutsidePress } from '@toobler-one/ui';
 import { useSession } from '../../auth/session';
 import { t } from '../i18n';
 
@@ -27,22 +27,8 @@ export function UserMenu({ variant, isCompact = false }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // While the menu is open: Escape or a press outside closes it (the press on the button itself is handled by the button).
-  useEffect(() => {
-    if (!isOpen) return;
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOnOutsidePress);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePress);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [isOpen]);
+  const close = useCallback(() => setIsOpen(false), []);
+  useDismissOnOutsidePress(containerRef, isOpen, close);
 
   if (sessionState.status !== 'signedIn') return null;
   const { user, business } = sessionState.profile;

@@ -4,11 +4,14 @@ import { useState } from 'react';
 import { Sparkles, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
+  ActionMenu,
   Alert,
   Badge,
   Button,
   Card,
   Checkbox,
+  ConfirmDialog,
+  Dialog,
   EmptyState,
   ErrorState,
   IconButton,
@@ -175,6 +178,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /** Shows every component and token of the design system on one page. */
 export function UiGallery() {
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   return (
     <>
       <p className="text-body-md mb-6 text-text-secondary">
@@ -364,6 +369,46 @@ export function UiGallery() {
         >
           <p className="text-body-md text-text-secondary">A form goes here. On a phone this fills the screen.</p>
         </SidePanel>
+      </Section>
+
+      <Section title="Row menu, dialog and confirmation">
+        <div className="flex flex-wrap items-center gap-3">
+          <ActionMenu
+            triggerLabel="More actions for the example row"
+            panelLabel="Example actions"
+            groupHeadings={{ move: 'Move to', owner: 'Owner' }}
+            items={[
+              { id: 'a', label: 'Contacted', group: 'move', onSelect: () => undefined },
+              { id: 'b', label: 'Quoted', group: 'move', onSelect: () => undefined },
+              { id: 'c', label: 'Assign to me', group: 'owner', onSelect: () => undefined },
+              { id: 'd', label: 'Delete lead', group: 'delete', tone: 'danger', onSelect: () => undefined },
+            ]}
+          />
+          <Button onClick={() => setIsDialogOpen(true)}>Open a dialog</Button>
+          <Button variant="destructive" onClick={() => setIsConfirmOpen(true)}>
+            Open the delete confirmation
+          </Button>
+        </div>
+        <Dialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          title="Example dialog"
+          closeLabel="Close"
+          footer={<Button onClick={() => setIsDialogOpen(false)}>Cancel</Button>}
+        >
+          <p className="text-body-md text-text-secondary">A short question or form goes here.</p>
+        </Dialog>
+        <ConfirmDialog
+          isOpen={isConfirmOpen}
+          tone="danger"
+          title="Delete the lead for Priya Menon?"
+          description="The lead is removed from your lists. The person stays in your contacts."
+          confirmLabel="Delete lead"
+          cancelLabel="Cancel"
+          closeLabel="Close"
+          onConfirm={() => setIsConfirmOpen(false)}
+          onCancel={() => setIsConfirmOpen(false)}
+        />
       </Section>
 
       <Section title="Checkboxes">

@@ -46,7 +46,28 @@ export interface PretendApi {
   /** When set, `POST /contacts` (or `POST /leads`) is refused with this status and code. */
   contactCreateRefusal: { status: number; code: string; message: string } | null;
   leadCreateRefusal: { status: number; code: string; message: string } | null;
+  /** The signed-in person's role: a manager may delete leads, staff may not. */
+  role: 'manager' | 'staff';
+  /** The calls the page made to move a lead, change its owner, or delete it. */
+  movedLeads: Array<{ leadId: string; body: Record<string, unknown> }>;
+  assignedLeads: Array<{ leadId: string; body: Record<string, unknown> }>;
+  deletedLeadIds: string[];
+  /** When set, moving, assigning or deleting a lead is refused with this status and code. */
+  leadActionRefusal: { status: number; code: string; message: string } | null;
 }
+
+/** The business's lost reasons as the pretend API gives them. */
+const PRETEND_LOST_REASONS = [
+  { id: 'reason-1', label: 'Too costly', sort: 0 },
+  { id: 'reason-2', label: 'Went elsewhere', sort: 1 },
+  { id: 'reason-3', label: 'No reply', sort: 2 },
+];
+
+/** The signed-in person as the pretend API gives them, with the role a test chose. */
+const profileFor = (pretendApi: { role: 'manager' | 'staff' }) => ({
+  ...PRETEND_PROFILE,
+  user: { ...PRETEND_PROFILE.user, role: pretendApi.role },
+});
 
 /** The people the pretend contact search can find. */
 const PRETEND_CONTACTS = [
@@ -145,6 +166,11 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         postedLeads: [],
         contactCreateRefusal: null,
         leadCreateRefusal: null,
+        role: 'manager',
+        movedLeads: [],
+        assignedLeads: [],
+        deletedLeadIds: [],
+        leadActionRefusal: null,
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -154,8 +180,28 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         const unauthorized = json(401, { error: { code: 'UNAUTHORIZED', message: 'Please sign in.' } });
         if (path === '/me') {
           return route.fulfill(
-            pretendApi.signedIn && !pretendApi.accessExpired ? json(200, PRETEND_PROFILE) : unauthorized,
+            pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
+        const leadActionMatch = /^\/leads\/([^/]+?)(\/move|\/assign)?$/.exec(path);
+        if (leadActionMatch && request.method() !== 'GET') {
+          const leadId = leadActionMatch[1]!;
+          const action = leadActionMatch[2];
+          if (pretendApi.leadActionRefusal) {
+            const { status, code, message } = pretendApi.leadActionRefusal;
+            return route.fulfill(json(status, { error: { code, message } }));
+          }
+          if (request.method() === 'DELETE') {
+            if (pretendApi.role !== 'manager') {
+              return route.fulfill(json(403, { error: { code: 'FORBIDDEN', message: 'Not allowed.' } }));
+            }
+            pretendApi.deletedLeadIds.push(leadId);
+            return route.fulfill({ status: 204 });
+          }
+          const body = request.postDataJSON() as Record<string, unknown>;
+          (action === '/move' ? pretendApi.movedLeads : pretendApi.assignedLeads).push({ leadId, body });
+          return route.fulfill(json(200, pretendLead(0)));
         }
         if (path === '/contacts' && request.method() === 'GET') {
           const searchText = (new URL(request.url()).searchParams.get('q') ?? '').toLowerCase();
@@ -214,7 +260,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           }
           pretendApi.signedIn = true;
           pretendApi.accessExpired = false;
-          return route.fulfill(json(200, PRETEND_PROFILE));
+          return route.fulfill(json(200, profileFor(pretendApi)));
         }
         if (path === '/auth/logout') {
           pretendApi.signedIn = false;
@@ -223,7 +269,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         if (path === '/auth/refresh') {
           if (pretendApi.refreshWorks && pretendApi.signedIn) {
             pretendApi.accessExpired = false;
-            return route.fulfill(json(200, PRETEND_PROFILE));
+            return route.fulfill(json(200, profileFor(pretendApi)));
           }
           pretendApi.signedIn = false;
           return route.fulfill(json(401, { error: { code: 'SESSION_ENDED', message: 'Your session has ended.' } }));

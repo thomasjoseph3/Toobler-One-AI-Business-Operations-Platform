@@ -13,6 +13,7 @@ export {
   TableHead,
   TableHeaderCell,
   TableRow,
+  type TableProps,
   type TableRowProps,
 } from './components/Table';
 export { SelectField, type SelectFieldProps } from './components/SelectField';
@@ -27,6 +28,10 @@ export { TextField, type TextFieldProps } from './components/TextField';
 export { TextAreaField, type TextAreaFieldProps } from './components/TextAreaField';
 export { SidePanel, type SidePanelProps } from './components/SidePanel';
 export { Alert, type AlertProps } from './components/Alert';
+export { ActionMenu, type ActionMenuItem, type ActionMenuProps } from './components/ActionMenu';
+export { Dialog, type DialogProps } from './components/Dialog';
+export { ConfirmDialog, type ConfirmDialogProps } from './components/ConfirmDialog';
+export { useDismissOnOutsidePress } from './use-dismiss-on-outside-press';
 export {
   EmptyState,
   ErrorState,

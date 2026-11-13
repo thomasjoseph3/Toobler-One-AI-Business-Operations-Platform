@@ -13,7 +13,8 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
 export function Checkbox({ label, isLabelHidden = false, className, ...rest }: CheckboxProps) {
   const inputId = useId();
   return (
-    <span className={joinClassNames('inline-flex items-center gap-2', className)}>
+    // `relative` keeps the hidden label (when `isLabelHidden`) next to its box instead of at the top of the page
+    <span className={joinClassNames('relative inline-flex items-center gap-2', className)}>
       <span className="relative inline-flex size-4 shrink-0">
         <input
           id={inputId}

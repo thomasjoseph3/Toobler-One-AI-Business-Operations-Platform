@@ -42,7 +42,7 @@ export function Sidebar() {
     <nav
       aria-label={t('nav.main')}
       className={joinClassNames(
-        'sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto bg-sidebar px-3 pb-3 md:flex md:w-[72px]',
+        'scrollbar-hidden sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto bg-sidebar px-3 pb-3 md:flex md:w-[72px]',
         isExpanded ? 'xl:w-[256px]' : '',
       )}
     >
@@ -58,9 +58,9 @@ export function Sidebar() {
           className="hidden text-sidebar-item hover:bg-sidebar-item-active-bg hover:text-sidebar-item-hover xl:inline-flex"
         />
       </div>
-      <div className="flex flex-1 flex-col gap-6 pt-4">
+      <div className="flex flex-1 flex-col gap-6 pt-4 [@media(max-height:719px)]:gap-4">
         {NAVIGATION_GROUPS.filter((group) => group.id !== 'footer').map((group) => (
-          <div key={group.id} className="flex flex-col gap-1.5">
+          <div key={group.id} className="flex flex-col gap-1.5 [@media(max-height:719px)]:gap-1">
             {group.labelKey ? (
               <p
                 className={joinClassNames(

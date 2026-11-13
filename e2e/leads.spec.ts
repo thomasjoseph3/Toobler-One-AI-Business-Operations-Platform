@@ -165,4 +165,53 @@ test.describe('Leads list', () => {
     await page.getByRole('dialog', { name: 'Filter leads' }).getByLabel('Owner').selectOption({ label: 'Only mine' });
     await expect(page).not.toHaveURL(/page=/);
   });
+
+  test('on a desktop the page stays still and the table scrolls inside it, with its heading row, toolbar and footer in view', async ({
+    page,
+    pretendApi,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The fixed frame is for tablets and desktops');
+    pretendApi.leadCount = 25;
+    await page.setViewportSize({ width: 1280, height: 640 });
+    await page.goto('/leads');
+    const table = page.getByRole('table');
+    await expect(table).toBeVisible();
+    const windowScrolls = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+    expect(windowScrolls, 'the window itself should not scroll').toBe(false);
+
+    // 25 rows are taller than the box, so the box scrolls; the heading row does not move
+    const heading = table.getByRole('columnheader', { name: 'Lead name' });
+    const headingBefore = (await heading.boundingBox())!.y;
+    const boxCanScroll = await page.evaluate(() => {
+      const box = document.querySelector('table')!.parentElement!;
+      return box.scrollHeight > box.clientHeight;
+    });
+    expect(boxCanScroll).toBe(true);
+    await page.evaluate(() => document.querySelector('table')!.parentElement!.scrollTo(0, 100_000));
+    expect((await heading.boundingBox())!.y).toBe(headingBefore);
+    // The last row is now in view, and the toolbar and the footer never left
+    await expect(page.getByText('Priya Menon 24', { exact: true }).locator('visible=true')).toBeInViewport();
+    await expect(page.getByRole('button', { name: 'Create lead' })).toBeInViewport();
+    await expect(page.getByRole('navigation', { name: 'Leads pages' }).locator('visible=true')).toBeInViewport();
+
+    // A row menu opened on the last row is drawn in full, not cut off by the scrolling box
+    await page.getByRole('button', { name: 'More actions for Priya Menon 24' }).click();
+    const menu = page.getByRole('group', { name: 'Actions for Priya Menon 24' });
+    const menuBox = (await menu.boundingBox())!;
+    expect(menuBox.y).toBeGreaterThanOrEqual(0);
+    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(640);
+    await expect(menu.getByRole('button', { name: 'Delete lead' })).toBeInViewport();
+    // Scrolling closes it, because its button moves away
+    await page.evaluate(() => document.querySelector('table')!.parentElement!.scrollTo(0, 0));
+    await expect(menu).toHaveCount(0);
+  });
+
+  test('on a phone the page scrolls as usual', async ({ page, pretendApi }, testInfo) => {
+    test.skip(testInfo.project.name !== 'phone', 'Phone only');
+    pretendApi.leadCount = 25;
+    await page.goto('/leads');
+    await expect(page.getByText('Priya Menon 0', { exact: true }).locator('visible=true')).toBeVisible();
+    const windowScrolls = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
+    expect(windowScrolls).toBe(true);
+  });
 });

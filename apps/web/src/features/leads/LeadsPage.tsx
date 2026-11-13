@@ -1,14 +1,27 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import type { LeadsListResponse, Pipeline } from '@toobler-one/shared';
-import { Alert, Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
+import type { Lead, LeadsListResponse, Pipeline, PipelineStage } from '@toobler-one/shared';
+import {
+  Alert,
+  Button,
+  Card,
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  LeadsIcon,
+  LoadingState,
+  Pagination,
+} from '@toobler-one/ui';
+import { ApiRequestError, apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
+import { LeadRowMenu } from './LeadRowMenu';
 import { LeadCards, LeadsTable } from './LeadsTable';
 import { LeadsToolbar } from './LeadsToolbar';
+import { MoveToLostDialog } from './MoveToLostDialog';
 import {
   buildLeadsPath,
   countActiveFilters,
@@ -18,6 +31,9 @@ import {
   writeLeadsView,
   type LeadsView,
 } from './leads-view';
+
+/** The Leads page fills the main area from 768 px, so the toolbar stays on top, the table scrolls and the footer stays at the bottom. */
+const PAGE_FRAME_CLASSES = 'md:flex md:h-full md:min-h-0 md:flex-col';
 
 /**
  * The Leads page: the toolbar (Filter and Sort work), then the leads, 25 to a page, as a table (tablet and desktop) or
@@ -32,7 +48,15 @@ export function LeadsPage() {
   // The Create lead panel: open or shut, a counter so each opening starts with an empty form, and the confirmation after a lead is created
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
-  const [createdLeadName, setCreatedLeadName] = useState<string | null>(null);
+  // The message under the toolbar after something was done (or failed), and the two questions that can be open: why lost, and are you sure
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
+  const [pendingLostMove, setPendingLostMove] = useState<{
+    lead: Lead;
+    displayName: string;
+    stage: PipelineStage;
+  } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ lead: Lead; displayName: string } | null>(null);
+  const [isActing, setIsActing] = useState(false);
   const view = readLeadsView(searchParams);
   const signedInUserId = sessionState.status === 'signedIn' ? sessionState.profile.user.id : '';
   const leadsResource = useApiResource<LeadsListResponse>(buildLeadsPath(view, signedInUserId));
@@ -60,29 +84,105 @@ export function LeadsPage() {
 
   const stages = pipelineResource.state.status === 'ready' ? pipelineResource.state.data.stages : [];
   const openCreatePanel = () => {
-    setCreatedLeadName(null);
+    setNotice(null);
     setCreatePanelOpenCount((count) => count + 1);
     setIsCreatePanelOpen(true);
   };
   // After a lead is created: close the panel, say so, and load the list again so the new lead shows
   const handleLeadCreated = (displayName: string) => {
     setIsCreatePanelOpen(false);
-    setCreatedLeadName(displayName);
+    setNotice({ tone: 'success', text: formatMessage('leadForm.created', { name: displayName }) });
     leadsResource.reload();
   };
+
+  // The words for a refusal. A lead that is gone (deleted by someone else) also reloads the list.
+  const describeActionError = (error: unknown): string => {
+    if (error instanceof ApiRequestError) {
+      if (error.code === 'NETWORK_ERROR') return t('leads.error.network');
+      if (error.status === 403) return t('leads.error.forbidden');
+      if (error.status === 404) {
+        leadsResource.reload();
+        return t('leads.error.gone');
+      }
+      if (error.status === 409 || error.code === 'VALIDATION_ERROR') return error.message;
+    }
+    return t('leads.error.unknown');
+  };
+  // Does one action on a lead: shows it is busy, says in words what happened (or what went wrong), and loads the list again.
+  const performLeadAction = async (action: () => Promise<unknown>, successText: string) => {
+    setIsActing(true);
+    setNotice(null);
+    try {
+      await action();
+      setNotice({ tone: 'success', text: successText });
+      leadsResource.reload();
+    } catch (error) {
+      setNotice({ tone: 'error', text: describeActionError(error) });
+    } finally {
+      setIsActing(false);
+    }
+  };
+  const moveToStage = (lead: Lead, displayName: string, stage: PipelineStage) => {
+    // A lead can only be lost with a reason, so that asks first; every other move goes straight through
+    if (stage.kind === 'lost') {
+      setPendingLostMove({ lead, displayName, stage });
+      return;
+    }
+    void performLeadAction(
+      () => apiRequest('POST', `/leads/${lead.id}/move`, { stageId: stage.id }),
+      formatMessage('leads.notice.moved', { name: displayName, stage: stage.name }),
+    );
+  };
+  const confirmLostMove = async (reason: string) => {
+    if (pendingLostMove === null) return;
+    const { lead, displayName, stage } = pendingLostMove;
+    await performLeadAction(
+      () => apiRequest('POST', `/leads/${lead.id}/move`, { stageId: stage.id, lostReason: reason }),
+      formatMessage('leads.notice.moved', { name: displayName, stage: stage.name }),
+    );
+    setPendingLostMove(null);
+  };
+  const assignOwner = (lead: Lead, displayName: string, ownerUserId: string | null) =>
+    void performLeadAction(
+      () => apiRequest('POST', `/leads/${lead.id}/assign`, { ownerUserId }),
+      formatMessage(ownerUserId === null ? 'leads.notice.unassigned' : 'leads.notice.assigned', { name: displayName }),
+    );
+  const confirmDelete = async () => {
+    if (pendingDelete === null) return;
+    const { lead, displayName } = pendingDelete;
+    await performLeadAction(
+      () => apiRequest('DELETE', `/leads/${lead.id}`),
+      formatMessage('leads.notice.deleted', { name: displayName }),
+    );
+    setPendingDelete(null);
+  };
+  // The "…" menu of one lead, with what each choice does
+  const renderRowMenu = (lead: Lead, displayName: string) => (
+    <LeadRowMenu
+      lead={lead}
+      displayName={displayName}
+      stages={stages}
+      signedInUser={{ id: user.id, role: user.role }}
+      onMoveToStage={(stage) => moveToStage(lead, displayName, stage)}
+      onAssignToMe={() => assignOwner(lead, displayName, user.id)}
+      onRemoveOwner={() => assignOwner(lead, displayName, null)}
+      onDelete={() => setPendingDelete({ lead, displayName })}
+    />
+  );
+
   const toolbar = (
     <>
-      {createdLeadName !== null ? (
+      {notice !== null ? (
         <Alert
-          tone="success"
+          tone={notice.tone}
           className="mb-4"
           action={
-            <Button variant="link" onClick={() => setCreatedLeadName(null)}>
+            <Button variant="link" onClick={() => setNotice(null)}>
               {t('leadForm.dismiss')}
             </Button>
           }
         >
-          {formatMessage('leadForm.created', { name: createdLeadName })}
+          {notice.text}
         </Alert>
       ) : null}
       <LeadsToolbar view={view} stages={stages} onChangeView={changeView} onCreateLead={openCreatePanel} />
@@ -93,23 +193,43 @@ export function LeadsPage() {
         timeZone={business.timeZone}
         onCreated={handleLeadCreated}
       />
+      {pendingLostMove !== null ? (
+        <MoveToLostDialog
+          displayName={pendingLostMove.displayName}
+          isSaving={isActing}
+          onConfirm={(reason) => void confirmLostMove(reason)}
+          onCancel={() => setPendingLostMove(null)}
+        />
+      ) : null}
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        tone="danger"
+        title={formatMessage('leads.delete.title', { name: pendingDelete?.displayName ?? '' })}
+        description={t('leads.delete.description')}
+        confirmLabel={t('leads.delete.confirm')}
+        cancelLabel={t('leadForm.cancel')}
+        closeLabel={t('leadForm.close')}
+        isConfirming={isActing}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
     </>
   );
 
   if (leadsResource.state.status === 'loading' || pipelineResource.state.status === 'loading') {
     return (
-      <>
+      <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
         <Card>
           <LoadingState label={t('leads.loading')} rows={6} />
         </Card>
-      </>
+      </div>
     );
   }
 
   if (leadsResource.state.status === 'error' || pipelineResource.state.status === 'error') {
     return (
-      <>
+      <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
         <Card>
           <ErrorState
@@ -118,7 +238,7 @@ export function LeadsPage() {
             action={<Button onClick={reloadAll}>{t('session.retry')}</Button>}
           />
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -130,7 +250,7 @@ export function LeadsPage() {
   if (leads.total === 0) {
     const hasFilters = countActiveFilters(view) > 0;
     return (
-      <>
+      <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
         <Card>
           {hasFilters ? (
@@ -156,7 +276,7 @@ export function LeadsPage() {
             />
           )}
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -189,7 +309,7 @@ export function LeadsPage() {
   );
 
   return (
-    <>
+    <div className={PAGE_FRAME_CLASSES}>
       {toolbar}
       <div className="md:hidden">
         <LeadCards
@@ -197,10 +317,11 @@ export function LeadsPage() {
           openStageIdsInOrder={openStageIdsInOrder}
           signedInUserId={user.id}
           timeZone={business.timeZone}
+          renderRowMenu={renderRowMenu}
         />
         <div className="mt-3 overflow-hidden rounded-lg border border-border-default">{footer}</div>
       </div>
-      <Card isFlush className="hidden md:block">
+      <Card isFlush className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col">
         <LeadsTable
           leads={leads.items}
           openStageIdsInOrder={openStageIdsInOrder}
@@ -209,9 +330,10 @@ export function LeadsPage() {
           selectedLeadIds={selectedLeadIds}
           onToggleLead={toggleLead}
           onToggleAllLeads={toggleAllLeads}
+          renderRowMenu={renderRowMenu}
         />
         {footer}
       </Card>
-    </>
+    </div>
   );
 }

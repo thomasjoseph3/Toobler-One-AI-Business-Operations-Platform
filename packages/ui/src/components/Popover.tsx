@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { joinClassNames } from '../join-class-names';
+import { useDismissOnOutsidePress } from '../use-dismiss-on-outside-press';
 
 export interface PopoverTriggerControl {
   isOpen: boolean;
@@ -24,22 +25,8 @@ export function Popover({ renderTrigger, panelLabel, align = 'left', children }:
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // While the panel is open: Escape or a press outside closes it
-  useEffect(() => {
-    if (!isOpen) return;
-    const closeOnOutsidePress = (event: PointerEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) setIsOpen(false);
-    };
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsOpen(false);
-    };
-    document.addEventListener('pointerdown', closeOnOutsidePress);
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOnOutsidePress);
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [isOpen]);
+  const close = useCallback(() => setIsOpen(false), []);
+  useDismissOnOutsidePress(containerRef, isOpen, close);
 
   return (
     <div ref={containerRef} className="relative">

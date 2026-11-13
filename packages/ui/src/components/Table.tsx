@@ -1,10 +1,19 @@
 import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from 'react';
 import { joinClassNames } from '../join-class-names';
 
-/** The table of a list screen (Figma "Table"): scrolls sideways inside its box when the screen is too narrow, never the whole page. */
-export function Table({ className, children, ...rest }: HTMLAttributes<HTMLTableElement>) {
+export interface TableProps extends HTMLAttributes<HTMLTableElement> {
+  /**
+   * Classes for the box the table scrolls in. By default it scrolls sideways when the screen is too narrow. A screen that gives
+   * the box a height (for example `min-h-0 flex-1 overflow-auto`) makes the rows scroll inside it while the heading row stays in view.
+   */
+  containerClassName?: string;
+}
+
+/** The table of a list screen (Figma "Table"): scrolls inside its own box when the screen is too small, never the whole page. */
+export function Table({ className, containerClassName = 'overflow-x-auto', children, ...rest }: TableProps) {
   return (
-    <div className="overflow-x-auto">
+    // `relative` keeps the invisible screen-reader labels inside the table's own box, so they cannot stretch the page
+    <div className={joinClassNames('relative', containerClassName)}>
       <table className={joinClassNames('w-full border-collapse text-left', className)} {...rest}>
         {children}
       </table>
@@ -47,7 +56,7 @@ export function TableHeaderCell({ className, scope = 'col', ...rest }: ThHTMLAtt
     <th
       scope={scope}
       className={joinClassNames(
-        'text-body-sm-medium px-3 py-3 align-middle text-text-primary whitespace-nowrap',
+        'text-body-sm-medium sticky top-0 z-10 bg-surface-subtle px-3 py-3 align-middle text-text-primary whitespace-nowrap',
         className,
       )}
       {...rest}

@@ -97,7 +97,7 @@ function refreshSession(): Promise<boolean> {
  * plain answer, not an expired session.
  */
 export async function apiRequest<Answer>(
-  method: 'GET' | 'POST' | 'PATCH',
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
   path: string,
   body?: unknown,
 ): Promise<Answer> {
