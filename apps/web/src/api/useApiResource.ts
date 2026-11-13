@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { apiRequest } from './client';
+import { ApiRequestError, apiRequest } from './client';
 
 /** What a screen has for one piece of data: still loading, could not load, or the answer. */
-export type LoadState<Data> = { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: Data };
+/** `httpStatus` on an error is the API's status (404 = no such thing), or 0 when the server could not be reached at all. */
+export type LoadState<Data> =
+  { status: 'loading' } | { status: 'error'; httpStatus: number } | { status: 'ready'; data: Data };
 
 /**
  * Loads one address from the API (`GET path`) and says whether it is loading, failed, or ready. It loads again when the
@@ -13,7 +15,9 @@ export function useApiResource<Data>(path: string): { state: LoadState<Data>; re
   const [reloadCount, setReloadCount] = useState(0);
   const requestKey = `${path}#${reloadCount}`;
   const [answer, setAnswer] = useState<
-    { requestKey: string; outcome: 'error' } | { requestKey: string; outcome: 'ready'; data: Data } | null
+    | { requestKey: string; outcome: 'error'; httpStatus: number }
+    | { requestKey: string; outcome: 'ready'; data: Data }
+    | null
   >(null);
 
   useEffect(() => {
@@ -22,8 +26,10 @@ export function useApiResource<Data>(path: string): { state: LoadState<Data>; re
       .then((data) => {
         if (!isCancelled) setAnswer({ requestKey, outcome: 'ready', data });
       })
-      .catch(() => {
-        if (!isCancelled) setAnswer({ requestKey, outcome: 'error' });
+      .catch((error: unknown) => {
+        if (!isCancelled) {
+          setAnswer({ requestKey, outcome: 'error', httpStatus: error instanceof ApiRequestError ? error.status : 0 });
+        }
       });
     return () => {
       isCancelled = true;
@@ -34,7 +40,7 @@ export function useApiResource<Data>(path: string): { state: LoadState<Data>; re
     answer === null || answer.requestKey !== requestKey
       ? { status: 'loading' }
       : answer.outcome === 'error'
-        ? { status: 'error' }
+        ? { status: 'error', httpStatus: answer.httpStatus }
         : { status: 'ready', data: answer.data };
   return { state, reload: () => setReloadCount((count) => count + 1) };
 }

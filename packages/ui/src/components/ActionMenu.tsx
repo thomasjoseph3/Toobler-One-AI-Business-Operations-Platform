@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { joinClassNames } from '../join-class-names';
 import { MoreIcon } from '../icons';
+import { Button } from './Button';
 import { IconButton } from './IconButton';
 import { useDismissOnOutsidePress } from '../use-dismiss-on-outside-press';
 
@@ -21,6 +22,8 @@ export interface ActionMenuItem {
 export interface ActionMenuProps {
   /** The name of the "…" button, for screen readers ("More actions for Priya Menon"). */
   triggerLabel: string;
+  /** When given, the menu opens from a button with these words ("Actions") instead of the "…" icon, for a page where the icon alone would be easy to miss. */
+  triggerText?: string;
   /** What the opened list is for. */
   panelLabel: string;
   items: readonly ActionMenuItem[];
@@ -32,7 +35,7 @@ export interface ActionMenuProps {
  * The "…" menu on a row (Figma "more"): a button that opens a short list of actions under it. The list closes on Escape, on a press
  * outside it, and after an action is chosen. The actions are plain buttons in the normal Tab order.
  */
-export function ActionMenu({ triggerLabel, panelLabel, items, groupHeadings = {} }: ActionMenuProps) {
+export function ActionMenu({ triggerLabel, triggerText, panelLabel, items, groupHeadings = {} }: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   // Where the list is drawn on the screen: fixed to the window (so a scrolling table cannot cut it off), under the button, or above it near the bottom
   const [panelPlace, setPanelPlace] = useState<{ right: number; top?: number; bottom?: number } | null>(null);
@@ -76,14 +79,20 @@ export function ActionMenu({ triggerLabel, panelLabel, items, groupHeadings = {}
 
   return (
     <div ref={containerRef} className="relative inline-block">
-      <IconButton
-        label={triggerLabel}
-        size="compact"
-        icon={<MoreIcon size={20} />}
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-        onClick={toggle}
-      />
+      {triggerText ? (
+        <Button size="compact" aria-haspopup="true" aria-expanded={isOpen} onClick={toggle}>
+          {triggerText}
+        </Button>
+      ) : (
+        <IconButton
+          label={triggerLabel}
+          size="compact"
+          icon={<MoreIcon size={20} />}
+          aria-haspopup="true"
+          aria-expanded={isOpen}
+          onClick={toggle}
+        />
+      )}
       {isOpen && panelPlace ? (
         <div
           role="group"

@@ -9,10 +9,10 @@ test.describe('navigation', () => {
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCount(1);
     if (testInfo.project.name === 'phone') {
       await expect(page.getByRole('link', { name: 'Leads' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'More' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'More', exact: true })).toBeVisible();
     } else {
       await expect(page.getByRole('link', { name: 'Companies' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'More' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'More', exact: true })).toHaveCount(0);
     }
   });
 
@@ -21,7 +21,7 @@ test.describe('navigation', () => {
     await page.goto('/');
     for (const pageEntry of PAGES) {
       if (isPhone && !pageEntry.isInPhoneBar) {
-        await page.getByRole('button', { name: 'More' }).click();
+        await page.getByRole('button', { name: 'More', exact: true }).click();
         await page.getByRole('dialog').getByRole('link', { name: pageEntry.label }).click();
         await expect(page.getByRole('dialog')).toHaveCount(0); // choosing a page closes the sheet
       } else {
@@ -52,7 +52,7 @@ test.describe('navigation', () => {
   }, testInfo) => {
     test.skip(testInfo.project.name !== 'phone', 'The More sheet exists on phones only');
     await page.goto('/');
-    const moreButton = page.getByRole('button', { name: 'More' });
+    const moreButton = page.getByRole('button', { name: 'More', exact: true });
     await moreButton.click();
     await expect(page.getByRole('dialog', { name: 'More pages' })).toBeVisible();
     await page.keyboard.press('Escape');

@@ -13,6 +13,8 @@ export interface LeadRowMenuProps {
   onAssignToMe: () => void;
   onRemoveOwner: () => void;
   onDelete: () => void;
+  /** Draws the menu as a labelled button ("Actions") instead of the "…" icon. */
+  triggerText?: string;
 }
 
 /**
@@ -28,6 +30,7 @@ export function LeadRowMenu({
   onAssignToMe,
   onRemoveOwner,
   onDelete,
+  triggerText,
 }: LeadRowMenuProps) {
   const items: ActionMenuItem[] = stages
     .filter((stage) => stage.id !== lead.stage.id)
@@ -49,6 +52,7 @@ export function LeadRowMenu({
   return (
     <ActionMenu
       triggerLabel={formatMessage('leads.row.more', { name: displayName })}
+      {...(triggerText ? { triggerText } : {})}
       panelLabel={formatMessage('leads.menu.panel', { name: displayName })}
       items={items}
       groupHeadings={{ move: t('leads.menu.moveTo'), owner: t('leads.menu.owner') }}

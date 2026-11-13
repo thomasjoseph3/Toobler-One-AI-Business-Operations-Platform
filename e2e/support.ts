@@ -242,6 +242,25 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           if (path === '/pipeline') return route.fulfill(json(200, PRETEND_PIPELINE));
           pretendApi.leadQueries.push(new URL(request.url()).search);
           const query = new URL(request.url()).searchParams;
+          // The board: a column per stage; the open leads are dealt out to the three open stages, the rest of the stages are empty
+          if (query.get('view') === 'board') {
+            const openLeads = Array.from({ length: Math.min(pretendApi.leadCount, 50 * 3) }, (_unused, index) =>
+              pretendLead(index),
+            );
+            const columns = PRETEND_PIPELINE.stages.map((stage) => {
+              const leadsInStage = openLeads.filter((lead) => lead.stage.id === stage.id);
+              const total = Array.from({ length: pretendApi.leadCount }, (_unused, index) => index).filter(
+                (index) => index % 3 === PRETEND_PIPELINE.stages.findIndex((candidate) => candidate.id === stage.id),
+              ).length;
+              return {
+                stage: { id: stage.id, name: stage.name, kind: stage.kind, sort: stage.sort },
+                leadCount: stage.kind === 'open' ? total : 0,
+                leads: stage.kind === 'open' ? leadsInStage.slice(0, 50) : [],
+                hasMore: stage.kind === 'open' && total > 50,
+              };
+            });
+            return route.fulfill(json(200, { view: 'board', columns }));
+          }
           const pageNumber = Number(query.get('page') ?? '1');
           const limit = Number(query.get('limit') ?? '25');
           const firstIndex = (pageNumber - 1) * limit;

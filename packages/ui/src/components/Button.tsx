@@ -23,6 +23,18 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   link: 'bg-transparent text-link hover:text-link-hover border border-transparent hover:underline underline-offset-2 !h-auto !px-0',
 };
 
+/** The classes of a button of this variant and size, so a link can be drawn exactly like a button (see ButtonLink). */
+export function buttonClasses(
+  variant: ButtonVariant = 'secondary',
+  size: 'standard' | 'touch' | 'compact' = 'standard',
+): string {
+  return joinClassNames(
+    'text-body-md-semibold inline-flex items-center justify-center gap-2 rounded-md px-4',
+    size === 'touch' ? 'h-11' : size === 'compact' ? 'text-body-xs !h-8 !px-3' : 'h-10',
+    VARIANT_CLASSES[variant],
+  );
+}
+
 /** A button with the design system's five variants and its default, hover, focus, pressed, disabled and loading states. */
 export function Button({
   variant = 'secondary',
@@ -41,9 +53,7 @@ export function Button({
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
       className={joinClassNames(
-        'text-body-md-semibold inline-flex items-center justify-center gap-2 rounded-md px-4',
-        size === 'touch' ? 'h-11' : size === 'compact' ? 'text-body-xs !h-8 !px-3' : 'h-10',
-        VARIANT_CLASSES[variant],
+        buttonClasses(variant, size),
         'disabled:cursor-not-allowed disabled:border-border-default disabled:bg-surface-subtle disabled:text-text-disabled',
         className,
       )}

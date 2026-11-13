@@ -1,6 +1,7 @@
 // The public API of the design-system package. Apps import from '@toobler-one/ui' only.
 export { joinClassNames } from './join-class-names';
-export { Button, type ButtonProps, type ButtonVariant } from './components/Button';
+export { Button, buttonClasses, type ButtonProps, type ButtonVariant } from './components/Button';
+export { ButtonLink, type ButtonLinkProps } from './components/ButtonLink';
 export { IconButton, type IconButtonProps } from './components/IconButton';
 export { Card, type CardProps } from './components/Card';
 export { Badge, type BadgeProps, type BadgeTone } from './components/Badge';

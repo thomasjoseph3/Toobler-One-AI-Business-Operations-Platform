@@ -4,12 +4,15 @@
 import type { PipelineStage } from '@toobler-one/shared';
 import { t, type MessageKey } from '../../app/i18n';
 
+/** `list` = the table; `pipeline` = the board with a column per stage. */
+export type LeadsLayout = 'list' | 'pipeline';
 export type LeadsStatus = 'open' | 'closed';
 export type LeadsSort = 'lastActivity' | 'createdAt' | 'callbackAt' | 'stage';
 export type LeadsOrder = 'asc' | 'desc';
 
-/** The whole view of the list. */
+/** The whole view of the leads page. */
 export interface LeadsView {
+  layout: LeadsLayout;
   /** `open` = still in progress; `closed` = won or lost. */
   status: LeadsStatus;
   /** One stage's id, or null for every stage. */
@@ -23,6 +26,7 @@ export interface LeadsView {
 
 /** The view when the page is opened with nothing in the address: open leads, newest activity first, page 1. */
 export const DEFAULT_LEADS_VIEW: LeadsView = {
+  layout: 'list',
   status: 'open',
   stageId: null,
   owner: 'anyone',
@@ -40,6 +44,7 @@ const STAGE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 
 /** Reads the view from the web address. Anything that is missing or not understood falls back to the default, so a bad link never breaks the page. */
 export function readLeadsView(searchParams: URLSearchParams): LeadsView {
+  const layout = searchParams.get('layout') === 'pipeline' ? 'pipeline' : DEFAULT_LEADS_VIEW.layout;
   const status = searchParams.get('status') === 'closed' ? 'closed' : DEFAULT_LEADS_VIEW.status;
   const stageIdText = searchParams.get('stage');
   const stageId = stageIdText !== null && STAGE_ID_PATTERN.test(stageIdText) ? stageIdText : null;
@@ -54,12 +59,13 @@ export function readLeadsView(searchParams: URLSearchParams): LeadsView {
         : DEFAULT_LEADS_VIEW.order;
   const pageNumber = Number(searchParams.get('page'));
   const page = Number.isInteger(pageNumber) && pageNumber >= 1 ? pageNumber : DEFAULT_LEADS_VIEW.page;
-  return { status, stageId, owner, sort, order, page };
+  return { layout, status, stageId, owner, sort, order, page };
 }
 
 /** Writes the view as a web address query. Only what differs from the default is written, so the plain page has a plain address. */
 export function writeLeadsView(view: LeadsView): URLSearchParams {
   const searchParams = new URLSearchParams();
+  if (view.layout !== DEFAULT_LEADS_VIEW.layout) searchParams.set('layout', view.layout);
   if (view.status !== DEFAULT_LEADS_VIEW.status) searchParams.set('status', view.status);
   if (view.stageId !== null) searchParams.set('stage', view.stageId);
   if (view.owner !== DEFAULT_LEADS_VIEW.owner) searchParams.set('owner', view.owner);
@@ -71,6 +77,12 @@ export function writeLeadsView(view: LeadsView): URLSearchParams {
 
 /** The API address for this view (`GET /leads?...`). "Only mine" becomes the signed-in person's id; the API checks it. */
 export function buildLeadsPath(view: LeadsView, signedInUserId: string): string {
+  // The board shows every stage (open, won and lost) with the newest leads of each, so only the owner narrows it
+  if (view.layout === 'pipeline') {
+    const boardQuery = new URLSearchParams({ view: 'board' });
+    if (view.owner === 'me') boardQuery.set('ownerUserId', signedInUserId);
+    return `/leads?${boardQuery.toString()}`;
+  }
   const query = new URLSearchParams({
     status: view.status,
     sort: view.sort,
@@ -85,6 +97,8 @@ export function buildLeadsPath(view: LeadsView, signedInUserId: string): string 
 
 /** How many filters are switched on (shown as a number on the Filter button). Closed leads, one stage and "only mine" each count as one. */
 export function countActiveFilters(view: LeadsView): number {
+  // On the board only the owner filter applies, so the others do not count
+  if (view.layout === 'pipeline') return view.owner !== 'anyone' ? 1 : 0;
   return [view.status !== 'open', view.stageId !== null, view.owner !== 'anyone'].filter(Boolean).length;
 }
 

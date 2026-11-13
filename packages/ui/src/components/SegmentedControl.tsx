@@ -17,7 +17,7 @@ export interface SegmentedControlProps<Value extends string> {
   ariaLabel: string;
 }
 
-/** A small switch between a few views (Figma "List | Split view"): the chosen one sits on a white tile. */
+/** A small switch between a few views (Figma "List | Pipeline"): the chosen one sits on a white tile. */
 export function SegmentedControl<Value extends string>({
   options,
   value,

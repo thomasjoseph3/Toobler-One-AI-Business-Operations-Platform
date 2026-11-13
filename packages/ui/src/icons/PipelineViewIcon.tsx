@@ -1,7 +1,7 @@
 import { Icon, type IconProps } from './Icon';
 
-/** Window with three bars (Toolbar: Split view). Drawn exactly as in the Figma frame; the colour comes from the surrounding text colour. */
-export function SplitViewIcon(props: IconProps) {
+/** Window with three bars of different heights (Toolbar: Pipeline view). Drawn exactly as in the Figma frame; the colour comes from the surrounding text colour. */
+export function PipelineViewIcon(props: IconProps) {
   return (
     <Icon viewBox="0 0 11 11" defaultWidth={11} defaultHeight={11} {...props}>
       <path

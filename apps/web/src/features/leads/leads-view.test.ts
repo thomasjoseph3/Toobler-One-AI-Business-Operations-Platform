@@ -23,6 +23,7 @@ describe('readLeadsView', () => {
       new URLSearchParams(`status=closed&stage=${QUOTED_ID}&owner=me&sort=callbackAt&order=asc&page=3`),
     );
     expect(view).toEqual({
+      layout: 'list',
       status: 'closed',
       stageId: QUOTED_ID,
       owner: 'me',
@@ -56,6 +57,29 @@ describe('writeLeadsView', () => {
     const written = writeLeadsView(view);
     expect(written.get('order')).toBeNull();
     expect(readLeadsView(written)).toEqual(view);
+  });
+});
+
+describe('the pipeline layout', () => {
+  it('is read from and written to the address, and the plain list writes nothing', () => {
+    const view = readLeadsView(new URLSearchParams('layout=pipeline&owner=me'));
+    expect(view.layout).toBe('pipeline');
+    expect(writeLeadsView(view).toString()).toBe('layout=pipeline&owner=me');
+    expect(readLeadsView(new URLSearchParams('layout=carousel')).layout).toBe('list');
+  });
+  it('asks the API for the board, narrowed only by the owner', () => {
+    expect(buildLeadsPath({ ...DEFAULT_LEADS_VIEW, layout: 'pipeline' }, 'me-id')).toBe('/leads?view=board');
+    const mine = buildLeadsPath(
+      { ...DEFAULT_LEADS_VIEW, layout: 'pipeline', owner: 'me', status: 'closed', stageId: QUOTED_ID, page: 3 },
+      'me-id',
+    );
+    expect(mine).toBe('/leads?view=board&ownerUserId=me-id');
+  });
+  it('counts only the owner as a filter on the board', () => {
+    expect(
+      countActiveFilters({ ...DEFAULT_LEADS_VIEW, layout: 'pipeline', status: 'closed', stageId: QUOTED_ID }),
+    ).toBe(0);
+    expect(countActiveFilters({ ...DEFAULT_LEADS_VIEW, layout: 'pipeline', owner: 'me' })).toBe(1);
   });
 });
 

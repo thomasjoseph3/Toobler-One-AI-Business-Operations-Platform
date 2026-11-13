@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import type { PipelineStage } from '@toobler-one/shared';
 import {
   Button,
@@ -7,11 +6,11 @@ import {
   ImportIcon,
   ListViewIcon,
   Popover,
+  PipelineViewIcon,
   PlusIcon,
   SegmentedControl,
   SelectField,
   SortIcon,
-  SplitViewIcon,
 } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import {
@@ -46,29 +45,35 @@ export interface LeadsToolbarProps {
 function FilterPanel({ view, stages, onChangeView }: Pick<LeadsToolbarProps, 'view' | 'stages' | 'onChangeView'>) {
   const stageChoices = findStageChoices(stages, view.status);
   const filtersAreOn = countActiveFilters(view) > 0;
+  // The board always shows every stage, open and closed, so only the owner can narrow it
+  const isBoard = view.layout === 'pipeline';
   return (
     <>
-      <SelectField
-        label={t('leads.filter.status')}
-        value={view.status}
-        options={[
-          { value: 'open', label: t('leads.filter.status.open') },
-          { value: 'closed', label: t('leads.filter.status.closed') },
-        ]}
-        // The stage the person had picked may not belong to the other status, so it is cleared
-        onChange={(event) =>
-          onChangeView({ status: event.target.value === 'closed' ? 'closed' : 'open', stageId: null })
-        }
-      />
-      <SelectField
-        label={t('leads.filter.stage')}
-        value={view.stageId ?? ''}
-        options={[
-          { value: '', label: t('leads.filter.stage.any') },
-          ...stageChoices.map((stage) => ({ value: stage.id, label: stage.name })),
-        ]}
-        onChange={(event) => onChangeView({ stageId: event.target.value === '' ? null : event.target.value })}
-      />
+      {isBoard ? null : (
+        <>
+          <SelectField
+            label={t('leads.filter.status')}
+            value={view.status}
+            options={[
+              { value: 'open', label: t('leads.filter.status.open') },
+              { value: 'closed', label: t('leads.filter.status.closed') },
+            ]}
+            // The stage the person had picked may not belong to the other status, so it is cleared
+            onChange={(event) =>
+              onChangeView({ status: event.target.value === 'closed' ? 'closed' : 'open', stageId: null })
+            }
+          />
+          <SelectField
+            label={t('leads.filter.stage')}
+            value={view.stageId ?? ''}
+            options={[
+              { value: '', label: t('leads.filter.stage.any') },
+              ...stageChoices.map((stage) => ({ value: stage.id, label: stage.name })),
+            ]}
+            onChange={(event) => onChangeView({ stageId: event.target.value === '' ? null : event.target.value })}
+          />
+        </>
+      )}
       <SelectField
         label={t('leads.filter.owner')}
         value={view.owner}
@@ -123,12 +128,11 @@ function SortPanel({ view, onChangeView }: Pick<LeadsToolbarProps, 'view' | 'onC
 }
 
 /**
- * The row of controls above the leads (Figma toolbar): Filter, Sort and the List / Split view switch on the left; Import,
- * Export and Create lead on the right. Filter, Sort and Create lead work. The rest are drawn exactly as designed and do nothing
- * yet: Import and Export wait for F12, and Split view has no description yet.
+ * The row of controls above the leads (Figma toolbar): Filter, Sort and the List / Pipeline switch on the left; Import,
+ * Export and Create lead on the right. Everything works except Import and Export, which are drawn as designed and wait for F12.
+ * On the Pipeline board the API cannot sort and only the owner filter applies, so Sort is switched off there (the Figma still shows it).
  */
 export function LeadsToolbar({ view, stages, onChangeView, onCreateLead }: LeadsToolbarProps) {
-  const [chosenView, setChosenView] = useState<'list' | 'split'>('list');
   const activeFilterCount = countActiveFilters(view);
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -158,34 +162,40 @@ export function LeadsToolbar({ view, stages, onChangeView, onCreateLead }: Leads
         >
           <FilterPanel view={view} stages={stages} onChangeView={onChangeView} />
         </Popover>
-        <Popover
-          panelLabel={t('leads.sort.title')}
-          renderTrigger={({ isOpen, toggle }) => (
-            <Button
-              size="compact"
-              leadingIcon={<SortIcon size={15} />}
-              aria-haspopup="dialog"
-              aria-expanded={isOpen}
-              onClick={toggle}
-            >
-              {t('leads.toolbar.sort')}
-            </Button>
-          )}
-        >
-          <SortPanel view={view} onChangeView={onChangeView} />
-        </Popover>
+        {view.layout === 'pipeline' ? (
+          <Button
+            size="compact"
+            leadingIcon={<SortIcon size={15} />}
+            {...notWorkingYet}
+            title={t('leads.toolbar.sortListOnly')}
+          >
+            {t('leads.toolbar.sort')}
+          </Button>
+        ) : (
+          <Popover
+            panelLabel={t('leads.sort.title')}
+            renderTrigger={({ isOpen, toggle }) => (
+              <Button
+                size="compact"
+                leadingIcon={<SortIcon size={15} />}
+                aria-haspopup="dialog"
+                aria-expanded={isOpen}
+                onClick={toggle}
+              >
+                {t('leads.toolbar.sort')}
+              </Button>
+            )}
+          >
+            <SortPanel view={view} onChangeView={onChangeView} />
+          </Popover>
+        )}
         <SegmentedControl
           ariaLabel={t('leads.toolbar.viewLabel')}
-          value={chosenView}
-          onChange={setChosenView}
+          value={view.layout}
+          onChange={(layout) => onChangeView({ layout })}
           options={[
             { value: 'list', label: t('leads.toolbar.list'), icon: <ListViewIcon size={12} /> },
-            {
-              value: 'split',
-              label: t('leads.toolbar.splitView'),
-              icon: <SplitViewIcon size={11} />,
-              isAvailable: false,
-            },
+            { value: 'pipeline', label: t('leads.toolbar.pipeline'), icon: <PipelineViewIcon size={11} /> },
           ]}
         />
       </div>
