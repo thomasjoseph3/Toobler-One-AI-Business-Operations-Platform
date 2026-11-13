@@ -229,19 +229,36 @@ export async function findLeadById(
   return row ? toLeadRow(row) : undefined;
 }
 
-/** One page of leads, newest activity first, and how many leads match in all. */
+/** What a list can be ordered by, and which way. */
+export interface LeadSorting {
+  sort: 'lastActivity' | 'createdAt' | 'callbackAt' | 'stage';
+  order: 'asc' | 'desc';
+}
+
+/** The order a board column uses: newest activity first. */
+const NEWEST_ACTIVITY_FIRST: LeadSorting = { sort: 'lastActivity', order: 'desc' };
+
+/**
+ * One page of leads in the given order (newest activity first when none is given), and how many leads match in all.
+ * The lead's id is always the last tie-breaker, so the order is the same on every page.
+ */
 export async function listLeadRows(
   db: Db,
   filters: LeadFilters,
   paging: { limit: number; offset: number },
+  sorting: LeadSorting = NEWEST_ACTIVITY_FIRST,
 ): Promise<{ rows: LeadRow[]; total: number }> {
-  const rows = await selectLeadRows(db, filters)
-    .select(LEAD_COLUMNS)
-    .orderBy('lead.last_activity_at', 'desc')
-    .orderBy('lead.id', 'desc')
-    .limit(paging.limit)
-    .offset(paging.offset)
-    .execute();
+  let query = selectLeadRows(db, filters).select(LEAD_COLUMNS);
+  if (sorting.sort === 'lastActivity') query = query.orderBy('lead.last_activity_at', sorting.order);
+  if (sorting.sort === 'createdAt') query = query.orderBy('lead.created_at', sorting.order);
+  // Leads with no callback date always come last, whichever way the dates are ordered
+  if (sorting.sort === 'callbackAt') {
+    const callbackOrder =
+      sorting.order === 'asc' ? sql`lead.callback_at asc nulls last` : sql`lead.callback_at desc nulls last`;
+    query = query.orderBy(callbackOrder);
+  }
+  if (sorting.sort === 'stage') query = query.orderBy('stage.sort', sorting.order);
+  const rows = await query.orderBy('lead.id', sorting.order).limit(paging.limit).offset(paging.offset).execute();
   const countRow = await selectLeadRows(db, filters)
     .select((expression) => expression.fn.countAll<string>().as('total'))
     .executeTakeFirstOrThrow();

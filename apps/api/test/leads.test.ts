@@ -362,6 +362,48 @@ describe('GET /api/v1/leads (list)', () => {
     expect(firstPage.items.map((lead: { id: string }) => lead.id)).not.toContain(secondPage.items[0].id);
   });
 
+  it('orders by when the lead was added, the next callback, or the stage, either way, and the same on every page', async () => {
+    const person = await createSignedInPerson(app, database);
+    const first = (
+      await addLead(person, { contactId: await addContact(person), callbackAt: '2026-12-02T10:00:00Z' })
+    ).json();
+    const second = (await addLead(person, { contactId: await addContact(person) })).json(); // no callback date
+    const third = (
+      await addLead(person, { contactId: await addContact(person), callbackAt: '2026-12-01T10:00:00Z' })
+    ).json();
+    await database.system
+      .updateTable('leads')
+      .set({ created_at: new Date('2026-01-01T00:00:00Z') })
+      .where('id', '=', first.id)
+      .execute();
+    await database.system
+      .updateTable('leads')
+      .set({ created_at: new Date('2026-01-02T00:00:00Z') })
+      .where('id', '=', second.id)
+      .execute();
+    await database.system
+      .updateTable('leads')
+      .set({ created_at: new Date('2026-01-03T00:00:00Z') })
+      .where('id', '=', third.id)
+      .execute();
+    await send(person, 'POST', `/leads/${third.id}/move`, { stageId: await stageIdNamed(person, 'Contacted') });
+
+    const ids = async (query: string) =>
+      (await listLeads(person, query)).json().items.map((lead: { id: string }) => lead.id);
+    expect(await ids('sort=createdAt&order=asc')).toEqual([first.id, second.id, third.id]);
+    expect(await ids('sort=createdAt')).toEqual([third.id, second.id, first.id]);
+    // Soonest callback first; the lead with no callback date is last either way round
+    expect(await ids('sort=callbackAt&order=asc')).toEqual([third.id, first.id, second.id]);
+    expect(await ids('sort=callbackAt&order=desc')).toEqual([first.id, third.id, second.id]);
+    // New comes before Contacted in the pipeline
+    expect((await ids('sort=stage&order=asc'))[2]).toBe(third.id);
+    expect((await ids('sort=stage&order=desc'))[0]).toBe(third.id);
+    // Paging keeps one order: two pages of one lead each show different leads
+    const pageOne = await ids('sort=createdAt&order=asc&limit=1&page=1');
+    const pageTwo = await ids('sort=createdAt&order=asc&limit=1&page=2');
+    expect([...pageOne, ...pageTwo]).toEqual([first.id, second.id]);
+  });
+
   it('filters by stage, owner, contact and open or closed', async () => {
     const person = await createSignedInPerson(app, database);
     const openContactId = await addContact(person);
@@ -421,6 +463,8 @@ describe('GET /api/v1/leads (list)', () => {
       'stageId=abc',
       'status=maybe',
       'ownerUserId=abc',
+      'sort=name',
+      'order=sideways',
     ]) {
       expect((await listLeads(person, query)).statusCode, query).toBe(400);
     }

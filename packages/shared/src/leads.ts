@@ -88,7 +88,7 @@ export const createLeadRequestSchema = z
   });
 export type CreateLeadRequest = z.infer<typeof createLeadRequestSchema>;
 
-/** The list or the board, with filters. The board shows every stage and ignores `stageId`, `status`, `page` and `limit`. */
+/** The list or the board, with filters. The board shows every stage and ignores `stageId`, `status`, `sort`, `order`, `page` and `limit`. */
 export const listLeadsQuerySchema = z.object({
   view: z.enum(['list', 'board']).default('list'),
   stageId: z.uuid().optional(),
@@ -97,6 +97,14 @@ export const listLeadsQuerySchema = z.object({
   offeringId: z.uuid().optional(),
   /** `open` = still in progress; `closed` = won or lost. */
   status: z.enum(['open', 'closed']).optional(),
+  /**
+   * What the list is ordered by (the board ignores it): newest activity (the default), when the lead was added, the
+   * next callback (leads without one always come last), or the stage's place in the pipeline. Ordering by the person's
+   * name, email or phone is not offered: those belong to the contacts module.
+   */
+  sort: z.enum(['lastActivity', 'createdAt', 'callbackAt', 'stage']).default('lastActivity'),
+  /** `desc` = largest or newest first (the default); `asc` = smallest or oldest first. */
+  order: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 });
