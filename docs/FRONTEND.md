@@ -2,10 +2,10 @@
 
 For `apps/web` (staff app), `apps/site` (the free check and public pages) and the chat widget. Product behaviour comes
 from [SCREENS.md](../requirements/phase-1-lead-engine/SCREENS.md). **Visual design comes from the designer's
-[Toobler One Design System v1.0](design/TooblerOne_Design_System_v1.0.md), which is the authority**: colours,
+[Toobler One Design System v1.3](design/TooblerOne-Design-System-v1.3.md), which is the authority** (replaced v1.0 on 13 Nov 2026; the v1.0 file stays in `docs/design/` for history). The Figma frame it was shown on is saved as [screens/leads-list-desktop.png](design/screens/leads-list-desktop.png). It covers colours,
 type, spacing, radius, components, motion, accessibility. This page does not repeat its values; it says how we apply
-it in code and what we add where it is silent. Do not edit the v1.0 copy: changes go to the designer and come back as
-a new version (their governance rule, section 9).
+it in code and what we add where it is silent. Do not edit the design-system copy: changes go to the designer and come back as
+a new version.
 
 Shared tokens and components live in `packages/ui` (`@toobler-one/ui`) so every app looks like one product.
 
@@ -30,24 +30,26 @@ real content) plus our product checks from SCREENS.md:
 
 ## 2. Using the design system in code
 
-**Tokens.** `packages/ui/src/tokens.css` implements the designer's section 8 CSS variables exactly
-(`--color-canvas`, `--color-surface`, `--color-text-primary`, `--color-action`, `--spacing-4`, `--rounded-lg`, …) and
-adds the rest of the designer's tables (neutral and emerald scales, feedback colours, shadows) under the same naming.
+**Tokens.** `packages/ui/src/tokens.css` implements the designer's v1.3 section 2 to 6 values exactly, named after its section 10
+(`--color-canvas`, `--color-surface`, `--color-text-primary`, `--color-border-default`, `--color-sidebar-item-active-bg`,
+`--spacing-4`, `--rounded-lg`, …): neutrals, light and dark semantic colours, card-header tints, status, chart, spacing,
+radius and shadow. Not in v1.3 and added by us as proposals (section 5): `action*`, `tag-stage-*`, `scrim`, `tooltip`.
 
 - **Dark mode redefines the same variables**, not separate `dark-` names. The designer's `dark-color-*` values go under
   `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { … } }` and `:root[data-theme="dark"] { … }`.
   A switch in the profile menu sets `data-theme`; the default follows the system.
 - **Tailwind 4 `@theme` references the variables** (`--color-canvas: var(--color-canvas)` style), never raw hex. So
-  `bg-surface`, `text-text-secondary`, `border-border` and the spacing/radius utilities all come from one place.
+  `bg-surface`, `text-text-secondary`, `border-border-default` and the spacing/radius utilities all come from one place.
 - **No one-off colours, spacing, radii or type styles in components.** An exception is documented in the component and
   listed in [REQUIREMENTS-REVIEW.md](REQUIREMENTS-REVIEW.md) for the designer.
 
-**Type.** Manrope (headings, buttons) and Inter (everything else), self-hosted by the Vite build (font files come from npm packages, so there is no call to Google Fonts and the content security policy stays `'self'`). The designer's named
-styles (`text-2xl-page-title`, `text-sm-body`, `text-xs-label`, …) become utility classes in `packages/ui`; use those,
-not raw sizes. Numbers, currency, dates and reference IDs use `tabular-nums`.
+**Type.** Plus Jakarta Sans (headings) and Inter (everything else, buttons included), self-hosted by the Vite build (font files come from npm packages, so there is no call to Google Fonts and the content security policy stays `'self'`). The designer's named
+styles (`text-heading-2xl`, `text-body-md`, `text-body-sm-medium`, `text-label-xs-semibold`, …, v1.3 section 3) are
+utility classes in `packages/ui/src/styles.css`; use those, not raw sizes. (`text-label-xs-caps` is ours: v1.3 allows
+capitals for short group labels.) Numbers, currency, dates and reference IDs use `tabular-nums`.
 
-**Indian scripts.** The app's own text is English only. Manrope and Inter have no Malayalam or Devanagari glyphs, but customer names, messages and call transcripts can contain them. Both font stacks therefore end with `"Noto Sans Malayalam", "Noto Sans Devanagari"` (also via
-self-hosted the same way, subsetted), then the system font. The 11 px styles are never used for text that can be in those scripts.
+**Indian scripts.** The app's own text is English only. Plus Jakarta Sans and Inter have no Malayalam or Devanagari glyphs, but customer names, messages and call transcripts can contain them. Both font stacks therefore end with `"Noto Sans Malayalam", "Noto Sans Devanagari"` (also via
+self-hosted the same way, subsetted), then the system font. The 11 px styles (`text-label-xs*`) are never used for text that can be in those scripts.
 
 **Icons.** One outline family: Lucide (stroke 1.75–2, sizes 16 / 20 / 24). Icon-only buttons have an accessible name.
 
@@ -79,11 +81,15 @@ Destructive means the error outline or tint, and always sits inside `ConfirmDial
 
 | Component | Notes |
 | --- | --- |
-| `AppShell`, `SideNav`, `BottomBar`, `TopBar`, `BusinessSwitcher`, `GlobalSearch` | Selected nav item: `color-action-subtle` with emerald icon and text. Badges only for actionable counts. Search opens a full-screen sheet on a phone. |
-| `PageHeader`, `Card`, `Section`, `Tabs`, `FilterChips`, `ViewTabs` | Page structure; no nested cards |
+| `AppShell`, `SideNav`, `BottomBar`, `TopBar`, `BusinessSwitcher`, `GlobalSearch` | Dark sidebar: active item changes text, icon and row (`sidebar-item-active`, `sidebar-item-active-bg`). Badges only for actionable counts. Search opens a full-screen sheet on a phone. |
+| `ActionMenu`, `Dialog`, `ConfirmDialog` | **Built (13 Nov 2026), ours (not in the Figma frame):** `ActionMenu` is the "…" button that opens a short list of actions under it (grouped, with headings; closes on Escape, an outside press, or after a choice); `Dialog` is a centred box over a dimmed page (16 px corners, native `<dialog>`); `ConfirmDialog` is the "Are you sure?" every delete goes through: it names the thing, says what will happen, and the danger button repeats the verb. To be reviewed by the designer. |
+| `SidePanel`, `TextAreaField`, `Alert` | **Built (13 Nov 2026), ours (not in the Figma frame):** `SidePanel` is a native `<dialog>` that slides in from the right (480 px) on a desktop and fills the screen on a phone, with a labelled title, a footer for the buttons, a focus trap, Escape to close and focus returned to the button that opened it (v1.3 dialog rules; the radius follows the 16 px dialog rule). `Alert` is an icon plus words, never colour alone (error announced at once, success politely); its icons are Lucide because the frame has none. To be reviewed by the designer. |
+| `SelectField`, `Popover`, `SegmentedControl` | **Built (13 Nov 2026), ours (the Figma frame draws only the buttons, not their panels):** `SelectField` is a labelled native `<select>` (keyboard, phone picker and screen readers all work); `Popover` is a non-modal panel under a button that closes on Escape or an outside press (used by Filter and Sort); `SegmentedControl` is the List / Split view switch. Filter and Sort choices live in the web address. To be reviewed by the designer. |
+| `Table` (with `TableHead`, `TableBody`, `TableRow`, `TableHeaderCell`, `TableCell`), `Pagination`, `Checkbox`, `Tag` | **Built (13 Nov 2026)** from the Figma Leads list: 48 px rows, 13 px text, selected row has a background as well as the tick, the table scrolls sideways inside its box, the footer has the summary and Previous / Next. On a phone a screen shows stacked cards instead of the table (see `features/leads/`). |
+| `Card`, `Section`, `Tabs`, `FilterChips`, `ViewTabs` | Page structure; no nested cards. The page title is the **top bar's h1** (as in the Figma frame); a screen has no title of its own, only its toolbar (Filter, Sort, view switch, Import, Export, the main action). `PageHeader` was removed on 13 Nov 2026. |
 | `DataList` | One component: table on desktop and tablet, stacked records on phone; chosen columns, sorting, sticky header |
 | `LeadCard` | Name, interest, dates, temperature, owner, time since last activity; draggable on the board; **Move** button on a phone |
-| `TemperatureTag`, `TypeChip`, `ChannelIcon`, `AiBadge`, `ActorLabel`, `StageBadge`, `AiUnsureChip`, `StatusBadge` | Tinted pill, readable foreground, icon + visible text; never colour alone |
+| `TemperatureTag`, `TypeChip`, `ChannelIcon`, `AiBadge`, `ActorLabel`, `Tag` (lead-stage pill, built), `StageBadge`, `AiUnsureChip`, `StatusBadge` | Tinted pill, readable foreground, icon + visible text; never colour alone |
 | `TimelineItem` | Icon, actor, when (relative, exact on hover/tap), summary; calls open recording and transcript |
 | `CallButton`, `WhatsAppButton`, `EmailButton` | Open the dialler, WhatsApp or mail app |
 | `ConfirmDialog` | Names the item, states the consequence, the danger button repeats the verb |
@@ -103,32 +109,48 @@ these **reuse existing tokens** only. The owner decided (9 Nov 2026) to keep the
 | Need | Proposal (existing tokens only) | Why / open point |
 | --- | --- | --- |
 | **Hot / warm / cold** | Hot = Error family + flame icon; Warm = Warning family + sun icon; Cold = Information family + snowflake icon; each with its word | Red for "hot" also reads as "error". Designer to confirm or give another pairing. |
-| **Lead stages** | Open stages: neutral pill with the stage's own name (businesses rename and add stages, so no colour per stage). Won = Success. Lost = neutral with a cross icon (not an error). | |
+| **Lead stages** | `Tag` with the stage's own name exactly as the API sends it. Businesses rename and add stages, so the colour is chosen by the stage's `kind` (open, won, lost) and position, never by its name. The six Figma tones are `new`, `contacted`, `qualified`, `rate-sent`, `won`, `lost`. | Which tone each stage gets is decided with the owner when the Leads screen is built. |
 | **Task due state** | Overdue = Error, due today = Warning, upcoming = neutral, done = Success | |
 | **Ticket** | Open = Warning, Done = Success; high priority adds an Error "High" badge | |
 | **Conversation flags** | Needs a person = Warning with an alert icon; AI unsure = Information with a question icon | |
 | **AI actor** | Sparkle icon + "AI agent" text on a neutral-muted pill; AI messages in a chat sit on `color-surface-muted`; people get an initials avatar | The design system has no actor colour; violet is dropped. |
-| **Channel** | Icon + word, neutral colour for all four channels | WhatsApp green would clash with "emerald = primary action". |
-| **Chart series** | Emerald-700 primary, emerald-300 comparison (designer). More than two categories: emerald-700 / emerald-300 / neutral-500 / neutral-300, and Information, Warning, Error only where the category truly means that | "Leads by channel" has four categories and "by conversation type" more; the designer must supply a categorical palette. |
+| **Channel** | Icon + word, neutral colour for all four channels | The design system gives channels no colours. |
+| **Chart series** | The four v1.3 series (`chart-series-1` to `-4`) with direct labels or markers. More than four categories: ask the designer. | "Leads by channel" and "by conversation type" may need more than four. |
 | **Operational states** | The designer's Occupied, Needs cleaning, Booked, Out of service and Do not disturb are hotel housekeeping states. **Not used in Phase 1**; Phase 2 booking states may adopt them. | |
 | **Money** | Full Indian grouping everywhere (₹1,20,000); no ₹1.2L form | The design system allows either "consistently"; a CRM is read for exact figures. |
 | **Dates and time** | `20 Dec 2026`, range `12–15 Dec 2026`; times in the business's time zone with the zone shown when staff are in several | |
 
-## 5. Contrast findings on the designer's v1.0 values
+**Figma updates read on 13 Nov 2026** (file page "UI - in progress"): the Leads frame was refreshed, and two frames were added: **Leads - Sidebar Minimised** (the icon-only sidebar: about 68 px wide, a separate "1" logo mark with the collapse button under it, thin divider lines between the groups, a highlighted square for the active page, Settings and the person's square avatar at the bottom) and **Leads Pipeline - Sidebar Minimised** (the board). "Split view" became **Pipeline** and is built (docs/features/F06, UI 8). Still no frames for the lead page, create-lead form, tickets or contacts: those are designed by us. **Built:** the collapsed sidebar (68 px, icon-only, the "1" mark with the expand button under it, thin lines between the groups, the active page in a lighter square, Settings and the person's square avatar at the bottom) shows on a tablet and after collapsing the full one on a desktop. Its account menu opens beside the sidebar (fixed to the window, so the sidebar's own scroll box cannot cut it off), and the collapsed account button has an accessible name.
 
-Computed with WCAG 2.2 formulas (9 Nov 2026). **Decision (owner): the designer's values are used unchanged.** The F00 contrast test asserts every token pair we use and keeps this table as its explicit known-exceptions list: a new failing pair fails the build, these five do not. We do not darken colours ourselves. Where practical we avoid them: timestamps use `color-text-secondary` at 12 px and above when they matter, and the dark primary button follows the designer's spec.
+**The app shell (built 13 Nov 2026 from the Figma Leads frame).** Sidebar 256 px (72 px compact on tablet, or when the person collapses it): logo and collapse button, groups Workspace (Today, Reports), CRM (Leads, Contacts, Companies, Inbox, Tasks, Tickets) and AI & communication (Knowledge base, Channels), then Settings and the signed-in person's card with a menu (Sign out). Top bar 64 px: page title, search, theme button, notifications. Things to know:
+- The group names and which page sits in which group are ours (the Figma shows Activities, Follow-ups, Shared Inbox, AI Agent, Phone and WhatsApp entries that are not pages yet). A page appears only when its module exists.
+- Search and notifications are drawn as designed but **switched off** until their features exist (search with views and filters, F11; notifications with staff alerts, F23).
+- The count badges next to Leads, Tasks and Inbox in the Figma need data from the API, so they are not shown yet.
+- The card under the person's name shows the business name, not a job title (the API only gives the three roles, and we do not rename backend words).
+- The theme button shows the designer's moon in light mode, a sun in dark mode and a monitor for System (the Figma has only the moon).
+- On a phone there is no sidebar: the top bar shows the title, the theme button and a round account button.
+
+## 5. v1.3 findings and open questions for the designer
+
+Computed with WCAG 2.2 formulas (13 Nov 2026). **Decision (owner, 9 Nov 2026): the designer's values are used unchanged.** The token test (`packages/ui/src/tokens.test.ts`) checks every text, sidebar, link, focus, control, status and tag pair we use in both themes (97 checks) and keeps an explicit known-exceptions list: a new failing pair fails the build.
+
+**Known exception (from the designer's own rules).**
 
 | Pair | Ratio | Need | Where it matters |
 | --- | ---: | ---: | --- |
-| `color-text-muted` #7C837F on canvas / white / muted surface | 3.58 / 3.88 / 3.52 | 4.5 | Timestamps and metadata at 12–13 px |
-| Dark theme: white text on `color-action` #43A77A | 2.98 | 4.5 | Primary buttons in dark mode (dark text on it is 5.91) |
-| `color-action` #078453 on `color-action-subtle` | 4.19 | 4.5 | Selected navigation item text at 13 px |
-| Dark theme: `color-action` #43A77A on `color-action-subtle` #263D32 | 3.92 | 4.5 | Selected navigation item text (found by the token test on 10 Nov 2026; same cause as the light-theme row above) |
-| `color-focus-ring` #58A987 on white | 2.82 | 3.0 | Keyboard focus indicator |
-| `color-text-disabled` on white | 2.37 | exempt | Disabled controls (WCAG exempts them) |
+| `border-default` on `input`, light / dark | 1.49 / 1.52 | 3.0 | v1.3 section 8 says inputs use the default border, and section 6 says a boundary that identifies a control needs 3:1. Both cannot hold. We follow the table (default border, `border-emphasis` on hover); the checkbox uses `border-emphasis` (3.3:1). |
 
-All other pairs checked pass (body and secondary text, white on `color-action` 4.74, all four feedback families in
-both themes, dark muted text 4.98–5.60).
+Every other pair passes, including all section 9 pairs and the card-header tints.
+
+**Questions for the designer (we built from the Figma frame where it answers them, and mark the rest as provisional):**
+
+1. **Primary button colour.** v1.3 section 8 gives none. We use the sidebar colour `#161715` (as in the Figma "Create Lead" button), hover `#2A2B28`, pressed `#3F3F3D`, label `#FCFCFC`; in dark: fill `#F2F2F0` with `#212121` label. Please confirm and define loading and disabled.
+2. **Lead-stage tags.** The Figma has `tag/stage/*` backgrounds (new `#D6EBFF`, contacted `#E8F2FC`, qualified `#E8F5ED`, rate sent `#FFF5E0`, won `#E5F5EB`, lost `#FCEBEB`) that are not in v1.3. Their text is `link/hover` (new, won, lost) or `text/secondary` (the rest). **Dark values are ours** (taken from the dark status backgrounds): please supply them.
+3. **Sizes not given:** checkbox (Figma 16 px with a 6 px radius, which is not on the radius scale; we use `rounded-sm`), segmented switch (List / Split view), pagination, dialogs, tabs, toasts, stepper, avatar.
+4. **Charts:** only four series; more categories are needed for "by channel" and "by conversation type".
+5. **Overlays:** `scrim` and `tooltip` colours (ours: `rgba(22,23,21,0.48)` and the sidebar colour).
+6. **Logo:** the Figma shows a "1One" logo image; we show the text "Toobler One" until the asset is supplied.
+7. **The "…" (more) icon blurs.** The Figma draws each dot as a tiny outlined ring at fractional positions (for example y = 10.4167), which smears on a normal-density screen. We use three filled dots on whole pixels (same size and place) in `MoreIcon`. Please supply a crisp version; the other icons are drawn exactly as delivered.
 
 ## 6. Writing on screen
 
@@ -149,10 +171,12 @@ Malayalam, Hindi and English without clipping or fixed widths.
 - **Single-page app.** `apps/web` is React + Vite. In development Vite proxies `/api` to the API; in production a reverse
   proxy serves the app and `/api` from one address, so the browser sees one origin.
 - **Sign-in cookies.** The API sets a short-lived access token and a refresh token in **httpOnly, Secure, SameSite=Lax**
-  cookies. Tokens never reach browser JavaScript, `localStorage` or a URL. When a request answers `TOKEN_EXPIRED`, the
-  API client in `lib/api.ts` calls `/auth/refresh` once and repeats the request; if that fails it signs the person out. State-changing requests are checked for a matching `Origin` and a CSRF
+  cookies. Tokens never reach browser JavaScript, `localStorage` or a URL. When a request answers 401 (the access token has
+  run out), the API client in `src/api/client.ts` calls `/auth/refresh` once (several failing requests share one refresh)
+  and repeats the request; if that fails it tells the app the session ended and the person lands on the sign-in page. The
+  `/auth/` routes are never refreshed-and-repeated. State-changing requests are checked for a matching `Origin` and a CSRF
   header (docs/SECURITY.md 2.2).
-- **Data.** A small typed client in `lib/api.ts` (schemas from `packages/shared`). Each page loads through a hook with
+- **Data.** A small typed client in `src/api/client.ts` (schemas from `packages/shared`). Each page loads through a hook with
   loading, empty and error states; forms show field errors from `error.details`.
 - **Live**: a hook subscribes to `GET /api/v1/events` (server-sent events) and refetches the affected list, debounced.
 - **Optimistic UI** only where it matters (board moves, ticking a task), with rollback and a toast on failure.
@@ -187,7 +211,10 @@ choice fails contrast).
 
 ## 10. Front-end tests
 
-- Playwright runs every click-through test at **phone (Pixel 7) and desktop** sizes.
+- Playwright runs every click-through test at **phone (Pixel 7) and desktop** sizes. By default it answers `/api/v1` itself
+  with a pretend API (`e2e/support.ts`, the `pretendApi` fixture: signed in unless a test says otherwise), so these tests need no
+  database. Browser "Failed to load resource" lines are ignored in the console check, because tests refuse calls on purpose.
+- Who is signed in lives in `src/auth/session.tsx`; `RequireSignIn` guards every page except the ones in `AuthLayout`.
 - A unit test checks every token pair we use for contrast in light and dark (see §5).
 - Each feature's manual test script includes a phone check; screenshots are taken with the browser tools at hand-off.
 - Visual checks per feature: light and dark, empty, loading and error states, a 60-character name, a Malayalam name.

@@ -126,7 +126,7 @@ agent (F19) will save every enquiry into.
 | DELETE | `/pipeline/stages/{id}?move_to=` | Manager | Remove an open stage, moving its leads (409 `STAGE_HAS_LEADS` without `move_to`; never Won, Lost or the last open stage) |
 | GET, PUT | `/lost-reasons` | Staff read, manager replace | The list the Lost dialog offers (1 to 20 reasons, no repeats ignoring capitals) |
 | POST | `/leads` | Staff | Add a lead by hand (409 `LEAD_OPEN` if the contact has an open lead; 409 `LEAD_RECENTLY_LOST` if one was lost under 60 days ago) |
-| GET | `/leads` | Staff | List, or `?view=board` for the board; filter by stage, owner, contact, open/closed |
+| GET | `/leads` | Staff | List, or `?view=board` for the board; filter by stage, owner, contact, open/closed; list order with `sort` (`lastActivity` default, `createdAt`, `callbackAt`, `stage`) and `order` (`desc` default, `asc`) |
 | GET | `/leads/{id}` | Staff | One lead with its contact and stage |
 | PATCH | `/leads/{id}` | Staff | Edit the details (not the stage or owner) |
 | POST | `/leads/{id}/move` | Staff | Move to a stage (Lost needs `lostReason`) |
@@ -150,9 +150,38 @@ agent (F19) will save every enquiry into.
 | Journey | chained story test (`leads-journeys.test.ts`) | done |
 | Review | security review with the `api-security` skill; `staff_own` added | done |
 | Approval | owner approved the backend, 12 Nov 2026 (R37 confirmed) | done |
-| UI | Board (drag on computer, **Move** on phone), list, lead page, Settings → Pipeline | on hold (designer) |
+| UI 4 | **Leads list screen** (`apps/web/src/features/leads/`): the open leads as a table (tablet, desktop) or cards (phone), 25 to a page, tags coloured by stage kind and place, owner as You / Team member / Unassigned, callback date chip, row ticks, loading, empty and error states. Uses `GET /leads?status=open` and `GET /pipeline` only. | built, waiting for the owner's check |
+| UI 5 | **Filter and Sort work** on the Leads list (owner choices, 13 Nov 2026): Filter by status (open or closed), one stage and owner (anyone or only mine); Sort by latest activity, date added, next callback or stage, in either direction. Every choice is kept in the web address (`/leads?status=closed&stage=…&owner=me&sort=createdAt&order=asc&page=2`), so a refresh or Back keeps the view and a link can be shared; a link that makes no sense opens the plain list. A "no leads match" state offers Clear filters. Uses only `GET /leads` (its existing filters and `sort` / `order`) and `GET /pipeline`. Import, Export, Split view and Create lead are still drawn and look-only. | built, waiting for the owner's check |
+| UI 6 | **Create lead works** (owner choices, 13 Nov 2026): a side panel on a desktop, full screen on a phone. Who: search the contacts (`GET /contacts?q=`) or add a new person in the same form (`POST /contacts`, name required in the form, a phone or an email needed). About the lead: what they want, from and to dates, number of people, budget in rupees (sent as paise), callback date and time (read in the business's time zone, sent as UTC). The owner is not asked: the sharing rule picks it (the manager can change it later). Then `POST /leads`. Checks on the device first; the API's refusals are shown in plain words (`LEAD_OPEN`, `LEAD_RECENTLY_LOST`, `CONTACT_EXISTS` switches back to the search so the existing person can be used); what was typed is kept. After creating, the panel closes, a confirmation shows, and the list loads again. Uses three existing routes, builds none. | built, waiting for the owner's check |
+| UI 7 | **The row "…" menu works** on every lead (table and phone cards): **Move to** any other stage (`POST /leads/{id}/move`; moving to Lost first asks why, offering the business's own reasons from `GET /lost-reasons`), **Assign to me** and **Remove owner** (`POST /leads/{id}/assign`; the team list does not exist yet, so the owner can only be me or nobody), and, **for managers only**, **Delete lead** (`DELETE /leads/{id}`) behind an "Are you sure?" that names the lead. Each action says in words what happened or what the API refused (for example `LEAD_OPEN` when reopening a lead whose person already has another open lead), and the list loads again. Uses four existing routes, builds none. | built, waiting for the owner's check |
+| UI 8 | **The Pipeline board** (the designer renamed "Split view" to "Pipeline" in the updated Figma, 13 Nov 2026; frame `Leads Pipeline - Sidebar Minimised`): the List / Pipeline switch on the Leads page (kept in the web address as `layout=pipeline`). One column per stage, in pipeline order, each with the stage's tag and its lead count; each lead is a card with its name and "…" menu, the source and phone, the owner, and the callback date chip (or the log-activity shortcut, drawn and not working yet). Moving a lead uses the card's "…" menu (**owner choice: the menu only for now, no drag and drop**). Uses only `GET /leads?view=board` (up to 50 leads a column, newest first, with a "showing the newest 50 of N" note) and the existing move, assign and delete routes. On the board only the owner filter applies, and Sort is switched off with a reason (the API cannot sort a board). The column "…" menu is drawn and does nothing yet. | built, waiting for the owner's check |
+| Sort | `sort` and `order` on `GET /leads` (added 13 Nov 2026 for the Leads list screen; tested in `leads.test.ts`) | done |
+| UI | Board (drag on computer, **Move** on phone), list, lead page, Settings → Pipeline | **in progress** from 13 Nov 2026: the designer delivered only the Leads list frame, so we build the screens ourselves in that style (see "Leads list screen" below) |
 
-## Screens (for when the designer delivers)
+## Leads list screen: what the Figma frame needs and what the API gives (13 Nov 2026)
+
+The designer's frame (`docs/design/screens/leads-list-desktop.png`) is the only delivered screen. Slice by slice, we build the Leads list from it and design the other screens ourselves in the same style (design system v1.3). Two routes are enough for the list: `GET /leads?status=open` and `GET /pipeline`.
+
+| Figma | Backend field or route | Status |
+| --- | --- | --- |
+| Lead Name, Email, Phone | `contact.name`, `contact.email`, `contact.phone` | **Have.** The name is optional: a contact needs a phone or an email, so a lead from an unknown caller has no name yet. The list shows the name, else the phone, else the email. The Create Lead form asks for a name; the AI saves the name when the caller gives one. |
+| Status (tag) | `stage.name`, `stage.kind` | **Have.** Stage names are the business's own. The tag colour comes from the stage's kind and position, never its name. |
+| Lead Source | `firstChannel`: `manual`, `web_chat`, `whatsapp`, `email`, `phone` | **Have the five channels only.** Shown as plain words. "Meta Ad" and "Referral" in the frame do not exist yet; sources like them are added later (owner, 13 Nov 2026). |
+| Lead Owner | `ownerUserId` (an id, no name) | **Missing the name.** The leads module cannot read the users table, and the team list is F02. Until then the column shows "You" for the signed-in person and "Team member" for anyone else. The name comes with F02. |
+| Next Activity | `callbackAt` | **Partly.** "Next activity" is the next thing to do for a lead: a meeting, a call or a note (owner, 13 Nov 2026). Only a callback date exists today and is shown as the date chip. **The designer is making the screen for adding these**, so we do not design it; it arrives with tasks (F08), notes (F07) and follow-ups (F27). The two hover icons in the row (log an activity, add a note) are drawn and do nothing until then. |
+| Sort | `sort`, `order` on `GET /leads` | **Added 13 Nov 2026.** By newest activity, date added, next callback (leads without one last) and stage. **Not yet:** sorting by name, email or phone, which belong to the contacts module (a later change). |
+| Filter | `stageId`, `ownerUserId`, `status` on `GET /leads` | Have. |
+| Showing 5 of 28 open leads, Previous and Next | `total`, `page`, `limit` | Have. |
+| Create Lead | `POST /leads` (needs a contact id) and `GET /contacts` to choose or add the person | Have. |
+| Owner of new leads | `GET` and `PUT /assignment-rules` (one person, or round-robin), `ownerUserId` on `POST /leads`, `POST /leads/{id}/assign` | Have (backend). |
+| Row actions (log activity, add note) | none | Not built: notes F07, tasks F08. Left out. |
+| Import, Export | none | Not built: F12. Left out. |
+| Split view, search box | none | Not described / F11. The search box and the notification bell are drawn but switched off. |
+| Row checkboxes | none | Drawn as in the frame; nothing acts on a selection yet. |
+| Count badges in the sidebar (Leads 6, Tasks 9, Inbox 4) | none | Need counts from the API; not shown yet. |
+
+## Screens
+
 - **Leads → Board:** a column per stage with a count; cards show name, interest, dates, temperature (icon + word), owner, time
   since last activity. Drag on a computer; a **Move** button on a phone. Moving to Lost opens a dialog asking for the reason.
   Empty column: "No leads here yet". Loading and error states on every list.
@@ -217,6 +246,7 @@ Defence in depth added by the database, not only the app: a lead's owner and the
 
 Known limits, recorded rather than hidden:
 - A disabled person can still be named as an owner or a round-robin person; the check arrives with the team feature (F02, which also adds disabling).
+- Round-robin ignores working hours, "Away" and workload. Planned with F02: see R52 in docs/REQUIREMENTS-REVIEW.md.
 - `LEAD_OPEN` and `LEAD_RECENTLY_LOST` name the other lead's id to a `staff_own` person even when it is not theirs. The id alone opens nothing (reading it is 404), and they need it to understand why they cannot add a lead.
 - The shared isolation suite was added on 12 Nov 2026 (R41, `apps/api/test/isolation.test.ts`); it holds an attempt for every leads and pipeline route.
 - `npm audit` shows moderate findings that were there before F06; F06 adds no package.

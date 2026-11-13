@@ -13,7 +13,7 @@ engine and the CRM core**.
 | `requirements/` | The owner's product requirements. The source of truth for *what*. Never edit them without being asked. |
 | `docs/ARCHITECTURE.md` | Modules (plug and play), the conversation engine, events, how later engines attach |
 | `docs/BACKEND.md` | Repository pattern, conventions, tests |
-| `docs/design/TooblerOne_Design_System_v1.0.md` | The designer's design system (authority; do not edit) |
+| `docs/design/TooblerOne-Design-System-v1.3.md` | The designer's design system (authority; do not edit; replaced v1.0 on 13 Nov 2026) |
 | `docs/FRONTEND.md` | How we apply it in code, proposed extensions, contrast findings, front-end rules |
 | `docs/SECURITY.md` | Controls and the per-feature security checklist |
 | `docs/CONVERSATION-TYPES.md` | How conversations are classified and routed (not every call is a lead) |
@@ -98,9 +98,9 @@ The whole app and every **text** channel (web chat, WhatsApp, email, setup chat,
 
 ## Front-end rules
 
-- **The designer's `docs/design/TooblerOne_Design_System_v1.0.md` is the authority** for colour, type, spacing, radius,
-  components and motion. Never edit it; gaps go in `docs/FRONTEND.md` §4–5 as proposals for the designer. Manrope +
-  Inter (plus Noto Sans Malayalam/Devanagari fallbacks) self-hosted by the Vite build (no call to Google Fonts). Use the designer's colours unchanged (owner decision: keep as delivered; known contrast exceptions are listed in FRONTEND.md §5).
+- **The designer's `docs/design/TooblerOne-Design-System-v1.3.md` is the authority** for colour, type, spacing, radius,
+  components and motion. Never edit it; gaps go in `docs/FRONTEND.md` §4–5 as proposals for the designer. Plus Jakarta Sans
+  + Inter (plus Noto Sans Malayalam/Devanagari fallbacks) self-hosted by the Vite build (no call to Google Fonts). Use the designer's colours unchanged (owner decision: keep as delivered; known contrast exceptions are listed in FRONTEND.md §5).
 - Phone first (375 px), then desktop. Tokens and components from `packages/ui` only; no one-off colours.
 - Temperature, channel and AI/person always shown with icon + word, never colour alone.
 - No hard-coded industry words; use the business's labels. All UI text through `t()`.

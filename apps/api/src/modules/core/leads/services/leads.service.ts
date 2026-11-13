@@ -538,7 +538,7 @@ export function createLeadsService({ database }: { database: Database }) {
       });
     },
 
-    /** The leads as a list (one page, newest activity first) or as a board (a column per stage), narrowed by the filters. */
+    /** The leads as a list (one page, in the order asked for, newest activity first by default) or as a board (a column per stage), narrowed by the filters. */
     async listLeads(
       principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       query: ListLeadsQuery,
@@ -561,6 +561,7 @@ export function createLeadsService({ database }: { database: Database }) {
             visibleToUserId,
           },
           { limit: query.limit, offset: (query.page - 1) * query.limit },
+          { sort: query.sort, order: query.order },
         );
         const related = await loadRelatedForLeads(transaction, accountId, rows);
         return {
