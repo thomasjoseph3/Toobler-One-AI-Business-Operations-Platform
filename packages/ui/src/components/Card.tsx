@@ -2,7 +2,7 @@ import type { HTMLAttributes } from 'react';
 import { joinClassNames } from '../join-class-names';
 
 export interface CardProps extends HTMLAttributes<HTMLElement> {
-  /** 16 px padding instead of 20 px, for dense data cards. */
+  /** 16 px padding instead of 24 px, for dense data cards. */
   isCompact?: boolean;
 }
 
@@ -12,7 +12,7 @@ export function Card({ isCompact = false, className, children, ...rest }: CardPr
     <section
       className={joinClassNames(
         'rounded-lg border border-border-default bg-surface',
-        isCompact ? 'p-4' : 'p-5',
+        isCompact ? 'p-4' : 'p-6',
         className,
       )}
       {...rest}
