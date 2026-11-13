@@ -1,87 +1,141 @@
 /*
- * Toobler One design tokens: the designer's Design System v1.0 (docs/design/TooblerOne_Design_System_v1.0.md), values
- * exactly as delivered. Names follow section 8 of that file.
+ * Toobler One design tokens: the designer's Design System v1.3 (docs/design/TooblerOne-Design-System-v1.3.md), values
+ * exactly as delivered. Names follow that file's section 10, written the Tailwind way: the group is part of the class
+ * (`bg-surface`, `text-text-primary`, `border-border-default`, `bg-sidebar-item-active-bg`).
  *
  * How this file works with Tailwind 4:
  *  - `@theme static` defines the tokens (and makes Tailwind print them even if unused), so classes such as
- *    `bg-canvas`, `text-text-primary` and `border-border` exist and read these variables.
+ *    `bg-canvas`, `text-text-primary` and `border-border-default` exist and read these variables.
  *  - The light theme is the default. The dark theme redefines the SAME variables in two places (the system setting, and
  *    the manual switch `data-theme="dark"`), because CSS cannot put one block under both conditions. The test
  *    tokens.test.ts checks the two dark blocks are identical.
  *  - Tailwind's own default colours are switched off (`--color-*: initial`), so only designer colours can be used.
+ *
+ * Not in v1.3 (proposals, listed for the designer in docs/FRONTEND.md section 5): the primary action colour
+ * (`action*`), the lead-stage tag colours (`tag-stage-*`, taken from the Figma frame; dark values are ours), the
+ * `scrim` and `tooltip` colours.
  */
 
 @theme static {
   --color-*: initial;
 
-  /* Brand scale */
-  --color-emerald-950: #064b35;
-  --color-emerald-900: #075c40;
-  --color-emerald-800: #06734a;
-  --color-emerald-700: #078453;
-  --color-emerald-600: #14966a;
-  --color-emerald-400: #58a987;
-  --color-emerald-300: #83c4aa;
-  --color-emerald-200: #c6e5d8;
-  --color-emerald-100: #e7f4ee;
-  --color-emerald-50: #f3faf6;
-
-  /* Neutral scale */
-  --color-neutral-950: #171a18;
-  --color-neutral-900: #252a27;
-  --color-neutral-700: #454c48;
-  --color-neutral-600: #626965;
-  --color-neutral-500: #7c837f;
-  --color-neutral-400: #a4aaa6;
-  --color-neutral-300: #d5d9d7;
-  --color-neutral-200: #e5e7e6;
-  --color-neutral-100: #f3f4f3;
-  --color-neutral-50: #f8f9f8;
+  /* Foundation neutrals (v1.3 section 2.1) */
+  --color-neutral-0: #ffffff;
+  --color-neutral-25: #fcfcfc;
+  --color-neutral-50: #f9f9f8;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-150: #ededed;
+  --color-neutral-200: #e2e2e0;
+  --color-neutral-300: #c9c9c6;
+  --color-neutral-400: #a6a6a2;
+  --color-neutral-500: #80807e;
+  --color-neutral-600: #666663;
+  --color-neutral-700: #4b4b49;
+  --color-neutral-800: #3f3f3d;
+  --color-neutral-900: #212121;
+  --color-neutral-950: #161715;
   --color-white: #ffffff;
   --color-transparent: transparent;
   --color-current: currentcolor;
 
-  /* Semantic colours (light theme; the dark theme redefines these below) */
-  --color-canvas: #f5f6f5;
+  /* Surfaces (light theme; the dark theme redefines these below) */
+  --color-canvas: #ededed;
+  --color-header: #fcfcfc;
   --color-surface: #ffffff;
-  --color-surface-raised: #ffffff; /* the designer defines a raised surface for dark mode only; in light it is white */
-  --color-surface-muted: #f3f4f3;
-  --color-surface-hover: #f8f9f8;
-  --color-border: #e5e7e6;
-  --color-border-strong: #d5d9d7;
-  --color-text-primary: #171a18;
-  --color-text-secondary: #626965;
-  --color-text-muted: #7c837f;
-  --color-text-disabled: #a4aaa6;
-  --color-action: #078453;
-  --color-action-hover: #06734a;
-  --color-action-pressed: #064b35;
-  --color-action-subtle: #e7f4ee;
-  --color-focus-ring: #58a987;
-  --color-scrim: rgba(23, 26, 24, 0.48);
-  --color-tooltip: #171a18;
+  --color-surface-subtle: #f9f9f8;
+  --color-input: #ffffff;
+  --color-hover: #f5f5f5;
+  --color-selected: #f0f0ef;
+  --color-disabled: #f5f5f5;
+  --color-sidebar: #161715;
+
+  /* Text */
+  --color-text-primary: #212121;
+  --color-text-secondary: #4b4b49;
+  --color-text-tertiary: #666663;
+  --color-text-placeholder: #666663;
+  --color-text-disabled: #666663;
+  --color-text-inverse: #fcfcfc;
+  --color-text-inverse-white: #ffffff;
+
+  /* Borders */
+  --color-border-subtle: #e8e8e6;
+  --color-border-default: #d4d4d1;
+  --color-border-strong: #b8b8b4;
+  --color-border-emphasis: #8e8e8a;
+
+  /* Icons */
+  --color-icon-primary: #3f3f3d;
+  --color-icon-secondary: #666663;
+  --color-icon-subtle: #666663;
+  --color-icon-strong: #212121;
+  --color-icon-inverse: #eeeeee;
+  --color-icon-decorative: #92928f;
+
+  /* Sidebar */
+  --color-sidebar-logo: #eeeeee;
+  --color-sidebar-section: #8e8e8a;
+  --color-sidebar-item: #a6a6a2;
+  --color-sidebar-item-hover: #d4d4d1;
+  --color-sidebar-item-active: #f5f5f3;
+  --color-sidebar-item-active-bg: #2a2b28;
+
+  /* Links and focus */
+  --color-link: #35566e;
+  --color-link-hover: #243f53;
+  --color-focus: #35566e;
+
+  /* Primary action: NOT defined by v1.3. The Figma frame shows a near-black button, so it uses the sidebar colour.
+     To be confirmed by the designer (docs/FRONTEND.md section 5). */
+  --color-action: #161715;
+  --color-action-hover: #2a2b28;
+  --color-action-pressed: #3f3f3d;
+  --color-action-text: #fcfcfc;
+
+  /* Card-header tints (v1.3 section 2.4) */
+  --color-card-header-lavender: #f9f2fc;
+  --color-card-header-peach: #f9ebe1;
+  --color-card-header-neutral: #f5f5f5;
+
+  /* Status: foreground for text and icons, background for badges and banners (v1.3 section 2.5) */
+  --color-success: #28613a;
+  --color-success-bg: #eaf4ec;
+  --color-warning: #765315;
+  --color-warning-bg: #fbf2df;
+  --color-error: #8c342c;
+  --color-error-bg: #f8e9e7;
+  --color-info: #35566e;
+  --color-info-bg: #eaf0f5;
+
+  /* Lead-stage tags: backgrounds from the Figma frame (Leads list). Text on them is text-secondary or link-hover. */
+  --color-tag-stage-new: #d6ebff;
+  --color-tag-stage-contacted: #e8f2fc;
+  --color-tag-stage-qualified: #e8f5ed;
+  --color-tag-stage-rate-sent: #fff5e0;
+  --color-tag-stage-won: #e5f5eb;
+  --color-tag-stage-lost: #fcebeb;
+
+  /* Charts (v1.3 section 2.6) */
+  --color-chart-series-1: #35566e;
+  --color-chart-series-2: #5c6b5a;
+  --color-chart-series-3: #9a6a45;
+  --color-chart-series-4: #7b668a;
+  --color-chart-grid: #d4d4d1;
+  --color-chart-axis: #666663;
+
+  /* Overlays (not in v1.3) */
+  --color-scrim: rgba(22, 23, 21, 0.48);
+  --color-tooltip: #161715;
   --color-tooltip-text: #ffffff;
 
-  /* Feedback colours: foreground for text and icons, background for badges and banners, border for outlines */
-  --color-success: #176345;
-  --color-success-bg: #e7f4ee;
-  --color-success-border: #b8ddca;
-  --color-warning: #805a12;
-  --color-warning-bg: #fff3d6;
-  --color-warning-border: #e8d39f;
-  --color-error: #a13f3a;
-  --color-error-bg: #fceae8;
-  --color-error-border: #e8b9b4;
-  --color-info: #315f76;
-  --color-info-bg: #e8f2f7;
-  --color-info-border: #b9d3e0;
+  /* Typography (v1.3 section 3): Plus Jakarta Sans for headings, Inter for everything else. The Noto fonts are only a
+     fallback for customer text in Malayalam or Devanagari (docs/FRONTEND.md section 2). */
+  --font-heading:
+    'Plus Jakarta Sans Variable', 'Plus Jakarta Sans', 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui,
+    sans-serif;
+  --font-sans: 'Inter Variable', Inter, 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui, sans-serif;
 
-  /* Typography: Manrope for headings and buttons, Inter for everything else. The Noto fonts are only a fallback for
-     customer text in Malayalam or Devanagari (docs/FRONTEND.md section 2). */
-  --font-heading: 'Manrope Variable', Manrope, 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui, sans-serif;
-  --font-body: 'Inter Variable', Inter, 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui, sans-serif;
-
-  /* Spacing (a 4 px base; the same values Tailwind's spacing classes give) */
+  /* Spacing (v1.3 section 4) */
   --spacing-1: 4px;
   --spacing-2: 8px;
   --spacing-3: 12px;
@@ -91,11 +145,12 @@
   --spacing-8: 32px;
   --spacing-10: 40px;
   --spacing-12: 48px;
+  --spacing-14: 56px;
   --spacing-16: 64px;
   --spacing-20: 80px;
   --spacing-24: 96px;
 
-  /* Radius */
+  /* Radius (v1.3 section 5) */
   --rounded-sm: 4px;
   --rounded-md: 8px;
   --rounded-lg: 12px;
@@ -103,10 +158,10 @@
   --rounded-2xl: 20px;
   --rounded-full: 9999px;
 
-  /* Elevation: a border is preferred; never stack shadows */
-  --shadow-xs: 0 1px 2px rgba(23, 26, 24, 0.05);
-  --shadow-sm: 0 2px 6px rgba(23, 26, 24, 0.06);
-  --shadow-md: 0 8px 24px rgba(23, 26, 24, 0.1);
+  /* Elevation (v1.3 section 6): a border is preferred; never stack shadows */
+  --shadow-sm: 0 1px 2px rgba(22, 23, 21, 0.06);
+  --shadow-md: 0 4px 12px rgba(22, 23, 21, 0.08);
+  --shadow-lg: 0 12px 32px rgba(22, 23, 21, 0.12);
 
   /* Breakpoints */
   --breakpoint-sm: 640px;
@@ -135,74 +190,139 @@
 /* Dark theme, chosen by the person (the switch in the top bar sets data-theme on <html>) */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --color-canvas: #151a17;
-  --color-surface: #1e2521;
-  --color-surface-raised: #28312c;
-  --color-surface-muted: #242b27;
-  --color-surface-hover: #2a342e;
-  --color-border: #38423c;
-  --color-border-strong: #4a554e;
-  --color-text-primary: #f0f3f1;
-  --color-text-secondary: #aeb8b1;
-  --color-text-muted: #89948c;
-  --color-text-disabled: #727d75;
-  --color-action: #43a77a;
-  --color-action-hover: #59b58b;
-  --color-action-pressed: #83c4aa;
-  --color-action-subtle: #263d32;
-  --color-focus-ring: #83c4aa;
-  --color-success: #a7d8be;
-  --color-success-bg: #263d32;
-  --color-success-border: #4a554e; /* the designer gives no dark borders for feedback: we reuse the strong border */
-  --color-warning: #e8c77f;
-  --color-warning-bg: #473b29;
-  --color-warning-border: #4a554e;
-  --color-error: #e5a29b;
-  --color-error-bg: #472d2b;
-  --color-error-border: #4a554e;
-  --color-info: #9cc9dc;
-  --color-info-bg: #243743;
-  --color-info-border: #4a554e;
-  /* In dark mode surfaces and borders carry the depth, not black shadows */
-  --shadow-xs: none;
+  --color-canvas: #111210;
+  --color-header: #1b1c19;
+  --color-surface: #1f201d;
+  --color-surface-subtle: #252623;
+  --color-input: #1b1c19;
+  --color-hover: #2a2b28;
+  --color-selected: #30312e;
+  --color-disabled: #252623;
+  --color-sidebar: #161715;
+  --color-text-primary: #f2f2f0;
+  --color-text-secondary: #d0d0cc;
+  --color-text-tertiary: #a6a6a2;
+  --color-text-placeholder: #a6a6a2;
+  --color-text-disabled: #a6a6a2;
+  --color-text-inverse: #212121;
+  --color-text-inverse-white: #ffffff;
+  --color-border-subtle: #2b2c29;
+  --color-border-default: #3a3b37;
+  --color-border-strong: #51524d;
+  --color-border-emphasis: #70716b;
+  --color-icon-primary: #d4d4d1;
+  --color-icon-secondary: #a6a6a2;
+  --color-icon-subtle: #a6a6a2;
+  --color-icon-strong: #fcfcfc;
+  --color-icon-inverse: #212121;
+  --color-icon-decorative: #858681;
+  --color-sidebar-logo: #eeeeee;
+  --color-sidebar-section: #8e8e8a;
+  --color-sidebar-item: #a6a6a2;
+  --color-sidebar-item-hover: #d4d4d1;
+  --color-sidebar-item-active: #fcfcfc;
+  --color-sidebar-item-active-bg: #30312e;
+  --color-link: #9fc4df;
+  --color-link-hover: #c2ddf0;
+  --color-focus: #9fc4df;
+  --color-action: #f2f2f0;
+  --color-action-hover: #d0d0cc;
+  --color-action-pressed: #a6a6a2;
+  --color-action-text: #212121;
+  --color-card-header-lavender: #302b32;
+  --color-card-header-peach: #332b26;
+  --color-card-header-neutral: #252623;
+  --color-success: #9dd3a8;
+  --color-success-bg: #203327;
+  --color-warning: #e8c879;
+  --color-warning-bg: #382f1d;
+  --color-error: #e5a09a;
+  --color-error-bg: #3b2523;
+  --color-info: #9fc4df;
+  --color-info-bg: #222f39;
+  --color-tag-stage-new: #222f39;
+  --color-tag-stage-contacted: #252623;
+  --color-tag-stage-qualified: #203327;
+  --color-tag-stage-rate-sent: #382f1d;
+  --color-tag-stage-won: #203327;
+  --color-tag-stage-lost: #3b2523;
+  --color-chart-grid: #3a3b37;
+  --color-chart-axis: #a6a6a2;
+  --color-scrim: rgba(0, 0, 0, 0.6);
+  --color-tooltip: #f2f2f0;
+  --color-tooltip-text: #212121;
   --shadow-sm: none;
   --shadow-md: none;
+  --shadow-lg: none;
 }
 
 /* Dark theme, when the system is dark and the person has not chosen light. MUST match the block above. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']):not([data-theme='dark']) {
     color-scheme: dark;
-    --color-canvas: #151a17;
-    --color-surface: #1e2521;
-    --color-surface-raised: #28312c;
-    --color-surface-muted: #242b27;
-    --color-surface-hover: #2a342e;
-    --color-border: #38423c;
-    --color-border-strong: #4a554e;
-    --color-text-primary: #f0f3f1;
-    --color-text-secondary: #aeb8b1;
-    --color-text-muted: #89948c;
-    --color-text-disabled: #727d75;
-    --color-action: #43a77a;
-    --color-action-hover: #59b58b;
-    --color-action-pressed: #83c4aa;
-    --color-action-subtle: #263d32;
-    --color-focus-ring: #83c4aa;
-    --color-success: #a7d8be;
-    --color-success-bg: #263d32;
-    --color-success-border: #4a554e;
-    --color-warning: #e8c77f;
-    --color-warning-bg: #473b29;
-    --color-warning-border: #4a554e;
-    --color-error: #e5a29b;
-    --color-error-bg: #472d2b;
-    --color-error-border: #4a554e;
-    --color-info: #9cc9dc;
-    --color-info-bg: #243743;
-    --color-info-border: #4a554e;
-    --shadow-xs: none;
+    --color-canvas: #111210;
+    --color-header: #1b1c19;
+    --color-surface: #1f201d;
+    --color-surface-subtle: #252623;
+    --color-input: #1b1c19;
+    --color-hover: #2a2b28;
+    --color-selected: #30312e;
+    --color-disabled: #252623;
+    --color-sidebar: #161715;
+    --color-text-primary: #f2f2f0;
+    --color-text-secondary: #d0d0cc;
+    --color-text-tertiary: #a6a6a2;
+    --color-text-placeholder: #a6a6a2;
+    --color-text-disabled: #a6a6a2;
+    --color-text-inverse: #212121;
+    --color-text-inverse-white: #ffffff;
+    --color-border-subtle: #2b2c29;
+    --color-border-default: #3a3b37;
+    --color-border-strong: #51524d;
+    --color-border-emphasis: #70716b;
+    --color-icon-primary: #d4d4d1;
+    --color-icon-secondary: #a6a6a2;
+    --color-icon-subtle: #a6a6a2;
+    --color-icon-strong: #fcfcfc;
+    --color-icon-inverse: #212121;
+    --color-icon-decorative: #858681;
+    --color-sidebar-logo: #eeeeee;
+    --color-sidebar-section: #8e8e8a;
+    --color-sidebar-item: #a6a6a2;
+    --color-sidebar-item-hover: #d4d4d1;
+    --color-sidebar-item-active: #fcfcfc;
+    --color-sidebar-item-active-bg: #30312e;
+    --color-link: #9fc4df;
+    --color-link-hover: #c2ddf0;
+    --color-focus: #9fc4df;
+    --color-action: #f2f2f0;
+    --color-action-hover: #d0d0cc;
+    --color-action-pressed: #a6a6a2;
+    --color-action-text: #212121;
+    --color-card-header-lavender: #302b32;
+    --color-card-header-peach: #332b26;
+    --color-card-header-neutral: #252623;
+    --color-success: #9dd3a8;
+    --color-success-bg: #203327;
+    --color-warning: #e8c879;
+    --color-warning-bg: #382f1d;
+    --color-error: #e5a09a;
+    --color-error-bg: #3b2523;
+    --color-info: #9fc4df;
+    --color-info-bg: #222f39;
+    --color-tag-stage-new: #222f39;
+    --color-tag-stage-contacted: #252623;
+    --color-tag-stage-qualified: #203327;
+    --color-tag-stage-rate-sent: #382f1d;
+    --color-tag-stage-won: #203327;
+    --color-tag-stage-lost: #3b2523;
+    --color-chart-grid: #3a3b37;
+    --color-chart-axis: #a6a6a2;
+    --color-scrim: rgba(0, 0, 0, 0.6);
+    --color-tooltip: #f2f2f0;
+    --color-tooltip-text: #212121;
     --shadow-sm: none;
     --shadow-md: none;
+    --shadow-lg: none;
   }
 }

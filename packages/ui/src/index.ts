@@ -4,6 +4,8 @@ export { Button, type ButtonProps, type ButtonVariant } from './components/Butto
 export { IconButton, type IconButtonProps } from './components/IconButton';
 export { Card, type CardProps } from './components/Card';
 export { Badge, type BadgeProps, type BadgeTone } from './components/Badge';
+export { Tag, type TagProps, type TagTone } from './components/Tag';
+export { Checkbox, type CheckboxProps } from './components/Checkbox';
 export { TextField, type TextFieldProps } from './components/TextField';
 export {
   EmptyState,
@@ -14,3 +16,4 @@ export {
   type ErrorStateProps,
 } from './components/states';
 export { PageHeader, type PageHeaderProps } from './components/PageHeader';
+export * from './icons';

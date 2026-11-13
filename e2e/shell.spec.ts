@@ -1,7 +1,7 @@
 import { expect, PAGES, test } from './support';
 
 test.describe('navigation', () => {
-  test('desktop and tablet show the side rail and not the bottom bar; phone shows the opposite', async ({
+  test('desktop and tablet show the sidebar and not the bottom bar; phone shows the opposite', async ({
     page,
   }, testInfo) => {
     await page.goto('/');
@@ -108,11 +108,11 @@ test.describe('theme', () => {
 
     await button.click();
     await expect(button).toHaveAccessibleName('Theme: Light. Click to change');
-    expect(await canvasColor(page)).toBe('rgb(245, 246, 245)'); // designer: color-canvas #F5F6F5
+    expect(await canvasColor(page)).toBe('rgb(237, 237, 237)'); // designer v1.3: color.light.bg.canvas #EDEDED
 
     await button.click();
     await expect(button).toHaveAccessibleName('Theme: Dark. Click to change');
-    expect(await canvasColor(page)).toBe('rgb(21, 26, 23)'); // designer: dark-color-canvas #151A17
+    expect(await canvasColor(page)).toBe('rgb(17, 18, 16)'); // designer v1.3: color.dark.bg.canvas #111210
 
     await button.click();
     await expect(button).toHaveAccessibleName('Theme: System. Click to change');
@@ -121,9 +121,9 @@ test.describe('theme', () => {
   test('System follows the device setting', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.goto('/');
-    expect(await canvasColor(page)).toBe('rgb(21, 26, 23)');
+    expect(await canvasColor(page)).toBe('rgb(17, 18, 16)');
     await page.emulateMedia({ colorScheme: 'light' });
-    expect(await canvasColor(page)).toBe('rgb(245, 246, 245)');
+    expect(await canvasColor(page)).toBe('rgb(237, 237, 237)');
   });
 
   test('the chosen theme is remembered and applied before the page is drawn', async ({ page }) => {
@@ -148,7 +148,7 @@ test.describe('theme', () => {
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await page.getByRole('button', { name: /^Theme:/ }).click();
-    expect(await canvasColor(page)).toBe('rgb(245, 246, 245)');
+    expect(await canvasColor(page)).toBe('rgb(237, 237, 237)');
   });
 });
 

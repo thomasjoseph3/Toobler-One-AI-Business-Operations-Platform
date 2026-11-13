@@ -17,7 +17,7 @@ export function IconButton({ label, icon, size = 'standard', className, type = '
       title={label}
       className={joinClassNames(
         'inline-flex items-center justify-center rounded-md border border-transparent text-text-secondary',
-        'hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:text-text-disabled',
+        'hover:bg-hover hover:text-text-primary disabled:cursor-not-allowed disabled:text-text-disabled',
         size === 'touch' ? 'size-11' : 'size-10',
         className,
       )}

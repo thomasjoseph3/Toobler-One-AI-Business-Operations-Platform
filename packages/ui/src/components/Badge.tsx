@@ -12,11 +12,11 @@ export interface BadgeProps {
 }
 
 const TONE_CLASSES: Record<BadgeTone, string> = {
-  neutral: 'bg-surface-muted text-text-secondary border-border',
-  success: 'bg-success-bg text-success border-success-border',
-  warning: 'bg-warning-bg text-warning border-warning-border',
-  error: 'bg-error-bg text-error border-error-border',
-  info: 'bg-info-bg text-info border-info-border',
+  neutral: 'bg-surface-subtle text-text-secondary',
+  success: 'bg-success-bg text-success',
+  warning: 'bg-warning-bg text-warning',
+  error: 'bg-error-bg text-error',
+  info: 'bg-info-bg text-info',
 };
 
 /** A small tinted pill with readable text and an optional icon, used for every status. */
@@ -24,7 +24,7 @@ export function Badge({ tone = 'neutral', icon, children, className }: BadgeProp
   return (
     <span
       className={joinClassNames(
-        'text-xs-label inline-flex items-center gap-1 rounded-full border px-2 py-0.5 whitespace-nowrap',
+        'text-label-sm inline-flex items-center gap-1 rounded-full px-2 py-1 whitespace-nowrap',
         TONE_CLASSES[tone],
         className,
       )}

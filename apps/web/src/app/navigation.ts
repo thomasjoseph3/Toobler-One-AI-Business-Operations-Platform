@@ -1,17 +1,16 @@
+import { BookOpen, Plug } from 'lucide-react';
 import {
-  BookOpen,
-  Building2,
-  CalendarCheck,
-  ChartColumn,
-  Inbox,
-  ListChecks,
-  Plug,
-  Settings,
-  Target,
-  Ticket,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
+  CompaniesIcon,
+  ContactsIcon,
+  LeadsIcon,
+  ReportsIcon,
+  SettingsIcon,
+  SharedInboxIcon,
+  TasksIcon,
+  TicketsIcon,
+  TodayIcon,
+} from '@toobler-one/ui';
+import type { ComponentType } from 'react';
 import type { MessageKey, PageId } from './i18n';
 
 /**
@@ -24,7 +23,8 @@ export interface NavigationItem {
   /** One line shown under the page title. */
   descriptionKey: MessageKey;
   path: string;
-  icon: LucideIcon;
+  /** Icons come from the designer's Figma frame; Knowledge base and Channels have none yet, so they keep a Lucide icon. */
+  icon: ComponentType<{ className?: string }>;
   group: 'work' | 'insight' | 'admin';
   /** Phone: the four most-used pages sit in the bottom bar; everything else is under "More". */
   isInBottomBar: boolean;
@@ -36,7 +36,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.today',
     descriptionKey: 'page.today.description',
     path: '/',
-    icon: CalendarCheck,
+    icon: TodayIcon,
     group: 'work',
     isInBottomBar: true,
   },
@@ -45,7 +45,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.leads',
     descriptionKey: 'page.leads.description',
     path: '/leads',
-    icon: Target,
+    icon: LeadsIcon,
     group: 'work',
     isInBottomBar: true,
   },
@@ -54,7 +54,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.contacts',
     descriptionKey: 'page.contacts.description',
     path: '/contacts',
-    icon: Users,
+    icon: ContactsIcon,
     group: 'work',
     isInBottomBar: false,
   },
@@ -63,7 +63,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.companies',
     descriptionKey: 'page.companies.description',
     path: '/companies',
-    icon: Building2,
+    icon: CompaniesIcon,
     group: 'work',
     isInBottomBar: false,
   },
@@ -72,7 +72,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.inbox',
     descriptionKey: 'page.inbox.description',
     path: '/inbox',
-    icon: Inbox,
+    icon: SharedInboxIcon,
     group: 'work',
     isInBottomBar: true,
   },
@@ -81,7 +81,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.tasks',
     descriptionKey: 'page.tasks.description',
     path: '/tasks',
-    icon: ListChecks,
+    icon: TasksIcon,
     group: 'work',
     isInBottomBar: true,
   },
@@ -90,7 +90,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.tickets',
     descriptionKey: 'page.tickets.description',
     path: '/tickets',
-    icon: Ticket,
+    icon: TicketsIcon,
     group: 'work',
     isInBottomBar: false,
   },
@@ -99,7 +99,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.reports',
     descriptionKey: 'page.reports.description',
     path: '/reports',
-    icon: ChartColumn,
+    icon: ReportsIcon,
     group: 'insight',
     isInBottomBar: false,
   },
@@ -126,13 +126,13 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.settings',
     descriptionKey: 'page.settings.description',
     path: '/settings',
-    icon: Settings,
+    icon: SettingsIcon,
     group: 'admin',
     isInBottomBar: false,
   },
 ];
 
-/** The menu groups in the order they appear in the side rail, with their heading text. */
+/** The menu groups in the order they appear in the sidebar, with their heading text. */
 export const NAVIGATION_GROUPS: readonly { id: NavigationItem['group']; labelKey: MessageKey }[] = [
   { id: 'work', labelKey: 'nav.group.work' },
   { id: 'insight', labelKey: 'nav.group.insight' },

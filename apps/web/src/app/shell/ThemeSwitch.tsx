@@ -19,7 +19,7 @@ export function ThemeSwitch() {
       label={`${t('theme.label')}: ${t(labelKey)}. ${t('theme.change')}`}
       icon={<Icon aria-hidden className="size-5" />}
       onClick={() => chooseTheme(next)}
-      className="border-border bg-surface"
+      className="border-border-default bg-surface"
     />
   );
 }

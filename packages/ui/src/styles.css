@@ -1,65 +1,98 @@
 /*
- * Base styles and the designer's named text styles (Design System v1.0, section 2.2).
+ * Base styles and the designer's named text styles (Design System v1.3, section 3). The names are the designer's:
+ * `text-body-md`, `text-body-sm-medium`, `text-label-xs-semibold`, `text-heading-2xl`.
  * Imported by apps/web AFTER `@import 'tailwindcss'` and tokens.css, so the `@utility` lines below become real classes.
- * The designer's `text-[11px]-*` names contain square brackets, which cannot be class names, so they are called
- * `text-11-compact` and `text-11-caps` here.
  */
 
-@utility text-4xl-display {
-  font: 700 32px/40px var(--font-heading);
-  letter-spacing: -0.02em;
+@utility text-body-xs {
+  font: 400 12px/16px var(--font-sans);
 }
-@utility text-2xl-page-title {
-  font: 700 24px/32px var(--font-heading);
-  letter-spacing: -0.02em;
+@utility text-body-xs-medium {
+  font: 500 12px/16px var(--font-sans);
 }
-@utility text-xl-section-title {
-  font: 600 20px/28px var(--font-heading);
-  letter-spacing: -0.01em;
+@utility text-body-xs-semibold {
+  font: 600 12px/16px var(--font-sans);
 }
-@utility text-lg-subsection-title {
-  font: 600 18px/24px var(--font-heading);
-  letter-spacing: -0.01em;
+@utility text-body-xs-bold {
+  font: 700 12px/16px var(--font-sans);
 }
-@utility text-base-heading {
-  font: 600 16px/24px var(--font-heading);
+@utility text-body-sm {
+  font: 400 13px/20px var(--font-sans);
 }
-@utility text-base-body {
-  font: 400 16px/24px var(--font-body);
+@utility text-body-sm-medium {
+  font: 500 13px/20px var(--font-sans);
 }
-@utility text-sm-body {
-  font: 400 14px/20px var(--font-body);
+@utility text-body-sm-semibold {
+  font: 600 13px/20px var(--font-sans);
 }
-@utility text-xs-supporting {
-  font: 400 13px/18px var(--font-body);
+@utility text-body-sm-bold {
+  font: 700 13px/20px var(--font-sans);
 }
-@utility text-xs-label {
-  font: 500 12px/16px var(--font-body);
+@utility text-body-md {
+  font: 400 14px/20px var(--font-sans);
 }
-@utility text-sm-button {
-  font: 600 14px/20px var(--font-heading);
+@utility text-body-md-medium {
+  font: 500 14px/20px var(--font-sans);
 }
-@utility text-xs-navigation {
-  font: 500 13px/20px var(--font-body);
+@utility text-body-md-semibold {
+  font: 600 14px/20px var(--font-sans);
 }
-@utility text-xs-caption {
-  font: 400 12px/16px var(--font-body);
+@utility text-body-md-bold {
+  font: 700 14px/20px var(--font-sans);
 }
-/* Dense secondary data. Never for essential instructions, primary data, or text that can be Malayalam or Hindi. */
-@utility text-11-compact {
-  font: 500 11px/14px var(--font-body);
+@utility text-body-lg {
+  font: 400 16px/24px var(--font-sans);
 }
-@utility text-11-caps {
-  font: 600 11px/14px var(--font-body);
+@utility text-body-lg-medium {
+  font: 500 16px/24px var(--font-sans);
+}
+@utility text-body-lg-semibold {
+  font: 600 16px/24px var(--font-sans);
+}
+@utility text-body-lg-bold {
+  font: 700 16px/24px var(--font-sans);
+}
+@utility text-label-xs {
+  font: 500 11px/16px var(--font-sans);
+}
+@utility text-label-xs-semibold {
+  font: 600 11px/16px var(--font-sans);
+}
+@utility text-label-sm {
+  font: 500 12px/16px var(--font-sans);
+}
+@utility text-label-sm-semibold {
+  font: 600 12px/16px var(--font-sans);
+}
+@utility text-label-xs-caps {
+  font: 600 11px/16px var(--font-sans);
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+@utility text-heading-sm {
+  font: 600 16px/24px var(--font-heading);
+}
+@utility text-heading-md {
+  font: 600 18px/28px var(--font-heading);
+}
+@utility text-heading-lg {
+  font: 600 20px/28px var(--font-heading);
+}
+@utility text-heading-xl {
+  font: 600 22px/32px var(--font-heading);
+}
+@utility text-heading-2xl {
+  font: 600 24px/32px var(--font-heading);
+}
+@utility text-heading-3xl {
+  font: 700 32px/40px var(--font-heading);
 }
 
 @layer base {
   html {
     background-color: var(--color-canvas);
     color: var(--color-text-primary);
-    font: 400 14px/20px var(--font-body);
+    font: 400 14px/20px var(--font-sans);
     -webkit-text-size-adjust: 100%;
   }
   body {
@@ -67,9 +100,9 @@
     min-height: 100vh;
     background-color: var(--color-canvas);
   }
-  /* A clear 2 px focus ring with an offset on every keyboard-focused control */
+  /* A clear 2 px focus ring with a 2 px offset on every keyboard-focused control (v1.3 section 6) */
   :focus-visible {
-    outline: 2px solid var(--color-focus-ring);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
   button,

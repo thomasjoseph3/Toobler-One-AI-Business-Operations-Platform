@@ -10,7 +10,11 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
 export function Card({ isCompact = false, className, children, ...rest }: CardProps) {
   return (
     <section
-      className={joinClassNames('rounded-lg border border-border bg-surface', isCompact ? 'p-4' : 'p-5', className)}
+      className={joinClassNames(
+        'rounded-lg border border-border-default bg-surface',
+        isCompact ? 'p-4' : 'p-5',
+        className,
+      )}
       {...rest}
     >
       {children}

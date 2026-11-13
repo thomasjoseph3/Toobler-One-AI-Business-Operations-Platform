@@ -44,32 +44,67 @@ type Pair = { foreground: string; background: string; minimum: number; note: str
 // Text needs 4.5:1 (WCAG AA); meaningful graphics and focus indicators need 3:1.
 const pairsToCheck = (): Pair[] => {
   const pairs: Pair[] = [];
-  for (const background of ['canvas', 'surface', 'surface-muted']) {
-    for (const foreground of ['text-primary', 'text-secondary', 'text-muted']) {
+  // Body text on every surface it can sit on (v1.3 section 9)
+  for (const background of ['canvas', 'header', 'surface', 'surface-subtle', 'input', 'hover']) {
+    for (const foreground of ['text-primary', 'text-secondary', 'text-tertiary']) {
       pairs.push({ foreground, background, minimum: 4.5, note: 'text' });
     }
   }
-  pairs.push({ foreground: 'action', background: 'surface', minimum: 4.5, note: 'link and action text' });
-  pairs.push({ foreground: 'action', background: 'action-subtle', minimum: 4.5, note: 'selected navigation text' });
-  pairs.push({ foreground: 'white', background: 'action', minimum: 4.5, note: 'primary button label' });
-  pairs.push({ foreground: 'focus-ring', background: 'surface', minimum: 3, note: 'focus indicator' });
+  pairs.push({ foreground: 'text-placeholder', background: 'input', minimum: 4.5, note: 'placeholder' });
+  pairs.push({ foreground: 'text-disabled', background: 'disabled', minimum: 4.5, note: 'essential disabled label' });
+  // Text on the card-header tints
+  for (const tint of ['lavender', 'peach', 'neutral']) {
+    pairs.push({ foreground: 'text-primary', background: `card-header-${tint}`, minimum: 4.5, note: 'card title' });
+  }
+  // Sidebar
+  pairs.push({ foreground: 'sidebar-item', background: 'sidebar', minimum: 4.5, note: 'inactive menu item' });
+  pairs.push({ foreground: 'sidebar-section', background: 'sidebar', minimum: 4.5, note: 'menu group label' });
+  pairs.push({ foreground: 'sidebar-logo', background: 'sidebar', minimum: 4.5, note: 'logo' });
+  pairs.push({
+    foreground: 'sidebar-item-active',
+    background: 'sidebar-item-active-bg',
+    minimum: 4.5,
+    note: 'active item',
+  });
+  pairs.push({
+    foreground: 'sidebar-item-hover',
+    background: 'sidebar-item-active-bg',
+    minimum: 4.5,
+    note: 'hovered item',
+  });
+  // Links and focus
+  pairs.push({ foreground: 'link', background: 'surface', minimum: 4.5, note: 'link' });
+  pairs.push({ foreground: 'link', background: 'canvas', minimum: 4.5, note: 'link on canvas' });
+  pairs.push({ foreground: 'focus', background: 'surface', minimum: 3, note: 'focus indicator' });
+  pairs.push({ foreground: 'focus', background: 'canvas', minimum: 3, note: 'focus indicator on canvas' });
+  // Primary action (not in v1.3: our proposal from the Figma frame)
+  for (const state of ['action', 'action-hover', 'action-pressed']) {
+    pairs.push({ foreground: 'action-text', background: state, minimum: 4.5, note: 'primary button label' });
+  }
+  // Controls: the boundary that identifies a control needs 3:1
+  pairs.push({ foreground: 'border-emphasis', background: 'surface', minimum: 3, note: 'checkbox outline' });
+  pairs.push({ foreground: 'border-default', background: 'input', minimum: 3, note: 'input boundary' });
+  // Status badges and alerts
   for (const state of ['success', 'warning', 'error', 'info']) {
     pairs.push({ foreground: state, background: `${state}-bg`, minimum: 4.5, note: `${state} badge` });
+  }
+  // Lead-stage tags (Figma): the text colour depends on the tone
+  for (const tone of ['new', 'won', 'lost']) {
+    pairs.push({ foreground: 'link-hover', background: `tag-stage-${tone}`, minimum: 4.5, note: `${tone} tag` });
+  }
+  for (const tone of ['contacted', 'qualified', 'rate-sent']) {
+    pairs.push({ foreground: 'text-secondary', background: `tag-stage-${tone}`, minimum: 4.5, note: `${tone} tag` });
   }
   return pairs;
 };
 
-// The designer's delivered values that do not reach the minimum. The owner decided to keep them (docs/FRONTEND.md
-// section 5). Each entry names the theme, the pair and the highest ratio it is allowed to have: a pair that gets
-// WORSE fails, and a pair that is fixed must be removed from this list.
+// Delivered values that do not reach the minimum. Each entry names the theme, the pair and the highest ratio it is
+// allowed to have: a pair that gets WORSE fails, and a pair that is fixed must be removed from this list. Filled in
+// from the first run of this test (see docs/FRONTEND.md section 5).
 const KNOWN_EXCEPTIONS: Record<string, number> = {
-  'light text-muted on canvas': 3.58,
-  'light text-muted on surface': 3.88,
-  'light text-muted on surface-muted': 3.52,
-  'light action on action-subtle': 4.19,
-  'light focus-ring on surface': 2.82,
-  'dark white on action': 2.98,
-  'dark action on action-subtle': 3.92, // found by this test on 10 Nov 2026 (not in the first analysis); same cause as the light one
+  // v1.3 says inputs use border.default, and also that a boundary needed to identify a control needs 3:1. Both cannot hold.
+  'light border-default on input': 1.49,
+  'dark border-default on input': 1.52,
 };
 
 describe('design tokens', () => {
@@ -80,14 +115,18 @@ describe('design tokens', () => {
   it('defines every colour token in both themes where the designer gives a dark value', () => {
     for (const tokenName of [
       'canvas',
+      'header',
       'surface',
       'text-primary',
+      'border-default',
+      'link',
+      'focus',
       'action',
-      'focus-ring',
       'success',
       'warning',
       'error',
       'info',
+      'tag-stage-new',
     ]) {
       expect(darkTheme.get(`--color-${tokenName}`), tokenName).toBeDefined();
       expect(darkByChoice.has(`--color-${tokenName}`), `${tokenName} should be redefined for dark`).toBe(true);

@@ -12,8 +12,8 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div className="min-w-0">
-        <h1 className="text-2xl-page-title text-text-primary">{title}</h1>
-        {description ? <p className="text-sm-body mt-1 text-text-secondary">{description}</p> : null}
+        <h1 className="text-heading-2xl text-text-primary">{title}</h1>
+        {description ? <p className="text-body-md mt-1 text-text-secondary">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
     </header>

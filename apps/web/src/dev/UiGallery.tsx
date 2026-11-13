@@ -1,35 +1,117 @@
 // Developer-only page (/dev/ui): every design-system piece in one place. Use the theme switch in the top bar to see
 // both themes. It is not part of the product, so its text is written directly instead of going through t().
-import { Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Sparkles, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   Badge,
   Button,
   Card,
+  Checkbox,
   EmptyState,
   ErrorState,
   IconButton,
   LoadingState,
+  LogoOne,
   PageHeader,
+  Tag,
   TextField,
+  ActivitiesIcon,
+  ActivityIcon,
+  AddNoteIcon,
+  AiAgentIcon,
+  BellIcon,
+  CalendarIcon,
+  CheckIcon,
+  CompaniesIcon,
+  ContactsIcon,
+  ExportIcon,
+  FilterIcon,
+  FollowUpsIcon,
+  ImportIcon,
+  LeadsIcon,
+  ListViewIcon,
+  ManageColumnsIcon,
+  MoonIcon,
+  MoreIcon,
+  PhoneIcon,
+  PlusIcon,
+  ReportsIcon,
+  SearchIcon,
+  SettingsIcon,
+  SharedInboxIcon,
+  SidebarToggleIcon,
+  SortIcon,
+  SplitViewIcon,
+  TasksIcon,
+  TicketsIcon,
+  TodayIcon,
+  WhatsappIcon,
 } from '@toobler-one/ui';
+
+/** Every icon from the Figma frame, with its component name, for the gallery. */
+const ICON_EXAMPLES = [
+  { name: 'ActivitiesIcon', Component: ActivitiesIcon },
+  { name: 'ActivityIcon', Component: ActivityIcon },
+  { name: 'AddNoteIcon', Component: AddNoteIcon },
+  { name: 'AiAgentIcon', Component: AiAgentIcon },
+  { name: 'BellIcon', Component: BellIcon },
+  { name: 'CalendarIcon', Component: CalendarIcon },
+  { name: 'CheckIcon', Component: CheckIcon },
+  { name: 'CompaniesIcon', Component: CompaniesIcon },
+  { name: 'ContactsIcon', Component: ContactsIcon },
+  { name: 'ExportIcon', Component: ExportIcon },
+  { name: 'FilterIcon', Component: FilterIcon },
+  { name: 'FollowUpsIcon', Component: FollowUpsIcon },
+  { name: 'ImportIcon', Component: ImportIcon },
+  { name: 'LeadsIcon', Component: LeadsIcon },
+  { name: 'ListViewIcon', Component: ListViewIcon },
+  { name: 'ManageColumnsIcon', Component: ManageColumnsIcon },
+  { name: 'MoonIcon', Component: MoonIcon },
+  { name: 'MoreIcon', Component: MoreIcon },
+  { name: 'PhoneIcon', Component: PhoneIcon },
+  { name: 'PlusIcon', Component: PlusIcon },
+  { name: 'ReportsIcon', Component: ReportsIcon },
+  { name: 'SearchIcon', Component: SearchIcon },
+  { name: 'SettingsIcon', Component: SettingsIcon },
+  { name: 'SharedInboxIcon', Component: SharedInboxIcon },
+  { name: 'SidebarToggleIcon', Component: SidebarToggleIcon },
+  { name: 'SortIcon', Component: SortIcon },
+  { name: 'SplitViewIcon', Component: SplitViewIcon },
+  { name: 'TasksIcon', Component: TasksIcon },
+  { name: 'TicketsIcon', Component: TicketsIcon },
+  { name: 'TodayIcon', Component: TodayIcon },
+  { name: 'WhatsappIcon', Component: WhatsappIcon },
+];
 
 const COLOR_TOKENS = [
   'canvas',
+  'header',
   'surface',
-  'surface-muted',
-  'surface-hover',
-  'border',
+  'surface-subtle',
+  'input',
+  'hover',
+  'selected',
+  'disabled',
+  'sidebar',
+  'sidebar-item-active-bg',
+  'border-subtle',
+  'border-default',
   'border-strong',
+  'border-emphasis',
   'text-primary',
   'text-secondary',
-  'text-muted',
+  'text-tertiary',
   'text-disabled',
+  'icon-primary',
+  'icon-secondary',
+  'link',
+  'focus',
   'action',
   'action-hover',
   'action-pressed',
-  'action-subtle',
-  'focus-ring',
+  'card-header-lavender',
+  'card-header-peach',
+  'card-header-neutral',
   'success',
   'success-bg',
   'warning',
@@ -38,30 +120,41 @@ const COLOR_TOKENS = [
   'error-bg',
   'info',
   'info-bg',
+  'tag-stage-new',
+  'tag-stage-contacted',
+  'tag-stage-qualified',
+  'tag-stage-rate-sent',
+  'tag-stage-won',
+  'tag-stage-lost',
+  'chart-series-1',
+  'chart-series-2',
+  'chart-series-3',
+  'chart-series-4',
 ];
 
 const TEXT_STYLES = [
-  'text-4xl-display',
-  'text-2xl-page-title',
-  'text-xl-section-title',
-  'text-lg-subsection-title',
-  'text-base-heading',
-  'text-base-body',
-  'text-sm-body',
-  'text-xs-supporting',
-  'text-xs-label',
-  'text-sm-button',
-  'text-xs-navigation',
-  'text-xs-caption',
-  'text-11-compact',
-  'text-11-caps',
+  'text-heading-3xl',
+  'text-heading-2xl',
+  'text-heading-lg',
+  'text-heading-md',
+  'text-heading-sm',
+  'text-body-lg',
+  'text-body-md',
+  'text-body-sm',
+  'text-label-sm',
+  'text-body-md-semibold',
+  'text-body-sm-medium',
+  'text-body-xs',
+  'text-label-xs',
+  'text-label-xs-semibold',
+  'text-label-xs-caps',
 ];
 
 /** A titled block of the gallery. */
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card className="mb-6">
-      <h2 className="text-lg-subsection-title mb-4 text-text-primary">{title}</h2>
+      <h2 className="text-heading-md mb-4 text-text-primary">{title}</h2>
       {children}
     </Card>
   );
@@ -82,10 +175,10 @@ export function UiGallery() {
             <li key={tokenName} className="flex items-center gap-2">
               <span
                 aria-hidden
-                className="size-8 shrink-0 rounded-md border border-border-strong"
+                className="size-8 shrink-0 rounded-md border border-border-default"
                 style={{ backgroundColor: `var(--color-${tokenName})` }}
               />
-              <span className="text-xs-caption text-text-secondary">{tokenName}</span>
+              <span className="text-body-xs text-text-secondary">{tokenName}</span>
             </li>
           ))}
         </ul>
@@ -103,7 +196,7 @@ export function UiGallery() {
 
       <Section title="Buttons">
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="primary" leadingIcon={<Plus aria-hidden className="size-4" />}>
+          <Button variant="primary" leadingIcon={<PlusIcon />}>
             Primary
           </Button>
           <Button variant="secondary">Secondary</Button>
@@ -124,7 +217,7 @@ export function UiGallery() {
           <Button variant="primary" size="touch">
             Touch size (44 px)
           </Button>
-          <IconButton label="Add" icon={<Plus aria-hidden className="size-5" />} />
+          <IconButton label="Add" icon={<PlusIcon size={20} />} />
         </div>
       </Section>
 
@@ -136,6 +229,40 @@ export function UiGallery() {
           <Badge tone="error">Error</Badge>
           <Badge tone="info">Information</Badge>
           <Badge icon={<Sparkles aria-hidden className="size-3" />}>AI agent</Badge>
+        </div>
+      </Section>
+
+      <Section title="Logo and icons">
+        <div className="mb-4 inline-flex rounded-lg bg-sidebar p-4">
+          <LogoOne className="text-sidebar-logo" />
+        </div>
+        <ul className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
+          {ICON_EXAMPLES.map(({ name, Component }) => (
+            <li key={name} className="flex items-center gap-2">
+              <Component size={20} className="shrink-0 text-icon-secondary" />
+              <span className="text-body-xs text-text-secondary">{name}</span>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      <Section title="Lead-stage tags">
+        <div className="flex flex-wrap gap-2">
+          <Tag tone="new">New</Tag>
+          <Tag tone="contacted">Contacted</Tag>
+          <Tag tone="qualified">Qualified</Tag>
+          <Tag tone="rate-sent">Rate sent</Tag>
+          <Tag tone="won">Won</Tag>
+          <Tag tone="lost">Lost</Tag>
+        </div>
+      </Section>
+
+      <Section title="Checkboxes">
+        <div className="flex flex-wrap items-center gap-6">
+          <Checkbox label="Unchecked" />
+          <Checkbox label="Checked" defaultChecked />
+          <Checkbox label="Disabled" disabled />
+          <Checkbox label="Select this row (label hidden)" isLabelHidden />
         </div>
       </Section>
 
@@ -157,7 +284,7 @@ export function UiGallery() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <EmptyState
-              icon={<Plus aria-hidden className="size-6" />}
+              icon={<PlusIcon size={24} />}
               title="No leads yet"
               description="Leads appear here when a customer calls or messages."
               action={<Button variant="primary">Add a lead</Button>}

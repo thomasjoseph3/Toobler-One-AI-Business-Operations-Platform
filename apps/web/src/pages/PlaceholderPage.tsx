@@ -49,7 +49,7 @@ export function PlaceholderPage({ item }: { item: NavigationItem }) {
               PAGES_THAT_START_WITH_CHANNELS.includes(item.id) ? (
                 <Link
                   to="/channels"
-                  className="text-sm-button inline-flex h-10 items-center rounded-md bg-action px-4 text-white hover:bg-action-hover active:bg-action-pressed"
+                  className="text-body-md-semibold inline-flex h-10 items-center rounded-md bg-action px-4 text-link-text hover:bg-action-hover active:bg-action-pressed"
                 >
                   {t('page.setUpChannels')}
                 </Link>
@@ -58,11 +58,11 @@ export function PlaceholderPage({ item }: { item: NavigationItem }) {
           />
         </Card>
         <Card>
-          <h2 className="text-base-heading mb-3 text-text-primary">{t('page.previewHeading')}</h2>
+          <h2 className="text-heading-sm mb-3 text-text-primary">{t('page.previewHeading')}</h2>
           <ul className="flex flex-col gap-3">
             {previewKeys(item.id).map((messageKey) => (
-              <li key={messageKey} className="text-sm-body flex gap-3 text-text-secondary">
-                <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-action" />
+              <li key={messageKey} className="text-body-md flex gap-3 text-text-secondary">
+                <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-link" />
                 {t(messageKey)}
               </li>
             ))}
