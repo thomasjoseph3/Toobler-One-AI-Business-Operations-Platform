@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
 import { RequireSignIn } from '../auth/RequireSignIn';
 import { SessionProvider } from '../auth/session';
@@ -36,6 +37,7 @@ export function App() {
                     element={item.id === 'leads' ? <LeadsPage /> : <PlaceholderPage item={item} />}
                   />
                 ))}
+                <Route path="/leads/:leadId" element={<LeadPage />} />
                 {UiGallery ? (
                   <Route
                     path="/dev/ui"

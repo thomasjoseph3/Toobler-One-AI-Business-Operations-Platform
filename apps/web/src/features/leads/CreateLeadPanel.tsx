@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import type { Contact } from '@toobler-one/shared';
-import { Alert, Button, SidePanel, TextAreaField, TextField } from '@toobler-one/ui';
+import { Alert, Button, SidePanel, TextField } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { t, type MessageKey } from '../../app/i18n';
+import { LeadDetailsFormFields } from './LeadDetailsFormFields';
 import { findLeadDisplayName } from './lead-display';
 import {
   buildContactRequest,
@@ -240,52 +241,7 @@ export function CreateLeadPanel({ isOpen, onClose, timeZone, onCreated }: Create
           <h3 id="lead-form-details" className="text-heading-sm text-text-primary">
             {t('leadForm.details.heading')}
           </h3>
-          <TextAreaField
-            label={t('leadForm.interest')}
-            requirementLabel={t('leadForm.optional')}
-            maxLength={1000}
-            value={fields.interest}
-            onChange={(event) => changeFields({ interest: event.target.value })}
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <TextField
-              label={t('leadForm.dateFrom')}
-              type="date"
-              value={fields.dateFrom}
-              onChange={(event) => changeFields({ dateFrom: event.target.value })}
-            />
-            <TextField
-              label={t('leadForm.dateTo')}
-              type="date"
-              value={fields.dateTo}
-              onChange={(event) => changeFields({ dateTo: event.target.value })}
-              {...(problems.dateTo ? { errorMessage: t(problems.dateTo) } : {})}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <TextField
-              label={t('leadForm.partySize')}
-              inputMode="numeric"
-              value={fields.partySize}
-              onChange={(event) => changeFields({ partySize: event.target.value })}
-              {...(problems.partySize ? { errorMessage: t(problems.partySize) } : {})}
-            />
-            <TextField
-              label={t('leadForm.budget')}
-              inputMode="decimal"
-              value={fields.budget}
-              onChange={(event) => changeFields({ budget: event.target.value })}
-              {...(problems.budget ? { errorMessage: t(problems.budget) } : {})}
-            />
-          </div>
-          <TextField
-            label={t('leadForm.callbackAt')}
-            requirementLabel={t('leadForm.optional')}
-            type="datetime-local"
-            value={fields.callbackAt}
-            onChange={(event) => changeFields({ callbackAt: event.target.value })}
-            {...(problems.callbackAt ? { errorMessage: t(problems.callbackAt) } : {})}
-          />
+          <LeadDetailsFormFields fields={fields} problems={problems} onChange={changeFields} />
           <p className="text-body-xs text-text-secondary">{t('leadForm.ownerNote')}</p>
         </section>
       </form>

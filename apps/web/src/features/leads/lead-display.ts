@@ -66,3 +66,42 @@ export function describeShownRange(page: number, limit: number, total: number): 
   const last = Math.min(page * limit, total);
   return first === last ? String(first) : `${first}–${last}`;
 }
+
+/** A plain date like 2026-12-20 as "20 Dec 2026" (the design system's unambiguous date style), or null when there is none. */
+export function formatLeadDate(plainDate: string | null): string | null {
+  if (plainDate === null) return null;
+  // A plain date has no time zone, so it is read as UTC and shown as UTC: it can never slip to the day before or after
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(
+    new Date(`${plainDate}T00:00:00Z`),
+  );
+}
+
+/** An amount in paise as rupees with Indian grouping ("₹1,20,000"), with paise only when there are some; null when there is no budget. */
+export function formatBudget(budgetPaise: number | null): string | null {
+  if (budgetPaise === null) return null;
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: budgetPaise % 100 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(budgetPaise / 100);
+}
+
+/** A UTC moment as "22 Nov 2026, 10:00 am" in the business's time zone, or null when there is none. */
+export function formatMoment(utcMoment: string | null, timeZone: string): string | null {
+  if (utcMoment === null) return null;
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone,
+  }).format(new Date(utcMoment));
+}
+
+/** The digits of a phone number for a WhatsApp link (`https://wa.me/<digits>`): the number in international form without the plus sign. */
+export function toWhatsappDigits(phone: string): string {
+  return phone.replace(/\D/g, '');
+}

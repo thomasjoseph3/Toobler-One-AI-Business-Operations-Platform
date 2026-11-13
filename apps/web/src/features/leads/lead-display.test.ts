@@ -5,7 +5,11 @@ import {
   findLeadDisplayName,
   findOwnerLabel,
   findStageTagTone,
+  formatBudget,
   formatCallbackDate,
+  formatLeadDate,
+  formatMoment,
+  toWhatsappDigits,
 } from './lead-display';
 
 const contact = (fields: Partial<{ name: string | null; phone: string | null; email: string | null }>) => ({
@@ -82,5 +86,38 @@ describe('describeShownRange', () => {
     expect(describeShownRange(3, 25, 60)).toBe('51–60');
     expect(describeShownRange(1, 25, 1)).toBe('1');
     expect(describeShownRange(1, 25, 0)).toBe('0');
+  });
+});
+
+describe('formatLeadDate', () => {
+  it('shows a plain date as day, month and year, never a day off', () => {
+    expect(formatLeadDate('2026-12-20')).toBe('20 Dec 2026');
+    expect(formatLeadDate('2026-01-01')).toBe('1 Jan 2026');
+    expect(formatLeadDate(null)).toBeNull();
+  });
+});
+
+describe('formatBudget', () => {
+  it('shows rupees with Indian grouping, and paise only when there are some', () => {
+    expect(formatBudget(4_500_000)).toBe('₹45,000');
+    expect(formatBudget(12_000_000)).toBe('₹1,20,000');
+    expect(formatBudget(450_050)).toBe('₹4,500.50');
+    expect(formatBudget(0)).toBe('₹0');
+    expect(formatBudget(null)).toBeNull();
+  });
+});
+
+describe('formatMoment', () => {
+  it('shows date and time in the business time zone', () => {
+    expect(formatMoment('2026-11-22T04:30:00.000Z', 'Asia/Kolkata')).toBe('22 Nov 2026, 10:00 am');
+    expect(formatMoment('2026-11-22T21:00:00.000Z', 'Asia/Kolkata')).toBe('23 Nov 2026, 2:30 am');
+    expect(formatMoment(null, 'Asia/Kolkata')).toBeNull();
+  });
+});
+
+describe('toWhatsappDigits', () => {
+  it('keeps only the digits of an international number', () => {
+    expect(toWhatsappDigits('+919847011201')).toBe('919847011201');
+    expect(toWhatsappDigits('+91 98470-11201')).toBe('919847011201');
   });
 });

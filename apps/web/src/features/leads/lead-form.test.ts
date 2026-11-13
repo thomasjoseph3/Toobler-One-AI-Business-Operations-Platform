@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { Lead } from '@toobler-one/shared';
 import {
   buildContactRequest,
   buildLeadRequest,
   checkLeadForm,
   convertBusinessLocalTimeToUtc,
   EMPTY_LEAD_FORM,
+  buildLeadChanges,
+  checkLeadDetails,
+  formatPaiseAsRupees,
+  formatUtcAsBusinessLocalTime,
+  leadToDetailsFields,
   parseRupeesToPaise,
   type LeadFormFields,
 } from './lead-form';
@@ -116,6 +122,114 @@ describe('what is sent to the API', () => {
       partySize: 4,
       budgetPaise: 4_500_000,
       callbackAt: '2026-11-22T04:30:00.000Z',
+    });
+  });
+});
+
+/** A lead as the API gives it, with the details a test wants to change. */
+const aLead = (changes: Partial<Lead> = {}): Lead => ({
+  id: 'lead-1',
+  contactId: 'contact-1',
+  contact: { id: 'contact-1', name: 'Priya Menon', phone: '+919847011201', email: null },
+  stage: { id: 'stage-new', name: 'New', kind: 'open' },
+  temperature: 'unscored',
+  interest: 'Family room, 3 nights',
+  dateFrom: '2026-12-20',
+  dateTo: '2026-12-23',
+  partySize: 4,
+  budgetPaise: 4_500_000,
+  promise: null,
+  callbackAt: '2026-11-22T04:30:00.000Z',
+  ownerUserId: 'user-1',
+  offering: null,
+  firstChannel: 'manual',
+  lastActivityAt: '2026-11-13T09:00:00.000Z',
+  lostReason: null,
+  closedAt: null,
+  createdAt: '2026-11-13T09:00:00.000Z',
+  updatedAt: '2026-11-13T09:00:00.000Z',
+  ...changes,
+});
+
+describe('formatPaiseAsRupees and formatUtcAsBusinessLocalTime', () => {
+  it('turn the stored values back into what the edit boxes show', () => {
+    expect(formatPaiseAsRupees(4_500_000)).toBe('45000');
+    expect(formatPaiseAsRupees(450_050)).toBe('4500.50');
+    expect(formatPaiseAsRupees(null)).toBe('');
+    expect(formatUtcAsBusinessLocalTime('2026-11-22T04:30:00.000Z', 'Asia/Kolkata')).toBe('2026-11-22T10:00');
+    expect(formatUtcAsBusinessLocalTime('2026-07-15T13:00:00.000Z', 'America/New_York')).toBe('2026-07-15T09:00');
+    expect(formatUtcAsBusinessLocalTime(null, 'Asia/Kolkata')).toBe('');
+  });
+  it('round-trip: what is shown converts back to the same moment', () => {
+    const shown = formatUtcAsBusinessLocalTime('2026-11-22T04:30:00.000Z', 'Asia/Kolkata');
+    expect(convertBusinessLocalTimeToUtc(shown, 'Asia/Kolkata')).toBe('2026-11-22T04:30:00.000Z');
+  });
+});
+
+describe('leadToDetailsFields and buildLeadChanges', () => {
+  it('fills the edit boxes from the lead', () => {
+    expect(leadToDetailsFields(aLead(), 'Asia/Kolkata')).toEqual({
+      interest: 'Family room, 3 nights',
+      dateFrom: '2026-12-20',
+      dateTo: '2026-12-23',
+      partySize: '4',
+      budget: '45000',
+      callbackAt: '2026-11-22T10:00',
+      promise: '',
+    });
+  });
+  it('sends nothing when nothing was changed, even if the callback has seconds', () => {
+    const lead = aLead({ callbackAt: '2026-11-22T04:30:42.000Z' });
+    expect(buildLeadChanges(lead, leadToDetailsFields(lead, 'Asia/Kolkata'), 'Asia/Kolkata')).toEqual({});
+  });
+  it('sends only the fields that changed, in the form the API takes', () => {
+    const lead = aLead();
+    const edited = {
+      ...leadToDetailsFields(lead, 'Asia/Kolkata'),
+      interest: '  Two rooms  ',
+      budget: '60,000',
+      callbackAt: '2026-11-25T15:00',
+      promise: 'Manager will call by 5 PM',
+    };
+    expect(buildLeadChanges(lead, edited, 'Asia/Kolkata')).toEqual({
+      interest: 'Two rooms',
+      budgetPaise: 6_000_000,
+      callbackAt: '2026-11-25T09:30:00.000Z',
+      promise: 'Manager will call by 5 PM',
+    });
+  });
+  it('clears a field with null when its box was emptied', () => {
+    const lead = aLead({ promise: 'Call by 5' });
+    const edited = {
+      ...leadToDetailsFields(lead, 'Asia/Kolkata'),
+      interest: '',
+      dateFrom: '',
+      dateTo: '',
+      partySize: '',
+      budget: '',
+      callbackAt: '',
+      promise: ' ',
+    };
+    expect(buildLeadChanges(lead, edited, 'Asia/Kolkata')).toEqual({
+      interest: null,
+      dateFrom: null,
+      dateTo: null,
+      partySize: null,
+      budgetPaise: null,
+      callbackAt: null,
+      promise: null,
+    });
+  });
+  it('checks the details the same way as the create form', () => {
+    const lead = aLead();
+    const problems = checkLeadDetails(
+      { ...leadToDetailsFields(lead, 'Asia/Kolkata'), dateTo: '2026-12-19', partySize: '0', budget: 'lots' },
+      'Asia/Kolkata',
+    );
+    expect(problems).toEqual({
+      dateTo: 'leadForm.problem.dateOrder',
+      partySize: 'leadForm.problem.partySize',
+      budget: 'leadForm.problem.budget',
     });
   });
 });
