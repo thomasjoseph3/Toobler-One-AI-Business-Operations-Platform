@@ -38,18 +38,29 @@ export interface PretendApi {
   leadCount: number;
   /** When true, the leads calls fail with a server error (the rest of the app still works). */
   leadsFail: boolean;
+  /** The query part (`?status=open&...`) of every `GET /leads` the page made, so a test can see what was asked for. */
+  leadQueries: string[];
 }
+
+/** The ids of the pretend stages (real-looking ids, because the page only accepts ids of that shape in the address). */
+export const PRETEND_STAGE_IDS = {
+  new: '0191f0a0-0000-7000-8000-0000000000a1',
+  contacted: '0191f0a0-0000-7000-8000-0000000000a2',
+  quoted: '0191f0a0-0000-7000-8000-0000000000a3',
+  won: '0191f0a0-0000-7000-8000-0000000000a4',
+  lost: '0191f0a0-0000-7000-8000-0000000000a5',
+};
 
 /** The business's pipeline as the pretend API gives it: three open stages, then Won and Lost. */
 const PRETEND_PIPELINE = {
   id: 'pipeline-1',
   name: 'Sales',
   stages: [
-    { id: 'stage-new', name: 'New', kind: 'open', sort: 0, leadCount: 0 },
-    { id: 'stage-contacted', name: 'Contacted', kind: 'open', sort: 1, leadCount: 0 },
-    { id: 'stage-quoted', name: 'Quoted', kind: 'open', sort: 2, leadCount: 0 },
-    { id: 'stage-won', name: 'Won', kind: 'won', sort: 3, leadCount: 0 },
-    { id: 'stage-lost', name: 'Lost', kind: 'lost', sort: 4, leadCount: 0 },
+    { id: PRETEND_STAGE_IDS.new, name: 'New', kind: 'open', sort: 0, leadCount: 0 },
+    { id: PRETEND_STAGE_IDS.contacted, name: 'Contacted', kind: 'open', sort: 1, leadCount: 0 },
+    { id: PRETEND_STAGE_IDS.quoted, name: 'Quoted', kind: 'open', sort: 2, leadCount: 0 },
+    { id: PRETEND_STAGE_IDS.won, name: 'Won', kind: 'won', sort: 3, leadCount: 0 },
+    { id: PRETEND_STAGE_IDS.lost, name: 'Lost', kind: 'lost', sort: 4, leadCount: 0 },
   ],
 };
 
@@ -61,6 +72,7 @@ const PRETEND_PIPELINE = {
 function pretendLead(index: number) {
   const shape = index % 3;
   const stageNames = ['New', 'Contacted', 'Quoted'];
+  const stageIds = [PRETEND_STAGE_IDS.new, PRETEND_STAGE_IDS.contacted, PRETEND_STAGE_IDS.quoted];
   const channels = ['whatsapp', 'web_chat', 'email'];
   return {
     id: `lead-${index}`,
@@ -71,7 +83,7 @@ function pretendLead(index: number) {
       phone: shape === 2 ? null : `+9198470${String(10000 + index)}`,
       email: shape === 1 ? null : `person${index}@example.com`,
     },
-    stage: { id: `stage-${stageNames[shape]!.toLowerCase()}`, name: stageNames[shape], kind: 'open' },
+    stage: { id: stageIds[shape], name: stageNames[shape], kind: 'open' },
     temperature: 'unscored',
     interest: null,
     dateFrom: null,
@@ -115,6 +127,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         lastSignInHeaders: {},
         leadCount: 3,
         leadsFail: false,
+        leadQueries: [],
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -131,6 +144,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           if (pretendApi.leadsFail) return route.fulfill(json(500, { error: { code: 'BROKEN', message: 'Broken.' } }));
           if (!pretendApi.signedIn || pretendApi.accessExpired) return route.fulfill(unauthorized);
           if (path === '/pipeline') return route.fulfill(json(200, PRETEND_PIPELINE));
+          pretendApi.leadQueries.push(new URL(request.url()).search);
           const query = new URL(request.url()).searchParams;
           const pageNumber = Number(query.get('page') ?? '1');
           const limit = Number(query.get('limit') ?? '25');

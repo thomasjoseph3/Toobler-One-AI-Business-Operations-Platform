@@ -15,6 +15,8 @@ export {
   TableRow,
   type TableRowProps,
 } from './components/Table';
+export { SelectField, type SelectFieldProps } from './components/SelectField';
+export { Popover, type PopoverProps, type PopoverTriggerControl } from './components/Popover';
 export { Pagination, type PaginationProps } from './components/Pagination';
 export {
   SegmentedControl,

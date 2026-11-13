@@ -13,6 +13,8 @@ import {
   LoadingState,
   LogoOne,
   Pagination,
+  Popover,
+  SelectField,
   Table,
   TableBody,
   TableCell,
@@ -312,6 +314,30 @@ export function UiGallery() {
         <div className="mt-4 flex flex-wrap gap-2">
           <Tag tone="neutral">Neutral tag (extra stage)</Tag>
           <Button size="compact">Compact button</Button>
+        </div>
+      </Section>
+
+      <Section title="Drop-down and panel">
+        <div className="flex flex-wrap items-start gap-4">
+          <SelectField
+            className="w-60"
+            label="Stage"
+            options={[
+              { value: '', label: 'Any stage' },
+              { value: 'new', label: 'New' },
+              { value: 'quoted', label: 'Quoted' },
+            ]}
+          />
+          <Popover
+            panelLabel="Example panel"
+            renderTrigger={({ isOpen, toggle }) => (
+              <Button size="compact" aria-haspopup="dialog" aria-expanded={isOpen} onClick={toggle}>
+                Open a panel
+              </Button>
+            )}
+          >
+            <SelectField label="Sort by" options={[{ value: 'a', label: 'Date added' }]} />
+          </Popover>
         </div>
       </Section>
 

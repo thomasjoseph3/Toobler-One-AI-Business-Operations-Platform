@@ -1,4 +1,4 @@
-import { expect, test } from './support';
+import { expect, PRETEND_PROFILE, PRETEND_STAGE_IDS, test } from './support';
 
 test.describe('Leads list', () => {
   test('shows the open leads with the display rules: name, phone or email as the name, tags, owner, callback date', async ({
@@ -68,5 +68,101 @@ test.describe('Leads list', () => {
     pretendApi.leadsFail = false;
     await page.getByRole('button', { name: 'Try again' }).click();
     await expect(page.getByText('Priya Menon 0', { exact: true }).locator('visible=true')).toBeVisible();
+  });
+
+  test('Filter: one stage, closed leads and only mine are asked of the API, shown in the address, and counted on the button', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/leads');
+    await page.getByRole('button', { name: 'Filter' }).click();
+    const panel = page.getByRole('dialog', { name: 'Filter leads' });
+    await panel.getByLabel('Stage').selectOption({ label: 'Quoted' });
+    await expect(page).toHaveURL(new RegExp(`stage=${PRETEND_STAGE_IDS.quoted}`));
+    await expect.poll(() => pretendApi.leadQueries.at(-1)).toContain(`stageId=${PRETEND_STAGE_IDS.quoted}`);
+    await panel.getByLabel('Owner').selectOption({ label: 'Only mine' });
+    await expect(page).toHaveURL(/owner=me/);
+    await expect.poll(() => pretendApi.leadQueries.at(-1)).toContain(`ownerUserId=${PRETEND_PROFILE.user.id}`);
+    // The button says how many filters are on, in words for screen readers too
+    await expect(page.getByRole('button', { name: /Filter.*Filters on: 2/ })).toBeVisible();
+    // Closed leads offer Won and Lost, not the open stages, and clear the stage that was picked
+    await panel.getByLabel('Show').selectOption({ label: 'Closed leads (won or lost)' });
+    await expect(page).toHaveURL(/status=closed/);
+    await expect(page).not.toHaveURL(/stage=/);
+    await expect(panel.getByLabel('Stage').getByRole('option')).toHaveText(['Any stage', 'Won', 'Lost']);
+    await expect(
+      page
+        .getByText(/closed leads/)
+        .locator('visible=true')
+        .first(),
+    ).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+  });
+
+  test('Sort: the field and its direction are asked of the API and shown in the address', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/leads');
+    await page.getByRole('button', { name: 'Sort' }).click();
+    const panel = page.getByRole('dialog', { name: 'Sort leads' });
+    await panel.getByLabel('Sort by').selectOption({ label: 'Next callback' });
+    await expect(page).toHaveURL(/sort=callbackAt/);
+    await expect(page).toHaveURL(/order=asc/);
+    await expect(panel.getByLabel('Order').getByRole('option')).toHaveText(['Soonest first', 'Latest first']);
+    await panel.getByLabel('Order').selectOption({ label: 'Latest first' });
+    await expect.poll(() => pretendApi.leadQueries.at(-1)).toContain('sort=callbackAt&order=desc');
+    await panel.getByLabel('Sort by').selectOption({ label: 'Date added' });
+    await expect(panel.getByLabel('Order').getByRole('option')).toHaveText(['Newest first', 'Oldest first']);
+    await expect.poll(() => pretendApi.leadQueries.at(-1)).toContain('sort=createdAt&order=desc');
+  });
+
+  test('a link keeps the view: the address is read when the page opens', async ({ page, pretendApi }) => {
+    await page.goto(`/leads?stage=${PRETEND_STAGE_IDS.contacted}&sort=callbackAt&order=asc`);
+    await expect(page.getByText('Priya Menon 0', { exact: true }).locator('visible=true')).toBeVisible();
+    expect(pretendApi.leadQueries[0]).toContain(`stageId=${PRETEND_STAGE_IDS.contacted}`);
+    expect(pretendApi.leadQueries[0]).toContain('sort=callbackAt&order=asc');
+    await expect(page.getByRole('button', { name: /Filter.*Filters on: 1/ })).toBeVisible();
+  });
+
+  test('a link that makes no sense still opens the plain list', async ({ page, pretendApi }) => {
+    await page.goto('/leads?status=maybe&stage=banana&sort=name&order=sideways&page=-4');
+    await expect(page.getByText('Priya Menon 0', { exact: true }).locator('visible=true')).toBeVisible();
+    expect(pretendApi.leadQueries[0]).toBe('?status=open&sort=lastActivity&order=desc&page=1&limit=25');
+  });
+
+  test('when no lead matches the filters it says so and Clear filters brings the list back', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.leadCount = 0;
+    await page.goto('/leads?owner=me');
+    await expect(page.getByRole('heading', { name: 'No leads match these filters' })).toBeVisible();
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page).not.toHaveURL(/owner=/);
+    await expect(page.getByRole('heading', { name: 'No leads yet' })).toBeVisible();
+  });
+
+  test('the page number is kept in the address, so a refresh stays on the same page', async ({ page, pretendApi }) => {
+    pretendApi.leadCount = 30;
+    await page.goto('/leads');
+    await page
+      .getByRole('navigation', { name: 'Leads pages' })
+      .locator('visible=true')
+      .getByRole('button', { name: 'Next' })
+      .click();
+    await expect(page).toHaveURL(/page=2/);
+    await page.reload();
+    await expect(page.getByText('Showing 26–30 of 30 open leads').locator('visible=true')).toBeVisible();
+  });
+
+  test('changing a filter goes back to page 1', async ({ page, pretendApi }) => {
+    pretendApi.leadCount = 30;
+    await page.goto('/leads?page=2');
+    await expect(page.getByText('Showing 26–30 of 30 open leads').locator('visible=true')).toBeVisible();
+    await page.getByRole('button', { name: 'Filter' }).click();
+    await page.getByRole('dialog', { name: 'Filter leads' }).getByLabel('Owner').selectOption({ label: 'Only mine' });
+    await expect(page).not.toHaveURL(/page=/);
   });
 });
