@@ -7,13 +7,13 @@ import { NAVIGATION_ITEMS } from '../navigation';
 
 const barLinkClasses = (isActive: boolean) =>
   joinClassNames(
-    'text-11-compact flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1',
-    isActive ? 'text-action' : 'text-text-secondary',
+    'text-label-xs flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1',
+    isActive ? 'text-text-primary' : 'text-text-secondary',
   );
 
 /**
  * The phone navigation: a bottom bar with the four most-used pages and "More", which opens a sheet with all the other
- * pages. Touch targets are 64 px high. Hidden from 768 px up, where the rail takes over.
+ * pages. Touch targets are 64 px high. Hidden from 768 px up, where the sidebar takes over.
  */
 export function BottomBar() {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
@@ -34,7 +34,7 @@ export function BottomBar() {
     <>
       <nav
         aria-label={t('nav.main')}
-        className="fixed inset-x-0 bottom-0 z-20 flex h-16 border-t border-border bg-surface md:hidden"
+        className="fixed inset-x-0 bottom-0 z-20 flex h-16 border-t border-border-default bg-surface md:hidden"
       >
         {barItems.map((item) => (
           <NavLink
@@ -62,10 +62,10 @@ export function BottomBar() {
         ref={sheetRef}
         aria-label={t('nav.moreTitle')}
         onClose={() => setIsMoreOpen(false)}
-        className="m-0 mt-auto w-full max-w-none rounded-t-xl border border-border bg-surface-raised p-4 text-text-primary backdrop:bg-scrim"
+        className="m-0 mt-auto w-full max-w-none rounded-t-xl border border-border-default bg-surface p-4 text-text-primary backdrop:bg-scrim"
       >
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base-heading">{t('nav.moreTitle')}</h2>
+          <h2 className="text-heading-sm">{t('nav.moreTitle')}</h2>
           <IconButton
             label={t('nav.close')}
             icon={<X aria-hidden className="size-5" />}
@@ -81,8 +81,8 @@ export function BottomBar() {
                 onClick={() => setIsMoreOpen(false)}
                 className={({ isActive }) =>
                   joinClassNames(
-                    'text-sm-body flex h-12 items-center gap-3 rounded-md px-2',
-                    isActive ? 'bg-action-subtle text-action' : 'text-text-primary hover:bg-surface-hover',
+                    'text-body-md flex h-12 items-center gap-3 rounded-md px-2',
+                    isActive ? 'bg-selected text-text-primary' : 'text-text-primary hover:bg-hover',
                   )
                 }
               >

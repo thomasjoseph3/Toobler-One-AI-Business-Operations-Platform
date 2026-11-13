@@ -4,6 +4,7 @@ import type { Database } from '../database';
 import type { EventHandlers } from '../events/events';
 import type { Authenticator } from '../http/guard';
 import type { JobDefinition } from '../jobs/jobs';
+import type { ModuleGate, Registry } from './registry';
 
 /**
  * Module kinds (docs/ARCHITECTURE.md): core is always on; engines, channels and features are switched on per business.
@@ -23,6 +24,11 @@ export interface ModuleManifest {
    * The kernel picks it up from the registry, so the kernel never imports the module.
    */
   authenticator?: (services: { config: Config; database: Database }) => Authenticator;
+  /**
+   * Only the `core.module_switches` module sets this: it builds the gate that says whether a module is on for a business.
+   * The kernel picks it up from the registry (like the authenticator), so the kernel never imports the module.
+   */
+  moduleGate?: (services: { config: Config; database: Database; registry: Registry }) => ModuleGate;
   /** Events this module reacts to (the module's handlers run only while the module is on for the business). */
   events?: EventHandlers;
   /** Background jobs this module owns, named `<module name>.<what>`. */

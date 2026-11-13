@@ -4,6 +4,8 @@ import type { Database } from '../../../../kernel/database';
 import { ApiError, conflict } from '../../../../kernel/errors';
 import { uuidv7 } from '../../../../kernel/ids';
 import { isActiveIndustry } from '../../industries';
+import { createDefaultPipelineSetup } from '../../leads';
+import { grantStartingModules } from '../../module-switches';
 import type { EmailVerificationService } from './email-verification.service';
 import * as accountsRepository from '../repositories/accounts.repository';
 import * as credentialsRepository from '../repositories/credentials.repository';
@@ -73,6 +75,10 @@ export function createSignUpService({
             createdBy: { kind: 'user', id: userId },
           });
           await credentialsRepository.insertCredentials(transaction, userId, passwordHash);
+          // The new business starts with its starting modules switched on
+          await grantStartingModules(transaction, accountId, userId);
+          // ...and its starting pipeline, lost reasons and the rule for sharing out new leads
+          await createDefaultPipelineSetup(transaction, { accountId, ownerUserId: userId });
           await writeActivityLog(transaction, {
             accountId,
             actor: { kind: 'user', id: userId },

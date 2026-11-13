@@ -29,7 +29,7 @@ export function TextField({
     [errorMessage ? errorId : null, helperText ? helperId : null].filter(Boolean).join(' ') || undefined;
   return (
     <div className={joinClassNames('flex flex-col gap-1', className)}>
-      <label htmlFor={inputId} className="text-xs-label text-text-primary">
+      <label htmlFor={inputId} className="text-label-sm text-text-primary">
         {label}
         {requirementLabel ? <span className="text-text-secondary"> ({requirementLabel})</span> : null}
       </label>
@@ -38,20 +38,20 @@ export function TextField({
         aria-invalid={errorMessage ? true : undefined}
         aria-describedby={describedBy}
         className={joinClassNames(
-          'text-sm-body w-full rounded-md border bg-surface px-3 text-text-primary placeholder:text-text-muted',
-          'hover:border-text-muted read-only:bg-surface-muted disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-disabled',
-          errorMessage ? 'border-error' : 'border-border-strong',
+          'text-body-md w-full rounded-md border bg-input px-3 text-text-primary placeholder:text-text-tertiary',
+          'hover:border-border-emphasis read-only:bg-surface-subtle disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:text-text-disabled',
+          errorMessage ? 'border-error' : 'border-border-default',
           size === 'touch' ? 'h-11' : 'h-10',
         )}
         {...rest}
       />
       {errorMessage ? (
-        <p id={errorId} className="text-xs-caption text-error">
+        <p id={errorId} className="text-body-xs text-error">
           {errorMessage}
         </p>
       ) : null}
       {helperText ? (
-        <p id={helperId} className="text-xs-caption text-text-secondary">
+        <p id={helperId} className="text-body-xs text-text-secondary">
           {helperText}
         </p>
       ) : null}

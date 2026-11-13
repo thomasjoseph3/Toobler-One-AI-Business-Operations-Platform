@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import { Link } from 'react-router';
-import { Card, EmptyState, PageHeader } from '@toobler-one/ui';
+import { Card, EmptyState } from '@toobler-one/ui';
 import { t, type MessageKey, type PageId } from '../app/i18n';
 import type { NavigationItem } from '../app/navigation';
 
@@ -33,12 +33,15 @@ const formatTodayDate = (date: Date): string =>
 export function PlaceholderPage({ item }: { item: NavigationItem }) {
   const now = new Date();
   const isToday = item.id === 'today';
-  const title = isToday ? greetingFor(now) : t(item.labelKey);
   const description = isToday ? `${formatTodayDate(now)}. ${t(item.descriptionKey)}` : t(item.descriptionKey);
 
   return (
     <>
-      <PageHeader title={title} description={description} />
+      {/* The page title is the top bar's heading (as in the Figma frame); here only the greeting and the description */}
+      <div className="mb-6">
+        {isToday ? <h2 className="text-heading-xl text-text-primary">{greetingFor(now)}</h2> : null}
+        <p className="text-body-md text-text-secondary">{description}</p>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <EmptyState
@@ -49,7 +52,7 @@ export function PlaceholderPage({ item }: { item: NavigationItem }) {
               PAGES_THAT_START_WITH_CHANNELS.includes(item.id) ? (
                 <Link
                   to="/channels"
-                  className="text-sm-button inline-flex h-10 items-center rounded-md bg-action px-4 text-white hover:bg-action-hover active:bg-action-pressed"
+                  className="text-body-md-semibold inline-flex h-10 items-center rounded-md bg-action px-4 text-action-text hover:bg-action-hover active:bg-action-pressed"
                 >
                   {t('page.setUpChannels')}
                 </Link>
@@ -58,11 +61,11 @@ export function PlaceholderPage({ item }: { item: NavigationItem }) {
           />
         </Card>
         <Card>
-          <h2 className="text-base-heading mb-3 text-text-primary">{t('page.previewHeading')}</h2>
+          <h2 className="text-heading-sm mb-3 text-text-primary">{t('page.previewHeading')}</h2>
           <ul className="flex flex-col gap-3">
             {previewKeys(item.id).map((messageKey) => (
-              <li key={messageKey} className="text-sm-body flex gap-3 text-text-secondary">
-                <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-action" />
+              <li key={messageKey} className="text-body-md flex gap-3 text-text-secondary">
+                <Check aria-hidden className="mt-0.5 size-4 shrink-0 text-link" />
                 {t(messageKey)}
               </li>
             ))}

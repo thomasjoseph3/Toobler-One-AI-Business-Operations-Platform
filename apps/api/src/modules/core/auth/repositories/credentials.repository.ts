@@ -17,3 +17,8 @@ export async function findPasswordHash(db: Db, userId: string): Promise<string |
     .executeTakeFirst();
   return row?.password_hash;
 }
+
+/** Replaces a person's password hash with a new one (never the password itself). */
+export async function setPasswordHash(db: Db, userId: string, passwordHash: string): Promise<void> {
+  await db.updateTable('user_credentials').set({ password_hash: passwordHash }).where('user_id', '=', userId).execute();
+}

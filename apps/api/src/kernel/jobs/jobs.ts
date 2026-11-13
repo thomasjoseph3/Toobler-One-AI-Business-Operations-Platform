@@ -1,8 +1,23 @@
 import type { FastifyBaseLogger } from 'fastify';
+import type { Config } from '../config';
 import type { AccountContext } from '../context';
+import type { Database } from '../database';
+import type { LlmProvider } from '../../providers/llm';
+import type { MailSender } from '../../providers/mail';
 
 /** What is stored with a job. `accountId` (when present) is the business the job is for. */
 export type JobData = { accountId?: string } & Record<string, unknown>;
+
+/**
+ * The services a job may need besides its business context: the settings, the database (for work across businesses, like a nightly
+ * check), the mail sender and the AI model layer. The same ones the web routes reach through `app.kernel`.
+ */
+export interface JobServices {
+  config: Config;
+  database: Database;
+  mail: MailSender;
+  llm: LlmProvider;
+}
 
 /** What a job's code receives when it runs. */
 export interface JobRun {
@@ -11,7 +26,10 @@ export interface JobRun {
   accountContext: AccountContext | undefined;
   /** Queues another job, for example one per business from a job that loops over businesses. */
   enqueueJob(jobName: string, data: JobData): Promise<void>;
+  /** The ids of every business, for a scheduled job that has no business of its own and queues one job per business. Ids only. */
+  listAccountIds(): Promise<string[]>;
   logger: FastifyBaseLogger;
+  services: JobServices;
 }
 
 /**
