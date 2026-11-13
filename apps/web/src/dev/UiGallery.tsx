@@ -12,7 +12,6 @@ import {
   IconButton,
   LoadingState,
   LogoOne,
-  PageHeader,
   Tag,
   TextField,
   ActivitiesIcon,
@@ -164,10 +163,9 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function UiGallery() {
   return (
     <>
-      <PageHeader
-        title="UI gallery"
-        description="Every design-system piece. Switch Light, Dark or System in the top bar."
-      />
+      <p className="text-body-md mb-6 text-text-secondary">
+        Every design-system piece. Switch Light, Dark or System with the moon button in the top bar.
+      </p>
 
       <Section title="Colours">
         <ul className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">

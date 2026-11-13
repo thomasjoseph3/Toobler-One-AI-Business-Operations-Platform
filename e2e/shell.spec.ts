@@ -97,6 +97,39 @@ test.describe('layout', () => {
   });
 });
 
+test.describe('shell (as in the Figma frame)', () => {
+  test('the top bar shows the page title as the one h1', async ({ page }) => {
+    await page.goto('/leads');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Leads');
+  });
+
+  test('the sidebar has the Figma groups, Settings and the signed-in person at the bottom, and it can collapse', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The sidebar is not shown on a phone');
+    await page.goto('/leads');
+    const sidebar = page.getByRole('navigation', { name: 'Main navigation' });
+    await expect(sidebar.getByText('CRM', { exact: true })).toBeVisible();
+    await expect(sidebar.getByText('AI & communication', { exact: true })).toBeVisible();
+    await expect(sidebar.getByRole('link', { name: 'Settings' })).toBeVisible();
+    await expect(sidebar.getByText('Anita Nair', { exact: true })).toBeVisible();
+    await sidebar.getByRole('button', { name: 'Collapse the sidebar' }).click();
+    await expect(sidebar.getByText('CRM', { exact: true })).toBeHidden();
+    expect((await sidebar.boundingBox())?.width).toBeCloseTo(72, 0);
+    await sidebar.getByRole('button', { name: 'Expand the sidebar' }).click();
+    expect((await sidebar.boundingBox())?.width).toBeCloseTo(256, 0);
+  });
+
+  test('the account menu opens with Sign out and closes with Escape', async ({ page }) => {
+    await page.goto('/');
+    const accountButton = page.getByRole('button', { name: /Account menu/ });
+    await accountButton.click();
+    await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menuitem', { name: 'Sign out' })).toHaveCount(0);
+  });
+});
+
 test.describe('theme', () => {
   const canvasColor = (page: import('@playwright/test').Page) =>
     page.evaluate(() => getComputedStyle(document.body).backgroundColor);

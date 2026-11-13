@@ -74,10 +74,10 @@ test.describe('signed-out visitors', () => {
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Account menu/ })).toBeVisible();
     if (testInfo.project.name === 'desktop') {
-      await expect(page.getByText('Anita Nair')).toBeVisible();
-      await expect(page.getByText('Nair Stays')).toBeVisible();
+      await expect(page.getByText('Anita Nair', { exact: true })).toBeVisible();
+      await expect(page.getByText('Nair Stays', { exact: true })).toBeVisible();
     }
     expect(pretendApi.lastSignInHeaders['x-requested-with']).toBe('toobler-web');
   });
@@ -106,7 +106,8 @@ test.describe('signed-in people', () => {
     await page.goto('/');
     await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Leads' }).click();
     await expect(page).toHaveURL(/\/leads$/);
-    await page.getByRole('button', { name: 'Sign out' }).click();
+    await page.getByRole('button', { name: /Account menu/ }).click();
+    await page.getByRole('menuitem', { name: 'Sign out' }).click();
     await expect(page).toHaveURL(/\/sign-in$/);
     expect(pretendApi.calls).toContain('POST /auth/logout');
     await page.goBack();
@@ -119,7 +120,7 @@ test.describe('signed-in people', () => {
     await page.goto('/');
     // /me answered 401; the client refreshed and asked again, so the person never sees the sign-in page. (In development
     // React asks /me twice on purpose, yet both share ONE refresh.)
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Account menu/ })).toBeVisible();
     await expect(page).toHaveURL(/\/$/);
     expect(pretendApi.calls.filter((call) => call === 'POST /auth/refresh')).toHaveLength(1);
   });
@@ -143,6 +144,6 @@ test.describe('when the server is down', () => {
     await expect(page).toHaveURL(/\/$/); // not sent to sign-in: being offline is not being signed out
     pretendApi.serverDown = false;
     await page.getByRole('button', { name: 'Try again' }).click();
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Account menu/ })).toBeVisible();
   });
 });

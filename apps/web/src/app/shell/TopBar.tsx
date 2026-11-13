@@ -1,34 +1,57 @@
-import { LogOut } from 'lucide-react';
-import { Button } from '@toobler-one/ui';
-import { useSession } from '../../auth/session';
+import { useLocation } from 'react-router';
+import { BellIcon, SearchIcon } from '@toobler-one/ui';
 import { t } from '../i18n';
+import { NAVIGATION_ITEMS } from '../navigation';
 import { ThemeSwitch } from './ThemeSwitch';
+import { UserMenu } from './UserMenu';
+
+/** The words for the heading of the page at this address: the menu entry's name, "UI gallery" for the developer page, else the product name. */
+function findPageTitle(pathname: string): string {
+  if (pathname.startsWith('/dev/ui')) return t('topBar.uiGalleryTitle');
+  const menuItem = NAVIGATION_ITEMS.find((item) =>
+    item.path === '/' ? pathname === '/' : pathname === item.path || pathname.startsWith(`${item.path}/`),
+  );
+  return menuItem ? t(menuItem.labelKey) : t('app.name');
+}
 
 /**
- * The 64 px bar across the top. On a phone it shows the product name (there is no sidebar). It shows who is signed in
- * and their business (the business name is hidden on a phone to save room), a Sign out button, and the theme switch.
+ * The 64 px bar across the top (Figma): the page's heading on the left (the one h1 of every page), then search, the theme
+ * button and notifications. Search and notifications are drawn as designed but switched off until their features exist
+ * (search with views and filters, notifications with staff alerts). On a phone only the heading, the theme button and the
+ * account button show.
  */
 export function TopBar() {
-  const { sessionState, signOut } = useSession();
-  const profile = sessionState.status === 'signedIn' ? sessionState.profile : null;
+  const { pathname } = useLocation();
   return (
-    <div className="sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-border-subtle bg-header px-4 md:justify-end md:px-6">
-      <span className="text-heading-sm text-text-primary md:hidden">{t('app.name')}</span>
-      <div className="flex min-w-0 items-center gap-2">
-        {profile ? (
-          <div className="hidden min-w-0 text-right md:block">
-            <p className="text-body-md-semibold truncate text-text-primary">{profile.user.name}</p>
-            <p className="text-body-xs truncate text-text-secondary">{profile.business.name}</p>
-          </div>
-        ) : null}
-        <Button
-          variant="tertiary"
-          leadingIcon={<LogOut aria-hidden className="size-4" />}
-          onClick={() => void signOut()}
+    <div className="sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-border-subtle bg-header px-4 md:px-6">
+      <h1 className="text-heading-lg min-w-0 truncate text-text-primary">{findPageTitle(pathname)}</h1>
+      <div className="flex shrink-0 items-center gap-2">
+        <label
+          title={t('topBar.searchSoon')}
+          className="hidden h-9 w-[240px] items-center gap-2 rounded-md border border-border-default bg-input px-3 md:flex"
         >
-          {t('session.signOut')}
-        </Button>
+          <SearchIcon size={18} className="shrink-0 text-icon-secondary" />
+          <span className="sr-only">{t('topBar.search')}</span>
+          <input
+            type="search"
+            disabled
+            placeholder={`${t('topBar.search')}…`}
+            className="text-body-md min-w-0 flex-1 bg-transparent text-text-primary placeholder:text-text-placeholder disabled:cursor-not-allowed"
+          />
+        </label>
         <ThemeSwitch />
+        <button
+          type="button"
+          disabled
+          title={t('topBar.notifications')}
+          aria-label={t('topBar.notifications')}
+          className="hidden size-10 items-center justify-center rounded-md text-icon-secondary disabled:cursor-not-allowed md:inline-flex"
+        >
+          <BellIcon size={20} />
+        </button>
+        <div className="md:hidden">
+          <UserMenu variant="avatar" />
+        </div>
       </div>
     </div>
   );

@@ -82,7 +82,7 @@ Destructive means the error outline or tint, and always sits inside `ConfirmDial
 | Component | Notes |
 | --- | --- |
 | `AppShell`, `SideNav`, `BottomBar`, `TopBar`, `BusinessSwitcher`, `GlobalSearch` | Dark sidebar: active item changes text, icon and row (`sidebar-item-active`, `sidebar-item-active-bg`). Badges only for actionable counts. Search opens a full-screen sheet on a phone. |
-| `PageHeader`, `Card`, `Section`, `Tabs`, `FilterChips`, `ViewTabs` | Page structure; no nested cards |
+| `Card`, `Section`, `Tabs`, `FilterChips`, `ViewTabs` | Page structure; no nested cards. The page title is the **top bar's h1** (as in the Figma frame); a screen has no title of its own, only its toolbar (Filter, Sort, view switch, Import, Export, the main action). `PageHeader` was removed on 13 Nov 2026. |
 | `DataList` | One component: table on desktop and tablet, stacked records on phone; chosen columns, sorting, sticky header |
 | `LeadCard` | Name, interest, dates, temperature, owner, time since last activity; draggable on the board; **Move** button on a phone |
 | `TemperatureTag`, `TypeChip`, `ChannelIcon`, `AiBadge`, `ActorLabel`, `Tag` (lead-stage pill, built), `StageBadge`, `AiUnsureChip`, `StatusBadge` | Tinted pill, readable foreground, icon + visible text; never colour alone |
@@ -115,6 +115,14 @@ these **reuse existing tokens** only. The owner decided (9 Nov 2026) to keep the
 | **Operational states** | The designer's Occupied, Needs cleaning, Booked, Out of service and Do not disturb are hotel housekeeping states. **Not used in Phase 1**; Phase 2 booking states may adopt them. | |
 | **Money** | Full Indian grouping everywhere (₹1,20,000); no ₹1.2L form | The design system allows either "consistently"; a CRM is read for exact figures. |
 | **Dates and time** | `20 Dec 2026`, range `12–15 Dec 2026`; times in the business's time zone with the zone shown when staff are in several | |
+
+**The app shell (built 13 Nov 2026 from the Figma Leads frame).** Sidebar 256 px (72 px compact on tablet, or when the person collapses it): logo and collapse button, groups Workspace (Today, Reports), CRM (Leads, Contacts, Companies, Inbox, Tasks, Tickets) and AI & communication (Knowledge base, Channels), then Settings and the signed-in person's card with a menu (Sign out). Top bar 64 px: page title, search, theme button, notifications. Things to know:
+- The group names and which page sits in which group are ours (the Figma shows Activities, Follow-ups, Shared Inbox, AI Agent, Phone and WhatsApp entries that are not pages yet). A page appears only when its module exists.
+- Search and notifications are drawn as designed but **switched off** until their features exist (search with views and filters, F11; notifications with staff alerts, F23).
+- The count badges next to Leads, Tasks and Inbox in the Figma need data from the API, so they are not shown yet.
+- The card under the person's name shows the business name, not a job title (the API only gives the three roles, and we do not rename backend words).
+- The theme button shows the designer's moon in light mode, a sun in dark mode and a monitor for System (the Figma has only the moon).
+- On a phone there is no sidebar: the top bar shows the title, the theme button and a round account button.
 
 ## 5. v1.3 findings and open questions for the designer
 

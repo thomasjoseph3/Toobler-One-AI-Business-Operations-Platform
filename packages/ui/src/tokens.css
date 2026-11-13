@@ -135,7 +135,8 @@
     sans-serif;
   --font-sans: 'Inter Variable', Inter, 'Noto Sans Malayalam', 'Noto Sans Devanagari', system-ui, sans-serif;
 
-  /* Spacing (v1.3 section 4) */
+  /* Spacing (v1.3 section 4). `--spacing` is Tailwind's 4 px base, so steps we do not name (1.5, 2.5, 11, 64...) are exact multiples of 4 px. */
+  --spacing: 4px;
   --spacing-1: 4px;
   --spacing-2: 8px;
   --spacing-3: 12px;

@@ -15,5 +15,4 @@ export {
   type EmptyStateProps,
   type ErrorStateProps,
 } from './components/states';
-export { PageHeader, type PageHeaderProps } from './components/PageHeader';
 export * from './icons';
