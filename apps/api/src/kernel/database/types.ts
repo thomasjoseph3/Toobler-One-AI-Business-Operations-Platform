@@ -338,6 +338,23 @@ export interface FaqsTable {
   updated_at: Generated<Date>;
 }
 
+/** A question customers asked that the AI could not answer, one row per question per business. Fenced by account_id. */
+export interface UnansweredQuestionsTable {
+  id: string;
+  account_id: string;
+  question: string;
+  group_key: string;
+  count: Generated<number>;
+  last_asked_at: Generated<Date>;
+  answered_at: Generated<Date | null>;
+  faq_id: Generated<string | null>;
+  ignored_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** A time-limited promotion. Fenced by account_id. `ends_on` is a plain date like 2026-12-31. */
 export interface OffersTable {
   id: string;
@@ -378,4 +395,5 @@ export interface DB {
   offerings: OfferingsTable;
   offers: OffersTable;
   faqs: FaqsTable;
+  unanswered_questions: UnansweredQuestionsTable;
 }

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
 import { createSignedInPerson, type SignedInPerson } from './support/auth';
+import { createUnansweredQuestionsService } from '../src/modules/core/knowledge';
 import { openTestDatabase } from './support/harness';
 
 // The shared isolation suite (docs/SECURITY.md, BACKEND.md): one place that proves business B can never reach business A's
@@ -104,6 +105,11 @@ beforeAll(async () => {
     '/offerings',
     { name: `Offering ${secretWords}`, fromPricePaise: 450_000, priceUnit: 'per night', gstMode: 'plus' },
     201,
+  );
+  await createUnansweredQuestionsService({ database }).logUnansweredQuestion(
+    businessA.profile.business.id,
+    { kind: 'agent', id: null },
+    `Does it work ${secretWords}?`,
   );
   const offer = await sendOk(businessA, 'POST', '/offers', { text: `Offer ${secretWords}`, endsOn: '2099-12-31' }, 201);
   const faq = await sendOk(
@@ -440,6 +446,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
   { route: 'GET /api/v1/offerings', url: '/offerings' },
   { route: 'GET /api/v1/knowledge/faqs', url: '/knowledge/faqs' },
+  { route: 'GET /api/v1/knowledge/unanswered', url: '/knowledge/unanswered?include=history' },
   { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
@@ -479,6 +486,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/offerings': 'covered by the list check',
   'GET /api/v1/offers': 'covered by the list check',
   'GET /api/v1/knowledge/faqs': 'covered by the list check',
+  'GET /api/v1/knowledge/unanswered': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",

@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/08-knowledge-base.md`; `requirements/API.md` (Knowledge base); docs/plan/PHASE-1.md (F18)
 **Depends on:** F00, F01, F16, F17      **Module:** `core.knowledge` (the existing core module: always on, no switch)
-**Status:** in progress (13 Nov 2026). Slice 1 built and tested by the owner in Postman (13 Nov 2026). Slice 2 built, owner test pending.
+**Status:** in progress (13 Nov 2026). Slice 1 built and tested by the owner in Postman (13 Nov 2026). Slice 2 built and tested. Slice 3 built, owner test pending.
 
 **Goal in one line:** the AI answers from what the business has told it. The owner types **FAQs** (question and answer). When a customer asks something the AI cannot
 answer, the question is logged under **Unanswered questions**; the manager answers it once and it becomes an FAQ, so the AI knows it from the next conversation.
@@ -56,7 +56,7 @@ answer, grouped, with how often each was asked; **Answer** (it becomes an FAQ) o
 | GET | `/knowledge/faqs` | Staff | The list, newest first; `?status=check` for the ones waiting for a check |
 | PATCH | `/knowledge/faqs/{id}` | Staff (anyone) | Edit the question or answer |
 | DELETE | `/knowledge/faqs/{id}` | Staff (anyone) | Soft delete (removes it from search) |
-| GET | `/knowledge/unanswered` | Staff (anyone) | Open questions, grouped, most asked first; `?include=answered` for history |
+| GET | `/knowledge/unanswered` | Staff (anyone) | Open questions, grouped, most asked first; `?include=history` for the answered and ignored ones too |
 | POST | `/knowledge/unanswered/{id}/answer` | Staff (anyone) | Answer it; it becomes an FAQ |
 | POST | `/knowledge/unanswered/{id}/dismiss` | Staff (anyone) | Ignore it |
 | GET | `/knowledge/search` | Staff | `?q=`: the matching FAQ passages with their source (decision 3) |
@@ -75,6 +75,13 @@ answer, grouped, with how often each was asked; **Answer** (it becomes an FAQ) o
 - `PATCH /knowledge/faqs/{id}` changes the question, the answer, or both (nothing to change: 400 `NOTHING_TO_CHANGE`; same values again: no change and no log line; a question another live FAQ has: 409 `FAQ_EXISTS`).
   `DELETE /knowledge/faqs/{id}` is a soft delete (204; the second time 404) and frees the question for a new FAQ. Both are open to every role. Unknown, removed and other businesses' ids are all 404.
 - Errors use the shared shape `{ "error": { "code", "message", "details"? } }` everywhere; no new error types were needed.
+
+## Slice 3 notes
+- Migration `020_knowledge_unanswered_questions.sql`: one row per question per business (unique on the tidied "group key"); answered means it points at an FAQ of its own business; never both answered and ignored (database checks).
+- The AI's function is `createUnansweredQuestionsService(...).logUnansweredQuestion(accountId, actor, text)`, exported through `core.knowledge`'s `index.ts` for F19. It tidies the text (spaces, emails and phone numbers of 7+ digits blanked out as `[email]`/`[number]`, cut to 300),
+  groups by lower case without punctuation (letters of every script are kept, including combining marks such as Malayalam vowel signs) and counts a repeat in one statement, so two customers asking at once are both counted. Only a new question writes a log line and an event.
+- `GET /knowledge/unanswered` (every role): the open ones, most asked first; `?include=history` adds the answered and ignored ones. There is no route to add a question: only the AI does that (F19), so Postman shows an empty list until a row exists (see the hand-off SQL).
+- To do in slice 4: when an FAQ made from a question is removed, the question must become open again, otherwise the AI would be left with no answer and no entry to answer.
 
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
 | Slice | What | Routes |
