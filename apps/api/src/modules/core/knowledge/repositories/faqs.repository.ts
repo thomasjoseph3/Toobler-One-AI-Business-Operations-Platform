@@ -156,3 +156,45 @@ export async function softDeleteFaq(
     .where('deleted_at', 'is', null)
     .execute();
 }
+
+/** An FAQ found by a search, with how well it matched. */
+export interface FoundFaqRow {
+  id: string;
+  question: string;
+  answer: string;
+  score: number;
+}
+
+/**
+ * Finds the business's usable FAQs (confirmed, not removed) that match the text, best first. It matches in two ways, both on the
+ * meaningful words only (filler words such as "do you have" are dropped first): full-text search (any one meaningful word is enough, so
+ * a long question still finds a short FAQ) and trigram matching, which still finds a word with a typo. The score adds the two, only to
+ * put the best first.
+ */
+export async function searchConfirmedFaqs(
+  db: Db,
+  options: { accountId: string; text: string; limit: number },
+): Promise<FoundFaqRow[]> {
+  // How alike a typed word and a word of the question must be to count as the same word (0 to 1; the default 0.6 misses
+  // "parkng" for "parking"). It lasts for this transaction only.
+  await sql`select set_config('pg_trgm.word_similarity_threshold', '0.45', true)`.execute(db);
+  const result = await sql<FoundFaqRow>`
+    with search as (
+      select
+        replace(plainto_tsquery('english', ${options.text}::text)::text, '&', '|')::tsquery as words,
+        coalesce((select string_agg(lexeme, ' ') from unnest(to_tsvector('english', ${options.text}::text))), '') as meaningful_words
+    )
+    select
+      faq.id,
+      faq.question,
+      faq.answer,
+      (ts_rank(faq.search_vector, search.words) + word_similarity(search.meaningful_words, faq.question))::float8 as score
+    from faqs as faq, search
+    where faq.account_id = ${options.accountId}
+      and faq.deleted_at is null
+      and faq.status = 'confirmed'
+      and (faq.search_vector @@ search.words or search.meaningful_words <% faq.question)
+    order by score desc, faq.id
+    limit ${options.limit}`.execute(db);
+  return result.rows;
+}

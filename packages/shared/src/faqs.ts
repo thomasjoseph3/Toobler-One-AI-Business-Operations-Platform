@@ -68,3 +68,32 @@ export type ListFaqsQuery = z.infer<typeof listFaqsQuerySchema>;
 /** The list of FAQs, newest first. */
 export const faqsResponseSchema = z.object({ items: z.array(faqSchema) });
 export type FaqsResponse = z.infer<typeof faqsResponseSchema>;
+
+/** The most results one search may ask for, and how many it gives when it is not told. */
+export const MAX_SEARCH_RESULTS = 10;
+export const DEFAULT_SEARCH_RESULTS = 5;
+
+/** What a person (or the AI) sends to search the knowledge base: the customer's question in their own words, and how many results. */
+export const searchKnowledgeQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(MAX_FAQ_QUESTION_LENGTH),
+    limit: z.coerce.number().int().min(1).max(MAX_SEARCH_RESULTS).default(DEFAULT_SEARCH_RESULTS),
+  })
+  .strict();
+export type SearchKnowledgeQuery = z.infer<typeof searchKnowledgeQuerySchema>;
+
+/** One passage found by a search, with where it came from (so the AI can say "answered from FAQ ..."). */
+export const searchResultSchema = z.object({
+  /** What kind of source: only FAQs for now. */
+  sourceKind: z.enum(['faq']),
+  sourceId: z.string(),
+  question: z.string(),
+  answer: z.string(),
+  /** How well it matches, higher is better. Only for ordering; it has no unit. */
+  score: z.number(),
+});
+export type SearchResult = z.infer<typeof searchResultSchema>;
+
+/** The passages found, best match first. */
+export const searchResponseSchema = z.object({ items: z.array(searchResultSchema) });
+export type SearchResponse = z.infer<typeof searchResponseSchema>;

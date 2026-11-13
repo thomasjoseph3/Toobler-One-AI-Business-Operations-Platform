@@ -465,6 +465,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/offerings', url: '/offerings' },
   { route: 'GET /api/v1/knowledge/faqs', url: '/knowledge/faqs' },
   { route: 'GET /api/v1/knowledge/unanswered', url: '/knowledge/unanswered?include=history' },
+  { route: 'GET /api/v1/knowledge/search', url: '/knowledge/search?q=question%20answer%20does%20it%20work' },
   { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
   { route: 'GET /api/v1/me', url: '/me' },
 ];
@@ -505,6 +506,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/offers': 'covered by the list check',
   'GET /api/v1/knowledge/faqs': 'covered by the list check',
   'GET /api/v1/knowledge/unanswered': 'covered by the list check',
+  'GET /api/v1/knowledge/search': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
   'POST /api/v1/contacts':
     "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",

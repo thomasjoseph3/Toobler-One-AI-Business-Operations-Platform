@@ -3,6 +3,7 @@ import { faqsRoutes } from './routes/faqs.routes';
 import { knowledgeRoutes } from './routes/knowledge.routes';
 import { settingsRoutes } from './routes/settings.routes';
 import { unansweredQuestionsRoutes } from './routes/unanswered-questions.routes';
+import { searchRoutes } from './routes/search.routes';
 import { situationsRoutes } from './routes/situations.routes';
 
 /**
@@ -22,5 +23,6 @@ export default defineModule({
     settingsRoutes(app);
     faqsRoutes(app);
     unansweredQuestionsRoutes(app);
+    searchRoutes(app);
   },
 });

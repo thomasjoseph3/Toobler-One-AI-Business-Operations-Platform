@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/08-knowledge-base.md`; `requirements/API.md` (Knowledge base); docs/plan/PHASE-1.md (F18)
 **Depends on:** F00, F01, F16, F17      **Module:** `core.knowledge` (the existing core module: always on, no switch)
-**Status:** in progress (13 Nov 2026). Slice 1 built and tested by the owner in Postman (13 Nov 2026). Slice 2 built and tested. Slice 3 built, tested and committed. Slice 4 built, owner test pending.
+**Status:** in progress (13 Nov 2026). Slice 1 built and tested by the owner in Postman (13 Nov 2026). Slice 2 built and tested. Slice 3 built, tested and committed. Slice 4 built, tested and committed. Slice 5 built, owner test pending.
 
 **Goal in one line:** the AI answers from what the business has told it. The owner types **FAQs** (question and answer). When a customer asks something the AI cannot
 answer, the question is logged under **Unanswered questions**; the manager answers it once and it becomes an FAQ, so the AI knows it from the next conversation.
@@ -89,6 +89,13 @@ answer, grouped, with how often each was asked; **Answer** (it becomes an FAQ) o
   Two people acting at the same moment take turns (row lock), so only one wins.
 - Removing an FAQ opens again every question it answered, so the AI never has a question with no answer and no entry to answer. An ignored question is not reopened by being asked again (its count still rises); to bring one back, add an FAQ by hand.
 - The steps "add a usable FAQ" and "turn a clashing question into 409" are written once in `services/faq-steps.service.ts` and used by the FAQ service and the unanswered questions service.
+
+## Slice 5 notes
+- **Keyword search, not vectors** (owner agreed, 13 Nov 2026): FAQs are short, English-only and written by the business, so Postgres full-text search plus trigram matching is enough. The whole search sits in `searchKnowledge` (service) and one query (repository); vectors would change only those if the AI evals (F19) ever show missed questions.
+- **Change from the brief:** no separate `knowledge_passages` table. The search reads `faqs` directly (migration `021_knowledge_search.sql` adds a generated `search_vector` column and two partial indexes, and the `pg_trgm` extension). A copy of every FAQ would have needed keeping in step on add, edit, remove and status change, for nothing until documents exist; if they are ever built, their passages join the same search.
+- How it matches: filler words ("do you have") are dropped; any one meaningful word is enough, in any form (park, parking, parked); a word with a typo still matches ("parkng"); question words count more than answer words. Only confirmed, live FAQs are found. Nothing matching gives an empty list, never a guess.
+- `GET /knowledge/search?q=&limit=` (every role; limit 1 to 10, default 5) answers `{ items: [{ sourceKind, sourceId, question, answer, score }] }`. The AI (F19) calls `createKnowledgeSearchService(...).searchKnowledge(accountId, text)` through the module's `index.ts`. Search text is always passed as a bound value, never built into SQL.
+- Two test findings fixed on the way: filler words alone matched any FAQ that contained them (typo matching now uses only the meaningful words), and the default typo threshold missed "parkng" (lowered to 0.45 for the search).
 
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
 | Slice | What | Routes |
