@@ -85,7 +85,8 @@ describe('GET /api/v1/knowledge/questions', () => {
       readyToGoLive: false,
       neededToGoLiveStillMissing: [...Object.keys(GOOD_ANSWERS_NEEDED_TO_GO_LIVE), 'offerings'],
     });
-    expect(body.progress.totalQuestions).toBe(32 - 4);
+    // The questions whose feature does not report yet (brochure upload, GST note, current offers) are left out of the total
+    expect(body.progress.totalQuestions).toBe(32 - 3);
   });
 
   it('describes each question fully: type, options, columns, hints', async () => {
@@ -198,7 +199,7 @@ describe('"What do you sell?" is answered by the offerings', () => {
     expect((await sellQuestionOf(person)).question.elsewhereStatus).toBe('not_done');
   });
 
-  it('counts only the business\'s own offerings, and says "not tracked" for the questions whose feature does not report yet', async () => {
+  it('counts only the business\'s own offerings and FAQs, and says "not tracked" for the questions whose feature does not report yet', async () => {
     const person = await createSignedInPerson(app, database);
     const stranger = await createSignedInPerson(app, database);
     await send(stranger, 'POST', '/offerings', { name: 'Their room' });
@@ -207,11 +208,41 @@ describe('"What do you sell?" is answered by the offerings', () => {
     const body = (await getQuestions(person)).json();
     const elsewhereStatusOf = (key: string) =>
       body.questions.find((candidate: { key: string }) => candidate.key === key).elsewhereStatus;
-    expect(elsewhereStatusOf('common_questions')).toBe('not_tracked');
+    expect(elsewhereStatusOf('common_questions')).toBe('not_done'); // FAQs report from F18
     expect(elsewhereStatusOf('brochure_upload')).toBe('not_tracked');
     expect(elsewhereStatusOf('prices_include_gst')).toBe('not_tracked'); // each offering carries its own GST note
     expect(elsewhereStatusOf('current_offers')).toBe('not_tracked');
     expect(elsewhereStatusOf('business_name')).toBeNull();
+  });
+
+  it('says "Anything else customers often ask?" is done once the business has an FAQ the AI may use, and not before', async () => {
+    const person = await createSignedInPerson(app, database);
+    const stranger = await createSignedInPerson(app, database);
+    const statusOfCommonQuestions = async () => {
+      const body = (await getQuestions(person)).json();
+      return body.questions.find((candidate: { key: string }) => candidate.key === 'common_questions').elsewhereStatus;
+    };
+    expect(await statusOfCommonQuestions()).toBe('not_done');
+    // Another business's FAQ does not count
+    await send(stranger, 'POST', '/knowledge/faqs', { question: 'Theirs?', answer: 'Yes.' });
+    expect(await statusOfCommonQuestions()).toBe('not_done');
+    // An FAQ waiting for a check does not count either
+    await database.system
+      .insertInto('faqs')
+      .values({
+        id: crypto.randomUUID(),
+        account_id: person.profile.business.id,
+        question: 'Drafted?',
+        answer: 'Maybe.',
+        status: 'check',
+        source: 'website',
+      })
+      .execute();
+    expect(await statusOfCommonQuestions()).toBe('not_done');
+    const faq = (await send(person, 'POST', '/knowledge/faqs', { question: 'Mine?', answer: 'Yes.' })).json();
+    expect(await statusOfCommonQuestions()).toBe('done');
+    await send(person, 'DELETE', `/knowledge/faqs/${faq.id}`);
+    expect(await statusOfCommonQuestions()).toBe('not_done');
   });
 });
 

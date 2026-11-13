@@ -11,6 +11,8 @@ export interface JobRun {
   accountContext: AccountContext | undefined;
   /** Queues another job, for example one per business from a job that loops over businesses. */
   enqueueJob(jobName: string, data: JobData): Promise<void>;
+  /** The ids of every business, for a scheduled job that has no business of its own and queues one job per business. Ids only. */
+  listAccountIds(): Promise<string[]>;
   logger: FastifyBaseLogger;
 }
 

@@ -22,14 +22,19 @@ import type { QuestionDefinition } from '../helpers/question-types';
 import { findQuestionForIndustry, getQuestionsForIndustry } from '../helpers/question-set';
 import { sameJson } from '../helpers/same-json';
 import * as answersRepository from '../repositories/answers.repository';
+import * as faqsRepository from '../repositories/faqs.repository';
 import type { AnswerRow } from '../repositories/answers.repository';
 
 /**
- * Which questions answered in another feature that feature already reports on, and whether they are answered. Today only "What do you
- * sell?" (the business has an offering switched on); FAQs and documents report from F18. Runs in the caller's fenced transaction.
+ * Which questions answered in another feature that feature already reports on, and whether they are answered: "What do you sell?" (the
+ * business has an offering switched on) and "Anything else customers often ask?" (the business has an FAQ the AI may use). Documents
+ * are on hold (R47), so their question stays "not tracked". Runs in the caller's fenced transaction.
  */
 async function findAnswersGivenElsewhere(transaction: Db, accountId: string): Promise<Map<string, boolean>> {
-  return new Map([['offerings', (await countActiveOfferingsOfBusiness(transaction, accountId)) > 0]]);
+  return new Map([
+    ['offerings', (await countActiveOfferingsOfBusiness(transaction, accountId)) > 0],
+    ['common_questions', (await faqsRepository.countConfirmedFaqs(transaction, accountId)) > 0],
+  ]);
 }
 
 /** Turns a question of the list, plus the business's answer to it (if any), into what the API answers with. */

@@ -6,13 +6,14 @@ import type {
   UnansweredQuestionsResponse,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
-import type { Actor } from '../../../../kernel/context';
+import type { AccountContext, Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
 import { conflict, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import * as faqsRepository from '../repositories/faqs.repository';
+import { chooseQuestionMerges } from '../helpers/choose-question-merges';
 import { tidyUnansweredQuestion } from '../helpers/tidy-unanswered-question';
 import * as unansweredQuestionsRepository from '../repositories/unanswered-questions.repository';
 import type { UnansweredQuestionRow } from '../repositories/unanswered-questions.repository';
@@ -92,6 +93,15 @@ export function createUnansweredQuestionsService({ database }: { database: Datab
             accountId,
             eventName: 'unanswered_question.logged',
             payload: { unansweredQuestionId: recorded.id },
+          });
+        }
+        // This question was joined into another one by the nightly job: the ask counts there
+        if (recorded.mergedIntoId !== null) {
+          return unansweredQuestionsRepository.addOneAsk(transaction, {
+            accountId,
+            unansweredQuestionId: recorded.mergedIntoId,
+            actor,
+            now: new Date(),
           });
         }
         return { id: recorded.id, count: recorded.count };
@@ -204,4 +214,36 @@ export function createUnansweredQuestionsService({ database }: { database: Datab
       });
     },
   };
+}
+
+/**
+ * The nightly clean-up for one business: joins open unanswered questions that have exactly the same meaningful words (a customer asked
+ * "Is parking available?" and another "Available parking?") into one row, so the team sees one question with the full count. Runs in
+ * the business's fence with the job's context. Safe to run twice: a second run finds nothing left to join. Writes one activity-log
+ * line per question that stays (ids only). Returns how many questions were joined into others.
+ */
+export async function mergeSimilarQuestionsForBusiness(accountContext: AccountContext): Promise<number> {
+  return accountContext.runInAccountTransaction(async (transaction) => {
+    const openQuestions = await unansweredQuestionsRepository.lockOpenQuestionsWithWordKey(
+      transaction,
+      accountContext.accountId,
+    );
+    const merges = chooseQuestionMerges(openQuestions);
+    for (const merge of merges) {
+      await unansweredQuestionsRepository.mergeQuestionsInto(transaction, {
+        accountId: accountContext.accountId,
+        keeperId: merge.keeperId,
+        absorbedIds: merge.absorbedIds,
+        totalCount: merge.totalCount,
+        lastAskedAt: merge.lastAskedAt,
+        actor: accountContext.actor,
+      });
+      await accountContext.audit(transaction, 'knowledge.unanswered_questions_merged', {
+        recordType: 'unanswered_question',
+        recordId: merge.keeperId,
+        fields: ['count'],
+      });
+    }
+    return merges.reduce((total, merge) => total + merge.absorbedIds.length, 0);
+  });
 }

@@ -2,7 +2,75 @@
 
 **Requirements:** `3-ai-agents-and-channels/08-knowledge-base.md`; `requirements/API.md` (Knowledge base); docs/plan/PHASE-1.md (F18)
 **Depends on:** F00, F01, F16, F17      **Module:** `core.knowledge` (the existing core module: always on, no switch)
-**Status:** in progress (13 Nov 2026). Slice 1 built and tested by the owner in Postman (13 Nov 2026). Slice 2 built and tested. Slice 3 built, tested and committed. Slice 4 built, tested and committed. Slice 5 built, owner test pending.
+**Status:** approved by the owner on 13 Nov 2026 (slices 1 to 6 built and tested; documents on hold, R47). `requirements/API.md` updated at the owner's request (R48).
+
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+Toobler One's AI answers customers only from what the business has told it. This feature is where the business tells it things, and where the AI learns what it is still missing. It has three parts:
+
+1. **FAQs.** Short questions with their answers, typed by anyone on the team ("Do you have parking?" / "Yes, free for guests."). The AI uses them to answer customers.
+2. **Unanswered questions.** When a customer asks something the AI has no answer for, the AI says it will check with the team and writes the question on a list, with how many times it was asked. Anyone on the team can **answer** it (the answer becomes an FAQ at once) or **ignore** it.
+3. **Search.** The way the AI (and the team, to try it out) finds the right FAQ for a customer's question, even when the customer uses different words or makes a typing mistake.
+
+### Why it is useful
+- **The AI gets better every week without anyone "training" it.** The team only answers real questions that real customers asked. Each answer is typed once and used in every future conversation, on every channel.
+- **Everyone gives the same answer.** Staff and the AI use the same FAQs.
+- **The team sees what customers actually want to know.** A question asked six times this month ("Is there EV charging?") is a clear sign of what to add or offer.
+- **Nothing is made up.** If nothing matches, the AI does not guess; it says it will check, and the question lands on the list.
+
+### How it works: a day in the life
+1. The manager adds FAQs when setting up: parking, breakfast, check-in time.
+2. At 11 PM a customer asks on WhatsApp: "Is there any EV charging for my car?" The AI searches the FAQs and finds nothing. It tells the customer the team will get back to them, and logs the question.
+3. Over the week, other customers ask "Is EV charging available?", "Available EV charging?" and so on. Each time the count goes up.
+4. Every night at 02:30 UTC (08:00 in India) the system tidies the list: questions that are the same question in different words are joined into one with the full count.
+5. On Monday anyone on the team opens **Unanswered questions** and sees "Available EV charging? (asked 3 times)". They type "Yes, two chargers in the basement" and tap **Answer**. It is now an FAQ.
+6. The next customer who asks about EV charging gets the real answer, and staff can see which FAQ it came from.
+7. If the team later removes that FAQ, the question goes back on the list, so it is never forgotten.
+
+### Who can do what
+Every signed-in person, whatever their role (manager, staff, or the "own leads only" role), can add, edit and remove FAQs, see the unanswered list, answer or ignore questions, and try the search. Nobody outside the business can see any of it.
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| An FAQ's question / answer | Up to 300 / 2,000 characters |
+| Two FAQs with the same question | Not allowed (capitals and extra spaces are ignored) |
+| Search results | 5 by default, at most 10 |
+| When the nightly tidy-up runs | Every day at 02:30 UTC. It is one line in the knowledge module (`MERGE_SIMILAR_QUESTIONS_SCHEDULE` in `module.ts`), changed by a developer. |
+| What the tidy-up joins | Only questions with **exactly the same meaningful words**. "Is parking available?" and "Available parking?" are joined; "price of room 101" and "price of room 102" are never joined. |
+| Personal details in questions | Emails and phone numbers a customer typed are replaced with `[email]` and `[number]` before the question is saved. |
+
+### What it will never do
+- Use an FAQ that is removed, or one that is still waiting for a check.
+- Show one business's FAQs or questions to another.
+- Guess: when nothing matches, the answer is an empty list.
+- Write the words of a question or answer into the activity log or the events (they hold ids only).
+
+### Not part of this feature (on hold)
+Uploading documents (PDF, Word, photos), reading them, "These don't match" warnings and "Re-read website" are on hold until the end of Phase 1 (decision R47). The screens for FAQs and unanswered questions arrive with the designer's work.
+
+### For the tech team
+- **Module:** `core.knowledge` (`apps/api/src/modules/core/knowledge`), always on. Layers as everywhere: `routes/` → `services/` → `repositories/` → database; pure logic in `helpers/`.
+- **Tables:** `faqs` (question, answer, `status` confirmed/check, `source` typed/website/unanswered, soft delete, generated `search_vector`, two partial indexes); `unanswered_questions` (one row per question per business, `group_key`, `count`, `answered_at`/`faq_id`/`ignored_at`, `merged_into_id`). All have `account_id`, forced row-level security, and the app role cannot delete rows. Migrations `019` to `022`.
+- **Routes (all `staff` access, i.e. every role):** `POST/GET /knowledge/faqs`, `PATCH/DELETE /knowledge/faqs/{id}`, `GET /knowledge/unanswered[?include=history]`, `POST /knowledge/unanswered/{id}/answer`, `POST /knowledge/unanswered/{id}/dismiss`, `GET /knowledge/search?q=&limit=`.
+- **For the AI agent (F19), through `core.knowledge`'s `index.ts`:** `createUnansweredQuestionsService(...).logUnansweredQuestion(accountId, actor, text)` and `createKnowledgeSearchService(...).searchKnowledge(accountId, text, limit)`.
+- **Search:** Postgres full-text search (English configuration; filler words dropped; any one meaningful word matches) plus `pg_trgm` word similarity (threshold 0.45, set per transaction) for typos. Question words weigh more than answer words. Keyword search was chosen over vectors on purpose (no embeddings cost, easy to explain); the whole search is one query in `faqs.repository.ts` behind `searchKnowledge`, so vectors could replace it later without touching callers.
+- **Logging a question:** one atomic `INSERT ... ON CONFLICT (account_id, group_key) DO UPDATE SET count = count + 1`, so simultaneous asks are all counted. If the row was joined into another by the nightly job, the ask is counted on the row it was joined into.
+- **Nightly job:** `knowledge.merge_similar_questions` (cron in the manifest) lists every business via `JobRun.listAccountIds()` (added to the kernel for this; ids only) and queues `knowledge.merge_similar_questions_for_business` for each. That job locks the business's open questions, computes each question's "word key" (stemmed meaningful words, sorted) in SQL, and `chooseQuestionMerges` (pure, unit-tested) decides the groups. The most asked question stays and takes the total count and latest time; the others get `merged_into_id` and disappear from lists. Safe to run twice. The job runs as actor `system` / `knowledge.merge_similar_questions_for_business`; failures are retried by pg-boss with growing waits.
+- **Events and log:** `faq.created/updated/deleted`, `unanswered_question.logged/answered/ignored` (ids only); activity-log kinds `knowledge.faq_*`, `knowledge.unanswered_question_*`, `knowledge.unanswered_questions_merged`.
+- **Errors (shared shape `{ error: { code, message, details? } }`):** `FAQ_EXISTS` (409, with the existing FAQ's id), `NOTHING_TO_CHANGE` (400), `UNANSWERED_QUESTION_NOT_OPEN` (409), plus the usual 400/401/404; another business's id is always 404.
+- **Profile link (F16):** "Anything else customers often ask?" (`common_questions`) reports `done` once the business has a confirmed FAQ.
+
+### Known limits
+- The nightly tidy-up only joins questions with identical meaningful words. Looser matching ("EV charging" vs "EV charger") is left out on purpose to avoid joining different questions; revisit with real data.
+- A question joined overnight disappears from the list: someone who had it open on screen and answers it gets "not found" and should refresh.
+- A reworded `[number]` placeholder may appear in a question; the team can fix the wording when answering.
+- No screens yet (designer); everything is tested through Postman and automated tests.
+
+---
 
 **Goal in one line:** the AI answers from what the business has told it. The owner types **FAQs** (question and answer). When a customer asks something the AI cannot
 answer, the question is logged under **Unanswered questions**; the manager answers it once and it becomes an FAQ, so the AI knows it from the next conversation.
@@ -97,6 +165,14 @@ answer, grouped, with how often each was asked; **Answer** (it becomes an FAQ) o
 - `GET /knowledge/search?q=&limit=` (every role; limit 1 to 10, default 5) answers `{ items: [{ sourceKind, sourceId, question, answer, score }] }`. The AI (F19) calls `createKnowledgeSearchService(...).searchKnowledge(accountId, text)` through the module's `index.ts`. Search text is always passed as a bound value, never built into SQL.
 - Two test findings fixed on the way: filler words alone matched any FAQ that contained them (typo matching now uses only the meaningful words), and the default typo threshold missed "parkng" (lowered to 0.45 for the search).
 
+## Slice 6 notes: the safety net
+- **Nightly tidy-up:** migration `022_knowledge_merge_questions.sql` adds `merged_into_id` (a joined question points at the one that stays, same business, never itself, hidden from every list and from answer/dismiss, which then answer 404). `JobRun` gained `listAccountIds()` (kernel change, ids only, wired in `server.ts`) because a scheduled job has no business of its own. The job is declared in `module.ts` (the module-structure rule has no `jobs/` folder) and calls `mergeSimilarQuestionsForBusiness` in the unanswered-questions service.
+- **Strict merge rule (decision):** only identical sets of meaningful words are joined. A fuzzier rule would be easy to build and risks joining different questions ("room 101" / "room 102").
+- **F16 link:** `common_questions` is now answered elsewhere (`done` with a confirmed FAQ, `not_done` without), so the profile total no longer leaves it out (`knowledge.test.ts` changed on purpose: 32 - 3).
+- **Consistency checker:** new rule "FAQs and unanswered questions are in order" (no two live FAQs with one question; an answered question points at a live FAQ; no open question points at an FAQ; never both answered and ignored; no chains of joined questions; counts at least one); FAQs and unanswered questions join "every creation is logged and announced once", "every stamp names someone of the business" and the personal-words scan. Two new damage cases prove it notices.
+- **Team journey chapter 5c:** the AI cannot answer EV charging asked in several words; the nightly tidy-up joins them; the own-leads-only person answers, the staff member ignores another; search finds the new FAQ; the profile question turns `done`; removing the FAQ reopens the question; an outsider sees none of it.
+- **Verification:** `npm run verify` green (78 test files, 1,056 tests, 94 browser tests). `npm audit --audit-level=high`: 10 moderate, none high or critical (as before F18). F18 adds no package. There are no F18 screens, so there was no browser walk-through.
+
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
 | Slice | What | Routes |
 | --- | --- | --- |
@@ -105,7 +181,7 @@ answer, grouped, with how often each was asked; **Answer** (it becomes an FAQ) o
 | 3 | Unanswered questions: table, the AI's logging function (unit and service tested), the grouped list | `GET /knowledge/unanswered` |
 | 4 | Answer (becomes an FAQ) or dismiss | `POST /knowledge/unanswered/{id}/answer`, `POST /knowledge/unanswered/{id}/dismiss` |
 | 5 | Search: passages table kept in step with FAQs, the search function, the test route | `GET /knowledge/search` |
-| 6 | Nightly merge job, consistency rules, isolation entries, team-journey chapter, `api-security` review, Postman collection, hand-off | none |
+| 6 | Nightly merge job, consistency rules, isolation entries, team-journey chapter, `api-security` review, Postman collection, hand-off | none; **built, owner review pending** |
 
 ## Reused from the hotel agent
 The old agent kept FAQs as one JSON column on the business (`faqs` in `hotel/business/repository.js`) with no search and no unanswered-question log. Nothing is ported; what is reused is the idea that
@@ -123,11 +199,46 @@ the agent reads the FAQs as business facts. We use a real table because FAQs nee
 R39 (disabled people) and R42 (own-leads role) are not touched. R44 (`npm audit`) is checked at the start. R47 (documents on hold) is this feature's own decision.
 
 ## Security checklist
-To be ticked at hand-off with the `api-security` skill.
+Reviewed with the `api-security` skill on 13 Nov 2026 (the whole F18 diff: 8 new routes, 2 jobs, 2 tables and a column, migrations 019 to 022, the kernel change to `JobRun`, and the knowledge-profile change).
+
+- [x] Every new table has account_id, RLS enabled + forced, and the schema test passes (`faqs`, `unanswered_questions`). The app role cannot delete rows and can change only named columns.
+- [x] Every new route: role guard (every route is `staff` = any signed-in role, by the owner's decision) and tests for works / 401 / 404 other business / 400 bad input. There is no 403 case because there is no role that is refused; this is tested ("open to every role").
+- [x] staff_own: FAQs and unanswered questions are business-wide for every role (owner decision), not filtered per person.
+- [x] No business id taken from body, query or params; every body and query is `.strict()`; the business comes from the session, and in the AI and job code from the caller (the agent runtime, the job payload).
+- [x] All input validated with zod with maximum lengths. Raw SQL is only the two fixed queries (search, and the nightly word keys); the customer's text is always a bound value, never part of the SQL text (tested with quotes, `;`, `&`, `|`, `%`).
+- [x] No public route, webhook, outside call or upload added.
+- [x] Nothing personal in the log or events: only ids and field names; the request log strips query strings (so search text is never logged); emails and phone numbers in a customer's question are blanked before saving; the consistency checker scans the whole log and events for FAQ and question words.
+- [x] The AI can read only confirmed, live FAQs (search); removed and waiting-for-check FAQs are never found (tested).
+- [x] Cross-module access only through `index.ts`: nobody imports the knowledge module's inside. `core.knowledge` requires only `core.auth` and `core.offerings`.
+- [x] Cross-business work: the only one is `listAccountIds` (ids of all businesses, nothing else), used by the scheduled job to queue one job per business; each of those runs in that business's fence. It is wired in `server.ts` with a comment saying why.
+- [x] Simultaneous requests: adding a FAQ takes a per-business lock; editing, answering and ignoring lock the row; the count of a question goes up in one statement; the nightly job takes a per-business lock. All tested with `Promise.all`.
+- [x] `process.env` is read only in `kernel/config.ts`; `npm audit --audit-level=high` shows no high or critical finding (10 moderate, as before F18); no package added.
+- [x] Full verification: `npm run verify` green (gate, format, lint, typecheck, 78 test files / 1,056 tests, 94 browser tests).
 
 ## Decisions and differences from the requirements
-- Owner (13 Nov 2026): documents, file reading, conflicts and "Re-read website" are on hold until the end of Phase 1 (R47).
-- Proposed defaults above (questions 1 to 6) are to be confirmed or changed by the owner.
+- Owner (13 Nov 2026): documents, file reading, conflicts, "Re-read website" and the three-monthly review reminder are on hold until the end of Phase 1 (R47).
+- Owner (13 Nov 2026): FAQs and unanswered questions can be used by every signed-in role, not managers only (R48 lists the difference from `API.md`; `API.md` is not edited unless the owner asks).
+- Owner (13 Nov 2026): keyword search, not vectors.
+- Build decisions (mine, for the owner to change): no `knowledge_passages` table (the search reads `faqs`); an extra route `GET /knowledge/search`; the nightly tidy-up joins only identical meaningful words; the clean-up runs daily at 02:30 UTC; `JobRun` got `listAccountIds()`; a typed FAQ is usable at once.
+- The six defaults near the top of this file were accepted by the owner as the work went on.
 
 ## Manual test script
-To be written at hand-off. Slice by slice, each slice's Postman steps are given when it is built.
+There are no F18 screens yet (the designer is working on them), so it is tested through Postman.
+
+**A. Postman (recommended).** Collection *Toobler One - F18 FAQs and unanswered questions (run in order)* and environment *Toobler One - local dev* (any verified person).
+1. `npm run db:migrate` (019 to 022 must be applied) and restart `npm run dev`.
+2. For folder 4 you need two open unanswered questions. Only the AI creates them (F19), so add two once in the Supabase SQL editor (your business id comes from `GET /api/v1/me`):
+   ```sql
+   begin;
+   select set_config('app.account_id', '<your business id>', true);
+   insert into app.unanswered_questions (id, account_id, question, group_key, count) values
+     (gen_random_uuid(), '<your business id>', 'Is there EV charging?', 'is there ev charging', 6),
+     (gen_random_uuid(), '<your business id>', 'Do you allow pets?', 'do you allow pets', 3);
+   commit;
+   ```
+3. Run the folders in order with the Runner: 0 sign in, 1 add and list, 2 refusals, 3 edit and remove, 4 unanswered questions, 5 search. Every request checks its answer; all must pass.
+
+**B. The nightly tidy-up** cannot be started from Postman (it runs by itself at 02:30 UTC). Its behaviour is proved by automated tests:
+`npx vitest run unanswered-questions choose-question-merges team-journey` (the journey's chapter 5c tells the whole story: several wordings of one question, the tidy-up, answering, searching, removing the FAQ and the question coming back).
+
+**C. By hand, the main path.** Add an FAQ ("Do you have parking?"); search `?q=where can I park my car` and see it; search `?q=parkng` and see it; ask for something unrelated and see an empty list; answer an unanswered question and search for it; remove that FAQ and see the question come back on `GET /knowledge/unanswered`.

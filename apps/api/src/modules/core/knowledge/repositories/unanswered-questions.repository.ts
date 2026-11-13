@@ -43,13 +43,13 @@ function toUnansweredQuestionRow(row: {
 
 /**
  * Records that a customer asked this question: a new row the first time, otherwise one more on the count of the row that has the same
- * group key (one statement, so two customers asking at the same moment are both counted). Returns the row's id, its count now, and
- * whether this ask created the row.
+ * group key (one statement, so two customers asking at the same moment are both counted). Returns the row's id, its count now, whether
+ * this ask created the row, and the row it was joined into by the nightly job (null if it was not): the caller then counts the ask there.
  */
 export async function recordQuestionAsked(
   db: Db,
   options: { id: string; accountId: string; question: string; groupKey: string; actor: Actor; now: Date },
-): Promise<{ id: string; count: number; wasCreated: boolean }> {
+): Promise<{ id: string; count: number; wasCreated: boolean; mergedIntoId: string | null }> {
   const actorStamp = { kind: options.actor.kind, id: options.actor.id };
   const row = await db
     .insertInto('unanswered_questions')
@@ -71,9 +71,9 @@ export async function recordQuestionAsked(
       }),
     )
     // A row that was just inserted has no earlier version, which Postgres shows as xmax = 0
-    .returning(['id', 'count', sql<boolean>`(xmax = 0)`.as('was_created')])
+    .returning(['id', 'count', 'merged_into_id', sql<boolean>`(xmax = 0)`.as('was_created')])
     .executeTakeFirstOrThrow();
-  return { id: row.id, count: row.count, wasCreated: row.was_created };
+  return { id: row.id, count: row.count, wasCreated: row.was_created, mergedIntoId: row.merged_into_id };
 }
 
 /**
@@ -90,6 +90,7 @@ export async function lockUnansweredQuestionForUpdate(
     .selectAll()
     .where('account_id', '=', accountId)
     .where('id', '=', unansweredQuestionId)
+    .where('merged_into_id', 'is', null)
     .forUpdate()
     .executeTakeFirst();
   return row ? toUnansweredQuestionRow(row) : undefined;
@@ -106,6 +107,7 @@ export async function findUnansweredQuestionById(
     .selectAll()
     .where('account_id', '=', accountId)
     .where('id', '=', unansweredQuestionId)
+    .where('merged_into_id', 'is', null)
     .executeTakeFirst();
   return row ? toUnansweredQuestionRow(row) : undefined;
 }
@@ -153,13 +155,118 @@ export async function reopenQuestionsAnsweredBy(
     .execute();
 }
 
+/** Adds one to the count of a question and marks it asked now (used when a customer asks a question that was joined into this one). */
+export async function addOneAsk(
+  db: Db,
+  options: { accountId: string; unansweredQuestionId: string; actor: Actor; now: Date },
+): Promise<{ id: string; count: number }> {
+  return db
+    .updateTable('unanswered_questions')
+    .set({
+      count: sql`count + 1`,
+      last_asked_at: options.now,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.unansweredQuestionId)
+    .returning(['id', 'count'])
+    .executeTakeFirstOrThrow();
+}
+
+/** An open question with the key made of its meaningful words (the root form of each, sorted), worked out by the database. */
+export interface OpenQuestionWithWordKey {
+  id: string;
+  count: number;
+  lastAskedAt: Date;
+  createdAt: Date;
+  wordKey: string;
+}
+
+/**
+ * Locks and returns the business's open questions (not answered, ignored or already joined) with their word keys, so a merge sees a
+ * steady list while it works. Business-wide advisory lock first: two merges of one business take turns.
+ */
+export async function lockOpenQuestionsWithWordKey(db: Db, accountId: string): Promise<OpenQuestionWithWordKey[]> {
+  await sql`select pg_advisory_xact_lock(hashtext(${`unanswered_questions:${accountId}`}))`.execute(db);
+  const result = await sql<{
+    id: string;
+    count: number;
+    last_asked_at: Date;
+    created_at: Date;
+    word_key: string;
+  }>`
+    select
+      question.id,
+      question.count,
+      question.last_asked_at,
+      question.created_at,
+      coalesce(
+        (select string_agg(distinct lexeme, ' ' order by lexeme) from unnest(to_tsvector('english', question.question))),
+        ''
+      ) as word_key
+    from unanswered_questions as question
+    where question.account_id = ${accountId}
+      and question.answered_at is null
+      and question.ignored_at is null
+      and question.merged_into_id is null
+    order by question.id
+    for update`.execute(db);
+  return result.rows.map((row) => ({
+    id: row.id,
+    count: row.count,
+    lastAskedAt: row.last_asked_at,
+    createdAt: row.created_at,
+    wordKey: row.word_key,
+  }));
+}
+
+/**
+ * Joins questions into one: the keeper takes over the total count and the latest time, each joined question points at the keeper
+ * (and stays hidden), and any question that was joined into one of them now points at the keeper too.
+ */
+export async function mergeQuestionsInto(
+  db: Db,
+  options: {
+    accountId: string;
+    keeperId: string;
+    absorbedIds: string[];
+    totalCount: number;
+    lastAskedAt: Date;
+    actor: Actor;
+  },
+): Promise<void> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  await db
+    .updateTable('unanswered_questions')
+    .set({ count: options.totalCount, last_asked_at: options.lastAskedAt, updated_by: actorStamp })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.keeperId)
+    .execute();
+  await db
+    .updateTable('unanswered_questions')
+    .set({ merged_into_id: options.keeperId, updated_by: actorStamp })
+    .where('account_id', '=', options.accountId)
+    .where('id', 'in', options.absorbedIds)
+    .execute();
+  await db
+    .updateTable('unanswered_questions')
+    .set({ merged_into_id: options.keeperId, updated_by: actorStamp })
+    .where('account_id', '=', options.accountId)
+    .where('merged_into_id', 'in', options.absorbedIds)
+    .execute();
+}
+
 /** The business's unanswered questions, most asked first. Only the open ones unless `includeHistory` is true. */
 export async function listUnansweredQuestions(
   db: Db,
   accountId: string,
   options: { includeHistory: boolean },
 ): Promise<UnansweredQuestionRow[]> {
-  let query = db.selectFrom('unanswered_questions').selectAll().where('account_id', '=', accountId);
+  let query = db
+    .selectFrom('unanswered_questions')
+    .selectAll()
+    .where('account_id', '=', accountId)
+    .where('merged_into_id', 'is', null);
   if (!options.includeHistory) query = query.where('answered_at', 'is', null).where('ignored_at', 'is', null);
   const rows = await query.orderBy('count', 'desc').orderBy('last_asked_at', 'desc').orderBy('id', 'desc').execute();
   return rows.map(toUnansweredQuestionRow);

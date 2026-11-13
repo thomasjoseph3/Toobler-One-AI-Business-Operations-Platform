@@ -1,6 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
+import { createContextFactory } from '../src/kernel/context';
+import { createUnansweredQuestionsService } from '../src/modules/core/knowledge';
+import { mergeSimilarQuestionsForBusiness } from '../src/modules/core/knowledge/services/unanswered-questions.service';
 import { buildTestApp } from './support/app';
 import { findConsistencyProblems } from './support/consistency';
 import { openTestDatabase } from './support/harness';
@@ -416,6 +419,66 @@ describe('journey: a busy day at Nair Stays', () => {
     expect((await vikram.ok('GET', `/leads/${aboutNothing.id}`)).ownerUserId).toBe(vikram.userId); // naming it does not reassign
     expect(await problemsOf(anita)).toEqual([]);
 
+    // -------------------- chapter 5c: the AI cannot answer, the team answers once, the AI knows next time
+    const parkingFaq = await rahul.ok(
+      'POST',
+      '/knowledge/faqs',
+      { question: 'Do you have parking?', answer: 'Yes, free for guests.' },
+      201,
+    );
+    expect(parkingFaq.source).toBe('typed');
+    const aiAgent = createUnansweredQuestionsService({ database });
+    const nairStays = { kind: 'agent', id: null } as const;
+    // Customers ask about EV charging in different words, and the AI cannot find it in the knowledge base
+    expect((await rahul.ok('GET', '/knowledge/search?q=ev%20charging')).items).toEqual([]);
+    await aiAgent.logUnansweredQuestion(anita.businessId, nairStays, 'Is EV charging available?');
+    await aiAgent.logUnansweredQuestion(anita.businessId, nairStays, 'Available EV charging?');
+    await aiAgent.logUnansweredQuestion(anita.businessId, nairStays, 'available ev charging');
+    await aiAgent.logUnansweredQuestion(anita.businessId, nairStays, 'Do you allow pets? Call me on 9847012345');
+    expect((await meera.ok('GET', '/knowledge/unanswered')).items).toHaveLength(3);
+    // In the night the same question in different words is joined into one with the full count
+    await mergeSimilarQuestionsForBusiness(
+      createContextFactory(database)(anita.businessId, {
+        kind: 'system',
+        id: 'knowledge.merge_similar_questions_for_business',
+      }),
+    );
+    const open = (await meera.ok('GET', '/knowledge/unanswered')).items as Array<{
+      id: string;
+      question: string;
+      count: number;
+    }>;
+    expect(open.map((item) => [item.question, item.count])).toEqual([
+      ['Available EV charging?', 3],
+      ['Do you allow pets? Call me on [number]', 1],
+    ]);
+    // Anyone on the team may answer or ignore: the own-leads-only person answers one, the staff member ignores the other
+    const evFaq = await meera.ok(
+      'POST',
+      `/knowledge/unanswered/${open[0]!.id}/answer`,
+      { question: 'Is there EV charging?', answer: 'Yes, two chargers in the basement.' },
+      201,
+    );
+    await rahul.ok('POST', `/knowledge/unanswered/${open[1]!.id}/dismiss`);
+    expect((await vikram.ok('GET', '/knowledge/unanswered')).items).toEqual([]);
+    // The next customer gets the answer from the knowledge base, with its source
+    const found = (await rahul.ok('GET', '/knowledge/search?q=any%20ev%20charger%20for%20my%20car')).items;
+    expect(found[0]).toMatchObject({ sourceKind: 'faq', sourceId: evFaq.id });
+    expect((await rahul.ok('GET', '/knowledge/search?q=parking')).items[0].sourceId).toBe(parkingFaq.id);
+    // The profile counts "Anything else customers often ask?" as answered
+    const profileAfterTheFaqs = await anita.ok('GET', '/knowledge/questions');
+    expect(
+      profileAfterTheFaqs.questions.find((question: { key: string }) => question.key === 'common_questions')
+        .elsewhereStatus,
+    ).toBe('done');
+    // Removing the FAQ takes the answer away from the AI and puts the question back for the team
+    await vikram.ok('DELETE', `/knowledge/faqs/${evFaq.id}`, undefined, 204);
+    expect((await rahul.ok('GET', '/knowledge/search?q=ev%20charging')).items).toEqual([]);
+    expect((await vikram.ok('GET', '/knowledge/unanswered')).items.map((item: { id: string }) => item.id)).toEqual([
+      open[0]!.id,
+    ]);
+    expect(await problemsOf(anita)).toEqual([]);
+
     // ---------------------------------------------------- chapter 6: an outsider sees nothing of Nair Stays
     const bob = await signUpOwner(app, database);
     for (const url of ['/leads', '/tickets', '/contacts']) expect((await bob.ok('GET', url)).total, url).toBe(0);
@@ -429,6 +492,9 @@ describe('journey: a busy day at Nair Stays', () => {
       ),
     ).toBe(true);
     expect((await bob.ok('GET', '/knowledge/settings')).defaultCountry).toBe('IN');
+    expect((await bob.ok('GET', '/knowledge/faqs')).items).toEqual([]);
+    expect((await bob.ok('GET', '/knowledge/unanswered?include=history')).items).toEqual([]);
+    expect((await bob.ok('GET', '/knowledge/search?q=parking')).items).toEqual([]);
     expect(await problemsOf(bob)).toEqual([]);
     expect(await problemsOf(anita)).toEqual([]);
 
@@ -452,8 +518,8 @@ describe('journey: a busy day at Nair Stays', () => {
 
     // ------------------------------------------------------ the end: the profile numbers match the database
     const final = await anita.ok('GET', '/knowledge/questions');
-    // Every answer row counts, plus "What do you sell?", which the offerings answer
-    expect(final.progress.answeredQuestions).toBe((await countRows('business_answers', anita.businessId)) + 1);
+    // Every answer row counts, plus "What do you sell?" (the offerings answer it) and "Anything else customers often ask?" (the FAQs)
+    expect(final.progress.answeredQuestions).toBe((await countRows('business_answers', anita.businessId)) + 2);
     expect(final.progress.readyToGoLive).toBe(true);
   });
 });
@@ -614,6 +680,61 @@ describe('the consistency checker itself', () => {
               kind: 'contacts.updated',
               fields: [contact.phone as string],
             })
+            .execute();
+        },
+      },
+      {
+        what: 'a question answered by an FAQ that has been removed',
+        expectInReport: '[FAQs and unanswered questions are in order]',
+        apply: async () => {
+          const removedFaqId = crypto.randomUUID();
+          await database.system
+            .insertInto('faqs')
+            .values({
+              id: removedFaqId,
+              account_id: businessId,
+              question: 'Is there a lift?',
+              answer: 'Yes.',
+              deleted_at: new Date(),
+            })
+            .execute();
+          await database.system
+            .insertInto('unanswered_questions')
+            .values({
+              id: crypto.randomUUID(),
+              account_id: businessId,
+              question: 'Lift?',
+              group_key: 'lift',
+              answered_at: new Date(),
+              faq_id: removedFaqId,
+            })
+            .execute();
+        },
+      },
+      {
+        what: 'a question joined into a question that was itself joined',
+        expectInReport: 'was joined into a question that was itself joined',
+        apply: async () => {
+          const [first, second, third] = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+          for (const [id, key] of [
+            [first, 'chain one'],
+            [second, 'chain two'],
+            [third, 'chain three'],
+          ] as const) {
+            await database.system
+              .insertInto('unanswered_questions')
+              .values({ id, account_id: businessId, question: key, group_key: key })
+              .execute();
+          }
+          await database.system
+            .updateTable('unanswered_questions')
+            .set({ merged_into_id: third })
+            .where('id', '=', second)
+            .execute();
+          await database.system
+            .updateTable('unanswered_questions')
+            .set({ merged_into_id: second })
+            .where('id', '=', first)
             .execute();
         },
       },

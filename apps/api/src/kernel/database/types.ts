@@ -349,6 +349,8 @@ export interface UnansweredQuestionsTable {
   answered_at: Generated<Date | null>;
   faq_id: Generated<string | null>;
   ignored_at: Generated<Date | null>;
+  /** Set when the nightly job joined this question into another one; the row is then hidden from every list. */
+  merged_into_id: Generated<string | null>;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;

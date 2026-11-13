@@ -42,6 +42,7 @@ beforeAll(async () => {
     registry: createRegistry([probeModule]),
     gate,
     contextFor: createContextFactory(database),
+    listAccountIds: async () => [],
     logger: pino({ level: 'silent' }),
     // A separate pg-boss schema for tests, and fast polling so the tests don't wait.
     options: { schema: 'pgboss_test', pollIntervalSeconds: 0.5 },
@@ -101,6 +102,7 @@ describe('job runner heartbeat', () => {
       registry: createRegistry([]),
       gate,
       contextFor: createContextFactory(database),
+      listAccountIds: async () => [],
       logger: pino({ level: 'silent' }),
       options: { schema: 'pgboss_test', heartbeatStaleAfterMilliseconds: 1 },
     });
@@ -121,6 +123,7 @@ describe('job runner health when not started', () => {
       registry: createRegistry([]),
       gate,
       contextFor: createContextFactory(database),
+      listAccountIds: async () => [],
       logger: pino({ level: 'silent' }),
       options: { schema: 'pgboss_test' },
     });

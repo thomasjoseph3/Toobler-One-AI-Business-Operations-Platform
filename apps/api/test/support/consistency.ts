@@ -253,6 +253,59 @@ const offeringsAndOffersAreInOrder: Check = async (database, accountId) => {
   return problems;
 };
 
+// ------------------------------------------------------------------------ FAQs and unanswered questions
+
+const faqsAndUnansweredQuestionsAreInOrder: Check = async (database, accountId) => {
+  const problems: string[] = [];
+  const duplicateQuestions = await rowsOf<{ question: string; total: number }>(
+    database,
+    sql`select lower(question) as question, count(*)::int as total from app.faqs
+        where account_id = ${accountId} and deleted_at is null group by lower(question) having count(*) > 1`,
+  );
+  problems.push(...duplicateQuestions.map((row) => `${row.total} live FAQs ask "${row.question}"`));
+
+  // A question that was answered must point at an FAQ that is still there (removing the FAQ opens the question again)
+  const answeredWithoutFaq = await rowsOf<{ id: string }>(
+    database,
+    sql`select q.id from app.unanswered_questions q
+        where q.account_id = ${accountId} and q.answered_at is not null
+          and not exists (select 1 from app.faqs f where f.id = q.faq_id and f.account_id = q.account_id and f.deleted_at is null)`,
+  );
+  problems.push(...answeredWithoutFaq.map((row) => `unanswered question ${row.id} is answered by an FAQ that is gone`));
+
+  const openWithFaq = await rowsOf<{ id: string }>(
+    database,
+    sql`select id from app.unanswered_questions
+        where account_id = ${accountId} and answered_at is null and faq_id is not null`,
+  );
+  problems.push(...openWithFaq.map((row) => `unanswered question ${row.id} is open but points at an FAQ`));
+
+  const answeredAndIgnored = await rowsOf<{ id: string }>(
+    database,
+    sql`select id from app.unanswered_questions
+        where account_id = ${accountId} and answered_at is not null and ignored_at is not null`,
+  );
+  problems.push(...answeredAndIgnored.map((row) => `unanswered question ${row.id} is both answered and ignored`));
+
+  // A joined question points at one that stays (no chains), and a question's count is never below one
+  const chains = await rowsOf<{ id: string }>(
+    database,
+    sql`select q.id from app.unanswered_questions q
+        join app.unanswered_questions target on target.id = q.merged_into_id and target.account_id = q.account_id
+        where q.account_id = ${accountId} and target.merged_into_id is not null`,
+  );
+  problems.push(
+    ...chains.map((row) => `unanswered question ${row.id} was joined into a question that was itself joined`),
+  );
+
+  const noCount = await rowsOf<{ id: string }>(
+    database,
+    sql`select id from app.unanswered_questions where account_id = ${accountId} and count < 1`,
+  );
+  problems.push(...noCount.map((row) => `unanswered question ${row.id} has a count below one`));
+  return problems;
+};
+
 // ---------------------------------------------------------------------------------------- business profile, settings
 
 const profileAnswersAreForRealQuestions: Check = async (database, accountId) => {
@@ -313,6 +366,8 @@ const everyStampNamesSomeoneOfTheBusiness: Check = async (database, accountId) =
     'situations',
     'offerings',
     'offers',
+    'faqs',
+    'unanswered_questions',
   ] as const;
   const problems: string[] = [];
   for (const table of tables) {
@@ -340,6 +395,13 @@ const everyCreationIsLoggedOnce: Check = async (database, accountId) => {
     { table: 'tickets', logKind: 'tickets.created', eventName: 'ticket.created', eventKey: 'ticketId' },
     { table: 'offerings', logKind: 'offerings.created', eventName: 'offering.created', eventKey: 'offeringId' },
     { table: 'offers', logKind: 'offers.created', eventName: 'offer.created', eventKey: 'offerId' },
+    { table: 'faqs', logKind: 'knowledge.faq_created', eventName: 'faq.created', eventKey: 'faqId' },
+    {
+      table: 'unanswered_questions',
+      logKind: 'knowledge.unanswered_question_logged',
+      eventName: 'unanswered_question.logged',
+      eventKey: 'unansweredQuestionId',
+    },
   ] as const;
   for (const thing of things) {
     const rows = await rowsOf<{ id: string; log_lines: number; events: number }>(
@@ -373,7 +435,7 @@ const logLinesNameAPersonOfTheBusiness: Check = async (database, accountId) => {
 
 /**
  * No personal data in the log or the events: the names, phone numbers and email addresses of the business's contacts and
- * people, and the words of its offerings and offers (long enough to be meaningful), must appear in no log line and no event.
+ * people, and the words of its offerings, offers, FAQs and unanswered questions (long enough to be meaningful), must appear in no log line and no event.
  */
 const noPersonalDataInTheLogOrEvents: Check = async (database, accountId) => {
   const people = await rowsOf<{ text: string }>(
@@ -385,7 +447,10 @@ const noPersonalDataInTheLogOrEvents: Check = async (database, accountId) => {
         union all select email from app.users where account_id = ${accountId}
         union all select name from app.offerings where account_id = ${accountId}
         union all select description from app.offerings where account_id = ${accountId} and description is not null
-        union all select text from app.offers where account_id = ${accountId}`,
+        union all select text from app.offers where account_id = ${accountId}
+        union all select question from app.faqs where account_id = ${accountId}
+        union all select answer from app.faqs where account_id = ${accountId}
+        union all select question from app.unanswered_questions where account_id = ${accountId}`,
   );
   const needles = [...new Set(people.map((row) => row.text.toLowerCase()).filter((text) => text.length >= 6))];
   if (needles.length === 0) return [];
@@ -409,6 +474,7 @@ const checks: ReadonlyArray<readonly [string, Check]> = [
   ["sharing out points at the business's own people", sharingOutPointsAtThePeopleOfTheBusiness],
   ['tickets are in order', ticketsAreInOrder],
   ['offerings and offers are in order', offeringsAndOffersAreInOrder],
+  ['FAQs and unanswered questions are in order', faqsAndUnansweredQuestionsAreInOrder],
   ['the profile and settings are valid', profileAnswersAreForRealQuestions],
   ['every stamp names someone of the business', everyStampNamesSomeoneOfTheBusiness],
   ['every creation is logged and announced once', everyCreationIsLoggedOnce],

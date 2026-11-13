@@ -198,3 +198,15 @@ export async function searchConfirmedFaqs(
     limit ${options.limit}`.execute(db);
   return result.rows;
 }
+
+/** How many usable FAQs (confirmed, not removed) the business has. */
+export async function countConfirmedFaqs(db: Db, accountId: string): Promise<number> {
+  const row = await db
+    .selectFrom('faqs')
+    .select((expression) => expression.fn.countAll<string>().as('total'))
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .where('status', '=', 'confirmed')
+    .executeTakeFirstOrThrow();
+  return Number(row.total);
+}

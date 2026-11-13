@@ -20,7 +20,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F14 | Tickets | approved | [brief](../features/F14-tickets.md) | 2026-11-12 |
 | F16 | Business profile, business questions and situations | approved | [brief](../features/F16-business-profile.md) | 2026-11-12 |
 | F17 | Offerings and offers | approved | [brief](../features/F17-offerings-and-offers.md) | 2026-11-13 |
-| F18 | Documents, FAQs, knowledge search and unanswered questions | in_progress | [brief](../features/F18-faqs-and-unanswered-questions.md) | |
+| F18 | Documents, FAQs, knowledge search and unanswered questions | approved | [brief](../features/F18-faqs-and-unanswered-questions.md) | 2026-11-13 |
 | F15 | Conversation types and the router | planned | | |
 | F19 | The AI agent (text) and Test the agent | planned | | |
 | F20 | Website chat | planned | | |

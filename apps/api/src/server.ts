@@ -22,7 +22,12 @@ const contextFor = createContextFactory(database);
 const app = await buildApp({ config, database, registry, healthChecks: [] });
 const gate = app.kernel.gate; // is this module on for this business? (built from the module-switches module)
 const eventDispatcher = createEventDispatcher({ database, registry, gate, contextFor, logger: app.log });
-const jobRunner = createJobRunner({ config, registry, gate, contextFor, logger: app.log });
+// A scheduled job has no business of its own, so it is given the list of business ids and queues one job per business
+const listAccountIds = async () => {
+  const rows = await database.system.selectFrom('accounts').select('id').execute();
+  return rows.map((row) => row.id);
+};
+const jobRunner = createJobRunner({ config, registry, gate, contextFor, listAccountIds, logger: app.log });
 app.kernel.healthChecks.push(eventDispatcher.healthCheck, jobRunner.healthCheck);
 await jobRunner.start();
 eventDispatcher.start();

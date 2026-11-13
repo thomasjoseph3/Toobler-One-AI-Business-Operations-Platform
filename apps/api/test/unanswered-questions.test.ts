@@ -1,5 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createContextFactory } from '../src/kernel/context';
+import knowledgeModule from '../src/modules/core/knowledge/module';
+import { mergeSimilarQuestionsForBusiness } from '../src/modules/core/knowledge/services/unanswered-questions.service';
 import { createUnansweredQuestionsService } from '../src/modules/core/knowledge';
 import type { Database } from '../src/kernel/database';
 import { buildTestApp, unsafeRequestHeaders } from './support/app';
@@ -471,6 +474,143 @@ describe('removing an FAQ that answered a question', () => {
       answer: 'Yes, new pool.',
     });
     expect(again.statusCode, again.body).toBe(201);
+  });
+});
+
+/** Runs the nightly clean-up for the person's business, as the job does. Returns how many questions were joined into others. */
+const runNightlyMerge = (person: SignedInPerson) =>
+  mergeSimilarQuestionsForBusiness(
+    createContextFactory(database)(person.profile.business.id, {
+      kind: 'system',
+      id: 'knowledge.merge_similar_questions_for_business',
+    }),
+  );
+
+describe('the nightly clean-up that joins the same question asked in different words', () => {
+  it('joins questions with the same meaningful words into the most asked one, with the full count', async () => {
+    const person = await createSignedInPerson(app, database);
+    await agentLogs(person, 'Is parking available?');
+    await agentLogs(person, 'Available parking?');
+    await agentLogs(person, 'available parking');
+    await agentLogs(person, 'Is there parking available');
+    const keeperId = await askedQuestionId(person, 'Parking, available?');
+    expect((await listUnanswered(person)).json().items).toHaveLength(4); // four different wordings so far
+    expect(await runNightlyMerge(person)).toBe(3);
+    const items = (await listUnanswered(person)).json().items;
+    expect(items).toHaveLength(1);
+    // The most asked wording stays ("Available parking?" was asked twice) and carries the full count of 5
+    expect(items[0]).toMatchObject({ question: 'Available parking?', count: 5, status: 'open' });
+    expect(items[0].id).not.toBe(keeperId);
+  });
+
+  it('never joins different questions, such as two room numbers, or answered and ignored ones', async () => {
+    const person = await createSignedInPerson(app, database);
+    await agentLogs(person, 'What is the price of room 101?');
+    await agentLogs(person, 'What is the price of room 102?');
+    const ignoredId = await askedQuestionId(person, 'Pool open late?');
+    await send(person, 'POST', `/knowledge/unanswered/${ignoredId}/dismiss`);
+    await agentLogs(person, 'Is the pool open late');
+    expect(await runNightlyMerge(person)).toBe(0);
+    expect((await listUnanswered(person)).json().items).toHaveLength(3);
+  });
+
+  it('is safe to run twice: the second run finds nothing to join', async () => {
+    const person = await createSignedInPerson(app, database);
+    await agentLogs(person, 'Is parking available?');
+    await agentLogs(person, 'Available parking?');
+    expect(await runNightlyMerge(person)).toBe(1);
+    expect(await runNightlyMerge(person)).toBe(0);
+    expect((await listUnanswered(person)).json().items).toHaveLength(1);
+  });
+
+  it('counts a joined question asked again on the question it was joined into', async () => {
+    const person = await createSignedInPerson(app, database);
+    await agentLogs(person, 'Is parking available?');
+    await agentLogs(person, 'Available parking?');
+    await agentLogs(person, 'Available parking?');
+    await runNightlyMerge(person); // "Available parking?" stays with a count of 3
+    const asked = await agentLogs(person, 'is parking available');
+    expect(asked?.count).toBe(4);
+    const items = (await listUnanswered(person)).json().items;
+    expect(items).toHaveLength(1);
+    expect(items[0].count).toBe(4);
+  });
+
+  it('hides joined questions everywhere, so they cannot be answered or ignored by an old id', async () => {
+    const person = await createSignedInPerson(app, database);
+    const joinedId = await askedQuestionId(person, 'Is parking available?');
+    await agentLogs(person, 'Available parking?');
+    await agentLogs(person, 'Available parking?');
+    await runNightlyMerge(person);
+    const history = (await listUnanswered(person, 'include=history')).json().items as Array<{ id: string }>;
+    expect(history.map((item) => item.id)).not.toContain(joinedId);
+    expect(
+      (await send(person, 'POST', `/knowledge/unanswered/${joinedId}/answer`, { answer: 'Yes.' })).statusCode,
+    ).toBe(404);
+    expect((await send(person, 'POST', `/knowledge/unanswered/${joinedId}/dismiss`)).statusCode).toBe(404);
+  });
+
+  it('keeps answering working on the question that stays', async () => {
+    const person = await createSignedInPerson(app, database);
+    await agentLogs(person, 'Is parking available?');
+    await agentLogs(person, 'Available parking?');
+    await runNightlyMerge(person);
+    const keeper = (await listUnanswered(person)).json().items[0];
+    const answered = await send(person, 'POST', `/knowledge/unanswered/${keeper.id}/answer`, { answer: 'Yes.' });
+    expect(answered.statusCode, answered.body).toBe(201);
+  });
+
+  it('leaves another business’s questions alone, and writes log lines holding ids only', async () => {
+    const person = await createSignedInPerson(app, database);
+    const other = await createSignedInPerson(app, database);
+    await agentLogs(person, 'Secret Parking 4412 available?');
+    await agentLogs(person, 'Available secret parking 4412');
+    await agentLogs(other, 'Is parking available?');
+    await agentLogs(other, 'Available parking?');
+    await runNightlyMerge(person);
+    expect((await listUnanswered(other)).json().items).toHaveLength(2);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'knowledge.unanswered_questions_merged')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      record_type: 'unanswered_question',
+      actor: { kind: 'system', id: 'knowledge.merge_similar_questions_for_business' },
+    });
+    expect(JSON.stringify(lines)).not.toContain('Secret');
+    expect(JSON.stringify(lines)).not.toContain('4412');
+  });
+
+  it('is declared by the knowledge module as a nightly job that queues one clean-up per business', async () => {
+    const nightly = knowledgeModule.jobs?.find((job) => job.name === 'knowledge.merge_similar_questions');
+    expect(nightly?.schedule).toBe('30 2 * * *');
+    const queued: Array<{ name: string; data: unknown }> = [];
+    await nightly?.run({
+      data: {},
+      accountContext: undefined,
+      enqueueJob: async (name, data) => {
+        queued.push({ name, data });
+      },
+      listAccountIds: async () => ['11111111-1111-7111-8111-111111111111', '22222222-2222-7222-8222-222222222222'],
+      logger: console as never,
+    });
+    expect(queued).toEqual([
+      {
+        name: 'knowledge.merge_similar_questions_for_business',
+        data: { accountId: '11111111-1111-7111-8111-111111111111' },
+      },
+      {
+        name: 'knowledge.merge_similar_questions_for_business',
+        data: { accountId: '22222222-2222-7222-8222-222222222222' },
+      },
+    ]);
+    const perBusiness = knowledgeModule.jobs?.find(
+      (job) => job.name === 'knowledge.merge_similar_questions_for_business',
+    );
+    expect(perBusiness?.schedule).toBeUndefined();
   });
 });
 
