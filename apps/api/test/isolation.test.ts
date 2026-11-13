@@ -63,6 +63,7 @@ interface BusinessAData {
   offeringId: string;
   offerId: string;
   faqId: string;
+  aiKeyId: string;
   unansweredQuestionId: string;
   userId: string;
   secretWords: string;
@@ -112,6 +113,14 @@ beforeAll(async () => {
     { kind: 'agent', id: null },
     `Does it work ${secretWords}?`,
   );
+  // A saves an AI key of its own; B must never see it, its label, or be able to touch it
+  const aiKey = await sendOk(
+    businessA,
+    'POST',
+    '/ai/keys',
+    { provider: 'gemini', label: `Key ${secretWords}`, key: `AIzaSyIsolation${secretWords}0123456789` },
+    201,
+  );
   const offer = await sendOk(businessA, 'POST', '/offers', { text: `Offer ${secretWords}`, endsOn: '2099-12-31' }, 201);
   const faq = await sendOk(
     businessA,
@@ -139,6 +148,7 @@ beforeAll(async () => {
     offeringId: offering.id,
     offerId: offer.id,
     faqId: faq.id,
+    aiKeyId: aiKey.id,
     unansweredQuestionId: unansweredQuestion?.id ?? '',
     userId: businessA.profile.user.id,
     secretWords,
@@ -411,6 +421,34 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'DELETE /api/v1/ai/keys/{id}',
+    what: "remove A's AI key",
+    request: () => ({ method: 'DELETE', url: `/ai/keys/${dataOfA.aiKeyId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/ai/keys/{id}/test',
+    what: "test A's AI key (which would spend A's quota)",
+    request: () => ({ method: 'POST', url: `/ai/keys/${dataOfA.aiKeyId}/test` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PUT /api/v1/ai/settings',
+    what: "change the AI settings (B's own business only), and A's must stay as they were",
+    request: () => ({ method: 'PUT', url: '/ai/settings', payload: { keyMode: 'own_then_platform' } }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/ai/keys',
+    what: "save an AI key of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/ai/keys',
+      payload: { provider: 'gemini', label: 'Bob key', key: 'AIzaSyBobsOwnKey0123456789abcdef' },
+    }),
+    expectedStatus: 201,
+  },
+  {
     route: 'POST /api/v1/knowledge/faqs',
     what: "add an FAQ of its own (B's own business only), and A's list must stay as it was",
     request: () => ({
@@ -447,6 +485,48 @@ const attempts: Attempt[] = [
     }),
     expectedStatus: 403,
   },
+  {
+    route: 'GET /api/v1/platform/businesses/{id}/ai-access',
+    what: "look at what the platform allowed A's business",
+    request: () => ({ method: 'GET', url: `/platform/businesses/${businessA.profile.business.id}/ai-access` }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'PUT /api/v1/platform/businesses/{id}/ai-access',
+    what: "give A's business (or itself) the platform's AI keys",
+    request: () => ({
+      method: 'PUT',
+      url: `/platform/businesses/${businessA.profile.business.id}/ai-access`,
+      payload: { enabled: true },
+    }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'PATCH /api/v1/platform/ai/models/{id}',
+    what: 'retire an AI model for every business',
+    request: () => ({ method: 'PATCH', url: `/platform/ai/models/${randomUUID()}`, payload: { status: 'retired' } }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'PUT /api/v1/platform/ai/tasks/{taskId}/models',
+    what: "change the platform's model order for a job",
+    request: () => ({
+      method: 'PUT',
+      url: '/platform/ai/tasks/chat_reply/models',
+      payload: { modelIds: [randomUUID()] },
+    }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'POST /api/v1/platform/ai/models',
+    what: 'add a model to the platform list',
+    request: () => ({
+      method: 'POST',
+      url: '/platform/ai/models',
+      payload: { provider: 'gemini', modelName: 'sneaky-model', label: 'Sneaky' },
+    }),
+    expectedStatus: 403,
+  },
 ];
 
 /** Lists B reads. Each must show none of A's ids or words. */
@@ -464,6 +544,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
   { route: 'GET /api/v1/offerings', url: '/offerings' },
   { route: 'GET /api/v1/knowledge/faqs', url: '/knowledge/faqs' },
+  { route: 'GET /api/v1/ai/keys', url: '/ai/keys' },
   { route: 'GET /api/v1/knowledge/unanswered', url: '/knowledge/unanswered?include=history' },
   { route: 'GET /api/v1/knowledge/search', url: '/knowledge/search?q=question%20answer%20does%20it%20work' },
   { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
@@ -487,6 +568,8 @@ const exemptRoutes: Record<string, string> = {
   'POST /api/v1/auth/reset-password': 'a one-time token tied to one person (tested in auth-password-reset)',
   'GET /api/v1/health': 'public, no data',
   'GET /api/v1/industries': 'a global list, the same for every business',
+  'GET /api/v1/ai/models':
+    'the list of AI models is the same for every business and holds no business data and no keys (tested in ai-models)',
   'POST /api/v1/industries': 'platform admin only, adds to the global list (tested in industries-add)',
   'PATCH /api/v1/me': "changes the caller's own profile; the person comes from the session",
   'POST /api/v1/me/password': "changes the caller's own password; the person comes from the session",
@@ -505,6 +588,19 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/offerings': 'covered by the list check',
   'GET /api/v1/offers': 'covered by the list check',
   'GET /api/v1/knowledge/faqs': 'covered by the list check',
+  'GET /api/v1/ai/keys': 'covered by the list check',
+  'GET /api/v1/ai/usage':
+    "shows only the caller's own numbers: the business comes from the session (tested in ai-usage)",
+  'GET /api/v1/ai/status':
+    "shows only the caller's own state: the business comes from the session (tested in ai-usage)",
+  'GET /api/v1/ai/calls':
+    "shows only the caller's own calls: the business comes from the session (tested in ai-call-log)",
+  'GET /api/v1/platform/ai/keys':
+    "platform admins only, and it holds no business data: only the places of the platform's own keys (tested in platform-ai-keys)",
+  'GET /api/v1/platform/ai/models':
+    'platform admins only, and the list of models is the same for every business (tested in platform-ai-models)',
+  'GET /api/v1/ai/settings':
+    "shows only the caller's own settings: the business comes from the session (tested in ai-settings)",
   'GET /api/v1/knowledge/unanswered': 'covered by the list check',
   'GET /api/v1/knowledge/search': 'covered by the list check',
   'GET /api/v1/me': 'covered by the list check',
@@ -618,6 +714,10 @@ describe('isolation: business B tries to reach business A', () => {
     const offersOfA = await sendOk(businessA, 'GET', '/offers');
     expect(offersOfA.items).toHaveLength(1);
     expect(offersOfA.items[0].text).toBe(`Offer ${dataOfA.secretWords}`);
+    expect((await sendOk(businessA, 'GET', '/ai/settings')).keyMode).toBe('own'); // B's change did not reach A
+    const keysOfA = await sendOk(businessA, 'GET', '/ai/keys');
+    expect(keysOfA.items).toHaveLength(1);
+    expect(keysOfA.items[0].label).toBe(`Key ${dataOfA.secretWords}`);
     const rules = await sendOk(businessA, 'GET', '/assignment-rules');
     expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
     // B's own records are untouched too

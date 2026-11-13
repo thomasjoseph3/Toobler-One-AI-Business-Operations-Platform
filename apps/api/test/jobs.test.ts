@@ -6,8 +6,17 @@ import { createJobRunner, type JobRunner } from '../src/kernel/jobs/job-runner';
 import type { JobData, JobRun } from '../src/kernel/jobs/jobs';
 import { defineModule } from '../src/kernel/module-system/define';
 import { createRegistry, type ModuleGate } from '../src/kernel/module-system/registry';
+import { createScriptedLlmProvider } from '../src/providers/llm';
 import { newAccountId, openTestDatabase, waitFor } from './support/harness';
 import { testConfig } from './support/app';
+
+/** The services a job may use, for tests that do not look at them: real settings and database, no mail, no AI. */
+const jobServices = () => ({
+  config: testConfig(),
+  database,
+  mail: { send: async () => {} },
+  llm: createScriptedLlmProvider(() => ({ answer: 'unused' })),
+});
 
 let database: Database;
 let runner: JobRunner;
@@ -43,6 +52,7 @@ beforeAll(async () => {
     gate,
     contextFor: createContextFactory(database),
     listAccountIds: async () => [],
+    services: jobServices(),
     logger: pino({ level: 'silent' }),
     // A separate pg-boss schema for tests, and fast polling so the tests don't wait.
     options: { schema: 'pgboss_test', pollIntervalSeconds: 0.5 },
@@ -103,6 +113,7 @@ describe('job runner heartbeat', () => {
       gate,
       contextFor: createContextFactory(database),
       listAccountIds: async () => [],
+      services: jobServices(),
       logger: pino({ level: 'silent' }),
       options: { schema: 'pgboss_test', heartbeatStaleAfterMilliseconds: 1 },
     });
@@ -124,6 +135,7 @@ describe('job runner health when not started', () => {
       gate,
       contextFor: createContextFactory(database),
       listAccountIds: async () => [],
+      services: jobServices(),
       logger: pino({ level: 'silent' }),
       options: { schema: 'pgboss_test' },
     });

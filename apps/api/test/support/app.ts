@@ -23,6 +23,8 @@ export const testConfig = () =>
     NODE_ENV: 'test',
     DATABASE_URL: testDatabaseConfig().url,
     JWT_SECRET: 'test-only-secret-test-only-secret-test-only',
+    // A fixed, made-up secret for the tests (never a real one)
+    SECRETS_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     WEB_URL: TEST_WEB_ORIGIN,
   });
 

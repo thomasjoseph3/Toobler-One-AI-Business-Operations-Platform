@@ -354,6 +354,85 @@ const profileAnswersAreForRealQuestions: Check = async (database, accountId) => 
   return problems;
 };
 
+// ------------------------------------------------------------------------------------------------- AI keys, settings and usage
+
+const aiKeysSettingsAndUsageAreInOrder: Check = async (database, accountId) => {
+  const problems: string[] = [];
+  // A live key holds a real scrambled value; a removed key is wiped, so no secret outlives its removal
+  const keyStates = await rowsOf<{ id: string; deleted: boolean; wiped: boolean; zeroed: boolean }>(
+    database,
+    sql`select id, deleted_at is not null as deleted,
+               encrypted_key = 'v1.removed.removed.removed' as wiped,
+               key_fingerprint = repeat('0', 64) as zeroed
+        from app.ai_keys where account_id = ${accountId}`,
+  );
+  for (const key of keyStates) {
+    if (key.deleted && !(key.wiped && key.zeroed)) problems.push(`removed AI key ${key.id} still holds its secret`);
+    if (!key.deleted && (key.wiped || key.zeroed)) problems.push(`live AI key ${key.id} holds the wiped placeholder`);
+  }
+  const keysOverTheLimit = await rowsOf<{ provider: string; total: number }>(
+    database,
+    sql`select provider, count(*)::int as total from app.ai_keys
+        where account_id = ${accountId} and deleted_at is null group by provider having count(*) > 10`,
+  );
+  problems.push(...keysOverTheLimit.map((row) => `${row.total} live ${row.provider} keys (the limit is 10)`));
+  const sameKeyTwice = await rowsOf<{ provider: string }>(
+    database,
+    sql`select provider from app.ai_keys where account_id = ${accountId} and deleted_at is null
+        group by provider, key_fingerprint having count(*) > 1`,
+  );
+  problems.push(...sameKeyTwice.map((row) => `the same ${row.provider} key is saved twice`));
+  const statusWithoutCheck = await rowsOf<{ id: string }>(
+    database,
+    sql`select id from app.ai_keys where account_id = ${accountId} and deleted_at is null
+        and status <> 'unchecked' and status_checked_at is null`,
+  );
+  problems.push(...statusWithoutCheck.map((row) => `AI key ${row.id} has a status but no time it was checked`));
+
+  // The business's own model order only names models that exist
+  const unknownModels = await rowsOf<{ job: string; model_id: string }>(
+    database,
+    sql`select jobs.key as job, model_ids.value as model_id
+        from app.ai_settings s,
+             jsonb_each(s.task_models) as jobs,
+             jsonb_array_elements_text(jobs.value) as model_ids
+        where s.account_id = ${accountId}
+          and not exists (select 1 from app.ai_models m where m.id::text = model_ids.value)`,
+  );
+  problems.push(
+    ...unknownModels.map((row) => `the model order for ${row.job} names a model that does not exist (${row.model_id})`),
+  );
+
+  // The daily totals agree with the call records they are made from (recent days only: old call records are cleaned away)
+  const mismatches = await rowsOf<{ description: string }>(
+    database,
+    sql`with recent_calls as (
+          select (created_at at time zone 'utc')::date as day, provider, model_name, task, agent_id, channel, key_source,
+                 count(*) filter (where success)::int as calls,
+                 count(*) filter (where not success)::int as failures,
+                 count(*) filter (where fallback_used)::int as fallbacks,
+                 sum(input_tokens)::bigint as input_tokens,
+                 sum(output_tokens)::bigint as output_tokens,
+                 sum(cached_tokens)::bigint as cached_tokens
+          from app.ai_calls
+          where account_id = ${accountId} and created_at > now() - interval '85 days'
+          group by 1, 2, 3, 4, 5, 6, 7
+        ), recent_usage as (
+          select * from app.ai_usage where account_id = ${accountId} and day > (now() - interval '85 days')::date
+        )
+        select concat(coalesce(c.day, u.day)::text, ' ', coalesce(c.task, u.task), ' ', coalesce(c.model_name, u.model_name),
+                      ': calls ', coalesce(c.calls, 0), ' vs ', coalesce(u.calls, 0),
+                      ', tokens ', coalesce(c.input_tokens, 0), ' vs ', coalesce(u.input_tokens, 0)) as description
+        from recent_calls c
+        full join recent_usage u using (day, provider, model_name, task, agent_id, channel, key_source)
+        where c.calls is distinct from u.calls or c.failures is distinct from u.failures or c.fallbacks is distinct from u.fallbacks
+           or c.input_tokens is distinct from u.input_tokens or c.output_tokens is distinct from u.output_tokens
+           or c.cached_tokens is distinct from u.cached_tokens`,
+  );
+  problems.push(...mismatches.map((row) => `the AI usage totals do not match the call records: ${row.description}`));
+  return problems;
+};
+
 // ------------------------------------------------------------------------------------- who did it, and what is written
 
 const everyStampNamesSomeoneOfTheBusiness: Check = async (database, accountId) => {
@@ -368,6 +447,7 @@ const everyStampNamesSomeoneOfTheBusiness: Check = async (database, accountId) =
     'offers',
     'faqs',
     'unanswered_questions',
+    'ai_keys',
   ] as const;
   const problems: string[] = [];
   for (const table of tables) {
@@ -396,6 +476,7 @@ const everyCreationIsLoggedOnce: Check = async (database, accountId) => {
     { table: 'offerings', logKind: 'offerings.created', eventName: 'offering.created', eventKey: 'offeringId' },
     { table: 'offers', logKind: 'offers.created', eventName: 'offer.created', eventKey: 'offerId' },
     { table: 'faqs', logKind: 'knowledge.faq_created', eventName: 'faq.created', eventKey: 'faqId' },
+    { table: 'ai_keys', logKind: 'ai.key_added', eventName: 'ai.key_added', eventKey: 'keyId' },
     {
       table: 'unanswered_questions',
       logKind: 'knowledge.unanswered_question_logged',
@@ -450,7 +531,9 @@ const noPersonalDataInTheLogOrEvents: Check = async (database, accountId) => {
         union all select text from app.offers where account_id = ${accountId}
         union all select question from app.faqs where account_id = ${accountId}
         union all select answer from app.faqs where account_id = ${accountId}
-        union all select question from app.unanswered_questions where account_id = ${accountId}`,
+        union all select question from app.unanswered_questions where account_id = ${accountId}
+        union all select label from app.ai_keys where account_id = ${accountId}
+          and lower(label) not in ('gemini', 'openai', 'anthropic')`, // a label that is only a company's name is no secret: events name the company
   );
   const needles = [...new Set(people.map((row) => row.text.toLowerCase()).filter((text) => text.length >= 6))];
   if (needles.length === 0) return [];
@@ -475,6 +558,7 @@ const checks: ReadonlyArray<readonly [string, Check]> = [
   ['tickets are in order', ticketsAreInOrder],
   ['offerings and offers are in order', offeringsAndOffersAreInOrder],
   ['FAQs and unanswered questions are in order', faqsAndUnansweredQuestionsAreInOrder],
+  ['AI keys, settings and usage are in order', aiKeysSettingsAndUsageAreInOrder],
   ['the profile and settings are valid', profileAnswersAreForRealQuestions],
   ['every stamp names someone of the business', everyStampNamesSomeoneOfTheBusiness],
   ['every creation is logged and announced once', everyCreationIsLoggedOnce],

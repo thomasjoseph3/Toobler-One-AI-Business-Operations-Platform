@@ -47,6 +47,128 @@ export interface IndustriesTable {
   updated_at: Generated<Date>;
 }
 
+/** An AI model the platform knows about. Shared by every business; the app role can read it but not change it. */
+export interface AiModelsTable {
+  id: Generated<string>;
+  provider: 'gemini' | 'openai' | 'anthropic';
+  model_name: string;
+  label: string;
+  tasks: Generated<string[]>;
+  status: Generated<'active' | 'deprecated' | 'retired'>;
+  sort_order: Generated<number>;
+  kind: Generated<'text' | 'voice'>;
+  size: Generated<'small' | 'medium' | 'large'>;
+  /** A moving name the provider points at newer models without notice. */
+  is_alias: Generated<boolean>;
+  /** The day the provider retires the model (like 2027-03-31), typed in by the admin. */
+  retires_on: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** The preset (and the platform's setting) of which models do a job, in order. Shared by every business; read-only for the app role. */
+export interface AiTaskModelsTable {
+  task: string;
+  position: number;
+  model_id: string;
+}
+
+/** An AI key a business saved for itself. The key is stored scrambled; only its last four characters are readable. Fenced by account_id. */
+export interface AiKeysTable {
+  id: string;
+  account_id: string;
+  provider: 'gemini' | 'openai' | 'anthropic';
+  label: string;
+  encrypted_key: string;
+  key_last_four: string;
+  key_fingerprint: string;
+  status: Generated<'unchecked' | 'working' | 'limited' | 'failed'>;
+  status_note: string | null;
+  status_checked_at: Date | null;
+  last_notice_at: Date | null;
+  deleted_at: Date | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** A business's AI settings (one row per business). The manager's columns and the platform's columns are written by different people. */
+export interface AiSettingsTable {
+  account_id: string;
+  key_mode: Generated<'own' | 'platform' | 'own_then_platform'>;
+  task_models: Generated<Json>;
+  platform_enabled: Generated<boolean>;
+  platform_monthly_call_cap: number | null;
+  platform_expires_at: Date | null;
+  notices_enabled: Generated<boolean>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One AI call (no message text, no key). Kept 90 days. Fenced by account_id. */
+export interface AiCallsTable {
+  id: string;
+  account_id: string;
+  created_at: Generated<Date>;
+  task: string;
+  agent_id: string;
+  channel: string;
+  prompt_version: string;
+  conversation_id: string | null;
+  provider: 'gemini' | 'openai' | 'anthropic';
+  model_name: string;
+  key_source: 'platform' | 'own';
+  key_position: number;
+  success: boolean;
+  error_kind: string | null;
+  attempt_count: number;
+  fallback_used: Generated<boolean>;
+  fallback_reason: string | null;
+  attempts: Generated<unknown>;
+  input_tokens: Generated<number>;
+  output_tokens: Generated<number>;
+  cached_tokens: Generated<number>;
+  usage_missing: Generated<boolean>;
+  latency_ms: number | null;
+}
+
+/** The daily totals of AI calls (kept for good; the monthly cap is counted from it). Fenced by account_id. */
+export interface AiUsageTable {
+  account_id: string;
+  /** The UTC day, like 2026-11-13. */
+  day: string;
+  provider: 'gemini' | 'openai' | 'anthropic';
+  model_name: string;
+  task: string;
+  agent_id: string;
+  channel: string;
+  key_source: 'platform' | 'own';
+  calls: Generated<number>;
+  failures: Generated<number>;
+  fallbacks: Generated<number>;
+  input_tokens: Generated<number>;
+  output_tokens: Generated<number>;
+  cached_tokens: Generated<number>;
+}
+
+/** What the daily check found about one of the platform's own keys (by position, never the key). Shared; the app role can only read it. */
+export interface AiPlatformKeyChecksTable {
+  provider: 'gemini' | 'openai' | 'anthropic';
+  key_position: number;
+  status: 'working' | 'limited' | 'failed';
+  status_note: string | null;
+  checked_at: Generated<Date>;
+}
+
+/** Which AI warning emails have gone out already (platform-level; only the nightly job touches it). */
+export interface AiNoticesSentTable {
+  notice_key: string;
+  sent_at: Generated<Date>;
+}
+
 /** A business. Fenced by its own id. */
 export interface AccountsTable {
   id: string;
@@ -376,6 +498,14 @@ export interface DB {
   domain_events: DomainEventsTable;
   activity_log: ActivityLogTable;
   industries: IndustriesTable;
+  ai_models: AiModelsTable;
+  ai_task_models: AiTaskModelsTable;
+  ai_keys: AiKeysTable;
+  ai_settings: AiSettingsTable;
+  ai_calls: AiCallsTable;
+  ai_usage: AiUsageTable;
+  ai_platform_key_checks: AiPlatformKeyChecksTable;
+  ai_notices_sent: AiNoticesSentTable;
   accounts: AccountsTable;
   users: UsersTable;
   user_credentials: UserCredentialsTable;

@@ -18,6 +18,34 @@ describe('loadConfig', () => {
       auth: { accessTokenMinutes: 15, sessionMaxDays: 30, sessionIdleDays: 7 },
     });
   });
+  it('reads the platform AI keys: comma lists, trimmed, no blanks, no repeats; a provider with none is empty', () => {
+    const config = loadConfig({
+      ...minimalValidEnvironment,
+      GEMINI_API_KEYS: ' key-a, key-b ,,key-a',
+      GEMINI_API_KEY: 'key-c',
+      OPEN_AI_API_KEY: 'open-key',
+    });
+    expect(config.ai.platformKeys).toEqual({
+      gemini: ['key-a', 'key-b', 'key-c'],
+      openai: ['open-key'],
+      anthropic: [],
+    });
+    expect(loadConfig(minimalValidEnvironment).ai.platformKeys).toEqual({ gemini: [], openai: [], anthropic: [] });
+  });
+  it('reads the encryption secret as 32 bytes, accepts none, and refuses a wrong size without repeating it', () => {
+    const valid = Buffer.alloc(32, 9).toString('base64');
+    expect(
+      loadConfig({ ...minimalValidEnvironment, SECRETS_ENCRYPTION_KEY: valid }).secrets.encryptionKey?.length,
+    ).toBe(32);
+    expect(loadConfig(minimalValidEnvironment).secrets.encryptionKey).toBeNull();
+    const tooShort = Buffer.alloc(16, 9).toString('base64');
+    expect(() => loadConfig({ ...minimalValidEnvironment, SECRETS_ENCRYPTION_KEY: tooShort })).toThrow(
+      /32 random bytes/,
+    );
+    expect(() => loadConfig({ ...minimalValidEnvironment, SECRETS_ENCRYPTION_KEY: tooShort })).not.toThrow(
+      new RegExp(tooShort),
+    );
+  });
   it('needs a database address', () => {
     expect(() => loadConfig({ JWT_SECRET: minimalValidEnvironment.JWT_SECRET })).toThrow(ConfigError);
     expect(() => loadConfig({ ...minimalValidEnvironment, DATABASE_URL: 'mysql://x' })).toThrow(/postgres/);
@@ -51,8 +79,21 @@ describe('loadConfig', () => {
       WEB_URL: 'https://app.example.com',
       SMTP_HOST: 'smtp.example.com',
       EMAIL_FROM: 'Toobler One <no-reply@example.com>',
+      SECRETS_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
     });
     expect(safeProductionConfig.env).toBe('production');
+    // Without the encryption secret, production would store business keys it cannot keep safe
+    expect(() =>
+      loadConfig({
+        ...minimalValidEnvironment,
+        NODE_ENV: 'production',
+        DATABASE_SSL: 'require',
+        PUBLIC_BASE_URL: 'https://api.example.com',
+        WEB_URL: 'https://app.example.com',
+        SMTP_HOST: 'smtp.example.com',
+        EMAIL_FROM: 'Toobler One <no-reply@example.com>',
+      }),
+    ).toThrow(/SECRETS_ENCRYPTION_KEY/);
   });
   it('production refuses the console mail sender, which would print working links in the log', () => {
     const productionWithoutMail = {
@@ -109,6 +150,7 @@ describe('loadConfig', () => {
         PUBLIC_BASE_URL: 'https://api.example.com',
         WEB_URL: 'https://app.example.com',
         MAIL_PROVIDER: 'smtp',
+        SECRETS_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
         SMTP_HOST: 'smtp.example.com',
         EMAIL_FROM: 'Toobler One <no-reply@example.com>',
       };

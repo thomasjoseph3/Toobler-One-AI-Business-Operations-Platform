@@ -22,6 +22,13 @@ const ROUTES_CALL_SERVICES = {
   message: 'Routes call the service; only the service talks to the repository.',
 };
 
+// The AI companies' packages are used in one folder only (apps/api/src/providers/llm). Everything else asks the AI model layer
+// for a job, so switching or adding a company touches one place (docs/features/F37-ai-models-and-keys.md).
+const AI_COMPANY_PACKAGES_ONLY_IN_LLM_FOLDER = {
+  group: ['@langchain/google-genai', '@langchain/openai', '@langchain/anthropic'],
+  message: 'Only apps/api/src/providers/llm talks to the AI companies. Ask the AI service (core.ai) for a job instead.',
+};
+
 // Names that hide what a thing is. `err` is not listed because the logging library requires that exact key in log lines (`{ err: error }`).
 const UNCLEAR_NAMES = [
   'ctx',
@@ -86,8 +93,22 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [DATABASE_ONLY_IN_REPOSITORIES, QUERY_BUILDER_ONLY_IN_REPOSITORIES] },
+        {
+          patterns: [
+            DATABASE_ONLY_IN_REPOSITORIES,
+            QUERY_BUILDER_ONLY_IN_REPOSITORIES,
+            AI_COMPANY_PACKAGES_ONLY_IN_LLM_FOLDER,
+          ],
+        },
       ],
+    },
+  },
+  // Outside the modules and the AI model layer (the app, the kernel, the other providers): the same AI rule
+  {
+    files: ['apps/api/src/**/*.ts'],
+    ignores: ['apps/api/src/modules/**', 'apps/api/src/providers/llm/**'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', { patterns: [AI_COMPANY_PACKAGES_ONLY_IN_LLM_FOLDER] }],
     },
   },
   {
@@ -95,7 +116,14 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-restricted-imports': [
         'error',
-        { patterns: [DATABASE_ONLY_IN_REPOSITORIES, QUERY_BUILDER_ONLY_IN_REPOSITORIES, ROUTES_CALL_SERVICES] },
+        {
+          patterns: [
+            DATABASE_ONLY_IN_REPOSITORIES,
+            QUERY_BUILDER_ONLY_IN_REPOSITORIES,
+            ROUTES_CALL_SERVICES,
+            AI_COMPANY_PACKAGES_ONLY_IN_LLM_FOLDER,
+          ],
+        },
       ],
     },
   },

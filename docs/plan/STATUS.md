@@ -21,6 +21,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F16 | Business profile, business questions and situations | approved | [brief](../features/F16-business-profile.md) | 2026-11-12 |
 | F17 | Offerings and offers | approved | [brief](../features/F17-offerings-and-offers.md) | 2026-11-13 |
 | F18 | Documents, FAQs, knowledge search and unanswered questions | approved | [brief](../features/F18-faqs-and-unanswered-questions.md) | 2026-11-13 |
+| F37 | AI models and keys (built before F15) | approved | [brief](../features/F37-ai-models-and-keys.md) | 2026-11-13 |
 | F15 | Conversation types and the router | planned | | |
 | F19 | The AI agent (text) and Test the agent | planned | | |
 | F20 | Website chat | planned | | |

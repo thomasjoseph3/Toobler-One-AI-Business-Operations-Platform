@@ -52,6 +52,15 @@ const EnvironmentVariablesSchema = z.object({
   SMTP_PASS: z.string().default(''),
   // The "From" line of every email, like: Toobler One <no-reply@yourdomain.com>
   EMAIL_FROM: z.string().default(''),
+  // The platform's own AI keys, used for demos. Each may hold several keys separated by commas; a provider with no key is
+  // simply not available. (GEMINI_API_KEY, with one key, is still read.) Never logged, never shown.
+  GEMINI_API_KEYS: z.string().default(''),
+  GEMINI_API_KEY: z.string().default(''),
+  OPEN_AI_API_KEY: z.string().default(''),
+  CLAUDE_API_KEY: z.string().default(''),
+  // Scrambles the AI keys that businesses save (AES-256-GCM): 32 random bytes written in base64. `npm run setup` adds one. Lose it and
+  // every saved business key becomes unreadable (the keys would have to be entered again). Never log it, never share it.
+  SECRETS_ENCRYPTION_KEY: z.string().default(''),
 });
 
 export interface Config {
@@ -71,9 +80,32 @@ export interface Config {
     from: string;
     smtp: { host: string; port: number; user: string; password: string };
   };
+  /** The platform's own AI keys per provider (possibly none). The values are secrets: never log or return them. */
+  ai: { platformKeys: { gemini: string[]; openai: string[]; anthropic: string[] } };
+  /** The server's secret for scrambling saved keys, or null when none is set (then saving a key answers 503). */
+  secrets: { encryptionKey: Buffer | null };
 }
 
 export class ConfigError extends Error {}
+
+/** Turns "keyA, keyB,,keyA" into ["keyA", "keyB"]: split on commas, trimmed, no blanks, no repeats. */
+function parseKeyList(...rawValues: string[]): string[] {
+  const keys = rawValues.flatMap((rawValue) => rawValue.split(',')).map((key) => key.trim());
+  return [...new Set(keys.filter((key) => key !== ''))];
+}
+
+/** Turns the SECRETS_ENCRYPTION_KEY setting into 32 bytes, or null when it is empty. Throws a ConfigError when it is the wrong size. */
+function parseEncryptionKey(rawValue: string): Buffer | null {
+  if (rawValue.trim() === '') return null;
+  const keyBytes = Buffer.from(rawValue.trim(), 'base64');
+  if (keyBytes.length !== 32) {
+    // The value itself is never repeated in the message
+    throw new ConfigError(
+      'Bad configuration:\n  SECRETS_ENCRYPTION_KEY must be 32 random bytes written in base64 (npm run setup makes one)',
+    );
+  }
+  return keyBytes;
+}
 
 /** Turns the TRUST_PROXY setting into what Fastify expects: false, a single address, or a list of addresses. */
 function parseTrustProxy(rawValue: string): boolean | string | string[] {
@@ -131,6 +163,14 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
         password: validEnvironment.SMTP_PASS,
       },
     },
+    ai: {
+      platformKeys: {
+        gemini: parseKeyList(validEnvironment.GEMINI_API_KEYS, validEnvironment.GEMINI_API_KEY),
+        openai: parseKeyList(validEnvironment.OPEN_AI_API_KEY),
+        anthropic: parseKeyList(validEnvironment.CLAUDE_API_KEY),
+      },
+    },
+    secrets: { encryptionKey: parseEncryptionKey(validEnvironment.SECRETS_ENCRYPTION_KEY) },
   };
   if (config.mail.provider === 'smtp' && (!config.mail.smtp.host || !config.mail.from)) {
     throw new ConfigError('Bad configuration:\n  MAIL_PROVIDER=smtp needs SMTP_HOST and EMAIL_FROM to be set');
@@ -144,6 +184,11 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
     if (!config.publicBaseUrl.startsWith('https://'))
       unsafeSettings.push('PUBLIC_BASE_URL must be https in production');
     if (!config.webUrl.startsWith('https://')) unsafeSettings.push('WEB_URL must be https in production');
+    if (!config.secrets.encryptionKey) {
+      unsafeSettings.push(
+        'SECRETS_ENCRYPTION_KEY must be set in production (it scrambles the AI keys businesses save)',
+      );
+    }
     if (config.mail.provider === 'console') {
       unsafeSettings.push('MAIL_PROVIDER must be smtp in production (console would print working links in the log)');
     }

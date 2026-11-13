@@ -6,7 +6,7 @@ import { buildSslOptions } from '../database';
 import type { HealthCheck } from '../health';
 import { isUuid } from '../ids';
 import type { ModuleGate, Registry } from '../module-system/registry';
-import type { JobData, JobDefinition } from './jobs';
+import type { JobData, JobDefinition, JobServices } from './jobs';
 
 export interface JobRunnerOptions {
   /** Where pg-boss keeps its own tables. */
@@ -48,10 +48,12 @@ export function createJobRunner(dependencies: {
   contextFor: ContextFactory;
   /** The ids of every business (nothing else), for scheduled jobs that queue one job per business. */
   listAccountIds: () => Promise<string[]>;
+  /** What jobs may use besides their business context: settings, database, mail and the AI layer. */
+  services: JobServices;
   logger: FastifyBaseLogger;
   options?: Partial<JobRunnerOptions>;
 }): JobRunner {
-  const { config, registry, gate, contextFor, listAccountIds, logger } = dependencies;
+  const { config, registry, gate, contextFor, listAccountIds, services, logger } = dependencies;
   const options: JobRunnerOptions = { ...DEFAULT_OPTIONS, ...dependencies.options };
 
   const boss = new PgBoss({
@@ -98,6 +100,7 @@ export function createJobRunner(dependencies: {
       enqueueJob,
       listAccountIds,
       logger,
+      services,
     });
   };
 

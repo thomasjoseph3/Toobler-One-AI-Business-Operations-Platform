@@ -284,7 +284,7 @@ The same recipe works for service (tickets pipeline, portal), marketing (consent
 | DB access | `pg` + Kysely (typed SQL builder, not an ORM), raw `.sql` migrations | Typed queries, SQL stays visible, repository pattern stays simple |
 | Validation | zod 4, shared in `packages/shared` | One schema for API, forms and agent tools |
 | Jobs | pg-boss | Postgres only, survives restarts, cron + retries |
-| AI | Vercel AI SDK (provider-agnostic: Gemini, Claude), `@google/genai` for Gemini Live voice | Swap models by evals, structured output, tool calling |
+| AI | LangChain + LangGraph behind `core.ai` (decided 13 Nov 2026, R49), `@google/genai` for Gemini Live voice | Swap models by evals, structured output, tool calling |
 | Staff app, site | React 19 + Vite, react-router, Tailwind 4, lucide icons, dnd-kit (board) | Owner's choice: React only, no Next.js. Single-page apps suit logged-in dashboards. |
 | Live updates | Server-sent events | Requirements |
 | Tests | Vitest (unit + API against a throwaway Postgres in Docker), Playwright (click-through), evals | Requirements |

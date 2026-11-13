@@ -15,12 +15,16 @@ const GLOBAL_TABLES = new Set([
   'accounts', // the business itself: it has its own forced RLS on `id` (checked below)
   'user_credentials', // password hashes: needed before a business is known; closed to app_user (checked below)
   'industries', // a list shared by every business; app_user may read it but not change it (checked in industries.test.ts)
+  'ai_models', // the AI models the platform knows about; app_user may read it but not change it (checked in ai-models.test.ts)
+  'ai_task_models', // which models do which job, in order; shared, read-only for app_user (checked in ai-models.test.ts)
+  'ai_platform_key_checks', // what the daily check found about the platform's own AI keys; shared, read-only for app_user (checked in platform-ai-keys.test.ts)
+  'ai_notices_sent', // which AI warning emails went out; only the nightly job reads it; closed to app_user (checked below)
   'sessions', // sign-ins: needed before a business is known; closed to app_user (checked below)
   'login_attempts', // wrong passwords per email, for the lockout: needed before sign-in; closed to app_user (checked below)
   'auth_tokens', // emailed single-use links: used before anyone is signed in; closed to app_user (checked below)
 ]);
 // Global tables that the app role must not be able to touch at all
-const CLOSED_TO_APP_ROLE = ['user_credentials', 'sessions', 'auth_tokens', 'login_attempts'];
+const CLOSED_TO_APP_ROLE = ['user_credentials', 'sessions', 'auth_tokens', 'login_attempts', 'ai_notices_sent'];
 
 describe('schema rules', () => {
   it('every table with an account_id has Row Level Security enabled, forced and a policy', async () => {

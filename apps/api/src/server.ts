@@ -27,7 +27,15 @@ const listAccountIds = async () => {
   const rows = await database.system.selectFrom('accounts').select('id').execute();
   return rows.map((row) => row.id);
 };
-const jobRunner = createJobRunner({ config, registry, gate, contextFor, listAccountIds, logger: app.log });
+const jobRunner = createJobRunner({
+  config,
+  registry,
+  gate,
+  contextFor,
+  listAccountIds,
+  services: { config, database, mail: app.kernel.mail, llm: app.kernel.llm },
+  logger: app.log,
+});
 app.kernel.healthChecks.push(eventDispatcher.healthCheck, jobRunner.healthCheck);
 await jobRunner.start();
 eventDispatcher.start();

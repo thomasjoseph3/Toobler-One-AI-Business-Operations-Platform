@@ -22,6 +22,8 @@ Run these from the project folder (`lead-engine-good`). Use `nvm use` first so N
 | -------------------------- | ----------------------------------------------------------------------------- |
 | `npm run db:migrate`       | Applies new migrations to the development database (Supabase). Only when told to apply |
 | `npm run db:migrate:test`  | Applies the migrations to the local test database                             |
+| `npm run platform-admin -- list` | Lists the platform admins. Also `grant <email>` and `revoke <email>` to make or remove one (changes the development database; the person must have signed up and verified their email) |
+| `npm run ai:check`         | Tries each AI key in `.env` with one tiny real call and lists what it can see. Never prints a key. Costs a few tokens |
 
 ## Tests and checks
 
