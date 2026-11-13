@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/08-knowledge-base.md`; `requirements/API.md` (Knowledge base); docs/plan/PHASE-1.md (F18)
 **Depends on:** F00, F01, F16, F17      **Module:** `core.knowledge` (the existing core module: always on, no switch)
-**Status:** in progress (13 Nov 2026). Slice 1 built and tested by the owner in Postman (13 Nov 2026). Slice 2 built and tested. Slice 3 built, owner test pending.
+**Status:** in progress (13 Nov 2026). Slice 1 built and tested by the owner in Postman (13 Nov 2026). Slice 2 built and tested. Slice 3 built, tested and committed. Slice 4 built, owner test pending.
 
 **Goal in one line:** the AI answers from what the business has told it. The owner types **FAQs** (question and answer). When a customer asks something the AI cannot
 answer, the question is logged under **Unanswered questions**; the manager answers it once and it becomes an FAQ, so the AI knows it from the next conversation.
@@ -82,6 +82,13 @@ answer, grouped, with how often each was asked; **Answer** (it becomes an FAQ) o
   groups by lower case without punctuation (letters of every script are kept, including combining marks such as Malayalam vowel signs) and counts a repeat in one statement, so two customers asking at once are both counted. Only a new question writes a log line and an event.
 - `GET /knowledge/unanswered` (every role): the open ones, most asked first; `?include=history` adds the answered and ignored ones. There is no route to add a question: only the AI does that (F19), so Postman shows an empty list until a row exists (see the hand-off SQL).
 - To do in slice 4: when an FAQ made from a question is removed, the question must become open again, otherwise the AI would be left with no answer and no entry to answer.
+
+## Slice 4 notes
+- `POST /knowledge/unanswered/{id}/answer` (body: `answer`, optional reworded `question`) creates a usable FAQ (source `unanswered`) and closes the question as answered, in one transaction; answers 201 with the FAQ.
+  `POST /knowledge/unanswered/{id}/dismiss` ignores an open question and answers 200 with it. Both are open to every role. Unknown and other businesses' ids are 404. A question that is not open (answered or ignored) is 409 `UNANSWERED_QUESTION_NOT_OPEN`; a question an FAQ already has is 409 `FAQ_EXISTS`.
+  Two people acting at the same moment take turns (row lock), so only one wins.
+- Removing an FAQ opens again every question it answered, so the AI never has a question with no answer and no entry to answer. An ignored question is not reopened by being asked again (its count still rises); to bring one back, add an FAQ by hand.
+- The steps "add a usable FAQ" and "turn a clashing question into 409" are written once in `services/faq-steps.service.ts` and used by the FAQ service and the unanswered questions service.
 
 ## Slice plan (each at most 2 routes; you test each in Postman before the next)
 | Slice | What | Routes |

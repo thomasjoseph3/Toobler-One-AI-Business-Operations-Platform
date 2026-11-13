@@ -211,6 +211,269 @@ describe('GET /api/v1/knowledge/unanswered', () => {
   });
 });
 
+/** Sends a request as the person (or as nobody), with the headers the web app sends. */
+const send = (person: SignedInPerson | null, method: 'GET' | 'POST' | 'DELETE', url: string, payload?: unknown) =>
+  app.inject({
+    method,
+    url: `/api/v1${url}`,
+    headers: { ...unsafeRequestHeaders, ...(person ? { cookie: person.cookieHeader } : {}) },
+    ...(payload === undefined ? {} : { payload: payload as object }),
+  });
+
+/** Logs a question as the AI agent would and answers its id. */
+async function askedQuestionId(person: SignedInPerson, text: string): Promise<string> {
+  const logged = await agentLogs(person, text);
+  if (!logged) throw new Error('The question was not saved');
+  return logged.id;
+}
+
+describe('POST /api/v1/knowledge/unanswered/{id}/answer', () => {
+  it('turns the question into a usable FAQ, closes the question as answered, and links the two', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Is there EV charging?');
+    const response = await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, {
+      answer: 'Yes, two chargers in the basement.',
+    });
+    expect(response.statusCode, response.body).toBe(201);
+    const faq = response.json();
+    expect(faq).toMatchObject({
+      question: 'Is there EV charging?',
+      answer: 'Yes, two chargers in the basement.',
+      status: 'confirmed',
+      source: 'unanswered',
+    });
+    // It is in the FAQ list now, and out of the open list but in the history
+    const faqs = (await send(person, 'GET', '/knowledge/faqs')).json().items as Array<{ id: string }>;
+    expect(faqs.map((item) => item.id)).toEqual([faq.id]);
+    expect((await listUnanswered(person)).json().items).toEqual([]);
+    const history = (await listUnanswered(person, 'include=history')).json().items;
+    expect(history[0]).toMatchObject({ id: questionId, status: 'answered', faqId: faq.id });
+  });
+
+  it('uses the reworded question when one is sent, tidying its spaces', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'ev charger??');
+    const response = await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, {
+      question: '  Do you have   an EV charger? ',
+      answer: 'Yes.',
+    });
+    expect(response.statusCode, response.body).toBe(201);
+    expect(response.json().question).toBe('Do you have an EV charger?');
+  });
+
+  it('answers 409 FAQ_EXISTS when an FAQ already has the question, and leaves the question open', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Is there parking?');
+    const existing = (
+      await send(person, 'POST', '/knowledge/faqs', { question: 'is there parking', answer: 'Yes.' })
+    ).json();
+    // The FAQ has no question mark, so the two differ: make them the same
+    await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, {
+      answer: 'Yes.',
+      question: 'is there parking',
+    }).then((response) => {
+      expect(response.statusCode, response.body).toBe(409);
+      expect(response.json()).toMatchObject({ error: { code: 'FAQ_EXISTS', details: { faqId: existing.id } } });
+    });
+    expect((await listUnanswered(person)).json().items).toHaveLength(1);
+    expect((await send(person, 'GET', '/knowledge/faqs')).json().items).toHaveLength(1);
+  });
+
+  it('answers 409 UNANSWERED_QUESTION_NOT_OPEN the second time, and for an ignored question', async () => {
+    const person = await createSignedInPerson(app, database);
+    const answeredId = await askedQuestionId(person, 'First?');
+    const ignoredId = await askedQuestionId(person, 'Second?');
+    expect(
+      (await send(person, 'POST', `/knowledge/unanswered/${answeredId}/answer`, { answer: 'One.' })).statusCode,
+    ).toBe(201);
+    await send(person, 'POST', `/knowledge/unanswered/${ignoredId}/dismiss`);
+    for (const id of [answeredId, ignoredId]) {
+      const response = await send(person, 'POST', `/knowledge/unanswered/${id}/answer`, { answer: 'Again.' });
+      expect(response.statusCode, id).toBe(409);
+      expect(response.json()).toMatchObject({ error: { code: 'UNANSWERED_QUESTION_NOT_OPEN' } });
+    }
+    expect((await send(person, 'GET', '/knowledge/faqs')).json().items).toHaveLength(1);
+  });
+
+  it('makes only one FAQ when two people answer at the same moment', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Race?');
+    const responses = await Promise.all([
+      send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, { answer: 'A.' }),
+      send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, { answer: 'B.' }),
+    ]);
+    expect(responses.map((response) => response.statusCode).sort()).toEqual([201, 409]);
+    expect((await send(person, 'GET', '/knowledge/faqs')).json().items).toHaveLength(1);
+  });
+
+  it('is 400 for a missing or empty answer, a too long text and fields it does not know', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Bad body?');
+    const bodies = [
+      {},
+      { answer: '   ' },
+      { answer: 'a'.repeat(2001) },
+      { answer: 'Yes.', question: '   ' },
+      { answer: 'Yes.', question: 'q'.repeat(301) },
+      { answer: 'Yes.', status: 'check' },
+      { answer: 'Yes.', faqId: crypto.randomUUID() },
+    ];
+    for (const body of bodies) {
+      const response = await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, body);
+      expect(response.statusCode, JSON.stringify(body)).toBe(400);
+    }
+    expect((await listUnanswered(person)).json().items).toHaveLength(1);
+  });
+
+  it('is 404 for an unknown id and another business’s question (which stays open), and 400 for an id that is not an id', async () => {
+    const person = await createSignedInPerson(app, database);
+    const other = await createSignedInPerson(app, database);
+    const othersQuestionId = await askedQuestionId(other, 'Theirs?');
+    for (const id of [crypto.randomUUID(), othersQuestionId]) {
+      expect((await send(person, 'POST', `/knowledge/unanswered/${id}/answer`, { answer: 'Hi.' })).statusCode, id).toBe(
+        404,
+      );
+    }
+    expect((await send(person, 'POST', '/knowledge/unanswered/not-an-id/answer', { answer: 'Hi.' })).statusCode).toBe(
+      400,
+    );
+    expect((await listUnanswered(other)).json().items).toHaveLength(1);
+    expect((await send(other, 'GET', '/knowledge/faqs')).json().items).toEqual([]);
+  });
+
+  it('is 401 signed out and open to every role', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Who may answer?');
+    expect((await send(null, 'POST', `/knowledge/unanswered/${questionId}/answer`, { answer: 'x' })).statusCode).toBe(
+      401,
+    );
+    await setRole(person, 'staff_own');
+    const response = await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, { answer: 'Anyone.' });
+    expect(response.statusCode, response.body).toBe(201);
+  });
+
+  it('writes log lines and events holding ids only, never the words', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Secret Question 3377');
+    const faq = (
+      await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, { answer: 'Secret Answer 5599' })
+    ).json();
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', 'in', [questionId, faq.id])
+      .execute();
+    expect(lines.map((line) => line.kind).sort()).toEqual([
+      'knowledge.faq_created',
+      'knowledge.unanswered_question_answered',
+      'knowledge.unanswered_question_logged',
+    ]);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'unanswered_question.answered')
+      .execute();
+    expect(events.map((event) => event.payload)).toEqual([{ unansweredQuestionId: questionId, faqId: faq.id }]);
+    expect(JSON.stringify([lines, events])).not.toContain('Secret');
+    expect(JSON.stringify([lines, events])).not.toContain('3377');
+  });
+});
+
+describe('POST /api/v1/knowledge/unanswered/{id}/dismiss', () => {
+  it('takes the question off the open list and keeps it in the history as ignored', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Not worth answering?');
+    const response = await send(person, 'POST', `/knowledge/unanswered/${questionId}/dismiss`);
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json()).toMatchObject({ id: questionId, status: 'ignored', faqId: null });
+    expect((await listUnanswered(person)).json().items).toEqual([]);
+    expect((await listUnanswered(person, 'include=history')).json().items[0]).toMatchObject({ status: 'ignored' });
+  });
+
+  it('keeps counting when an ignored question is asked again, but it stays ignored', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Ignore me?');
+    await send(person, 'POST', `/knowledge/unanswered/${questionId}/dismiss`);
+    await agentLogs(person, 'ignore me');
+    expect((await listUnanswered(person)).json().items).toEqual([]);
+    expect((await listUnanswered(person, 'include=history')).json().items[0]).toMatchObject({
+      status: 'ignored',
+      count: 2,
+    });
+  });
+
+  it('answers 409 UNANSWERED_QUESTION_NOT_OPEN the second time and for an answered question', async () => {
+    const person = await createSignedInPerson(app, database);
+    const ignoredId = await askedQuestionId(person, 'One?');
+    const answeredId = await askedQuestionId(person, 'Two?');
+    await send(person, 'POST', `/knowledge/unanswered/${ignoredId}/dismiss`);
+    await send(person, 'POST', `/knowledge/unanswered/${answeredId}/answer`, { answer: 'Yes.' });
+    for (const id of [ignoredId, answeredId]) {
+      const response = await send(person, 'POST', `/knowledge/unanswered/${id}/dismiss`);
+      expect(response.statusCode, id).toBe(409);
+      expect(response.json()).toMatchObject({ error: { code: 'UNANSWERED_QUESTION_NOT_OPEN' } });
+    }
+  });
+
+  it('is 404 for an unknown id and another business’s question (which stays open), and 400 for an id that is not an id', async () => {
+    const person = await createSignedInPerson(app, database);
+    const other = await createSignedInPerson(app, database);
+    const othersQuestionId = await askedQuestionId(other, 'Theirs?');
+    for (const id of [crypto.randomUUID(), othersQuestionId]) {
+      expect((await send(person, 'POST', `/knowledge/unanswered/${id}/dismiss`)).statusCode, id).toBe(404);
+    }
+    expect((await send(person, 'POST', '/knowledge/unanswered/not-an-id/dismiss')).statusCode).toBe(400);
+    expect((await listUnanswered(other)).json().items).toHaveLength(1);
+  });
+
+  it('is 401 signed out and open to every role', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Who may ignore?');
+    expect((await send(null, 'POST', `/knowledge/unanswered/${questionId}/dismiss`)).statusCode).toBe(401);
+    await setRole(person, 'staff');
+    expect((await send(person, 'POST', `/knowledge/unanswered/${questionId}/dismiss`)).statusCode).toBe(200);
+  });
+
+  it('writes a log line and an event holding ids only', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Secret Question 8181');
+    await send(person, 'POST', `/knowledge/unanswered/${questionId}/dismiss`);
+    const line = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('record_id', '=', questionId)
+      .where('kind', '=', 'knowledge.unanswered_question_ignored')
+      .executeTakeFirstOrThrow();
+    const event = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('name', '=', 'unanswered_question.ignored')
+      .executeTakeFirstOrThrow();
+    expect(event.payload).toEqual({ unansweredQuestionId: questionId });
+    expect(JSON.stringify([line, event])).not.toContain('Secret');
+  });
+});
+
+describe('removing an FAQ that answered a question', () => {
+  it('opens the question again, so the team can answer it better', async () => {
+    const person = await createSignedInPerson(app, database);
+    const questionId = await askedQuestionId(person, 'Is there a pool?');
+    const faq = (await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, { answer: 'No.' })).json();
+    expect((await listUnanswered(person)).json().items).toEqual([]);
+    expect((await send(person, 'DELETE', `/knowledge/faqs/${faq.id}`)).statusCode).toBe(204);
+    const open = (await listUnanswered(person)).json().items;
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({ id: questionId, status: 'open', faqId: null });
+    // And it can be answered again
+    const again = await send(person, 'POST', `/knowledge/unanswered/${questionId}/answer`, {
+      answer: 'Yes, new pool.',
+    });
+    expect(again.statusCode, again.body).toBe(201);
+  });
+});
+
 describe('the unanswered_questions table', () => {
   it('refuses an answered question with no FAQ, an FAQ of another business, and a question both answered and ignored', async () => {
     const person = await createSignedInPerson(app, database);

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { answerTextSchema, tidiedQuestionSchema } from './faqs';
 
 // The words and shapes of unanswered questions (what customers asked that the AI could not answer), between the API and the web app.
 
@@ -35,3 +36,18 @@ export type ListUnansweredQuestionsQuery = z.infer<typeof listUnansweredQuestion
 /** The list of unanswered questions, most asked first. */
 export const unansweredQuestionsResponseSchema = z.object({ items: z.array(unansweredQuestionSchema) });
 export type UnansweredQuestionsResponse = z.infer<typeof unansweredQuestionsResponseSchema>;
+
+/** The id in the address of /knowledge/unanswered/{id}/answer and /dismiss. */
+export const unansweredQuestionIdParamsSchema = z.object({ id: z.uuid() });
+
+/**
+ * What a person sends to answer an unanswered question: the answer, and optionally a better wording of the question (customers' own
+ * words may be rough). The question and answer become a new FAQ. Anything else in the body is refused.
+ */
+export const answerUnansweredQuestionRequestSchema = z
+  .object({
+    answer: answerTextSchema,
+    question: tidiedQuestionSchema.optional(),
+  })
+  .strict();
+export type AnswerUnansweredQuestionRequest = z.infer<typeof answerUnansweredQuestionRequestSchema>;

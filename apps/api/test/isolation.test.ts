@@ -63,6 +63,7 @@ interface BusinessAData {
   offeringId: string;
   offerId: string;
   faqId: string;
+  unansweredQuestionId: string;
   userId: string;
   secretWords: string;
 }
@@ -106,7 +107,7 @@ beforeAll(async () => {
     { name: `Offering ${secretWords}`, fromPricePaise: 450_000, priceUnit: 'per night', gstMode: 'plus' },
     201,
   );
-  await createUnansweredQuestionsService({ database }).logUnansweredQuestion(
+  const unansweredQuestion = await createUnansweredQuestionsService({ database }).logUnansweredQuestion(
     businessA.profile.business.id,
     { kind: 'agent', id: null },
     `Does it work ${secretWords}?`,
@@ -138,6 +139,7 @@ beforeAll(async () => {
     offeringId: offering.id,
     offerId: offer.id,
     faqId: faq.id,
+    unansweredQuestionId: unansweredQuestion?.id ?? '',
     userId: businessA.profile.user.id,
     secretWords,
   };
@@ -390,6 +392,22 @@ const attempts: Attempt[] = [
     route: 'DELETE /api/v1/knowledge/faqs/{id}',
     what: "remove A's FAQ",
     request: () => ({ method: 'DELETE', url: `/knowledge/faqs/${dataOfA.faqId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/knowledge/unanswered/{id}/answer',
+    what: "answer A's unanswered question",
+    request: () => ({
+      method: 'POST',
+      url: `/knowledge/unanswered/${dataOfA.unansweredQuestionId}/answer`,
+      payload: { answer: 'Hacked' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/knowledge/unanswered/{id}/dismiss',
+    what: "ignore A's unanswered question",
+    request: () => ({ method: 'POST', url: `/knowledge/unanswered/${dataOfA.unansweredQuestionId}/dismiss` }),
     expectedStatus: 404,
   },
   {

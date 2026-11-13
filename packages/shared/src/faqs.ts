@@ -16,13 +16,13 @@ export const MAX_FAQ_QUESTION_LENGTH = 300;
 export const MAX_FAQ_ANSWER_LENGTH = 2000;
 
 /** Text with the spaces tidied: no spaces at the ends, and every run of spaces or line breaks in the middle becomes one space. */
-const tidiedQuestionSchema = z
+export const tidiedQuestionSchema = z
   .string()
   .transform((text) => text.replace(/\s+/g, ' ').trim())
   .pipe(z.string().min(1).max(MAX_FAQ_QUESTION_LENGTH));
 
 /** An answer keeps its line breaks (an answer may have several lines) but loses spaces at the ends. */
-const answerTextSchema = z.string().trim().min(1).max(MAX_FAQ_ANSWER_LENGTH);
+export const answerTextSchema = z.string().trim().min(1).max(MAX_FAQ_ANSWER_LENGTH);
 
 /** A question and answer, as the API shows it. */
 export const faqSchema = z.object({

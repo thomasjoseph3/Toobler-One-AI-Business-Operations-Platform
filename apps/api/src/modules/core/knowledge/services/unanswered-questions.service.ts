@@ -1,17 +1,22 @@
 import type {
+  AnswerUnansweredQuestionRequest,
+  Faq,
+  ListUnansweredQuestionsQuery,
   UnansweredQuestion,
   UnansweredQuestionsResponse,
-  ListUnansweredQuestionsQuery,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
+import { conflict, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
+import * as faqsRepository from '../repositories/faqs.repository';
 import { tidyUnansweredQuestion } from '../helpers/tidy-unanswered-question';
 import * as unansweredQuestionsRepository from '../repositories/unanswered-questions.repository';
 import type { UnansweredQuestionRow } from '../repositories/unanswered-questions.repository';
+import { createFaqInTransaction, rethrowAsDuplicateFaqIfClash, toFaq } from './faq-steps.service';
 
 /** Turns a database row into the UnansweredQuestion the API answers with. */
 function toUnansweredQuestion(row: UnansweredQuestionRow): UnansweredQuestion {
@@ -24,6 +29,15 @@ function toUnansweredQuestion(row: UnansweredQuestionRow): UnansweredQuestion {
     faqId: row.faqId,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/** Throws 409 UNANSWERED_QUESTION_NOT_OPEN unless nobody has dealt with the question yet. */
+function requireOpen(question: UnansweredQuestionRow) {
+  if (question.status !== 'open') {
+    throw conflict('UNANSWERED_QUESTION_NOT_OPEN', 'This question has already been answered or ignored.', {
+      status: question.status,
+    });
+  }
 }
 
 /**
@@ -81,6 +95,112 @@ export function createUnansweredQuestionsService({ database }: { database: Datab
           });
         }
         return { id: recorded.id, count: recorded.count };
+      });
+    },
+
+    /**
+     * Answers an open question: the answer (and the question, as first asked or as the person reworded it) becomes a new usable FAQ
+     * with source `unanswered`, and the question is closed as answered, in one step. Writes the activity-log lines and events (ids
+     * only). An unknown or other business's question answers 404; one already answered or ignored answers 409
+     * UNANSWERED_QUESTION_NOT_OPEN; a question a live FAQ already has answers 409 FAQ_EXISTS. Answers with the new FAQ.
+     */
+    async answerUnansweredQuestion(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      unansweredQuestionId: string,
+      request: AnswerUnansweredQuestionRequest,
+    ): Promise<Faq> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      let questionOfFaq = request.question ?? ''; // for the "already exists" answer; filled in once the question is read
+      try {
+        return await database.runInAccountTransaction(accountId, async (transaction) => {
+          // Two people answering one question at the same moment take turns
+          const current = await unansweredQuestionsRepository.lockUnansweredQuestionForUpdate(
+            transaction,
+            accountId,
+            unansweredQuestionId,
+          );
+          if (!current) throw notFound('That question');
+          requireOpen(current);
+          questionOfFaq = request.question ?? current.question;
+
+          const faqId = await createFaqInTransaction(transaction, {
+            accountId,
+            actor,
+            question: questionOfFaq,
+            answer: request.answer,
+            source: 'unanswered',
+          });
+          await unansweredQuestionsRepository.markAnswered(transaction, {
+            accountId,
+            unansweredQuestionId,
+            faqId,
+            actor,
+            now: new Date(),
+          });
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'knowledge.unanswered_question_answered',
+            details: { recordType: 'unanswered_question', recordId: unansweredQuestionId },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'unanswered_question.answered',
+            payload: { unansweredQuestionId, faqId },
+          });
+          const saved = await faqsRepository.findFaqById(transaction, accountId, faqId);
+          if (!saved) throw new Error('The FAQ that was just saved cannot be read');
+          return toFaq(saved);
+        });
+      } catch (error) {
+        return rethrowAsDuplicateFaqIfClash(database, accountId, questionOfFaq, error);
+      }
+    },
+
+    /**
+     * Ignores an open question: it leaves the open list (and stays in the history). An unknown or other business's question answers
+     * 404; one already answered or ignored answers 409 UNANSWERED_QUESTION_NOT_OPEN. Writes an activity-log line and an event (ids
+     * only). Answers with the question.
+     */
+    async dismissUnansweredQuestion(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      unansweredQuestionId: string,
+    ): Promise<UnansweredQuestion> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const current = await unansweredQuestionsRepository.lockUnansweredQuestionForUpdate(
+          transaction,
+          accountId,
+          unansweredQuestionId,
+        );
+        if (!current) throw notFound('That question');
+        requireOpen(current);
+        await unansweredQuestionsRepository.markIgnored(transaction, {
+          accountId,
+          unansweredQuestionId,
+          actor,
+          now: new Date(),
+        });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'knowledge.unanswered_question_ignored',
+          details: { recordType: 'unanswered_question', recordId: unansweredQuestionId },
+        });
+        await publishEvent(transaction, {
+          accountId,
+          eventName: 'unanswered_question.ignored',
+          payload: { unansweredQuestionId },
+        });
+        const saved = await unansweredQuestionsRepository.findUnansweredQuestionById(
+          transaction,
+          accountId,
+          unansweredQuestionId,
+        );
+        if (!saved) throw new Error('The question that was just ignored cannot be read');
+        return toUnansweredQuestion(saved);
       });
     },
   };

@@ -76,6 +76,83 @@ export async function recordQuestionAsked(
   return { id: row.id, count: row.count, wasCreated: row.was_created };
 }
 
+/**
+ * Locks one unanswered question until the end of the transaction, so two people answering or ignoring it at the same moment take
+ * turns, and returns it. Returns undefined when the id is unknown or another business's.
+ */
+export async function lockUnansweredQuestionForUpdate(
+  db: Db,
+  accountId: string,
+  unansweredQuestionId: string,
+): Promise<UnansweredQuestionRow | undefined> {
+  const row = await db
+    .selectFrom('unanswered_questions')
+    .selectAll()
+    .where('account_id', '=', accountId)
+    .where('id', '=', unansweredQuestionId)
+    .forUpdate()
+    .executeTakeFirst();
+  return row ? toUnansweredQuestionRow(row) : undefined;
+}
+
+/** One unanswered question of the business, or undefined when the id is unknown or another business's. */
+export async function findUnansweredQuestionById(
+  db: Db,
+  accountId: string,
+  unansweredQuestionId: string,
+): Promise<UnansweredQuestionRow | undefined> {
+  const row = await db
+    .selectFrom('unanswered_questions')
+    .selectAll()
+    .where('account_id', '=', accountId)
+    .where('id', '=', unansweredQuestionId)
+    .executeTakeFirst();
+  return row ? toUnansweredQuestionRow(row) : undefined;
+}
+
+/** Closes an open question as answered by the given FAQ. */
+export async function markAnswered(
+  db: Db,
+  options: { accountId: string; unansweredQuestionId: string; faqId: string; actor: Actor; now: Date },
+): Promise<void> {
+  await db
+    .updateTable('unanswered_questions')
+    .set({
+      answered_at: options.now,
+      faq_id: options.faqId,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.unansweredQuestionId)
+    .execute();
+}
+
+/** Closes an open question as ignored. */
+export async function markIgnored(
+  db: Db,
+  options: { accountId: string; unansweredQuestionId: string; actor: Actor; now: Date },
+): Promise<void> {
+  await db
+    .updateTable('unanswered_questions')
+    .set({ ignored_at: options.now, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.unansweredQuestionId)
+    .execute();
+}
+
+/** Opens again every question that was answered by this FAQ (used when the FAQ is removed). */
+export async function reopenQuestionsAnsweredBy(
+  db: Db,
+  options: { accountId: string; faqId: string; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('unanswered_questions')
+    .set({ answered_at: null, faq_id: null, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('faq_id', '=', options.faqId)
+    .execute();
+}
+
 /** The business's unanswered questions, most asked first. Only the open ones unless `includeHistory` is true. */
 export async function listUnansweredQuestions(
   db: Db,

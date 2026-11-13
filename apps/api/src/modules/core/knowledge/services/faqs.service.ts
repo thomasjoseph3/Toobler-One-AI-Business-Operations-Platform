@@ -2,32 +2,12 @@ import type { CreateFaqRequest, Faq, FaqsResponse, ListFaqsQuery, UpdateFaqReque
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
-import { ApiError, conflict, notFound } from '../../../../kernel/errors';
+import { ApiError, notFound } from '../../../../kernel/errors';
 import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
-import { uuidv7 } from '../../../../kernel/ids';
 import * as faqsRepository from '../repositories/faqs.repository';
-import type { FaqRow } from '../repositories/faqs.repository';
-
-// The database error code for "a unique rule was broken".
-const UNIQUE_VIOLATION = '23505';
-
-/** True when the error is the database saying a unique rule was broken. */
-const isUniqueViolation = (error: unknown) =>
-  error instanceof Error && 'code' in error && error.code === UNIQUE_VIOLATION;
-
-/** Turns a database row into the Faq the API answers with. */
-function toFaq(row: FaqRow): Faq {
-  return {
-    id: row.id,
-    question: row.question,
-    answer: row.answer,
-    status: row.status,
-    source: row.source,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
+import * as unansweredQuestionsRepository from '../repositories/unanswered-questions.repository';
+import { createFaqInTransaction, rethrowAsDuplicateFaqIfClash, toFaq } from './faq-steps.service';
 
 /**
  * Everything about FAQs that is not plain reading of the database. The routes call this.
@@ -54,44 +34,19 @@ export function createFaqsService({ database }: { database: Database }) {
       const actor: Actor = { kind: 'user', id: principal.userId };
       try {
         return await database.runInAccountTransaction(accountId, async (transaction) => {
-          await faqsRepository.lockFaqsOfBusiness(transaction, accountId);
-          const faqId = uuidv7();
-          await faqsRepository.insertFaq(transaction, {
-            id: faqId,
+          const faqId = await createFaqInTransaction(transaction, {
             accountId,
+            actor,
             question: request.question,
             answer: request.answer,
-            status: 'confirmed',
             source: 'typed',
-            actor,
-          });
-          await writeActivityLog(transaction, {
-            accountId,
-            actor,
-            kind: 'knowledge.faq_created',
-            // Which fields were filled in, never their words
-            details: { recordType: 'faq', recordId: faqId, fields: ['question', 'answer'] },
-          });
-          await publishEvent(transaction, {
-            accountId,
-            eventName: 'faq.created',
-            payload: { faqId, source: 'typed' },
           });
           const saved = await faqsRepository.findFaqById(transaction, accountId, faqId);
           if (!saved) throw new Error('The FAQ that was just saved cannot be read');
           return toFaq(saved);
         });
       } catch (error) {
-        if (!isUniqueViolation(error)) throw error;
-        // Another live FAQ has this question. The failed transaction is gone, so look in a new one.
-        const existing = await database.runInAccountTransaction(accountId, (transaction) =>
-          faqsRepository.findFaqByQuestion(transaction, accountId, request.question),
-        );
-        throw conflict(
-          'FAQ_EXISTS',
-          'You already have an FAQ with this question.',
-          existing ? { faqId: existing.id } : undefined,
-        );
+        return rethrowAsDuplicateFaqIfClash(database, accountId, request.question, error);
       }
     },
 
@@ -143,22 +98,13 @@ export function createFaqsService({ database }: { database: Database }) {
           return toFaq(saved);
         });
       } catch (error) {
-        if (!isUniqueViolation(error)) throw error;
-        // Another live FAQ has this question. The failed transaction is gone, so look in a new one.
-        const existing = await database.runInAccountTransaction(accountId, (transaction) =>
-          faqsRepository.findFaqByQuestion(transaction, accountId, request.question ?? ''),
-        );
-        throw conflict(
-          'FAQ_EXISTS',
-          'You already have an FAQ with this question.',
-          existing ? { faqId: existing.id } : undefined,
-        );
+        return rethrowAsDuplicateFaqIfClash(database, accountId, request.question ?? '', error);
       }
     },
 
     /**
      * Removes an FAQ: it disappears from the list (and later from search); its row is kept. An unknown, already removed or other
-     * business's FAQ answers 404. Writes an activity-log line and the `faq.deleted` event (ids only).
+     * business's FAQ answers 404. A question that was answered by this FAQ becomes open again. Writes an activity-log line and the `faq.deleted` event (ids only).
      */
     async deleteFaq(principal: Pick<Principal, 'accountId' | 'userId'>, faqId: string): Promise<void> {
       const accountId = principal.accountId;
@@ -166,6 +112,8 @@ export function createFaqsService({ database }: { database: Database }) {
       await database.runInAccountTransaction(accountId, async (transaction) => {
         if (!(await faqsRepository.lockFaqForUpdate(transaction, accountId, faqId))) throw notFound('That FAQ');
         await faqsRepository.softDeleteFaq(transaction, { accountId, faqId, actor, now: new Date() });
+        // A question that was answered by this FAQ has no answer any more, so it goes back to the open list
+        await unansweredQuestionsRepository.reopenQuestionsAnsweredBy(transaction, { accountId, faqId, actor });
         await writeActivityLog(transaction, {
           accountId,
           actor,
