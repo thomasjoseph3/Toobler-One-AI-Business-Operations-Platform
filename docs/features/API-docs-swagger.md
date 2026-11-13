@@ -4,6 +4,30 @@
 business rule, so it stays outside the F-number gate in `STATUS.md`. It still follows our process: brief, vetted
 packages, small slices, your "go", your approval. Branch: `chore/api-docs`.
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+A web page (at `/docs` while the app runs in development) that lists every API route with its fields, examples and error codes, plus an OpenAPI file you can import into Postman. It is not a business feature; it is a tool for the team and for anyone integrating with Toobler One.
+
+### Why it is useful
+- **Always correct.** It is built from the same definitions the routes use, so it cannot drift from the code.
+- **Faster testing.** Import the file into Postman instead of typing each request by hand. "Try it out" buttons work on the page.
+- **Safe.** It exists only in development; production and tests do not serve it.
+
+### How to use it
+Start the API with `npm run dev` and open `http://localhost:4000/docs`. The OpenAPI file is at `http://localhost:4000/docs/json`. Routes are grouped by module (Auth, Industries, Module switches, Contacts, Leads, and so on).
+
+### For the tech team
+- **How:** every route declares its params, body and response with zod; `fastify-type-provider-zod`'s `jsonSchemaTransform` turns them into an OpenAPI document; `@fastify/swagger` collects it and `@fastify/swagger-ui` shows it. No route is described twice.
+- **Dev only:** served only when `NODE_ENV=development`. "Try it out" is allowed through `API_DOCS_ORIGIN` (default `http://localhost:4000`), which is ignored outside development; production refuses to start when it is set. The `X-Requested-With: toobler-web` header is pre-filled on routes that change something.
+- **Registration:** the docs plugin registers before the guard, so the guard's check that every route has an access declaration never sees the docs routes; a test proves they are absent outside development.
+- **Packages (vetted):** `@fastify/swagger` 9.9.2, `@fastify/swagger-ui` 6.1.2, `@fastify/static` 10.1.8.
+- The document describes routes and shapes only; no cookie, token or secret ever appears in it.
+
+---
+
 **Goal in one line:** a page that lists every API route with its fields and error codes, always in step with the code, and an
 OpenAPI file you can import into Postman, so you stop typing requests by hand.
 

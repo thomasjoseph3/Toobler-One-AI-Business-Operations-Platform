@@ -4,6 +4,60 @@
 **Depends on:** F00, F01, F04, F06, F16      **Module:** `core.offerings` (core: always on, no switch)
 **Status:** in review (12 Nov 2026). Slices 0 to 7 are built. The owner lifted the "one slice at a time" rule for slices 6 and 7 (built together) and asked for the full verification and the merge into `dev`; the owner's "approved" is still to come after the Postman test.
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+Writes down what the business sells, once, so the AI can answer "How much is a family room, and what is included?" correctly. Each **offering** has a name, a description, a "from" price, a unit (per night, per person...), a GST note, what is included, a few extra details, an on/off switch and a position in the list. Each **offer** is a time-limited promotion with an end date. It also finishes the lead feature's rule "share out new leads by offering".
+
+### Why it is useful
+- **Correct prices, every time.** The AI quotes only the "from" price you wrote, with its GST note ("from ₹4,500 a night plus GST"), and never adds up a total.
+- **Nothing outdated.** An offering that is switched off, and an offer past its end date, are never mentioned.
+- **Right person, right lead.** A lead about the day tour goes to whoever looks after the day tour.
+
+### How it works: a day in the life
+1. The manager adds "Family room, from ₹4,500 per night plus GST, breakfast included" and "Day tour, from ₹1,800 per person". They drag them into the order they want.
+2. They add an offer: "10 percent off weekday stays", ending on 31 December. On 1 January it quietly stops being mentioned.
+3. They name Rahul as the person who looks after the family room and Meera for the day tour, and choose "share out by offering".
+4. A lead arrives about the day tour and goes to Meera. A lead about nothing in particular goes to the fallback person.
+5. For winter they switch the day tour off; it hides everywhere, and switching it back on restores it.
+
+### Who can do what
+- **Everyone signed in** can read offerings and offers.
+- **Managers** can add, edit, switch on/off, reorder and remove them, and name the person who looks after each.
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| Price | Optional. A price needs its unit and its GST note (included, plus GST, or none), or none of the three. Whole paise, never rupees with decimals. |
+| Names | Unique per business, ignoring capitals |
+| Extra details | Up to 10 label and value pairs |
+| Offer | Text up to 300 characters and a required end date; counted through the end of that day in the business's time zone |
+| Removing | Hides it everywhere; the record is kept for history |
+
+### What it will never do
+- Work out a total or add GST.
+- Mention an offering that is off, or an offer that has ended.
+- Let an offering or lead point at another business's person or offering.
+- Write names, descriptions or prices into the activity log or events.
+
+### Not part of this feature
+Photos, reading offerings from a website or rate card (F31), quotes and exact prices (Phase 2), seasonal price tables, the AI's `list_offerings` tool (F19), and the screens (designer).
+
+### For the tech team
+- **Module:** `core.offerings` (core, shared with the Phase 2 sales engine). Migrations `017` (tables `offerings`, `offers`) and `018` (`leads.offering_id`, sharing mode `by_offering` with a fallback person).
+- **Routes:** `GET/POST /offerings`, `PATCH/DELETE /offerings/{id}`, `POST /offerings/reorder`, `GET/POST /offers`, `PATCH/DELETE /offers/{id}`; `POST/PATCH /leads` gain `offeringId`; `PUT /assignment-rules` gains `{ mode: "by_offering", fallbackUserId }`.
+- **Pure functions** (`helpers/`): `describePriceInWords` (never multiplies anything), `offerIsCurrent` (time-zone aware, so expiry is never a day late), and `selectWhatTheAgentMaySee` (active offerings in order, current offers only), ready for F19.
+- **Concurrency:** adding and reordering take a per-business advisory lock; edits lock the row.
+- **Profile link:** "What do you sell?" counts when an offering is on (`core.knowledge` asks `core.offerings` through its `index.ts`).
+
+### Known limits
+- A disabled person can still be an offering's owner or the fallback person until F02 (R39).
+- No screens yet (designer).
+
+---
+
 **Goal in one line:** what the business sells, written down once so the AI can answer "how much is a family room, and what is included?" correctly: each
 **offering** has a name, a description, a "from" price in paise, a unit (per night, per person...), a GST note, what is included and a few details; each
 **offer** is a time-limited promotion with an end date. Switched-off offerings and expired offers are never mentioned. It also finishes the F06 rule

@@ -3,6 +3,61 @@
 **Requirements:** `2-crm-core/03-leads-and-pipeline-board.md`; `requirements/API.md` (Leads and the pipeline board); docs/plan/PHASE-1.md (F06)
 **Depends on:** F00, F01, F04      **Module:** `core.leads` (core: always on, no switch)
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+A **lead** is one enquiry that might become a sale. Leads sit on a **board** with one column per stage (New, Contacted, Quoted, Won, Lost), so the business sees at a glance who is waiting, who is being followed up, and how many enquiries become sales. This is also where the AI agent will save every enquiry.
+
+### Why it is useful
+- **Nothing gets forgotten.** Every enquiry has a stage and an owner.
+- **Fair sharing.** New leads are given to the right person automatically.
+- **Honest numbers.** A lead must have a reason when it is lost, so the business learns why it loses sales.
+
+### How it works: a day in the life
+1. A customer enquires. A lead is created for their contact and given to a team member by the sharing rule.
+2. The team member moves it New → Contacted → Quoted as they work.
+3. The customer says yes: the lead moves to **Won**, and the contact becomes a customer. Or the customer says no: moving to **Lost** asks for a reason such as "Too costly".
+4. If a lost customer writes again within 60 days, the old lead is reopened at the first stage and the owner is told, rather than a duplicate being made.
+5. The manager reshapes the board in settings: rename a stage, add one, reorder, or remove one (its leads must be moved to another stage first).
+
+### Who can do what
+- **Everyone signed in** can add, view, edit, move and reassign leads. The "own leads only" role sees only the leads assigned to them.
+- **Managers** can delete leads, change the stages and lost reasons, and set how new leads are shared out.
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| Stages | New → Contacted → Quoted → Won / Lost. **Won and Lost always exist once and are last.** Other stages can be renamed, added, reordered or removed. |
+| Open leads per contact | One |
+| Lost reasons | 1 to 20; defaults: Too costly, Went elsewhere, Dates not available, No reply, Other |
+| Re-enquiry window | 60 days |
+| Sharing out new leads | All to one person, or round-robin over the people the manager names (a third mode, by offering, arrives with F17) |
+
+### What it will never do
+- Let a lead move to Lost without a reason.
+- Remove Won or Lost, or a stage that still has leads without moving them.
+- Give a lead to someone from another business.
+- Write names, phones or emails into the activity log or events.
+
+### Not part of this feature
+The board screens (designer), scoring (F10), notes and timeline (F07), tasks (F08), and the AI's "save lead" tool (F19).
+
+### For the tech team
+- **Module:** `core.leads`. Migrations `010` to `012`. Tables `pipelines`, `pipeline_stages` (`kind` open/won/lost; exactly one Won and one Lost enforced by the database), `lost_reasons`, `assignment_rules`, `leads`. Every business, new and existing, gets the default pipeline, reasons and sharing rule (new ones from the sign-up service through the leads module's `index.ts`).
+- **Routes:** `GET /pipeline`, `POST /pipeline/stages`, `PATCH /pipeline/stages/{id}`, `POST /pipeline/stages/reorder`, `DELETE /pipeline/stages/{id}?move_to=`, `GET/PUT /lost-reasons`, `POST/GET /leads` (list, or `?view=board`), `GET/PATCH/DELETE /leads/{id}`, `POST /leads/{id}/move`, `POST /leads/{id}/assign`, `GET/PUT /assignment-rules`.
+- **The re-enquiry rule (R6)** is a pure function: open lead takes the new enquiry; lost under 60 days ago reopens; won under 60 days ago depends on the conversation type; older starts a new lead. The agent wires it in at F19.
+- **Events:** `lead.created`, `lead.moved`, `lead.won`, `lead.lost`, `lead.reopened` (ids only), which the timeline (F07) and alerts (F23) will read.
+- **Money** is in paise; `callback_at` is UTC; temperature stays `unscored` until F10.
+
+### Known limits
+- A disabled person can still be a lead's owner or in the round-robin until F02 (R39).
+- Another lead's id appears in the 409 message to an "own leads only" person (R43).
+- No screens yet (designer).
+
+---
+
 **Goal in one line:** a lead is one enquiry that might become a sale; leads sit on a board with one column per stage, so the
 business sees at a glance who is waiting, who is following up, and how many enquiries turn into sales. It is the place the AI
 agent (F19) will save every enquiry into.

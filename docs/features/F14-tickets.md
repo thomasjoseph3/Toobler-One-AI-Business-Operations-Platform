@@ -4,6 +4,57 @@
 **Depends on:** F00, F01, F04      **Module:** `core.tickets` (core: always on, no switch; requires `core.contacts`)
 **Status:** approved by the owner on 12 Nov 2026 (backend; the ticket screens wait for the designer). All slices tested by the owner in Postman.
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+A **ticket** is a request that is not a sale: a complaint, a question about a past order, a callback, or something the AI could not answer. Keeping these off the leads board keeps sales clean and makes sure an unhappy customer gets an answer. Staff assign a ticket, add notes, and close it.
+
+### Why it is useful
+- **Complaints are not lost** among new enquiries.
+- **Clear ownership:** every ticket can have a person responsible, and "Unassigned" shows what nobody has taken yet.
+- **A simple history:** notes show who said what and when.
+
+### How it works: a day in the life
+1. A guest complains about noise. A ticket (type "complaint", priority "high") is added for their contact.
+2. The manager assigns it to Meera. Meera adds a note ("Called the guest, moved them to a quiet room").
+3. She closes the ticket. The guest comes back the next day with a follow-up; she reopens it and adds another note.
+4. At any time the team can list "my tickets", "unassigned" tickets, or all tickets of one contact.
+
+### Who can do what
+Every signed-in person, including the "own leads only" role, can see and work every ticket (tickets are shared work). There is no delete in Phase 1.
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| Type | callback, question, complaint, existing customer, other |
+| Priority | low, normal (default), high, urgent |
+| Status | open or done |
+| Notes | 1 to 2,000 characters each; never edited or deleted |
+| A closed ticket | Takes a note or a reopen; any other change is refused unless it also reopens |
+
+### What it will never do
+- Let a ticket belong to another business's contact or owner.
+- Change or delete a note.
+- Write a title, details or note words into the activity log or events.
+
+### Not part of this feature
+The ticket screens (designer), the AI's "raise a ticket" tool (F19), the router (F15), alerts when a ticket is raised (F23), and replying on the customer's channel (Phase 3).
+
+### For the tech team
+- **Module:** `core.tickets` (requires `core.contacts`). Migration `013_tickets.sql`: tables `tickets` and `ticket_notes` (the app role has no update or delete on notes; there is no delete on tickets). The closing time is required exactly when the status is `done` (database check).
+- **Routes (4):** `POST /tickets`, `GET /tickets/{id}` (with notes, oldest first), `GET /tickets` (filters `status`, `ownerUserId` = `me`/`unassigned`/a person, `type`, `priority`, `contactId`; paging), `PATCH /tickets/{id}` (assign, edit, add a note, close with `status: done`, reopen with `status: open`).
+- **PATCH** writes only fields that change; `{}` is 400 `NOTHING_TO_CHANGE`; a closed ticket answers 409 `TICKET_CLOSED` to other changes.
+- **Events:** `ticket.created`, `ticket.updated`, `ticket.assigned`, `ticket.note_added`, `ticket.closed`, `ticket.reopened` (ids and field names only) for alerts (F23) and the timeline (F07).
+
+### Known limits
+- No alerts yet when a ticket is raised or assigned (R45, F23).
+- A disabled person can still own a ticket until F02 (R39).
+- No screens yet (designer).
+
+---
+
 **Goal in one line:** a ticket is a request that is not a sale (a complaint, a question about a past order, a callback,
 something the AI cannot answer). Keeping these off the leads board keeps sales clean and makes sure an unhappy customer gets
 an answer. Staff assign a ticket, add notes, and close it. The router (F15) and the AI agent (F19) will raise tickets later.

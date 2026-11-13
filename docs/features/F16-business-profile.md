@@ -4,6 +4,59 @@
 **Depends on:** F00, F01     **Module:** `core.knowledge` (core: always on, no switch; later features F17, F18 and F19 add to it)
 **Status:** approved by the owner on 12 Nov 2026 (backend; the profile and situations screens wait for the designer). All slices tested by the owner in Postman.
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+This is the business telling the AI who it is. A fixed list of questions (about 26 general ones, plus a few extra for the business's industry) covers what the business does, where it is, when it opens, its contact details, languages, policies, and more. The answers are the **business profile**. Seven **situations** (a discount request, fully booked, a customer who wants a person, and so on) each have a ready-picked way of handling them that the manager can change. A **completeness score** shows how much is answered and what is still missing before the business can go live.
+
+### Why it is useful
+- **The AI answers from facts, not guesses.** Everything it says about the business comes from these answers.
+- **Fast set-up.** Sensible defaults mean a new business already handles every situation sensibly without answering anything.
+- **A clear to-do list.** The score names what is missing and what is needed to go live.
+
+### How it works: a day in the life
+1. A manager opens the profile and answers "What is your business name?", "What do you do?", "What is your address?" and "When are you open?". The score rises with each answer.
+2. They set their time zone and default country (opening hours and phone numbers depend on them).
+3. They look at the seven situations. For "A customer asks for a discount" the first choice is already picked; they choose a different way to handle it.
+4. The profile shows "ready to go live" once every needed question is answered. (A later feature does the actual go-live.)
+
+### Who can do what
+- **Everyone signed in** can read the questions, answers, situations and settings.
+- **Managers** can answer questions, change situations, and change the time zone and default country.
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| Answers a manager types | Confirmed at once. Answers filled in by the system later (from a website) wait for a check and are not used until a manager accepts them. |
+| Industry extras | Hotel or resort, travel agent, clinic, car dealer, school or coaching, wedding planner, real estate |
+| Fixed situations | A complaint, an exact price, and an unknown answer cannot be changed |
+| Time zone / default country | Start at Asia/Kolkata and India |
+| Questions answered elsewhere | What you sell (Offerings), offers, extra FAQs; documents are on hold |
+
+### What it will never do
+- Give the AI an answer that is still waiting for a check.
+- Write the answers themselves into the activity log (only question keys).
+- Do any maths with answers: scores are computed in code.
+
+### Not part of this feature
+Reading a website to pre-fill answers (F31), uploads (on hold), the AI using the answers (F19), the setup chat (F31), and the profile screens (designer).
+
+### For the tech team
+- **Module:** `core.knowledge` (always on). Migrations `014` (tables), `015` (more industries), `016` (`accounts.default_country`). Tables `business_answers` (one row per business and question; `value` jsonb, `source`, `status`) and `situations` (one row per business and situation). The question list is **code**, not a table, so it can be tested and versioned (`helpers/general-questions.ts`, `industry-questions.ts`).
+- **Answer types** each have a validator (short text, long text, pick one or several, yes/no, weekly hours, list rows, price in paise, link, file reference). Unknown keys are 404; a bad answer is 400 `INVALID_ANSWER`.
+- **Routes:** `GET /knowledge/questions` (with progress and go-live readiness), `PUT /knowledge/answers/{question_key}`, `POST /knowledge/answers/confirm` (all or none), `GET /knowledge/situations`, `PUT /knowledge/situations/{key}` (400 `SITUATION_FIXED`, `INVALID_CHOICE`), `GET/PUT /knowledge/settings`.
+- **Industry** reaches the module through `Principal.industryId`; the module never reads the `accounts` table.
+- **Answered elsewhere:** questions handled by other features report from them: offerings (F17) and FAQs (F18) feed the score; documents stay "not tracked".
+- **Contacts** read the default country through the module's `index.ts`.
+
+### Known limits
+- Extras for restaurants, auto service, salons and gyms are not written yet.
+- No screens yet (designer).
+
+---
+
 **Goal in one line:** a fixed list of questions tells the system everything the AI agent must know about a business: what it does, where it
 is, when it opens, how it handles a discount request, a complaint, an after-hours call. The owner answers them (the form now, the setup
 chat later in F31); the answers are the business profile and "situations" that the AI agent (F19) will answer customers from. A score

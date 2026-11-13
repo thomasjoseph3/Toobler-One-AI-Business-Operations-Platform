@@ -3,6 +3,58 @@
 **Requirements:** `2-crm-core/01-contacts.md`; docs/plan/PHASE-1.md (F04)
 **Depends on:** F00, F01      **Module:** `core.contacts` (core: always on, no switch)
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+Keeps one record for every person the business deals with, found by phone number from any country. Leads, tickets, conversations and tasks all attach to a contact, so the whole history of a person is in one place.
+
+### Why it is useful
+- **No duplicates.** If "Priya" calls on WhatsApp and also fills the website form, she is the same person, not two.
+- **Works worldwide.** Numbers are matched on the full international number, so a +44 or +971 customer is handled as well as an Indian one.
+- **The AI never guesses.** A name is optional; a contact needs only a phone or an email.
+
+### How it works: a day in the life
+1. Staff add a contact: "Priya Menon, 098470 12345". The system stores it as `+919847012345` and lower-cases her email.
+2. Later someone adds "+91 98470-12345" for a "new" person. The system refuses and points at Priya, because it is the same number.
+3. Staff search by name, email or part of the number to find her; the list is paged, newest first.
+4. If a contact is deleted, the record is only hidden; the same phone number can be used again for a new contact.
+
+### Who can do what
+Everyone signed in can add, view, edit and search contacts. **Only managers can delete.** Staff can mark a contact "not a fit" (and undo it); the other stages (lead, customer, repeat customer) are worked out automatically from leads.
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| A contact needs | A phone or an email (a name is optional) |
+| Phone | Any common format; stored as international `+...`; impossible numbers are refused |
+| Same phone or email twice | Not allowed within a business |
+| Number typed without a country code | Uses the business's default country (set in the business profile; India at first) |
+| List page size | Up to 100 |
+
+### What it will never do
+- Show one business's contacts to another.
+- Delete a contact's row for good (it is hidden, not removed).
+- Write a phone number or email into the activity log or events (they hold ids and field names only).
+
+### Not part of this feature
+Companies, custom fields, notes and timeline, duplicate merging, import and export, and the contact screens (designer).
+
+### For the tech team
+- **Module:** `core.contacts` (core). Migration `009_contacts.sql`: table `contacts` with `phone` (E.164) and a **generated** `phone_key` (the E.164 digits, so it can never drift), `email`, `language`, `lifecycle_stage`, soft delete, actor stamps. Partial unique indexes on `(account_id, phone_key)` and `(account_id, email)` where not deleted; the app role has no `DELETE` and can update only the editable columns.
+- **Phone parsing:** `kernel/phone.ts` using `libphonenumber-js`; invalid or extension numbers give 400 `INVALID_PHONE`.
+- **Routes:** `POST /contacts` (409 `CONTACT_EXISTS` with only `{ contactId }`), `GET /contacts` (`q`, `lifecycleStage`, `page`, `limit`), `GET /contacts/{id}`, `PATCH /contacts/{id}` (`{}` is 400 `NOTHING_TO_CHANGE`), `DELETE /contacts/{id}` (manager only).
+- **Concurrency:** two requests for one number at the same moment cannot both win; the database decides.
+- **Lifecycle:** a pure function. Staff may only set `not_a_fit`; `lead`, `customer` and `repeat_customer` are set by the leads module.
+
+### Known limits
+- Deleting a contact leaves its open lead on the board with no contact attached (R46, owner to decide).
+- The "own contacts only" role is not applied to contacts yet (R42, with F02 and F11).
+- No screens yet (designer).
+
+---
+
 **Goal in one line:** one record per person the business deals with, found by phone number from any country, so every later
 feature (leads, tickets, conversations, tasks) hangs off one contact.
 

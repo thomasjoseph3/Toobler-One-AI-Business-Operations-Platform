@@ -3,6 +3,51 @@
 **Requirements:** `1-foundation/03-engines-and-plans.md`; docs/ARCHITECTURE.md §1
 **Depends on:** F00, F01      **Module:** `core.module_switches` (core)
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+Each business has its own switches for the parts of the product: the lead engine, website chat, WhatsApp, email, phone, follow-ups, the staff assistant and the competitor report. A part that is switched off disappears: its menu item is hidden, its pages answer "not found", and the AI does not use it. **Nothing is deleted**: switch it back on and everything is as it was.
+
+### Why it is useful
+- **Pay for what you use, use what you pay for.** Toobler decides which parts a business's plan includes; the business then chooses which of those to turn on.
+- **A calmer app.** A business that does not use WhatsApp never sees WhatsApp.
+- **Safe changes.** A part that another part depends on cannot be switched off by accident without switching off what needs it.
+
+### How it works: a day in the life
+1. A new business starts with the lead engine and website chat included and switched on.
+2. The owner opens the module list and sees each part as **active**, **off**, **not in your plan** or **needs connecting**.
+3. The manager switches website chat off for a week; the chat widget stops answering, its data is kept; they switch it back on and it works again.
+4. The owner wants WhatsApp, which is not in the plan. Toobler adds it to the plan (platform side); now the manager can switch it on.
+
+### Who can do what
+- **Everyone signed in** can see the list.
+- **Managers** can switch a part on or off, but only if it is in the plan.
+- **Toobler's platform team** decides what is in a business's plan.
+
+### What it will never do
+- Let a business switch on a part that is not in its plan.
+- Delete a business's data when a part is switched off.
+- Allow a part to be on while the part it needs is off.
+
+### Not part of this feature
+The screens (Settings → Modules, the menu built from the list, the platform page), the per-channel "connected and healthy" check (each channel feature), and plans and billing (F35).
+
+### For the tech team
+- **Module:** `core.module_switches` (core). Migration `008_modules.sql`: table `account_modules` (fenced; `entitled`, `enabled`, timestamps, `settings`). Column grants keep `entitled` out of the app role's reach, so only the platform path can grant a module.
+- **Three switches:** `entitled` (the plan allows it; platform only), `enabled` (the business wants it), and *ready* (for channels, arrives with each channel). A module is **active** only when entitled and enabled (and ready), and its `requires` are active.
+- **The catalogue** is a plain list: `engine.leads`, `channel.webchat`, `channel.whatsapp`, `channel.email`, `channel.phone`, `feature.followups`, `feature.assistant`, `feature.competitors`. Core modules are always on and have no row. A test keeps real module manifests matching the catalogue.
+- **The gate:** the kernel finds the real gate through the module manifest (`moduleGate`). Routes, jobs, event handlers and agent tools of an inactive module answer 404 or are skipped. A business's answer is cached for 10 seconds; any change on the same server clears it.
+- **Routes:** `GET /modules`, `PATCH /modules/{id}` (409 `NOT_IN_PLAN`, 409 `NEEDS_MODULE`), `POST /platform/businesses/{id}/modules` (platform), and `GET /me` now lists the active modules. Changes write the activity log and publish `module.enabled` / `module.disabled`.
+- New businesses start with `engine.leads` and `channel.webchat` entitled and enabled.
+
+### Known limits
+- No screens yet (designer).
+- Voice and other paid channels will run on the business's own keys (decision, 11 Nov 2026); that arrives with F25 and F29.
+
+---
+
 **Goal in one line:** each business has its own switches for the parts of the product (lead engine, website chat,
 WhatsApp, and so on). A part that is off is hidden: its routes answer 404, its menu items go, and its data is kept.
 

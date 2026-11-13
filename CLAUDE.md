@@ -36,6 +36,11 @@ engine and the CRM core**.
    file by file, what was added or changed and why; give the owner the exact steps to test it in Postman and in the
    browser; then **stop** until the owner has verified it and says to continue. Never batch slices together.
 
+6. **Feature guide (owner rule, 13 Nov 2026): every feature file in `docs/features/` starts with a `## Feature guide`** written so a
+   non-technical user can understand it (what it does, why it is useful, a day-in-the-life example, who can do what, settings and limits,
+   what it never does, what is not part of it), followed by a "For the tech team" part (module, tables, routes, jobs, events, how it works,
+   known limits). Write it before hand-off; keep it up to date when a later feature changes the behaviour. F18's is the model.
+
 ## Dependencies rule
 
 Only stable, well-known packages, vetted first with `npm run vet -- <name>` (≥14 days old, ≥50k downloads a week, named
