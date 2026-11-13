@@ -8,7 +8,7 @@ export default defineConfig({
       {
         test: {
           name: 'tooling',
-          include: ['tools/**/*.test.ts', 'scripts/**/*.test.ts', 'packages/**/*.test.ts'],
+          include: ['tools/**/*.test.ts', 'scripts/**/*.test.ts', 'packages/**/*.test.ts', 'apps/web/src/**/*.test.ts'],
           environment: 'node',
         },
       },

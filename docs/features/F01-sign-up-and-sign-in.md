@@ -105,7 +105,14 @@ Slices of at most 2 API routes, backend first; **the screens come after the whol
 | 6 | lockout after 5 wrong passwords, rate limits, common-password list (no new route) | done and tested by the owner |
 | 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | done and tested by the owner |
 | 8 | `PATCH /me`, `POST /me/password` | done and tested by the owner |
-| UI | sign-up, verify, sign-in, forgot and reset, profile, sign-out | **deferred** until the designer's screens arrive (see "Deferred work" in docs/plan/STATUS.md). UI slice 1, sign-in with the guard and API client, is built on the branch `feature/F01-ui-sign-in`. |
+| UI 1 | sign-in, sign-out and the signed-in guard (no new routes) | built, waiting for the owner's test |
+| UI 2 | sign-up and the "check your email" screen (adds the "Create an account" link) | planned |
+| UI 3 | the verify-email page, "verify your email" banner, resend | planned |
+| UI 4 | forgot and reset password pages (adds the "Forgot password?" link) | planned |
+| UI 5 | profile page: edit name and mobile, change password | planned |
+| UI 6 | full-stack browser tests (real API and test database), hand-off script | planned |
+
+**Design (owner decision, 13 Nov 2026):** the designer supplied only the Leads list frame, so these screens are designed by us in that style (design system v1.3 tokens, the Figma icons and logo) and listed in docs/FRONTEND.md for the designer to review. Built slice by slice on the branch `feature/ui-design-v1.3`.
 
 ## Reused from the hotel agent
 - Read: `src/modules/core/auth/{routes,service,sessions,repository}.js`, `src/middleware/auth.js` (489 lines). **We keep

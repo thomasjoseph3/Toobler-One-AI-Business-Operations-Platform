@@ -156,10 +156,12 @@ Malayalam, Hindi and English without clipping or fixed widths.
 - **Single-page app.** `apps/web` is React + Vite. In development Vite proxies `/api` to the API; in production a reverse
   proxy serves the app and `/api` from one address, so the browser sees one origin.
 - **Sign-in cookies.** The API sets a short-lived access token and a refresh token in **httpOnly, Secure, SameSite=Lax**
-  cookies. Tokens never reach browser JavaScript, `localStorage` or a URL. When a request answers `TOKEN_EXPIRED`, the
-  API client in `lib/api.ts` calls `/auth/refresh` once and repeats the request; if that fails it signs the person out. State-changing requests are checked for a matching `Origin` and a CSRF
+  cookies. Tokens never reach browser JavaScript, `localStorage` or a URL. When a request answers 401 (the access token has
+  run out), the API client in `src/api/client.ts` calls `/auth/refresh` once (several failing requests share one refresh)
+  and repeats the request; if that fails it tells the app the session ended and the person lands on the sign-in page. The
+  `/auth/` routes are never refreshed-and-repeated. State-changing requests are checked for a matching `Origin` and a CSRF
   header (docs/SECURITY.md 2.2).
-- **Data.** A small typed client in `lib/api.ts` (schemas from `packages/shared`). Each page loads through a hook with
+- **Data.** A small typed client in `src/api/client.ts` (schemas from `packages/shared`). Each page loads through a hook with
   loading, empty and error states; forms show field errors from `error.details`.
 - **Live**: a hook subscribes to `GET /api/v1/events` (server-sent events) and refetches the affected list, debounced.
 - **Optimistic UI** only where it matters (board moves, ticking a task), with rollback and a toast on failure.
@@ -194,7 +196,10 @@ choice fails contrast).
 
 ## 10. Front-end tests
 
-- Playwright runs every click-through test at **phone (Pixel 7) and desktop** sizes.
+- Playwright runs every click-through test at **phone (Pixel 7) and desktop** sizes. By default it answers `/api/v1` itself
+  with a pretend API (`e2e/support.ts`, the `pretendApi` fixture: signed in unless a test says otherwise), so these tests need no
+  database. Browser "Failed to load resource" lines are ignored in the console check, because tests refuse calls on purpose.
+- Who is signed in lives in `src/auth/session.tsx`; `RequireSignIn` guards every page except the ones in `AuthLayout`.
 - A unit test checks every token pair we use for contrast in light and dark (see §5).
 - Each feature's manual test script includes a phone check; screenshots are taken with the browser tools at hand-off.
 - Visual checks per feature: light and dark, empty, loading and error states, a 60-character name, a Malayalam name.
