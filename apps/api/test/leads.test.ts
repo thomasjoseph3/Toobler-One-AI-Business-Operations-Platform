@@ -404,6 +404,19 @@ describe('GET /api/v1/leads (list)', () => {
     expect([...pageOne, ...pageTwo]).toEqual([first.id, second.id]);
   });
 
+  it('still gives the right total for a page past the last one, and for a list with no leads', async () => {
+    const person = await createSignedInPerson(app, database);
+    expect((await listLeads(person)).json()).toMatchObject({ total: 0, items: [] });
+    for (let count = 0; count < 3; count += 1) await addLead(person, { contactId: await addContact(person) });
+    // 3 leads, 2 to a page: page 2 holds 1, page 5 holds none but the total is still 3
+    expect((await listLeads(person, 'limit=2&page=2')).json()).toMatchObject({ total: 3, page: 2 });
+    expect((await listLeads(person, 'limit=2&page=2')).json().items).toHaveLength(1);
+    const pastTheEnd = (await listLeads(person, 'limit=2&page=5')).json();
+    expect(pastTheEnd).toMatchObject({ total: 3, page: 5, items: [] });
+    // The total follows the filters, not the whole business
+    expect((await listLeads(person, 'status=closed')).json()).toMatchObject({ total: 0, items: [] });
+  });
+
   it('filters by stage, owner, contact and open or closed', async () => {
     const person = await createSignedInPerson(app, database);
     const openContactId = await addContact(person);

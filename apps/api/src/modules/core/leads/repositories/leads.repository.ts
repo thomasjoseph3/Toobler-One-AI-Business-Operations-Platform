@@ -239,7 +239,7 @@ export interface LeadSorting {
 const NEWEST_ACTIVITY_FIRST: LeadSorting = { sort: 'lastActivity', order: 'desc' };
 
 /**
- * One page of leads in the given order (newest activity first when none is given), and how many leads match in all.
+ * One page of leads in the given order (newest activity first when none is given), and how many leads match in all (one database call).
  * The lead's id is always the last tie-breaker, so the order is the same on every page.
  */
 export async function listLeadRows(
@@ -258,11 +258,23 @@ export async function listLeadRows(
     query = query.orderBy(callbackOrder);
   }
   if (sorting.sort === 'stage') query = query.orderBy('stage.sort', sorting.order);
-  const rows = await query.orderBy('lead.id', sorting.order).limit(paging.limit).offset(paging.offset).execute();
+  // The total comes back in the same call as the page: `count(*) over ()` counts every matching lead before the page is cut,
+  // so the list needs one database call fewer (each call costs a round trip, which is slow when the database is far away).
+  const rows = await query
+    .select(sql<string>`count(*) over ()`.as('total_matching'))
+    .orderBy('lead.id', sorting.order)
+    .limit(paging.limit)
+    .offset(paging.offset)
+    .execute();
+  const firstRow = rows[0];
+  if (firstRow) return { rows: rows.map(toLeadRow), total: Number(firstRow.total_matching) };
+  // No rows came back, so there was no row to carry the total. That is 0 leads in all, unless the page asked for lies past
+  // the last one (page 5 of 3), where the real total is still wanted: count then.
+  if (paging.offset === 0) return { rows: [], total: 0 };
   const countRow = await selectLeadRows(db, filters)
     .select((expression) => expression.fn.countAll<string>().as('total'))
     .executeTakeFirstOrThrow();
-  return { rows: rows.map(toLeadRow), total: Number(countRow.total) };
+  return { rows: [], total: Number(countRow.total) };
 }
 
 /**
