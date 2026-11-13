@@ -19,8 +19,8 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F06 | Pipeline and leads board | approved | [brief](../features/F06-pipeline-and-leads.md) | 2026-11-12 |
 | F14 | Tickets | approved | [brief](../features/F14-tickets.md) | 2026-11-12 |
 | F16 | Business profile, business questions and situations | approved | [brief](../features/F16-business-profile.md) | 2026-11-12 |
-| F17 | Offerings and offers | in_review | [brief](../features/F17-offerings-and-offers.md) | |
-| F18 | Documents, FAQs, knowledge search and unanswered questions | planned | | |
+| F17 | Offerings and offers | approved | [brief](../features/F17-offerings-and-offers.md) | 2026-11-13 |
+| F18 | Documents, FAQs, knowledge search and unanswered questions | in_progress | [brief](../features/F18-faqs-and-unanswered-questions.md) | |
 | F15 | Conversation types and the router | planned | | |
 | F19 | The AI agent (text) and Test the agent | planned | | |
 | F20 | Website chat | planned | | |
@@ -59,6 +59,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | **F16-UI: the business profile screens** (Knowledge base → Business profile with sections A to H and the completeness card, Situations, Settings → time zone and country) | The designer is making the screens. The owner approved the F16 **backend** on 2026-11-12 (7 routes, tested) and parked the screens. | Planned in the F16 brief. The Postman collection *Toobler One - F16 business profile (run in order)* tests the API meanwhile. |
 | **F01-UI: the auth screens** (sign-in, sign-up, verify email, forgot and reset password, profile, full-stack browser tests) | The designer is making the screens. The owner approved the F01 **backend** on 2026-11-11 (8 slices, all tested by the owner) and parked the screens. | UI slice 1 (sign-in, sign-out, the guard, the API client) is built on the local branch `feature/F01-ui-sign-in`, commit `0d78997`. It works, and the designer's look goes on top. UI slices 2 to 6 are planned in the F01 brief. |
 | **F03-UI: the module screens** (Settings → Modules, the menu built from `/me`, the platform page) | The designer is making the screens; the owner put the front end on hold (11 Nov 2026). The F03 backend is built and tested. | Planned in the F03 brief. |
+| **F18-Documents: uploads, file reading, "Use this / Don't use", "These don't match", Re-read website** | Owner decision 13 Nov 2026: too messy for now (files, storage, reading PDF/Word/photos, cost, security). F18 is built with FAQs, unanswered questions and search only. | Decide at the end of Phase 1 whether to build it (R47). Planned design: storage behind an interface (Supabase Storage), vetted PDF/Word libraries, AI image reading for photos. |
 | **API docs (Swagger / OpenAPI)** | The routes already describe their shapes with zod, so a docs page can be generated. It is a small feature of its own, planned right after F03 is approved (owner agreed 2026-11-11). Packages to be vetted first; served in development only. | Built and merged (`/docs`, development only); brief: [API-docs-swagger.md](../features/API-docs-swagger.md). |
 
 When the designer's screens arrive, the F01-UI work is done as slices (one screen at a time, owner testing each), and it is approved separately.
