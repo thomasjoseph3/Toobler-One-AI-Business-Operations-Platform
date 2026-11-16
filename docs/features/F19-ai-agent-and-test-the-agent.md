@@ -2,7 +2,7 @@
 
 **Requirements:** `3-ai-agents-and-channels/02-how-the-agent-behaves.md`; docs/plan/PHASE-1.md (F19); docs/ARCHITECTURE.md §3; docs/CONVERSATION-TYPES.md
 **Depends on:** F15, F16, F17, F18, F37      **Module:** `core.agents` (a new core module, always on; the agent is used by every channel)
-**Status:** `in_review` (all five slices built on 16 Nov 2026; waiting for the owner's test and approval)
+**Status:** `approved` by the owner on 16 Nov 2026 (all five slices built and tested; `npm run verify` green)
 
 ## Feature guide
 
