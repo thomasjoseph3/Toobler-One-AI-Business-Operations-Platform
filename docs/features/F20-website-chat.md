@@ -2,11 +2,66 @@
 
 **Requirements:** `3-ai-agents-and-channels/05-website-chat.md`; docs/plan/PHASE-1.md (F20); docs/ARCHITECTURE.md §2 (the conversation engine and `ChannelAdapter`); docs/SECURITY.md (public routes and the widget); `requirements/API.md` (Website chat)
 **Depends on:** F03, F15, F19, F37      **Module:** `channel.webchat` (a channel module: switched on per business, plug and play)
-**Status:** `in_progress` (brief written 16 Nov 2026; owner decisions below)
+**Status:** `approved` by the owner on 16 Nov 2026 (all five slices built and tested; `npm run verify` green)
 
 ## Feature guide
 
-*(Written before hand-off, as F18's and F19's are. Plain English first, then "For the tech team".)*
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+It puts a chat bubble on your own website. A visitor taps it and talks to your AI agent (the one from F19) in writing, in English. The agent answers from what you have told Toobler One, asks for the visitor's name and phone number, and makes the one promise ("our team will call you within 15 minutes"). When the chat is over, the system sorts it like every other conversation: an enquiry becomes a **lead** with a **contact**, a complaint becomes a **ticket**, and a short **summary** is written for your team.
+
+The bubble can also show a **Call** button (it opens the phone app with your number) and a **WhatsApp** button (it opens WhatsApp with your number and a ready-typed message). These two are simple links: they need nothing else set up, and you choose which buttons show and in what order.
+
+### Why it is useful
+- **No visitor is lost.** Somebody browsing at 11 pm gets an answer at once and leaves a number, instead of closing the tab.
+- **One line to install.** You paste one line of code into your website. Nothing else changes on your page, and the bubble never slows it down.
+- **Only your websites.** The chat works only on the websites you list. Another website that copies your line gets nothing.
+- **You stay in control.** You can switch the whole chat off in Settings, and your data is kept.
+
+### How it works: a day in the life
+1. The manager opens the chat settings (the screen is being designed; for now Postman), sets the colour and the greeting, lists `https://nairstays.example` as the allowed website, adds the phone and WhatsApp numbers, and pastes the one line into the website.
+2. Ravi visits the website at night. A blue bubble with Chat, Call and WhatsApp buttons appears in the corner.
+3. He taps Chat. The window says *"AI assistant"* and greets him. He writes: *"Do you have a room next weekend?"* and, when asked, *"I'm Ravi, 98470 12345."* The agent says: *"Thank you, Ravi. Our team will call you within 15 minutes."*
+4. Ravi's page reloads by accident: the chat is still there. He closes the window and leaves.
+5. After **15 minutes of silence** the chat ends by itself. The system sorts it as an enquiry, makes the contact "Ravi" with his phone number, makes a lead, and writes the summary.
+6. In the morning the manager sees the lead with the summary. Another visitor who complained about the air conditioning got a ticket instead, and no lead.
+
+### Who can do what
+- **Managers** change the chat settings. **Staff** can read them (and the code to paste).
+- **Visitors** need no sign-in: they can only chat, read their own chat, and end it.
+- The role "own leads only" cannot see the settings.
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| Colour, greeting, corner (left or right) | Chosen by the manager. Starts as near-black, "Hi! How can I help you today?", bottom right. |
+| Allowed websites | Up to 20, each written as an address like `https://nairstays.example` (no page, no wildcard). **Empty means the chat works nowhere**, so a new business is safe until it lists its site. |
+| Call and WhatsApp buttons | Each shows only when its number is set. The manager chooses their order. The Chat button cannot be left out. |
+| A message | Up to 1,000 characters. |
+| A chat | Up to 100 messages; it ends after 15 minutes of silence, or when the visitor taps **End chat**. |
+| Limits per connection | 20 messages a minute, 10 new chats an hour. 120 messages a minute for the whole business. |
+| Language | English only. |
+
+### What it never does
+- It never shows one business's chat to another, or lets a visitor read anyone else's chat.
+- It never lets a website that is not on your list use your chat.
+- It never makes a lead or a contact while the chat is still going, and never for a chat where nobody gave a phone number or email (a person looks at those).
+- It never shows the visitor technical errors, and never writes the visitor's words to the log.
+- It never gives a price the business did not state, or a second promise (that is the agent's rule, from F19).
+
+### What is not part of it
+- The **Channels, Website chat screen** (colour picker, preview, "Check installation"): it is with the designer; until then Postman and the test page are used.
+- **Word-by-word replies** (the reply appears all at once), the **in-browser call** (the Call button is a plain phone link until voice arrives), the **WhatsApp AI chat**, the **WordPress plugin**, and staff **taking over** a chat (the inbox, F21).
+
+### For the tech team
+- **Module:** `channel.webchat` (kind channel; requires core.auth, core.conversations, core.agents, core.ai). Off means its routes answer 404, its jobs are skipped, and data is kept.
+- **Tables:** `webchat_settings` (migration 040; one row per business, made on first read; the widget key is never updatable). Migration 041 lets a web chat fill in `conversations.from_phone_key` and `from_email` once (a trigger forbids changing or clearing them afterwards).
+- **Routes:** `GET` and `PATCH /api/v1/channels/webchat` (settings). Public: `GET /api/v1/public/widget/{key}/config`, `GET` and `POST .../messages`, `POST .../end`, each with `OPTIONS` for the browser's permission check. Files (outside `/api/v1`): `/widget/loader.js`, `/widget/assets/{file}`, `/widget/chat?key=`, and `/widget/test?key=` (not in production).
+- **Jobs:** `webchat.find_idle_chats` (every minute, finds businesses with chats quiet for 15 minutes) and `webchat.end_idle_chats` (per business: queues `conversations.sort_conversation` and `agents.summarise_conversation`, then marks the chat ended). A visitor's End chat does the same through `handOverChat`. Routes queue jobs through `app.kernel.enqueueJob`.
+- **How a message flows:** key finds the business (the one cross-business lookup) → module on? → website allowed (or the chat window's own same-origin call while a website is listed)? → visitor token (HS256, 24 hours, key derived from the app secret, tied to business and conversation) → limits → `createAgentSavedTurnService` (shared with Test the agent) → conversation and messages saved → phone or email the agent saved is linked → new token.
+- **Widget:** `apps/site` (React 19 + Vite) builds the chat window; `public/loader.js` is plain JavaScript. The API serves `apps/site/dist` (or `WIDGET_FILES_DIRECTORY`). Run `npm run build:widget` after changes and on deploy. The chat page's policy allows no inline code and lets only the listed websites frame it; every other page stays unframeable.
+- **Known limits:** the per-key and new-chat limits live in server memory (one server); a visitor message is lost if the AI stays down (the visitor is told and can resend); a very long chat is not summarised as it grows (only the last 30 messages are shown to the agent); websites with a strict Content-Security-Policy need to allow the chat service address; callback minutes are fixed at 15 (F19); an idle business with the chat switched off keeps its quiet chats open until it is switched on again; one chat window per browser and business.
 
 ## Scope
 
@@ -87,11 +142,62 @@ The **Channels → Website chat** screen is parked with the designer (code to co
 
 ## Manual test script
 
-*(To be written in slice 5.)* Planned: paste the code on the test page, chat as a customer (an enquiry, then a complaint), see the lead, the ticket and the summaries appear; try from a website that is not allowed and see it refused.
+You need: the API running (`npm run dev`), `npm run build:widget` run once, a **manager** login for a test business with an AI key (or the platform's), and Postman with the collection *Toobler One - F20 website chat (run in order)*.
+
+1. **Settings.** Run folders 0 to 3 in Postman. Expect 200 everywhere, a key `wk_...`, and the buttons shown once the numbers are set.
+2. **List the test page.** `PATCH /channels/webchat` with `{"allowedWebsites":["http://localhost:4000"]}` (the test page is its own website).
+3. **Open the test page:** `http://localhost:4000/widget/test?key=YOUR_KEY`. Expect a blue (or your colour) bubble with Chat, Call and WhatsApp buttons in the corner. On a phone-sized window the chat covers the whole screen.
+4. **Enquiry.** Tap Chat. The window says *AI assistant* and shows your greeting. Write: *"Hi, do you have a room next weekend?"*, then *"I'm Ravi, 98470 12345, please call me."* Expect the promise sentence in the reply.
+5. **Reload** the page and open the chat again: the conversation is still there.
+6. **End by closing.** Tap **End chat**. Within about half a minute, in Postman `GET /leads`: a lead for Ravi (phone +919847012345) with a summary on the conversation.
+7. **Silence.** Start another chat, give a name and phone, and leave it for 16 minutes. Expect the same result without tapping anything (the job runs every minute).
+8. **Complaint.** New chat: *"The air conditioning in room 12 is broken and nobody came."* with a phone number, then End chat. Expect a **ticket** and no lead.
+9. **No phone number.** New chat: *"What are your opening hours?"*, End chat. Expect no lead and the conversation flagged for a person.
+10. **A website that is not allowed.** In Postman run folder 6, request *a website that is not allowed*: expect 403. Open the test page from a website that is not listed (for example `http://127.0.0.1:4000/widget/test?key=...` while only `localhost` is listed): no bubble appears.
+11. **Switch off.** In Settings, Modules, switch the website chat off: the bubble disappears and Postman's chat routes answer 404. Switch it on again: the same key works.
+12. **Errors in plain words.** Stop the AI (remove the key) and send a message: the window says it cannot answer right now, with no technical words, and the message stays in the box.
+13. **Keyboard and screen reader.** Tab through the bubble: every button has a name; Enter sends, Shift+Enter makes a new line, Escape closes the window.
 
 ## Security checklist
 
-*(Copied from docs/SECURITY.md and ticked at hand-off, using the `api-security` skill.)*
+Reviewed with the `api-security` skill on 16 Nov 2026. Evidence is in the tests named in brackets.
+
+**1. Keeping businesses apart**
+- [x] The business comes only from the widget key (public routes) or the session (settings), never from the body, query or a tool argument (`webchat-widget`, isolation entries).
+- [x] The one cross-business lookup (`findSettingsByWidgetKey`, and the list of businesses with idle chats) is named, commented, reads one row or ids only, and everything after it runs in the business's fence.
+- [x] `webchat_settings` has `account_id`, RLS enabled and forced, and column grants (the key and the business can never change). The schema test passes.
+- [x] An unknown key and a switched-off chat give the same 404; another business's token gives 401 and changes nothing (`webchat-widget`, `webchat-chat-end`, `webchat-journey`).
+
+**2. Sessions and tokens**
+- [x] No cookie is used by the public routes, so there is nothing to ride on; the CSRF check is replaced by the allowed-website check and the signed visitor token, and the reason is written in `public-routes.ts` and `csrf.ts`.
+- [x] The visitor token is signed (HS256), expires (24 hours), names the business and the conversation, uses a key derived from the app secret (a sign-in token and a visitor token are never interchangeable), and is checked against the conversation (a test chat, another channel or another business is refused) (`visitor-token.test`, `webchat-widget`).
+
+**3. Roles**
+- [x] `GET` settings: any signed-in role except own-leads-only through the module guard; `PATCH`: managers only (`webchat-settings`).
+
+**4. Agent tools**
+- [x] Tool identity comes from the server (F19). The visitor's words are data: they are never logged and never reach an event or the activity log (`webchat-widget`: log test).
+
+**5. Public routes**
+- [x] Every public route is listed in `public-routes.ts` with its reason, and is rate limited (per address by the plugin; per key and per new chat in memory) (`webchat-widget`, strict-limit tests).
+- [x] Allowed websites are checked on every call (exact scheme, host and port; no wildcard; empty list allows none); CORS headers are given only to an allowed website; the permission check reveals nothing for a refused one.
+- [x] Size limits: 1,000 characters a message, 100 messages a chat, the body limit of the server.
+- [x] The chat page can be framed only by the allowed websites (`frame-ancestors`), is shown only in a frame, answers 404 otherwise; every other page keeps "never framed" (`webchat-widget-files`).
+- [x] The chat window's own calls are accepted through the browser's `Sec-Fetch-Site: same-origin` mark, only while a website is listed.
+- [ ] A public route can still be called by a program that fakes the website header: the allowed-website check protects against other websites in a browser, not against a script. The limits and the AI budget (F37) are what stop abuse. Accepted: documented here.
+
+**6. Input, files, secrets, logs**
+- [x] Every body, query and parameter is checked by zod with maximum lengths; Kysely parameters only.
+- [x] The files served are read by plain file name from one folder (no path can leave it; `.env`, `..`, encoded paths and unknown types answer 404) (`webchat-widget-files`).
+- [x] The test page exists only outside production and puts only a key of the right shape into the page (no script injection).
+- [x] The loader accepts only `tel:` and `https://wa.me/` links and a `#RRGGBB` colour, whatever the server sends; the chat window sets text with React (no raw HTML) and its page policy allows no inline code.
+- [x] No secret is added; logs hold ids only.
+
+**7. Tests**
+- [x] Every route: works, 400, 401 or 403, 404 (`webchat-settings`, `webchat-widget`, `webchat-chat-end`, `webchat-widget-files`), isolation entries, the journey (`webchat-journey`), browser tests at phone and desktop size including an accessibility check (`e2e/website-chat.spec.ts`).
+
+**8. Dependencies**
+- [x] No new package (React, Vite and the plugin are the versions the staff app already uses). `npm audit` is part of `npm run audit:deps`.
 
 ## Decisions and differences from the requirements
 
