@@ -149,12 +149,12 @@ export default tseslint.config(
   },
   // The small scripts served as they are by the web app (they run in the browser)
   {
-    files: ['apps/web/public/**/*.js'],
+    files: ['apps/web/public/**/*.js', 'apps/site/public/**/*.js'],
     languageOptions: { globals: globals.browser },
   },
   // The React apps and the shared UI package
   {
-    files: ['apps/web/**/*.{ts,tsx}', 'packages/ui/**/*.{ts,tsx}'],
+    files: ['apps/web/**/*.{ts,tsx}', 'apps/site/**/*.{ts,tsx}', 'packages/ui/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
     ...reactHooks.configs.flat.recommended,
   },

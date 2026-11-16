@@ -1,6 +1,7 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { webchatSettingsRoutes } from './routes/webchat-settings.routes';
 import { createIdleChatsService } from './services/idle-chats.service';
+import { widgetFilesRoutes } from './routes/widget-files.routes';
 import { widgetPublicRoutes } from './routes/widget-public.routes';
 
 /**
@@ -39,6 +40,10 @@ export default defineModule({
       },
     },
   ],
+  // The loader, the chat window and (in development) a test page: served from the API's own address, outside /api/v1
+  pages: (app) => {
+    widgetFilesRoutes(app);
+  },
   routes: (app) => {
     webchatSettingsRoutes(app);
     widgetPublicRoutes(app);

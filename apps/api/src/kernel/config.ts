@@ -29,6 +29,8 @@ const EnvironmentVariablesSchema = z.object({
   PUBLIC_BASE_URL: z.url().default('http://localhost:4000'),
   // Development only: the address the API docs page (/docs) runs on. Requests from it are allowed to change data so
   // "Try it out" works. Ignored outside development, and production refuses to start when it is set.
+  // Where the built website-chat files are (the apps/site build). Empty means the build next to the API in this repository.
+  WIDGET_FILES_DIRECTORY: z.preprocess((value) => (value === '' ? undefined : value), z.string().optional()),
   API_DOCS_ORIGIN: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
   // Sign-in. The secret signs the access tokens: at least 32 characters, only ever in the environment, never shared.
   JWT_SECRET: z
@@ -74,6 +76,8 @@ export interface Config {
   publicBaseUrl: string;
   /** The address of the API docs page (development only). Null everywhere else: the docs page does not exist there. */
   docsOrigin: string | null;
+  /** Where the built website-chat files are, or null for the build next to the API in this repository. */
+  widgetFilesDirectory: string | null;
   auth: { jwtSecret: string; accessTokenMinutes: number; sessionMaxDays: number; sessionIdleDays: number };
   mail: {
     provider: 'smtp' | 'console';
@@ -143,6 +147,7 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
     trustProxy: parseTrustProxy(validEnvironment.TRUST_PROXY),
     webUrl: validEnvironment.WEB_URL.replace(/\/$/, ''),
     publicBaseUrl: validEnvironment.PUBLIC_BASE_URL.replace(/\/$/, ''),
+    widgetFilesDirectory: validEnvironment.WIDGET_FILES_DIRECTORY ?? null,
     docsOrigin:
       validEnvironment.NODE_ENV === 'development'
         ? (validEnvironment.API_DOCS_ORIGIN ?? 'http://localhost:4000').replace(/\/$/, '')

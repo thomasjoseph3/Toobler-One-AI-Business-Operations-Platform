@@ -50,6 +50,12 @@ export interface ModuleManifest {
   /** Registers this module's routes. Mounted under /api/v1; every route declares `config.access`. */
   routes?: (app: FastifyInstance) => void | Promise<void>;
   /**
+   * Registers pages and files that are NOT part of the JSON API and so are not under /api/v1: for example the website chat's loader script
+   * and chat window, which a business's website loads (`/widget/...`). Same rules as `routes`: every route declares `config.access`, and a
+   * public one is listed in public-routes.ts.
+   */
+  pages?: (app: FastifyInstance) => void | Promise<void>;
+  /**
    * Only the `core.auth` module sets this: it builds the function that turns a request's cookies into a signed-in person.
    * The kernel picks it up from the registry, so the kernel never imports the module.
    */

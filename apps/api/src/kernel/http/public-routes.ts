@@ -119,4 +119,32 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
       "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
       "business's allowed list. Each address is limited to 60 a minute.",
   },
+  {
+    method: 'GET',
+    path: '/widget/loader.js',
+    reason:
+      'The one line a business pastes into its website loads this script. It is the same file for every business, holds no data, and reads ' +
+      'nothing from the page. Each address is limited to 120 requests a minute.',
+  },
+  {
+    method: 'GET',
+    path: '/widget/assets/:file',
+    reason:
+      "The chat window's own script and styles: built files, the same for every business, read only by plain file name from one folder " +
+      '(no path can leave it). Each address is limited to 120 requests a minute.',
+  },
+  {
+    method: 'GET',
+    path: '/widget/chat',
+    reason:
+      "The chat window's page, shown in an iframe on a business's website. It answers 404 for an unknown key, a switched-off chat, a " +
+      "business with no allowed website, and a page opened on its own (not in a frame); the browser is told that only the business's " +
+      'allowed websites may frame it. Each address is limited to 60 requests a minute.',
+  },
+  {
+    method: 'GET',
+    path: '/widget/test',
+    reason:
+      'A page to try the chat bubble on. It is only registered when the app is not in production, and it shows only the key typed into the address.',
+  },
 ];

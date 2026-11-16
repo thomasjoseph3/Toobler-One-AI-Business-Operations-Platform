@@ -16,7 +16,9 @@ import { createWindowLimiter } from '../helpers/window-limiter';
 import { createWidgetChatService } from '../services/widget-chat.service';
 
 /** Lets the browser read the answer when the call came from an allowed website (the website was checked before this is called). */
-function allowTheWebsiteToReadTheAnswer(reply: FastifyReply, origin: string): void {
+function allowTheWebsiteToReadTheAnswer(reply: FastifyReply, origin: string | null): void {
+  // A call from the chat window itself is on the same address, so it needs no permission
+  if (origin === null) return;
   reply.header('access-control-allow-origin', origin);
   reply.header('vary', 'Origin');
 }
@@ -105,7 +107,11 @@ export function widgetPublicRoutes(app: FastifyInstance) {
       schema: { params: widgetKeyParamsSchema, response: { 200: widgetConfigSchema } },
     },
     async (request, reply) => {
-      const widget = await widgetChatService.openWidget(request.params.key, request.headers.origin);
+      const widget = await widgetChatService.openWidget(
+        request.params.key,
+        request.headers.origin,
+        request.headers['sec-fetch-site'] === 'same-origin',
+      );
       allowTheWebsiteToReadTheAnswer(reply, widget.origin);
       return widgetChatService.readConfig(widget);
     },
@@ -124,7 +130,11 @@ export function widgetPublicRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const widget = await widgetChatService.openWidget(request.params.key, request.headers.origin);
+      const widget = await widgetChatService.openWidget(
+        request.params.key,
+        request.headers.origin,
+        request.headers['sec-fetch-site'] === 'same-origin',
+      );
       allowTheWebsiteToReadTheAnswer(reply, widget.origin);
       return widgetChatService.sendMessage({
         widget,
@@ -143,7 +153,11 @@ export function widgetPublicRoutes(app: FastifyInstance) {
       schema: { params: widgetKeyParamsSchema, response: { 200: widgetChatSchema } },
     },
     async (request, reply) => {
-      const widget = await widgetChatService.openWidget(request.params.key, request.headers.origin);
+      const widget = await widgetChatService.openWidget(
+        request.params.key,
+        request.headers.origin,
+        request.headers['sec-fetch-site'] === 'same-origin',
+      );
       allowTheWebsiteToReadTheAnswer(reply, widget.origin);
       return widgetChatService.readChat({ widget, visitorToken: readBearerToken(request.headers.authorization) });
     },
@@ -157,7 +171,11 @@ export function widgetPublicRoutes(app: FastifyInstance) {
       schema: { params: widgetKeyParamsSchema, response: { 200: widgetEndResponseSchema } },
     },
     async (request, reply) => {
-      const widget = await widgetChatService.openWidget(request.params.key, request.headers.origin);
+      const widget = await widgetChatService.openWidget(
+        request.params.key,
+        request.headers.origin,
+        request.headers['sec-fetch-site'] === 'same-origin',
+      );
       allowTheWebsiteToReadTheAnswer(reply, widget.origin);
       await widgetChatService.endChat({ widget, visitorToken: readBearerToken(request.headers.authorization) });
       return { ended: true as const };

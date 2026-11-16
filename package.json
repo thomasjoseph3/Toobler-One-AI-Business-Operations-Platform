@@ -14,7 +14,8 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "dev": "concurrently -k -n api,web -c blue,magenta \"npm run dev -w @toobler-one/api\" \"npm run dev -w @toobler-one/web\"",
-    "build": "npm run build -w @toobler-one/web",
+    "build": "npm run build -w @toobler-one/web && npm run build -w @toobler-one/site",
+    "build:widget": "npm run build -w @toobler-one/site",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
     "db:migrate": "tsx scripts/migrate.ts",

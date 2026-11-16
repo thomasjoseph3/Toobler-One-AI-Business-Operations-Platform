@@ -149,5 +149,9 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
       { prefix: '/api/v1' },
     );
   }
+  // Pages and files a module serves outside the API (no prefix, no module tag: they are the same for every business)
+  for (const moduleManifest of registry.modules) {
+    if (moduleManifest.pages) await app.register(async (pageScope) => moduleManifest.pages?.(pageScope));
+  }
   return app;
 }

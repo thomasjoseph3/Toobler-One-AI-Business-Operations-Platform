@@ -32,8 +32,8 @@ export interface OpenedWidget {
   accountId: string;
   defaultCountry: string;
   settings: SettingsFoundByKey['settings'];
-  /** The website's address as the browser sent it, already checked against the business's allowed websites. */
-  origin: string;
+  /** The website's address as the browser sent it, already checked against the business's allowed websites. Null for a call from the chat window itself (see openWidget). */
+  origin: string | null;
 }
 
 /** The limits that are kept in memory: messages per widget key, and new chats per address. Left out in tests that switch limits off. */
@@ -74,32 +74,53 @@ export function createWidgetChatService(input: {
 
   return {
     /**
-     * Finds the business from the widget key and checks the website. 404 for an unknown key and for a business that switched the chat off
-     * (the same answer, so nothing is said about which); 403 when the website is not on the business's list (an empty list allows none).
+     * Finds the business from the widget key and checks who is calling. 404 for an unknown key and for a business that switched the chat off
+     * (the same answer, so nothing is said about which). The call must come from a website on the business's list (403 otherwise; an empty
+     * list allows none). One more caller is accepted: the chat window itself, which the API serves and which a browser only shows inside the
+     * business's own websites. Its calls are on the API's own address, so the browser marks them `same-origin` (a mark a web page cannot fake),
+     * and they count only while the business has listed at least one website.
      */
-    async openWidget(widgetKey: string, requestOrigin: string | undefined): Promise<OpenedWidget> {
+    async openWidget(
+      widgetKey: string,
+      requestOrigin: string | undefined,
+      callerIsOurOwnPage = false,
+    ): Promise<OpenedWidget> {
       const found = await webchatSettingsRepository.findSettingsByWidgetKey(database.system, widgetKey);
       if (!found || !(await gate.isActive(found.accountId, 'channel.webchat'))) throw notFound('That chat');
-      if (requestOrigin === undefined || !isWebsiteAllowed(requestOrigin, found.settings.allowedWebsites)) {
-        throw new ApiError(403, 'WEBSITE_NOT_ALLOWED', 'This website may not use this chat.');
+      const { allowedWebsites } = found.settings;
+      const fromAllowedWebsite = requestOrigin !== undefined && isWebsiteAllowed(requestOrigin, allowedWebsites);
+      if (fromAllowedWebsite) {
+        return {
+          accountId: found.accountId,
+          defaultCountry: found.defaultCountry,
+          settings: found.settings,
+          origin: requestOrigin,
+        };
       }
-      return {
-        accountId: found.accountId,
-        defaultCountry: found.defaultCountry,
-        settings: found.settings,
-        origin: requestOrigin,
-      };
+      if (callerIsOurOwnPage && allowedWebsites.length > 0) {
+        return {
+          accountId: found.accountId,
+          defaultCountry: found.defaultCountry,
+          settings: found.settings,
+          origin: null,
+        };
+      }
+      throw new ApiError(403, 'WEBSITE_NOT_ALLOWED', 'This website may not use this chat.');
     },
 
     /** How the bubble should look and which buttons it shows. Also notes that the bubble was seen working on this website. */
     async readConfig(widget: OpenedWidget): Promise<WidgetConfig> {
-      await database.runInAccountTransaction(widget.accountId, (transaction) =>
-        webchatSettingsRepository.recordLastSeen(transaction, {
-          accountId: widget.accountId,
-          website: widget.origin,
-          seenAt: now(),
-        }),
-      );
+      // "Last seen" is about the business's own websites: the chat window's own calls do not count
+      const { origin } = widget;
+      if (origin !== null) {
+        await database.runInAccountTransaction(widget.accountId, (transaction) =>
+          webchatSettingsRepository.recordLastSeen(transaction, {
+            accountId: widget.accountId,
+            website: origin,
+            seenAt: now(),
+          }),
+        );
+      }
       return describeWidgetConfig(widget.settings, input.publicBaseUrl);
     },
 
