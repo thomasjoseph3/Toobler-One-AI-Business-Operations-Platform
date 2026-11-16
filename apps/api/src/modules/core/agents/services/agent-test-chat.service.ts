@@ -13,13 +13,12 @@ import { EMPTY_AGENT_CONVERSATION_STATE, type AgentConversationState } from '../
 import { describeAnswerSources } from '../helpers/describe-answer-sources';
 import * as conversationFactsRepository from '../repositories/conversation-facts.repository';
 import type { createAgentRuntime } from './agent-runtime.service';
+import { createAgentSavedTurnService } from './agent-saved-turn.service';
 import type { createConversationSummaryService } from './conversation-summary.service';
 
 type AgentRuntime = ReturnType<typeof createAgentRuntime>;
 type SummaryService = ReturnType<typeof createConversationSummaryService>;
 
-/** How many messages of the conversation the agent is shown. Older ones are not sent (a summary of them arrives in a later slice). */
-const MESSAGES_SHOWN_TO_THE_AGENT = 30;
 /** A test chat longer than this is refused, so a test chat cannot grow without end (and cost without end). */
 const MOST_MESSAGES_IN_A_TEST_CHAT = 200;
 
@@ -40,6 +39,7 @@ export function createAgentTestChatService(input: {
 }) {
   const { database, runtime, summaries } = input;
   const conversationRecords = createConversationRecordsService({ database });
+  const savedTurns = createAgentSavedTurnService({ database, runtime });
 
   return {
     /**
@@ -56,7 +56,7 @@ export function createAgentTestChatService(input: {
       const { accountId } = principal;
       const actor: Actor = { kind: 'user', id: principal.userId };
 
-      // What was said before, and what the agent remembers. A new chat has neither.
+      // What was said before. A new chat has nothing.
       const earlierMessages = request.conversationId
         ? await conversationRecords.readMessagesOfTestConversation(accountId, request.conversationId)
         : [];
@@ -64,44 +64,20 @@ export function createAgentTestChatService(input: {
       if (earlierMessages.length >= MOST_MESSAGES_IN_A_TEST_CHAT) {
         throw badRequest('This test chat is long enough. Start a new one.');
       }
-      const earlierState = request.conversationId
-        ? await database.runInAccountTransaction(accountId, (transaction) =>
-            conversationFactsRepository.findConversationState(transaction, accountId, request.conversationId as string),
-          )
-        : undefined;
 
-      const turn = await runtime.runTurn({
+      const { conversationId, turn } = await savedTurns.answerAndSave({
         accountId,
         conversationId: request.conversationId ?? null,
+        startConversation: { channel: 'webchat', isTest: true, actor },
+        earlierMessages: earlierMessages.flatMap((message) =>
+          message.sender === 'customer' || message.sender === 'agent'
+            ? [{ sender: message.sender, body: message.body }]
+            : [],
+        ),
+        message: request.message,
         channel: 'webchat',
-        messages: [
-          ...earlierMessages
-            .filter((message) => message.sender === 'customer' || message.sender === 'agent')
-            .slice(-MESSAGES_SHOWN_TO_THE_AGENT)
-            .map((message) => ({
-              role: message.sender === 'customer' ? ('user' as const) : ('assistant' as const),
-              text: message.body,
-            })),
-          { role: 'user', text: request.message },
-        ],
-        state: earlierState ?? EMPTY_AGENT_CONVERSATION_STATE,
+        actor,
       });
-
-      // The AI answered: now the chat, its two messages and what the agent learned are saved
-      const conversationId =
-        request.conversationId ??
-        (await conversationRecords.startConversation(accountId, { channel: 'webchat', isTest: true, actor }));
-      await conversationRecords.addMessage(accountId, conversationId, { sender: 'customer', body: request.message });
-      await conversationRecords.addMessage(accountId, conversationId, { sender: 'agent', body: turn.reply });
-      await database.runInAccountTransaction(accountId, (transaction) =>
-        conversationFactsRepository.saveConversationState(transaction, {
-          accountId,
-          conversationId,
-          state: turn.state,
-          promiseMadeAt: new Date(),
-          actor,
-        }),
-      );
 
       return {
         conversationId,

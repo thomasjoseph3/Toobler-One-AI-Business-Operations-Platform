@@ -64,3 +64,39 @@ export const patchWebchatSettingsRequestSchema = z
   })
   .strict();
 export type PatchWebchatSettingsRequest = z.infer<typeof patchWebchatSettingsRequestSchema>;
+
+// ---- The public chat routes a visitor's browser calls (no sign-in) ----
+
+/** The widget key in the address of every public chat route. */
+export const widgetKeyParamsSchema = z.object({ key: z.string().regex(/^wk_[A-Za-z0-9_-]{32}$/) });
+
+/** The longest message a visitor may send. */
+export const MOST_CHARACTERS_IN_A_VISITOR_MESSAGE = 1000;
+
+/** What the bubble needs to draw itself: the look, and the buttons with their links (the chat button has none). */
+export const widgetConfigSchema = z.object({
+  colour: z.string(),
+  greeting: z.string(),
+  position: webchatPositionSchema,
+  buttons: z.array(z.object({ kind: webchatButtonSchema, link: z.string().nullable() })),
+});
+export type WidgetConfig = z.infer<typeof widgetConfigSchema>;
+
+/** A visitor's message. The visitor's token (when the chat has begun) goes in the Authorization header, never in the body. */
+export const widgetMessageRequestSchema = z.object({
+  message: z
+    .string()
+    .trim()
+    .min(1, 'Write a message')
+    .max(MOST_CHARACTERS_IN_A_VISITOR_MESSAGE, 'That message is too long'),
+});
+export type WidgetMessageRequest = z.infer<typeof widgetMessageRequestSchema>;
+
+/** The agent's reply, and the token that proves this browser owns the chat (keep it and send it with the next message). */
+export const widgetMessageResponseSchema = z.object({
+  reply: z.string(),
+  visitorToken: z.string(),
+  /** True when this message began a new chat (the first message, or the earlier chat had ended). */
+  newChat: z.boolean(),
+});
+export type WidgetMessageResponse = z.infer<typeof widgetMessageResponseSchema>;

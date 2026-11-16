@@ -191,6 +191,41 @@ export async function linkContactToConversation(
     .execute();
 }
 
+/**
+ * Fills in the phone and/or the email of the person on the other end, for a chat that did not know them when it began (a web chat). Only an
+ * EMPTY value is filled: one that is already there is never replaced, so who the conversation is with can never be swapped afterwards.
+ */
+export async function fillInVisitorContact(
+  db: Db,
+  options: {
+    accountId: string;
+    conversationId: string;
+    phoneKey: string | undefined;
+    email: string | undefined;
+    actor: Actor;
+  },
+): Promise<void> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  if (options.phoneKey !== undefined) {
+    await db
+      .updateTable('conversations')
+      .set({ from_phone_key: options.phoneKey, updated_by: actorStamp })
+      .where('account_id', '=', options.accountId)
+      .where('id', '=', options.conversationId)
+      .where('from_phone_key', 'is', null)
+      .execute();
+  }
+  if (options.email !== undefined) {
+    await db
+      .updateTable('conversations')
+      .set({ from_email: options.email, updated_by: actorStamp })
+      .where('account_id', '=', options.accountId)
+      .where('id', '=', options.conversationId)
+      .where('from_email', 'is', null)
+      .execute();
+  }
+}
+
 /** Says that a person must look at the conversation (for example, a lead was wanted but nobody could be identified). */
 export async function markConversationNeedsPerson(
   db: Db,

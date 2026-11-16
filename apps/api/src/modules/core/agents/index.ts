@@ -16,3 +16,5 @@ export type { ChosenPromise, PromiseKind, PromiseSituation } from './helpers/cho
 export { findUnbackedAmounts, UNCONFIRMED_AMOUNT_REPLY } from './helpers/check-amounts';
 export { createConversationSummaryService } from './services/conversation-summary.service';
 export type { ConversationSummaryResult, SummaryAiService } from './services/conversation-summary.service';
+export { createAgentSavedTurnService } from './services/agent-saved-turn.service';
+export type { SavedTurnInput, SavedTurnResult } from './services/agent-saved-turn.service';

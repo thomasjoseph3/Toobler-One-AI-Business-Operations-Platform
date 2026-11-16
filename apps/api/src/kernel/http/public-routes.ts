@@ -65,4 +65,35 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
       'expires after an hour, and an unknown, used or expired token all get the same answer. Each address is limited ' +
       'to 10 tries a minute.',
   },
+  {
+    method: 'GET',
+    path: '/api/v1/public/widget/:key/config',
+    reason:
+      "A visitor's browser on the business's own website asks how the chat bubble should look. The business comes only from the widget key " +
+      "(an unknown key and a switched-off chat both answer 404), and the website must be on the business's allowed list (else 403). It " +
+      'reveals only the look and the contact links the business already shows on that website. Each address is limited to 60 a minute.',
+  },
+  {
+    method: 'OPTIONS',
+    path: '/api/v1/public/widget/:key/config',
+    reason:
+      "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
+      "business's allowed list, and reveals nothing else. Each address is limited to 60 a minute.",
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/public/widget/:key/messages',
+    reason:
+      "A visitor chats with the business's AI agent from the business's own website, with no sign-in. The business comes only from the widget " +
+      "key; the website must be on the business's allowed list; a chat is carried on only with the signed visitor token the server gave for " +
+      'it. A message is limited in size and a chat in length; each address is limited to 20 messages a minute, each key to 120 a minute, ' +
+      'and each address to 10 new chats an hour. The CSRF check does not apply (no cookie is used), the website check and the token take its place.',
+  },
+  {
+    method: 'OPTIONS',
+    path: '/api/v1/public/widget/:key/messages',
+    reason:
+      "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
+      "business's allowed list. Each address is limited to 60 a minute.",
+  },
 ];

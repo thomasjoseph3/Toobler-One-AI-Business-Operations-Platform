@@ -111,3 +111,15 @@ To confirm with the owner (my choices, written so they can be changed):
 - **An empty list of allowed websites means the chat works nowhere**, so a new business is safe until it adds its site.
 
 Differences from the requirements: the **Call** button is a plain `tel:` link now ("connects to the voice agent" in the browser arrives with voice, F29, as the plan already says). The "WordPress plugin" is later.
+
+## Slice 2 build notes (16 Nov 2026)
+
+- **Built:** `GET /public/widget/{key}/config`, `POST /public/widget/{key}/messages`, plus the browser's permission check (`OPTIONS`) on both paths (they have no logic; they are listed in `public-routes.ts`). Migration 041 (a web chat learns the visitor's phone or email during the chat: column grant plus a database trigger so a known phone or email can never be changed or cleared).
+- **How a message flows:** key finds the business (the one cross-business lookup, `findSettingsByWidgetKey`) → module on? → website on the allowed list? → token checked (signed with a key derived from the app secret, so it can never be used as a sign-in token) → limits → the agent answers through the new shared `createAgentSavedTurnService` (also used by Test the agent, so a message is handled the same everywhere) → the conversation and both messages are saved → the phone or email the agent saved is linked to the conversation → a fresh token comes back.
+- **Choices to confirm:**
+  1. The public routes skip our CSRF check (it is for our own web app's cookies); the allowed-website check and the token replace it. No cookie is ever used.
+  2. When the AI cannot answer, the visitor gets `503 ASSISTANT_UNAVAILABLE` in plain words and nothing is saved, so the message can be sent again. (A visitor message is lost if the AI stays down; staff are not told. Known limit.)
+  3. A chat of 100 messages is refused (`CHAT_TOO_LONG`); 1,000 characters per message; 10 new chats per address per hour; 120 messages per key per minute; 20 per address per minute. The per-key and new-chat limits are kept in the server's memory (fine for one server; revisit if the API runs on several).
+  4. A token for an ended chat starts a new chat (answer says `newChat: true`).
+- **Open for slice 4:** the chat window runs on the API's own address, so its calls are same-origin and carry the API's own address as `Origin`, not the customer's website. Slice 4 must decide how those calls prove which website framed them (the framing rule `frame-ancestors` already limits who can show the window). Also the API sends `Cross-Origin-Resource-Policy: same-origin` (helmet default), which must be relaxed for `/widget/loader.js`.
+

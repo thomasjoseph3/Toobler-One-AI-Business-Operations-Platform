@@ -100,3 +100,54 @@ export async function updateSettings(
     .where('account_id', '=', options.accountId)
     .execute();
 }
+
+/** The business a widget key belongs to, with its settings and the country its phone numbers are read in. */
+export interface SettingsFoundByKey {
+  accountId: string;
+  defaultCountry: string;
+  settings: StoredWebchatSettings;
+}
+
+/**
+ * Finds the business by its widget key. THIS IS THE ONE LOOKUP THAT CROSSES BUSINESSES: a visitor's browser knows only the key, so there is
+ * no business yet to fence the query with. It takes the unfenced handle (`database.system`) on purpose, reads only this one row, and
+ * everything after it runs fenced to the business it found. Answers undefined for an unknown key.
+ */
+export async function findSettingsByWidgetKey(
+  systemDb: Db,
+  widgetKey: string,
+): Promise<SettingsFoundByKey | undefined> {
+  const row = await systemDb
+    .selectFrom('webchat_settings')
+    .innerJoin('accounts', 'accounts.id', 'webchat_settings.account_id')
+    .selectAll('webchat_settings')
+    .select('accounts.default_country')
+    .where('webchat_settings.widget_key', '=', widgetKey)
+    .executeTakeFirst();
+  if (!row) return undefined;
+  return { accountId: row.account_id, defaultCountry: row.default_country, settings: toStoredSettings(row) };
+}
+
+/**
+ * Notes that the bubble was seen working on a website. Written at most about once a minute per website, so a busy site does not make a
+ * database write for every page view.
+ */
+export async function recordLastSeen(
+  db: Db,
+  options: { accountId: string; website: string; seenAt: Date },
+): Promise<void> {
+  // `updated_by` is left alone: a page view is not a person changing the settings
+  const oneMinuteBefore = new Date(options.seenAt.getTime() - 60_000);
+  await db
+    .updateTable('webchat_settings')
+    .set({ last_seen_website: options.website, last_seen_at: options.seenAt })
+    .where('account_id', '=', options.accountId)
+    .where((condition) =>
+      condition.or([
+        condition('last_seen_at', 'is', null),
+        condition('last_seen_at', '<', oneMinuteBefore),
+        condition('last_seen_website', 'is distinct from', options.website),
+      ]),
+    )
+    .execute();
+}

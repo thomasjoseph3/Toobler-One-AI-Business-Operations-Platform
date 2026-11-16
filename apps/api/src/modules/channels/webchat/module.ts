@@ -1,5 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { webchatSettingsRoutes } from './routes/webchat-settings.routes';
+import { widgetPublicRoutes } from './routes/widget-public.routes';
 
 /**
  * The website chat: a chat bubble on the business's own website where the AI agent answers visitors (docs/features/F20-website-chat.md).
@@ -15,5 +16,6 @@ export default defineModule({
   requires: ['core.auth', 'core.conversations', 'core.agents', 'core.ai'],
   routes: (app) => {
     webchatSettingsRoutes(app);
+    widgetPublicRoutes(app);
   },
 });

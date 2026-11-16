@@ -751,6 +751,10 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/block-list': 'covered by the list check',
   'GET /api/v1/channels/webchat':
     "shows only the caller's own chat settings and key: the business comes from the session, nothing in the request names one (tested in webchat-settings, including that two businesses never share a key)",
+  'GET /api/v1/public/widget/{key}/config':
+    "public: the business comes only from the widget key and nothing in the request can name another; it shows only that business's own look (tested in webchat-widget, including that a key never reaches another business)",
+  'POST /api/v1/public/widget/{key}/messages':
+    "public: the business comes only from the widget key, and a visitor token made for another business or chat is refused with 401 (tested in webchat-widget: another business's token, a test chat, another channel, an unknown chat)",
   'POST /api/v1/conversation-types/test':
     "answers only about the caller's own types: the business comes from the session, nothing is saved, and the AI is only told the caller's own types (tested in conversation-types-try-it)",
   'GET /api/v1/pipeline': 'covered by the list check',

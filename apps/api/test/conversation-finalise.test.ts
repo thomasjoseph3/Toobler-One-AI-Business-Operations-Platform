@@ -467,15 +467,32 @@ describe('keeping businesses apart and the record safe', () => {
         transaction.updateTable('conversations').set({ channel: 'email' }).where('id', '=', conversationId).execute(),
       ),
     ).rejects.toThrow(/permission denied/);
+    // Who it was with can be filled in once (a web chat learns the phone during the chat), but never changed or cleared after
+    await attempt((transaction) =>
+      transaction
+        .updateTable('conversations')
+        .set({ from_phone_key: '919800000000' })
+        .where('id', '=', conversationId)
+        .execute(),
+    );
     await expect(
       attempt((transaction) =>
         transaction
           .updateTable('conversations')
-          .set({ from_phone_key: '919800000000' })
+          .set({ from_phone_key: '919811111111' })
           .where('id', '=', conversationId)
           .execute(),
       ),
-    ).rejects.toThrow(/permission denied/);
+    ).rejects.toThrow(/cannot be changed/);
+    await expect(
+      attempt((transaction) =>
+        transaction
+          .updateTable('conversations')
+          .set({ from_phone_key: null })
+          .where('id', '=', conversationId)
+          .execute(),
+      ),
+    ).rejects.toThrow(/cannot be changed/);
   });
 
   it('refuses a conversation that claims to be sorted without a type, or a type without being sorted', async () => {

@@ -25,6 +25,10 @@ export const ROUTE_LIMITS = {
   tryConversationType: { max: 10, timeWindow: '1 minute' },
   // Each "Test the agent" message makes real calls to an AI company (and costs a little)
   testAgentChat: { max: 20, timeWindow: '1 minute' },
+  // The bubble on a website asks for its look once per page view (and the browser's preflight asks first)
+  widgetConfig: { max: 60, timeWindow: '1 minute' },
+  // Each visitor message makes real calls to an AI company (and costs the business a little)
+  widgetMessage: { max: 20, timeWindow: '1 minute' },
 } as const satisfies Record<string, RouteLimit>;
 
 /**

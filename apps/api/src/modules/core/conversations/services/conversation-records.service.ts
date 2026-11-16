@@ -109,6 +109,69 @@ export function createConversationRecordsService({ database }: { database: Datab
     },
 
     /**
+     * A real (not test) chat of the given channel, or undefined when the id is unknown, another business's, a test chat, or from another
+     * channel. Says whether the conversation has ended. A channel uses this to check that a visitor's token points at one of its own chats.
+     */
+    async findChat(
+      accountId: string,
+      conversationId: string,
+      channel: ConversationChannel,
+    ): Promise<{ id: string; ended: boolean } | undefined> {
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+        if (!conversation || conversation.isTest || conversation.channel !== channel) return undefined;
+        return { id: conversation.id, ended: conversation.endedAt !== null };
+      });
+    },
+
+    /** What the customer and the agent said in a conversation, oldest first (staff messages and system notes are left out). */
+    async readChatMessages(
+      accountId: string,
+      conversationId: string,
+    ): Promise<Array<{ sender: 'customer' | 'agent'; body: string; createdAt: Date }>> {
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const messages = await conversationMessagesRepository.listMessagesOfConversation(
+          transaction,
+          accountId,
+          conversationId,
+        );
+        const chatMessages: Array<{ sender: 'customer' | 'agent'; body: string; createdAt: Date }> = [];
+        for (const message of messages) {
+          if (message.sender === 'customer' || message.sender === 'agent') {
+            chatMessages.push({ sender: message.sender, body: message.body, createdAt: message.createdAt });
+          }
+        }
+        return chatMessages;
+      });
+    },
+
+    /**
+     * Fills in the phone (digits only) and/or the email (lower case) of a chat whose visitor said them. Only an empty value is filled: a
+     * phone or an email already linked is never replaced.
+     */
+    async linkVisitorContact(
+      accountId: string,
+      conversationId: string,
+      contact: { phoneKey?: string | undefined; email?: string | undefined; actor?: Actor | undefined },
+    ): Promise<void> {
+      if (contact.phoneKey !== undefined && !/^[0-9]{5,20}$/.test(contact.phoneKey)) {
+        throw badRequest('A phone number must be given as digits only (the form contacts use).');
+      }
+      if (contact.email !== undefined && contact.email !== contact.email.toLowerCase()) {
+        throw badRequest('An email must be given in lower case.');
+      }
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        await conversationsRepository.fillInVisitorContact(transaction, {
+          accountId,
+          conversationId,
+          phoneKey: contact.phoneKey,
+          email: contact.email,
+          actor: contact.actor ?? ENGINE_ACTOR,
+        });
+      });
+    },
+
+    /**
      * Adds a message to a conversation of the business. 404 when the conversation is unknown or another business's. A message whose
      * channel id is already stored for this conversation is ignored. Answers true when the message was added, false when it was a repeat.
      */
