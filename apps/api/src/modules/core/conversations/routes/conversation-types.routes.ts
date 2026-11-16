@@ -5,16 +5,31 @@ import {
   conversationTypeSchema,
   conversationTypesListResponseSchema,
   createConversationTypeRequestSchema,
+  tryConversationTypeRequestSchema,
+  tryConversationTypeResponseSchema,
   reorderConversationTypesRequestSchema,
   updateConversationTypeRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
+import { routeLimit } from '../../../../kernel/http/route-limits';
+import { createAiService } from '../../ai';
+import { createConversationClassifier } from '../services/conversation-classifier.service';
+import { createConversationTypeTrialService } from '../services/conversation-type-trial.service';
+import { createConversationTypeChangesService } from '../services/conversation-type-changes.service';
 import { createConversationTypesService } from '../services/conversation-types.service';
 
-/** Registers /api/v1/conversation-types (list, add), /conversation-types/reorder, /conversation-types/{id} (change, remove). More routes arrive with the later slices. */
+/** Registers /api/v1/conversation-types (list, add), /conversation-types/test (Try it), /conversation-types/reorder, /conversation-types/{id} (change, remove). More routes arrive with the later slices. */
 export function conversationTypesRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const conversationTypesService = createConversationTypesService({ database: app.kernel.database });
+  const changesService = createConversationTypeChangesService({ database: app.kernel.database });
+  // "Try it" asks the AI through the AI module's service (the job and the business's settings pick the model, never this module)
+  const trialService = createConversationTypeTrialService({
+    database: app.kernel.database,
+    classifier: createConversationClassifier({
+      aiService: createAiService({ database: app.kernel.database, config: app.kernel.config, llm: app.kernel.llm }),
+    }),
+  });
 
   // For any signed-in, verified person: staff see how conversations are sorted. The business comes from the session.
   typedApp.get(
@@ -40,6 +55,20 @@ export function conversationTypesRoutes(app: FastifyInstance) {
     },
   );
 
+  // Managers only, and limited to 10 a minute: each "Try it" is a real AI call that costs a little. Saves nothing. A static address,
+  // so "test" is never read as an id.
+  typedApp.post(
+    '/conversation-types/test',
+    {
+      config: { access: 'manager', ...routeLimit(app, 'tryConversationType') },
+      schema: { body: tryConversationTypeRequestSchema, response: { 200: tryConversationTypeResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return trialService.tryConversationText(request.principal, request.body);
+    },
+  );
+
   // Managers only. Lists every type of the business exactly once, in the order wanted. A static address, so "reorder" is never read as an id.
   typedApp.post(
     '/conversation-types/reorder',
@@ -49,7 +78,7 @@ export function conversationTypesRoutes(app: FastifyInstance) {
     },
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
-      return conversationTypesService.reorderConversationTypes(request.principal, request.body);
+      return changesService.reorderConversationTypes(request.principal, request.body);
     },
   );
 
@@ -66,7 +95,7 @@ export function conversationTypesRoutes(app: FastifyInstance) {
     },
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
-      return conversationTypesService.updateConversationType(request.principal, request.params.id, request.body);
+      return changesService.updateConversationType(request.principal, request.params.id, request.body);
     },
   );
 

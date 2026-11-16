@@ -122,3 +122,66 @@ export const reorderConversationTypesRequestSchema = z
   .object({ typeIds: z.array(z.uuid()).min(1).max(MAX_CONVERSATION_TYPES_IN_ORDER) })
   .strict();
 export type ReorderConversationTypesRequest = z.infer<typeof reorderConversationTypesRequestSchema>;
+
+/** The ways a person can get in touch (what the "Try it" box can pretend the pasted text came from). */
+export const conversationChannelSchema = z.enum(['webchat', 'whatsapp', 'email', 'phone']);
+export type ConversationChannel = z.infer<typeof conversationChannelSchema>;
+
+/** The longest text "Try it" reads, in characters: more than this is cut by the classifier anyway, and it keeps the AI cost small. */
+export const MAX_TRY_IT_TEXT_LENGTH = 4000;
+
+/**
+ * "Try it" (a manager): paste a message or a whole conversation and see which type it gets and what would happen, without saving
+ * anything. It makes one real AI call, so it counts towards the business's AI use.
+ */
+export const tryConversationTypeRequestSchema = z
+  .object({
+    text: z.string().trim().min(1).max(MAX_TRY_IT_TEXT_LENGTH),
+    channel: conversationChannelSchema.optional(),
+  })
+  .strict();
+export type TryConversationTypeRequest = z.infer<typeof tryConversationTypeRequestSchema>;
+
+/** A type the AI named, with the business's own word for it and how sure the AI was (0 to 1). */
+export const namedTypeSchema = z.object({ typeKey: z.string(), label: z.string(), confidence: z.number() });
+export type NamedType = z.infer<typeof namedTypeSchema>;
+
+/** One thing the router would do for the conversation. */
+export const trialOutcomeSchema = z.object({
+  typeKey: z.string(),
+  typeLabel: z.string(),
+  kind: conversationOutcomeSchema,
+  /** Applied, but the AI was only fairly sure. */
+  aiUnsure: z.boolean(),
+  /** For a ticket: its kind and priority. */
+  ticketType: conversationTicketTypeSchema.nullable(),
+  priority: conversationTicketPrioritySchema.nullable(),
+  needsPerson: z.boolean(),
+  alert: conversationAlertSchema.nullable(),
+  /** Whether a contact would be kept for this conversation. */
+  keepContact: z.boolean(),
+  /** A lead was wanted but the lead engine is off, so it is only logged and a callback task is made. */
+  createCallbackTask: z.boolean(),
+});
+export type TrialOutcome = z.infer<typeof trialOutcomeSchema>;
+
+/** What "Try it" answers: what the AI said, what the router would do about it, and which AI answered. Nothing is saved. */
+export const tryConversationTypeResponseSchema = z.object({
+  classification: z.object({
+    primary: namedTypeSchema,
+    secondary: z.array(namedTypeSchema),
+    needsPerson: z.boolean(),
+    /** The AI's one-line reason. */
+    reason: z.string(),
+  }),
+  decision: z.object({
+    /** The type the conversation would be shown under ("unclear" when the AI was not sure). */
+    primaryTypeKey: z.string(),
+    primaryLabel: z.string(),
+    needsPerson: z.boolean(),
+    aiUnsure: z.boolean(),
+    outcomes: z.array(trialOutcomeSchema),
+  }),
+  servedBy: z.object({ provider: z.string(), modelName: z.string() }),
+});
+export type TryConversationTypeResponse = z.infer<typeof tryConversationTypeResponseSchema>;

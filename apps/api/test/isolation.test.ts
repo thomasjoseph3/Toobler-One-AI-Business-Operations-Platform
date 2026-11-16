@@ -647,6 +647,8 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/tickets': 'covered by the list check',
   'GET /api/v1/conversation-types': 'covered by the list check',
   'GET /api/v1/block-list': 'covered by the list check',
+  'POST /api/v1/conversation-types/test':
+    "answers only about the caller's own types: the business comes from the session, nothing is saved, and the AI is only told the caller's own types (tested in conversation-types-try-it)",
   'GET /api/v1/pipeline': 'covered by the list check',
   'GET /api/v1/lost-reasons': 'covered by the list check',
   'GET /api/v1/assignment-rules': 'covered by the list check',
