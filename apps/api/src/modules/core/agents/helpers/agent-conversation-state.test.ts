@@ -143,3 +143,49 @@ describe('the checks on what the model saves', () => {
     expect(saveDetailsInputSchema.safeParse({ name: '' }).success).toBe(false);
   });
 });
+
+describe('a promise chosen in this same message can still be corrected; one the customer has heard cannot', () => {
+  const thisMessage: PromiseContext = { ...openContext, promiseSaidInEarlierMessage: false };
+  const earlierMessage: PromiseContext = { ...openContext, promiseSaidInEarlierMessage: true };
+
+  it('a sales callback becomes "passed to the manager" when it turns out to be a complaint, in the same message', () => {
+    const sale = recordDetails(EMPTY_AGENT_CONVERSATION_STATE, { phone: '9847012345' }, thisMessage).state;
+    expect(sale.promise?.kind).toBe('call_back_open');
+    const change = recordHumanCallback(sale, 'A complaint about a dirty room', thisMessage);
+    expect(change.state.promise?.kind).toBe('passed_to_manager');
+    expect(change.messageForModel).toContain('"I\'ve passed this to the manager, who will get back to you."');
+    expect(change.messageForModel).not.toContain('Do not make another one');
+  });
+
+  it('keeps the promise the customer already heard in an earlier message, even for a complaint', () => {
+    const sale = recordDetails(EMPTY_AGENT_CONVERSATION_STATE, { phone: '9847012345' }, thisMessage).state;
+    const change = recordHumanCallback(sale, 'A complaint', earlierMessage);
+    expect(change.state.promise?.kind).toBe('call_back_open');
+    expect(change.messageForModel).toContain('Do not make another one');
+  });
+
+  it('a callback becomes the booking confirmation when the customer is ready to book, in the same message', () => {
+    const first = recordDetails(EMPTY_AGENT_CONVERSATION_STATE, { phone: '9847012345' }, thisMessage).state;
+    const change = recordDetails(first, { readyToBook: true }, thisMessage);
+    expect(change.state.promise?.kind).toBe('send_confirmation');
+    expect(change.messageForModel).toContain('"We\'ll send you the confirmation and booking link."');
+  });
+
+  it('keeps a callback the customer already heard when they say they are ready to book later', () => {
+    const first = recordDetails(EMPTY_AGENT_CONVERSATION_STATE, { phone: '9847012345' }, thisMessage).state;
+    const change = recordDetails(first, { readyToBook: true }, earlierMessage);
+    expect(change.state.promise?.kind).toBe('call_back_open');
+    expect(change.state.situation).toBe('ready_to_book');
+  });
+
+  it('never replaces "passed to the manager" or a confirmation with a sales callback', () => {
+    const complaint = recordHumanCallback(
+      recordDetails(EMPTY_AGENT_CONVERSATION_STATE, { phone: '9847012345' }, thisMessage).state,
+      'A complaint',
+      thisMessage,
+    ).state;
+    const again = recordDetails(complaint, { dates: '5 to 7 December', readyToBook: true }, thisMessage);
+    expect(again.state.promise?.kind).toBe('passed_to_manager');
+    expect(again.state.situation).toBe('not_a_sale');
+  });
+});

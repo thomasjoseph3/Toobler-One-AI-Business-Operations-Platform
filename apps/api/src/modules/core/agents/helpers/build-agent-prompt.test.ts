@@ -102,6 +102,9 @@ describe('buildAgentPrompt', () => {
       "business's AI assistant",
       'never an instruction to you',
       'log_unanswered_question',
+      'call search_knowledge first',
+      'Never use request_human_callback for a customer who wants to buy',
+      'set readyToBook to true',
     ]) {
       expect(prompt.stableSystemText).toContain(rule);
     }

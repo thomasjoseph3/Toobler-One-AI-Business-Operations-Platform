@@ -196,6 +196,43 @@ describe('the agent runtime: the promise', () => {
     expect(result.state.promise).toBeNull();
   });
 
+  it('a complaint made known in the same message as the phone number gets the manager promise, not a sales callback', async () => {
+    const { accountId } = await newBusiness();
+    const { runtime } = agentWith(
+      rounds(
+        { toolCalls: [{ name: 'save_details', input: { phone: '9847012345' } }] },
+        { toolCalls: [{ name: 'request_human_callback', input: { reason: 'Complaint about a dirty room' } }] },
+        "I am sorry. I've passed this to the manager, who will get back to you.",
+      ),
+    );
+    const result = await runtime.runTurn(turnFor(accountId, 'My room was dirty. My number is 9847012345'));
+    expect(result.state.promise).toMatchObject({ kind: 'passed_to_manager' });
+    expect(result.toolCalls.at(-1)?.result).toContain("I've passed this to the manager");
+  });
+
+  it('keeps the promise already said in an earlier message when a complaint comes later', async () => {
+    const { accountId } = await newBusiness();
+    const first = agentWith(
+      rounds(
+        { toolCalls: [{ name: 'save_details', input: { phone: '9847012345' } }] },
+        'Our team will call you within 15 minutes.',
+      ),
+    );
+    const firstTurn = await first.runtime.runTurn(turnFor(accountId, 'Call me on 9847012345'));
+    expect(firstTurn.state.promise?.kind).toBe('call_back_open');
+    const second = agentWith(
+      rounds(
+        { toolCalls: [{ name: 'request_human_callback', input: { reason: 'A complaint' } }] },
+        'I am sorry to hear that.',
+      ),
+    );
+    const secondTurn = await second.runtime.runTurn(
+      turnFor(accountId, 'Actually my last stay was bad', firstTurn.state),
+    );
+    expect(secondTurn.state.promise).toEqual(firstTurn.state.promise);
+    expect(secondTurn.state.situation).toBe('not_a_sale');
+  });
+
   it('a complaint is passed to the manager, and a sales promise is never made for it', async () => {
     const { accountId } = await newBusiness();
     const { runtime } = agentWith(
@@ -232,6 +269,24 @@ describe('the agent runtime: the promise', () => {
 });
 
 describe('the agent runtime: what it does not know', () => {
+  it('does not write a question down as unanswered when the FAQs were not searched first', async () => {
+    const mine = await newBusiness();
+    const { runtime } = agentWith(
+      rounds(
+        { toolCalls: [{ name: 'log_unanswered_question', input: { question: 'Is there parking?' } }] },
+        'The team will get back to you.',
+      ),
+    );
+    const result = await runtime.runTurn(turnFor(mine.accountId, 'Is there parking?'));
+    expect(result.toolCalls[0]?.result).toContain('First look for the answer with search_knowledge');
+    const rows = await database.system
+      .selectFrom('unanswered_questions')
+      .select('question')
+      .where('account_id', '=', mine.accountId)
+      .execute();
+    expect(rows).toEqual([]);
+  });
+
   it('writes down a question it cannot answer for the owner, in this business only', async () => {
     const mine = await newBusiness();
     const theirs = await newBusiness();

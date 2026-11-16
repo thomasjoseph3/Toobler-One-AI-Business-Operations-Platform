@@ -33,6 +33,24 @@ export interface PromiseContext {
   now: Date;
   timeZone: string;
   weeklyHours: WeeklyHoursValue | undefined;
+  /**
+   * True when a promise was already made in an EARLIER message, so the customer has heard it and it cannot change. When it is false (or
+   * left out), a promise made earlier in this same message has not been said yet, so a better one may replace it.
+   */
+  promiseSaidInEarlierMessage?: boolean;
+}
+
+/**
+ * True when the promise already chosen in this same message should be replaced because the conversation turned out to be something
+ * else: a sales callback when it is a complaint, or a callback when the customer is ready to book. Nothing the customer has heard is changed.
+ */
+function shouldReplaceUnsaidPromise(state: AgentConversationState, context: PromiseContext): boolean {
+  if (!state.promise || context.promiseSaidInEarlierMessage !== false) return false;
+  if (state.situation === 'not_a_sale') return state.promise.kind !== 'passed_to_manager';
+  if (state.situation === 'ready_to_book') {
+    return state.promise.kind === 'call_back_open' || state.promise.kind === 'call_back_closed';
+  }
+  return false;
 }
 
 /** What a tool gives back to the model, and the state after the tool ran. */
@@ -55,7 +73,10 @@ export const saveDetailsInputSchema = z
     numberOfPeople: SHORT_TEXT.optional().describe('How many people, as they said it'),
     budget: SHORT_TEXT.optional().describe('Their budget, only if they offered one'),
     bestTimeToCall: SHORT_TEXT.optional().describe('When they would like to be called'),
-    readyToBook: z.boolean().optional().describe('True only when the customer says they want to go ahead and book'),
+    readyToBook: z
+      .boolean()
+      .optional()
+      .describe('Set to true, in the same call, when the customer says they want to book or to go ahead'),
   })
   .strict();
 export type SaveDetailsInput = z.infer<typeof saveDetailsInputSchema>;
@@ -121,7 +142,8 @@ export function recordDetails(
     state.situation === 'not_a_sale' ? 'not_a_sale' : input.readyToBook === true ? 'ready_to_book' : state.situation;
   const afterSaving: AgentConversationState = { ...state, details, situation };
 
-  if (afterSaving.promise) {
+  const replacingTheUnsaidPromise = shouldReplaceUnsaidPromise(afterSaving, context);
+  if (afterSaving.promise && !replacingTheUnsaidPromise) {
     return {
       state: afterSaving,
       messageForModel: ['Saved.', ...problems, describeThePromiseForTheModel(afterSaving, false)].join(' '),
@@ -169,7 +191,7 @@ export function recordHumanCallback(
     situation: 'not_a_sale',
     callbackReason: reason.trim().slice(0, CALLBACK_REASON_MAX),
   };
-  if (afterRequest.promise) {
+  if (afterRequest.promise && !shouldReplaceUnsaidPromise(afterRequest, context)) {
     return {
       state: afterRequest,
       messageForModel: `Noted: a person will follow up. ${describeThePromiseForTheModel(afterRequest, false)}`,

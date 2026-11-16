@@ -7,16 +7,24 @@ import { promiseContextOf, type AgentTurnData, type StateHolder } from '../helpe
  * `request_human_callback`: the agent asks for a person to follow up, for anything that is not a sale. It answers with the exact words to
  * say. The ticket itself is made by the router when the conversation ends (as the conversations module already does).
  */
-export function makeRequestHumanCallbackTool(input: { data: AgentTurnData; holder: StateHolder }): AgentToolDefinition {
+export function makeRequestHumanCallbackTool(input: {
+  data: AgentTurnData;
+  holder: StateHolder;
+  promiseSaidInEarlierMessage: boolean;
+}): AgentToolDefinition {
   return {
     name: 'request_human_callback',
     description:
-      'Asks for a person on the team to follow up. Use it for a complaint, a problem with an order or booking, or anything that is not a sale. Give a short reason in your own words, with no personal details. It tells you what to say.',
+      'Asks for a person on the team to follow up on something that is NOT a sale: a complaint, a problem with a stay or an order, or a request to speak to a person. Never use it for a customer who wants to buy or to book. Give a short reason in your own words, with no personal details. It tells you what to say.',
     inputSchema: z.object({ reason: z.string().trim().min(1).max(300) }).strict(),
     effect: 'ticket',
     run: async (toolInput) => {
       const { reason } = toolInput as { reason: string };
-      const change = recordHumanCallback(input.holder.current, reason, promiseContextOf(input.data));
+      const change = recordHumanCallback(
+        input.holder.current,
+        reason,
+        promiseContextOf(input.data, input.promiseSaidInEarlierMessage),
+      );
       input.holder.current = change.state;
       return change.messageForModel;
     },

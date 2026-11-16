@@ -19,8 +19,14 @@ export interface StateHolder {
   current: AgentConversationState;
 }
 
-/** The facts the promise is chosen from, taken from what the turn read. */
-export function promiseContextOf(data: AgentTurnData): PromiseContext {
+/** The facts the promise is chosen from, taken from what the turn read, and whether the customer has already heard a promise. */
+export function promiseContextOf(data: AgentTurnData, promiseSaidInEarlierMessage: boolean): PromiseContext {
   const weeklyHours: WeeklyHoursValue | undefined = data.knowledge.weeklyHours;
-  return { now: data.now, timeZone: data.timeZone, weeklyHours };
+  return { now: data.now, timeZone: data.timeZone, weeklyHours, promiseSaidInEarlierMessage };
+}
+
+/** What happened during this turn so far, so a tool can insist on the right order (a question is logged as unanswered only after a search). */
+export interface TurnTracker {
+  /** True once `search_knowledge` has run in this turn. */
+  searchedTheKnowledge: boolean;
 }

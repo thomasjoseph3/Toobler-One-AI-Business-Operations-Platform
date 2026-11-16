@@ -107,6 +107,14 @@ async function countsFor(accountId: string) {
   };
 }
 
+/** A pretend AI that does one step per round: asks for tools, and in the last step says its words. */
+const rounds =
+  (...steps: Array<string | { toolCalls: { name: string; input: unknown }[] }>): LlmScript =>
+  (_tried, _request, messagesSoFar = []) => {
+    const roundNumber = messagesSoFar.filter((message) => message.kind === 'tool_request').length;
+    return { answer: steps[Math.min(roundNumber, steps.length - 1)] };
+  };
+
 /** A pretend AI that asks for the given tools in its first round and then says the given words. */
 const asksThenSays =
   (toolCalls: { name: string; input: unknown }[], words: string): LlmScript =>
@@ -234,8 +242,9 @@ describe('POST /api/v1/agent/test-chat', () => {
 
   it('writes a question it cannot answer on the real Unanswered list', async () => {
     const person = await newBusiness();
-    script = asksThenSays(
-      [{ name: 'log_unanswered_question', input: { question: 'Is there EV charging?' } }],
+    script = rounds(
+      { toolCalls: [{ name: 'search_knowledge', input: { question: 'Is there EV charging?' } }] },
+      { toolCalls: [{ name: 'log_unanswered_question', input: { question: 'Is there EV charging?' } }] },
       'The team will get back to you.',
     );
     const response = await testChat(person, { message: 'Is there EV charging?' });

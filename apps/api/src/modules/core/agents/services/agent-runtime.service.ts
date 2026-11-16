@@ -12,7 +12,7 @@ import {
 } from '../../knowledge';
 import { findWhatTheAgentMaySee } from '../../offerings';
 import type { AgentConversationState } from '../helpers/agent-conversation-state';
-import type { AgentTurnData, StateHolder } from '../helpers/agent-turn-data';
+import type { AgentTurnData, StateHolder, TurnTracker } from '../helpers/agent-turn-data';
 import {
   AGENT_PROMPT_VERSION,
   buildAgentPrompt,
@@ -30,7 +30,10 @@ import { makeRequestHumanCallbackTool } from './agent-tool-request-human-callbac
 import { makeSaveDetailsTool } from './agent-tool-save-details.service';
 import { makeSearchKnowledgeTool } from './agent-tool-search-knowledge.service';
 
-type AiService = ReturnType<typeof createAiService>;
+/** The part of the AI service the agent needs, so an eval or a test can give a smaller one. */
+export type AgentAiService = Pick<ReturnType<typeof createAiService>, 'generateWithTools' | 'generateText'>;
+type KnowledgeSearch = Pick<ReturnType<typeof createKnowledgeSearchService>, 'searchKnowledge'>;
+type UnansweredQuestions = Pick<ReturnType<typeof createUnansweredQuestionsService>, 'logUnansweredQuestion'>;
 
 /** Said when the model kept asking for tools and never answered. */
 export const COULD_NOT_WORK_IT_OUT_REPLY = "Sorry, I couldn't work that out. Could you say it another way?";
@@ -69,7 +72,12 @@ export interface AgentTurnResult {
 
 export interface AgentRuntimeDependencies {
   database: Database;
-  aiService: AiService;
+  aiService: AgentAiService;
+  /** Where the search of the FAQs and the writing of unanswered questions go. Default: the business's own database. */
+  knowledgeSearch?: KnowledgeSearch;
+  unansweredQuestions?: UnansweredQuestions;
+  /** Reads what the agent may know. Default: from the database. An eval gives a fixed example business instead. */
+  readTurnData?: (accountId: string) => Promise<AgentTurnData>;
   /** The tools the other modules add (WhatsApp's "send details" and so on), only for modules that are on for the business. */
   findExtraTools?: (context: AgentToolContext) => Promise<AgentToolDefinition[]>;
   /** The time, so tests can fix it. */
@@ -84,8 +92,8 @@ export interface AgentRuntimeDependencies {
 export function createAgentRuntime(dependencies: AgentRuntimeDependencies) {
   const { database, aiService } = dependencies;
   const now = dependencies.now ?? (() => new Date());
-  const knowledgeSearch = createKnowledgeSearchService({ database });
-  const unansweredQuestions = createUnansweredQuestionsService({ database });
+  const knowledgeSearch = dependencies.knowledgeSearch ?? createKnowledgeSearchService({ database });
+  const unansweredQuestions = dependencies.unansweredQuestions ?? createUnansweredQuestionsService({ database });
 
   /** Reads everything the agent may know about the business, in one go. */
   async function readTurnData(accountId: string): Promise<AgentTurnData> {
@@ -110,8 +118,11 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies) {
   return {
     /** Runs one turn: the customer's new message in, the reply and the new state out. */
     async runTurn(input: AgentTurnInput): Promise<AgentTurnResult> {
-      const data = await readTurnData(input.accountId);
+      const data = await (dependencies.readTurnData ?? readTurnData)(input.accountId);
       const holder: StateHolder = { current: input.state };
+      const tracker: TurnTracker = { searchedTheKnowledge: false };
+      // A promise made in an earlier message has been heard by the customer and never changes; one made in this message has not
+      const promiseSaidInEarlierMessage = input.state.promise !== null;
       const tag = {
         task: 'chat_reply',
         agentId: 'text-agent',
@@ -137,10 +148,10 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies) {
       const ownTools = [
         makeGetBusinessInfoTool(data),
         makeListOfferingsTool(data),
-        makeSearchKnowledgeTool({ accountId: input.accountId, knowledgeSearch }),
-        makeLogUnansweredQuestionTool({ accountId: input.accountId, unansweredQuestions }),
-        makeSaveDetailsTool({ data, holder }),
-        makeRequestHumanCallbackTool({ data, holder }),
+        makeSearchKnowledgeTool({ accountId: input.accountId, tracker, knowledgeSearch }),
+        makeLogUnansweredQuestionTool({ accountId: input.accountId, tracker, unansweredQuestions }),
+        makeSaveDetailsTool({ data, holder, promiseSaidInEarlierMessage }),
+        makeRequestHumanCallbackTool({ data, holder, promiseSaidInEarlierMessage }),
       ];
       const extraTools = dependencies.findExtraTools
         ? await dependencies.findExtraTools({

@@ -7,7 +7,11 @@ import { promiseContextOf, type AgentTurnData, type StateHolder } from '../helpe
  * the exact words to say. Nothing is written to the database here: the details are kept in the conversation's state, and the
  * router makes the contact and the lead when the conversation ends.
  */
-export function makeSaveDetailsTool(input: { data: AgentTurnData; holder: StateHolder }): AgentToolDefinition {
+export function makeSaveDetailsTool(input: {
+  data: AgentTurnData;
+  holder: StateHolder;
+  promiseSaidInEarlierMessage: boolean;
+}): AgentToolDefinition {
   return {
     name: 'save_details',
     description:
@@ -15,7 +19,11 @@ export function makeSaveDetailsTool(input: { data: AgentTurnData; holder: StateH
     inputSchema: saveDetailsInputSchema,
     effect: 'writes',
     run: async (toolInput) => {
-      const change = recordDetails(input.holder.current, toolInput as SaveDetailsInput, promiseContextOf(input.data));
+      const change = recordDetails(
+        input.holder.current,
+        toolInput as SaveDetailsInput,
+        promiseContextOf(input.data, input.promiseSaidInEarlierMessage),
+      );
       input.holder.current = change.state;
       return change.messageForModel;
     },

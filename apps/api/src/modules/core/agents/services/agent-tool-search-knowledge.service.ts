@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import type { AgentToolDefinition } from '../../../../kernel/module-system/define';
 import type { createKnowledgeSearchService } from '../../knowledge';
+import type { TurnTracker } from '../helpers/agent-turn-data';
 
 /** `search_knowledge`: looks for an answer in the business's confirmed FAQs. Only reads. */
 export function makeSearchKnowledgeTool(input: {
   accountId: string;
-  knowledgeSearch: ReturnType<typeof createKnowledgeSearchService>;
+  tracker: TurnTracker;
+  knowledgeSearch: Pick<ReturnType<typeof createKnowledgeSearchService>, 'searchKnowledge'>;
 }): AgentToolDefinition {
   return {
     name: 'search_knowledge',
@@ -15,6 +17,7 @@ export function makeSearchKnowledgeTool(input: {
     effect: 'reads',
     run: async (toolInput) => {
       const { question } = toolInput as { question: string };
+      input.tracker.searchedTheKnowledge = true;
       // The business is the one this tool was built for; the model's words are only the text searched
       const found = await input.knowledgeSearch.searchKnowledge(input.accountId, question, 3);
       if (found.items.length === 0) {
