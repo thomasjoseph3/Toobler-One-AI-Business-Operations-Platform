@@ -148,7 +148,9 @@ channel-agnostic (see [REQUIREMENTS-REVIEW.md](REQUIREMENTS-REVIEW.md)).
 ```text
 agents/
   runtime/     prompt builder (business profile + types + playbook + industry words), model calls, the tool loop,
-               summaries, final classification
+               summaries. (Final classification is NOT here: it is a one-shot call that needs the business's types and the
+               router, so it lives in `core.conversations` (helpers/classifier-prompt.ts, services/conversation-classifier.service.ts).
+               The runtime starts it when a conversation ends, through that module's index.ts. See R58.)
   tools/       every tool defined once: zod input schema, effect (reads | writes | sends | ticket), module owner
   languages/   voice only: detection, language lock, number words (Malayalam, Hindi, English). Text agents are English only.
   voice/       live phone sessions (Gemini Live)

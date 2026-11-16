@@ -192,3 +192,19 @@ export async function updateOwnDetails(
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** The phone numbers (as digits) and emails of every person who works in the business, so a conversation from one of them is known to be the team's own. */
+export async function listStaffContactPoints(
+  db: Db,
+  accountId: string,
+): Promise<{ phoneKeys: string[]; emails: string[] }> {
+  const rows = await db
+    .selectFrom('users')
+    .select(['mobile_key', 'email'])
+    .where('account_id', '=', accountId)
+    .execute();
+  return {
+    phoneKeys: rows.flatMap((row) => (row.mobile_key === null ? [] : [row.mobile_key])),
+    emails: rows.map((row) => row.email),
+  };
+}

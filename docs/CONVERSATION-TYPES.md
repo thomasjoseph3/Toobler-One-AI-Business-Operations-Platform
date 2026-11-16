@@ -135,6 +135,8 @@ last speak? These facts come from our data, never from what the person says ("I'
 
 ### 2. Live type (the agent, during the conversation)
 
+> **Decision (owner, 16 Nov 2026, R58): this step is not part of the first release.** The first release sorts a conversation only after it ends (step 3). The live type comes after Phase 1, and when it does it will be conservative and switchable off per business.
+
 The agent's prompt lists the business's active types with their descriptions. When the reason becomes clear, it calls
 the tool `set_conversation_type({ type, confidence, reason })`. That does three things at once:
 
@@ -246,7 +248,7 @@ The morning summary splits by type: "Overnight: 6 enquiries (2 hot), 2 service r
 
 ## What is built so far (F15, 16 Nov 2026) and where it differs from the design above
 
-The design above is the plan; this section says what the code does today. Slices 1 to 4 are built (7 of the 9 routes): the types, the block list, and their rules. The pre-filter, the router, the AI sorting, the "Try it" route and the staff correction are slices 5 to 7. Who may call each route is in [ROLES-AND-ACCESS.md](ROLES-AND-ACCESS.md).
+The design above is the plan; this section says what the code does today. Slices 1 to 6 and 7a are built (8 of the 9 routes): the types, the block list, the pre-filter, the router, the AI sorting, "Try it", the example set, and the storing and sorting of conversations. Creating the lead, ticket and contact (7b) and the staff correction (7c) are still to come. Who may call each route is in [ROLES-AND-ACCESS.md](ROLES-AND-ACCESS.md).
 
 | Topic | What the code does |
 | --- | --- |
@@ -261,6 +263,12 @@ The design above is the plan; this section says what the code does today. Slices
 | Order | `POST /conversation-types/reorder` takes every type of the business exactly once; anything else is 400 `TYPES_MISMATCH`. Adding and reordering take turns. |
 | Removing a type | History is left alone. When conversations exist (slice 7), a conversation whose type was removed moves to `unclear`. |
 | Block list | Table `block_list` (migration 034). One row is **either** a phone number **or** an email, never both. A number is kept as its digits (`phone_key`, the form contacts use, so every way of writing a number matches) and the number with its plus is worked out when shown, so nothing is stored twice; an email is kept in lower case. A number or email can be on a business's list once. `PUT /block-list` saves the **whole list**: what is sent is what the business has afterwards; an entry already there keeps its id, date and author, only its reason can change; a number typed without a country code is read as the business's country. Managers only, because it holds personal data. The numbers and emails are never written to the activity log. |
+| Pre-filter (step 0) | `helpers/pre-filter.ts`, pure code. Order: silence or an empty chat, then machine-made email, then the block list, then the business's own staff. Silence is a call under 10 seconds with no speech; an empty chat is a web chat or WhatsApp conversation that ended with no customer message; machine-made email is an `Auto-Submitted` header other than `no`, `List-Unsubscribe`, bulk, junk or list precedence, or a noreply-style sender. |
+| Router (step 4) | `helpers/router.ts`, pure code: `decide(types, classification, context, rules)`. Thresholds as in the design (0.70 and 0.40). **Differences and choices:** only the main reason falls back to "unclear"; a weak, unknown or switched-off secondary reason is left out; at most one outcome of each kind per conversation (the first wins); a lead with the lead engine off becomes "log" plus a callback task; no contact is kept for spam, wrong number, no conversation and automated, nor for any type whose outcome is Filtered or Ignored. |
+| AI sorting (step 3) | `helpers/classifier-prompt.ts` and `services/conversation-classifier.service.ts`. One structured-output call per conversation through the AI module's service (job `classify_conversation`, temperature 0; the business's own model order from F37). The answer must fit a shape built from the business's switched-on types, so the AI cannot name a type that does not exist. It returns a main type, up to two others, a confidence for each, `needsPerson` and a one-line reason (kept out of personal details). The conversation is passed as data between markers, and the rules say never to obey it. Longer than 12,000 characters keeps the start and the end. |
+| "Try it" | `POST /conversation-types/test` (managers, 10 a minute): the classifier plus the router on a pasted message, nothing saved, the AI call record holds no text. |
+| Measurement | `evals/classification/hotel_resort.jsonl` (58 labelled English examples) and `npm run eval:types`, with the targets from "How we test it". |
+| Conversations (7a) | Tables `conversations`, `conversation_messages` and `conversation_outcomes` (migration 035), one set for every channel. `createConversationFinaliser` sorts a conversation after it ends: rules first, then the AI, then the router, then the type and one outcome per type are saved under a row lock; it is safe to run twice and to retry. A channel queues the job `conversations.sort_conversation` when a conversation ends. The lead, ticket and contact an outcome asks for are made in 7b; the staff correction is 7c. Differences from the plan above: no `held_by_user_id`, `held_until`, `summary` or `done_at` yet (staff takeover, summaries and "done" belong to F21 and F19). |
 | Who can do what | Everyone signed in can read the types. Only managers add, change, remove or reorder types, and only managers see or change the block list. |
 
 ## Screens

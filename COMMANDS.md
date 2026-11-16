@@ -24,6 +24,8 @@ Run these from the project folder (`lead-engine-good`). Use `nvm use` first so N
 | `npm run db:migrate:test`  | Applies the migrations to the local test database                             |
 | `npm run platform-admin -- list` | Lists the platform admins. Also `grant <email>` and `revoke <email>` to make or remove one (changes the development database; the person must have signed up and verified their email) |
 | `npm run ai:check`         | Tries each AI key in `.env` with one tiny real call and lists what it can see. Never prints a key. Costs a few tokens |
+| `npm run eval:types`       | Sorts the labelled example conversations in `evals/classification/` with the AI and prints how often it was right (targets: main type 90%, complaints kept 95%, non-sales made leads at most 5%). Uses the keys in `.env`, costs a few thousand tokens, does not touch the database. `-- --industry hotel_resort` picks the example file |
+| `npm run conversation:simulate` | Makes one pretend conversation in a business from your text and sorts it the way the app will (rules, then the AI, then the router), then prints what was decided. `-- --email <a person of the business> --text "..."`. Writes to the database in `.env` and makes one real AI call; a database that is not on this computer needs `--allow-remote` |
 
 ## Tests and checks
 

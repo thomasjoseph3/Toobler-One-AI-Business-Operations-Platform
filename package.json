@@ -19,6 +19,8 @@
     "db:down": "docker compose down",
     "db:migrate": "tsx scripts/migrate.ts",
     "ai:check": "tsx scripts/ai-check.ts",
+    "eval:types": "tsx scripts/eval-classification.ts",
+    "conversation:simulate": "tsx scripts/simulate-conversation.ts",
     "platform-admin": "tsx scripts/platform-admin.ts",
     "db:migrate:test": "tsx scripts/migrate.ts --test",
     "db:seed:demo": "tsx scripts/seed-demo.ts",

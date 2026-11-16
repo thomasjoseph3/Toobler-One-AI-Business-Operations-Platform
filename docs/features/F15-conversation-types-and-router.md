@@ -69,7 +69,7 @@ Sending the alerts (F23), the inbox and staff takeover (F21), the AI agent that 
 
 ## Scope
 - **In:** the tables `conversation_types`, `conversations`, `messages`, `conversation_outcomes`, `classification_corrections`, `block_list`; the 13 system types (and the industry presets) given to every business, new and existing; types API (list, add, edit, delete a custom one, reorder); block list; the pre-filter (pure code); `router.decide` (pure code); the classifier (one structured AI call, schema built from the business's own type keys); a "Try it" route; the **finalise** service (final type, router, outcomes applied: lead, ticket, log, filter, ignore, review); staff correction (`POST /conversations/{id}/type`) that re-runs the router and moves lead ↔ ticket; the classification eval set v1 (English).
-- **Out (later):** the agent and its `set_conversation_type` tool and playbooks (F19); every channel (F20, F25, F26, F29); the inbox screens and staff takeover (F21); staff alerts (F23: F15 records who should be alerted, F23 sends); scoring (F10); reports; Malayalam and Hindi eval sets (voice, F29); the **screens** (Settings → Conversation types with the Try it box, block list, Change type menus, the Filtered tab): waiting for the designer.
+- **Out (later):** the agent and its playbooks (F19; the live `set_conversation_type` tool is after Phase 1, R58: the first release sorts only after a conversation ends); every channel (F20, F25, F26, F29); the inbox screens and staff takeover (F21); staff alerts (F23: F15 records who should be alerted, F23 sends); scoring (F10); reports; Malayalam and Hindi eval sets (voice, F29); the **screens** (Settings → Conversation types with the Try it box, block list, Change type menus, the Filtered tab): waiting for the designer.
 
 ## Reused from the hotel agent
 - **Read:** `src/agent/{index.js,industry.js}`, `src/agent/shared/{conversation.js,prompt.js,schema.js}`, `src/modules/core/{conversations,inbox}`, `test/unit/{prompts,agentTools,agentInputs}.test.js`, `scripts/agent-eval.js`.
@@ -77,7 +77,7 @@ Sending the alerts (F23), the inbox and staff takeover (F21), the AI agent that 
 - **Changed:** the old project had no classifier and no router: every conversation was handled inside each channel. Here one shared engine decides the type for every channel. Types, outcomes and the router are new work, written to docs/CONVERSATION-TYPES.md.
 - **Left behind:** hotel-only prompt text and the per-channel conversation handling (it moves into the engine).
 
-## Database (forward-only, one migration per change: `031_conversation_types.sql`, `032_conversation_types_active_limit.sql`, `033_conversation_types_delete.sql` and `034_block_list.sql` so far; the others with the slice that needs them)
+## Database (forward-only, one migration per change: `031_conversation_types.sql`, `032_conversation_types_active_limit.sql`, `033_conversation_types_delete.sql` and `034_block_list.sql` and `035_conversations.sql` so far; the others with the slice that needs them)
 Every table has `account_id`, RLS enabled and forced, `created_by` / actor where a person or the system changes it.
 - `conversation_types`: `key`, `label`, `description`, `examples` jsonb (up to 5), `system` bool, `outcome` (`lead` / `ticket` / `log` / `filter` / `ignore` / `review`), `ticket_type`, `priority`, `route` jsonb, `needs_person`, `alert` jsonb, `playbook`, `active`, `sort`. Unique per (business, key). Up to 25 active per business.
 - `conversations`: one row per conversation on any channel (`channel`, `contact_id`, `type_key`, `type_confidence`, `type_source` = `rule` / `ai_live` / `ai_final` / `staff`, `ai_unsure`, `needs_person`, `status`, `held_by_user_id`, `held_until`, `summary`, `ended_at`, `done_at`).
@@ -102,16 +102,18 @@ Every table has `account_id`, RLS enabled and forced, `created_by` / actor where
 | POST | `/conversation-types/test` | manager | Classify a sample text, save nothing |
 | POST | `/conversations/{id}/type` | staff | Staff correction; re-runs the router |
 
-## Slices (each at most 2 routes; stop after each for the owner to verify)
+## Slices (each at most 2 routes; stop after each for the owner to verify; slice 7 was split into 7a, 7b and 7c at the owner's choice, 16 Nov 2026)
 | Slice | Builds | Routes |
 | --- | --- | --- |
 | 1 | **Built, waiting for the owner's check.** Migration 031, the system types and industry presets, the types list and add | `GET /conversation-types`, `POST /conversation-types` |
 | 2 | **Built, waiting for the owner's check.** Edit and remove a type (migration 033) | `PATCH /conversation-types/{id}`, `DELETE /conversation-types/{id}` |
 | 3 | **Built, waiting for the owner's check.** Reorder | `POST /conversation-types/reorder` |
 | 4 | **Built, waiting for the owner's check.** Block list (migration 034) | `GET /block-list`, `PUT /block-list` |
-| 5 | The pre-filter and `router.decide` (pure code, unit tests for every row of the design; no route) | none |
-| 6 | The classifier through the AI service, the "Try it" route and the classification eval set v1 | `POST /conversation-types/test` |
-| 7 | Finalise: store, classify, route, apply outcomes (lead, ticket, log, filter, ignore, review) and the staff correction | `POST /conversations/{id}/type` |
+| 5 | **Built, waiting for the owner's check.** The pre-filter and `router.decide` (pure code, unit tests for every row of the design; no route) | none |
+| 6 | **Built, waiting for the owner's check.** The classifier through the AI service, the "Try it" route and the classification eval set v1 (English, hotel) | `POST /conversation-types/test` |
+| 7a | **Built, waiting for the owner's check.** The tables `conversations`, `conversation_messages` and `conversation_outcomes` (migration 035), and the sorting step: store a conversation and its messages, run the rules, ask the AI, run the router, save the type and one outcome per type. A background job, `conversations.sort_conversation`, runs it. Lead and ticket outcomes are only recorded here. No route. | none |
+| 7b | Applies the outcomes for real: finds or creates the contact, and creates the lead or ticket (or joins the open one) through the contacts, leads and tickets modules, with the re-enquiry rule R6 (a lead lost less than 60 days ago is reopened). Facts about open leads and tickets go to the router. | none |
+| 7c | The staff correction and reading a conversation: `POST /conversations/{id}/type` (re-runs the router; a lead becomes a ticket and the other way, keeping the timeline) and `GET /conversations/{id}`; migration for `classification_corrections`; a removed type's conversations move to `unclear`. | `GET /conversations/{id}`, `POST /conversations/{id}/type` |
 
 ## Screens (for when the designer delivers)
 Settings → Conversation types (each type as a sentence, edit form, Try it box); block list; Change type on the inbox, lead and ticket pages; the Filtered tab. No screen is built now.
@@ -130,6 +132,31 @@ Settings → Conversation types (each type as a sentence, edit form, Try it box)
 - System types can be renamed and re-routed but never deleted; up to 25 active types per business.
 - The classifier reads facts from our database, never from what the person claims; no personal data or message text in logs.
 - A correction lead → ticket closes the lead as `reclassified` (kept, off the board) and opens a ticket with the same timeline.
+
+## Router decisions made at slice 5 (owner to confirm)
+- **Only the main reason can become "unclear".** A secondary reason the AI is not fairly sure about (below 0.40), or that does not exist or is switched off, is simply left out: a guess must not create work or review noise.
+- **At most one outcome of each kind per conversation.** A complaint plus a booking enquiry still gives a ticket and a lead (different kinds). Two types that would both make a lead make one lead, and two that would both make a ticket make one ticket: the first, which is the main reason, wins.
+- **No contact is kept for** the types `spam`, `wrong_number`, `no_conversation` and `automated`, **and** for any type (including a custom one) whose outcome is Filtered or Ignored. Re-routing a built-in type to a ticket or a log does not make it a spam type.
+- **A lead outcome with the lead engine off** becomes "only log it" plus a callback task (`createCallbackTask`); tickets are core and never fall back.
+- **Pre-filter order:** silence or an empty chat, then machine-made email, then the block list, then the business's own staff. Silence is a call under 10 seconds where the caller did not speak (or it is not known); an empty chat is a web chat or WhatsApp conversation that ended with no message from the customer. Machine-made email: an `Auto-Submitted` header other than `no`, a `List-Unsubscribe` header, `Precedence` of bulk, junk or list, or a sender such as noreply@, no-reply@, donotreply@, mailer-daemon@, postmaster@ or bounce@.
+- **The router never touches the database or the AI.** It takes the business's types, the classification, the person's open lead and ticket, and what is switched on, and returns the outcomes with their ticket kind and priority, who to alert, whether to reuse an open record, whether a contact is kept, and whether the lifecycle stage may move. Slice 7 applies them.
+
+## Sorting a conversation (slice 7a)
+- **Tables (migration 035):** `conversations` (one per conversation on any channel: channel, who was on the other end as phone digits and/or email, the contact once known, the type and who decided it, how sure, a short reason, "AI unsure", "needs a person", open or sorted, and when it ended and was sorted), `conversation_messages` (written once, never edited or deleted; the channel's own message id keeps a repeated message from being stored twice), `conversation_outcomes` (one per conversation and type, with room for the lead or ticket it made and a "no longer applies" time). A database rule says a conversation is "sorted" only when it has a type, who decided it and a time. Business code cannot delete a conversation or a message, nor change a conversation's channel or who it was with.
+- **Public entry points** (the module's `index.ts`, for the channels): `createConversationRecordsService` (start a conversation, add a message) and `createConversationFinaliser` (sort it), plus the background job `conversations.sort_conversation` that a channel queues when a conversation ends (for a call or an email it passes the facts only the channel knows: call length and whether the caller spoke, or the email headers; these are not stored).
+- **The steps:** read the conversation, its messages, the business's switched-on types, the block list and the team's own phone numbers and emails (the auth module gives these two through its `index.ts`); the rules decide first (silence, empty chat, machine-made email, blocked, own team); a conversation with nothing from the customer is "no conversation" without the AI; otherwise the AI reads the whole conversation (business lines too, system lines left out); the router decides; the type and the outcomes are saved in one transaction under a row lock.
+- **Safe to run twice and to retry:** no transaction is held open during the AI call; a conversation that is already sorted is left alone ("already sorted", no new AI call); if the AI cannot answer, nothing is changed and the job fails so it is tried again; sorting again on request (a correction) supersedes the outcomes that no longer apply and never stores a type twice. **Known limit:** two sortings at the same moment both ask the AI (one answer is thrown away); only one is saved.
+- **Nothing of what was said** goes into the activity log, the event, the AI call record or any other record than the messages themselves.
+- **Not yet in this slice:** creating the contact, the lead or the ticket (7b); reading a conversation and the staff correction (7c); the channels that start conversations (F20 onward).
+
+## The classifier and "Try it" (slice 6)
+- **Where:** `helpers/classifier-prompt.ts` (the prompt, the answer's shape, pure), `services/conversation-classifier.service.ts` (asks the AI), `services/conversation-type-trial.service.ts` ("Try it"), `scripts/eval-classification.ts` and `evals/classification/hotel_resort.jsonl` (the measurement).
+- **The AI is asked for the job `classify_conversation` through the AI module's service** (F37 picks the model and key from the business's own settings; this code never names a model). Defaults today: Gemini Flash-Lite first, GPT-4o mini next. Temperature 0.
+- **The answer must fit a shape built from the business's switched-on types:** an unknown or switched-off type is refused, so the AI cannot invent one (the call then answers 502 `AI_FAILED`).
+- **The prompt keeps the steady part (rules and the type list) separate from the conversation,** so the AI company can cache it. The conversation is wrapped in markers, a closing marker typed by a customer is removed, and the rules say that text in the conversation is data and never to be obeyed. A conversation longer than 12,000 characters keeps its start and its end.
+- **The AI only names the type.** Facts such as "has an open lead" come from our records and are stated separately from the conversation. What happens next is the router (slice 5).
+- **Try it** (`POST /conversation-types/test`, managers only, limited to 10 a minute): sorts a pasted message with the business's own types and shows what the router would do. It saves nothing; the AI call record holds no text.
+- **The measurement:** `npm run eval:types` sorts the labelled English examples with the real AI and prints three numbers against the targets (main type right 90%, complaints kept 95%, non-sales made leads at most 5%). It needs an AI key in `.env`, costs a few thousand tokens, and does not touch the database. The example file has 58 hotel examples, including complaints that also ask a price and messages that try to give the AI orders. Malayalam and Hindi sets come with voice (F29).
 
 ## Tests
 - **Unit:** `router.decide` (every threshold, multi-type, fallback and re-run case); pre-filter rules (silent call, each auto-email header, block list, staff number); the schema built from a business's type keys.

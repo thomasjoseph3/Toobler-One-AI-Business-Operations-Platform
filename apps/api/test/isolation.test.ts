@@ -157,6 +157,41 @@ beforeAll(async () => {
     { label: `Type ${secretWords}`, description: `Description ${secretWords}`, outcome: 'log' },
     201,
   );
+  // A has a conversation with a message and an outcome (no route reads them yet, so the database-level check below is what proves B cannot)
+  const conversationOfA = randomUUID();
+  await database.system
+    .insertInto('conversations')
+    .values({
+      id: conversationOfA,
+      account_id: businessA.profile.business.id,
+      channel: 'webchat',
+      from_phone_key: null,
+      from_email: null,
+      contact_id: null,
+    })
+    .execute();
+  await database.system
+    .insertInto('conversation_messages')
+    .values({
+      id: randomUUID(),
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      sender: 'customer',
+      body: `Message ${secretWords}`,
+      channel_message_id: null,
+    })
+    .execute();
+  await database.system
+    .insertInto('conversation_outcomes')
+    .values({
+      id: randomUUID(),
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      type_key: 'new_enquiry',
+      kind: 'lead',
+      confidence: 0.9,
+    })
+    .execute();
   dataOfA = {
     conversationTypeId: conversationType.id,
     contactId: contact.id,

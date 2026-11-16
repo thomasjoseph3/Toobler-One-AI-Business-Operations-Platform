@@ -408,6 +408,59 @@ export interface ConversationTypesTable {
   updated_at: Generated<Date>;
 }
 
+/** One conversation on any channel (web chat, WhatsApp, email, phone). Fenced by account_id. */
+export interface ConversationsTable {
+  id: string;
+  account_id: string;
+  channel: 'webchat' | 'whatsapp' | 'email' | 'phone';
+  /** The other person's phone as digits only, if the channel knew it. */
+  from_phone_key: string | null;
+  from_email: string | null;
+  contact_id: string | null;
+  type_key: string | null;
+  /** 0 to 1. A numeric column, so it is read back as text and turned into a number by the repository. */
+  type_confidence: ColumnType<string | null, number | null | undefined, number | null | undefined>;
+  type_source: 'rule' | 'ai_final' | 'staff' | null;
+  type_reason: string | null;
+  ai_unsure: Generated<boolean>;
+  needs_person: Generated<boolean>;
+  status: Generated<'open' | 'sorted'>;
+  ended_at: Date | null;
+  sorted_at: Date | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One message of a conversation. Written once, never edited or deleted. Fenced by account_id. */
+export interface ConversationMessagesTable {
+  id: string;
+  account_id: string;
+  conversation_id: string;
+  sender: 'customer' | 'agent' | 'staff' | 'system';
+  body: string;
+  channel_message_id: string | null;
+  created_at: Generated<Date>;
+}
+
+/** What a conversation led to, once per conversation and type. Fenced by account_id. */
+export interface ConversationOutcomesTable {
+  id: string;
+  account_id: string;
+  conversation_id: string;
+  type_key: string;
+  kind: 'lead' | 'ticket' | 'log' | 'filter' | 'ignore' | 'review';
+  confidence: ColumnType<string, number, number>;
+  ai_unsure: Generated<boolean>;
+  lead_id: string | null;
+  ticket_id: string | null;
+  applied_at: Date | null;
+  superseded_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** A phone number or an email a manager never wants treated as a customer. Fenced by account_id. */
 export interface BlockListTable {
   id: string;
@@ -563,6 +616,9 @@ export interface DB {
   ticket_notes: TicketNotesTable;
   conversation_types: ConversationTypesTable;
   block_list: BlockListTable;
+  conversations: ConversationsTable;
+  conversation_messages: ConversationMessagesTable;
+  conversation_outcomes: ConversationOutcomesTable;
   business_answers: BusinessAnswersTable;
   situations: SituationsTable;
   offerings: OfferingsTable;
