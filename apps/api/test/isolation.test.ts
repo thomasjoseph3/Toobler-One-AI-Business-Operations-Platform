@@ -414,6 +414,16 @@ const attempts: Attempt[] = [
     expectedStatus: 201,
   },
   {
+    route: 'POST /api/v1/conversation-types/reorder',
+    what: "put A's conversation type in B's order (B must list only its own types)",
+    request: () => ({
+      method: 'POST',
+      url: '/conversation-types/reorder',
+      payload: { typeIds: [dataOfA.conversationTypeId] },
+    }),
+    expectedStatus: 400,
+  },
+  {
     route: 'PATCH /api/v1/conversation-types/{id}',
     what: "change A's conversation type",
     request: () => ({

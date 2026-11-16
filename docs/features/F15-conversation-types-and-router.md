@@ -55,7 +55,7 @@ Every table has `account_id`, RLS enabled and forced, `created_by` / actor where
 | --- | --- | --- |
 | 1 | **Built, waiting for the owner's check.** Migration 031, the system types and industry presets, the types list and add | `GET /conversation-types`, `POST /conversation-types` |
 | 2 | **Built, waiting for the owner's check.** Edit and remove a type (migration 033) | `PATCH /conversation-types/{id}`, `DELETE /conversation-types/{id}` |
-| 3 | Reorder | `POST /conversation-types/reorder` |
+| 3 | **Built, waiting for the owner's check.** Reorder | `POST /conversation-types/reorder` |
 | 4 | Block list | `GET /block-list`, `PUT /block-list` |
 | 5 | The pre-filter and `router.decide` (pure code, unit tests for every row of the design; no route) | none |
 | 6 | The classifier through the AI service, the "Try it" route and the classification eval set v1 | `POST /conversation-types/test` |
@@ -66,6 +66,7 @@ Settings → Conversation types (each type as a sentence, edit form, Try it box)
 
 ## Rules to enforce
 - **The built-in (system) types are always on and cannot be removed** (decided at slice 2, owner to confirm): the router needs them as its fallbacks (`unclear` for low confidence, `spam` for the block list, `no_conversation`, `automated` and `internal` for the code rules). They can be renamed and re-routed. Switching one off answers 409 `SYSTEM_TYPE_ALWAYS_ON`; removing one answers 409 `SYSTEM_TYPE_CANNOT_BE_REMOVED`, and the database refuses it too (migration 033).
+- **Reorder lists every type of the business exactly once** (like offerings): a missing, repeated, extra or unknown id, including another business's, answers 400 `TYPES_MISMATCH` and never says whether the id exists. Positions become 0, 1, 2 with no gaps; the same order again changes nothing and writes no log line. Adding and reordering take turns (a per-business lock).
 - Removing a custom type leaves history alone (a ticket keeps its type key as text). When conversations arrive (slice 7), a conversation whose type was removed moves to `unclear`.
 - The AI says what it was about; **code decides what to do** (the router is pure and has a unit test per row).
 - Confidence ≥ 0.70 apply; 0.40 to 0.70 apply and mark "AI unsure"; below 0.40 treat as `unclear` (needs review, no lead or ticket yet).

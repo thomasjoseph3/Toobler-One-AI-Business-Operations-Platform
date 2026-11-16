@@ -1,5 +1,5 @@
 import type { ConversationAlert, ConversationOutcome, ConversationPlaybook } from '@toobler-one/shared';
-import type { Selectable } from 'kysely';
+import { sql, type Selectable } from 'kysely';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 import type { ConversationTypesTable } from '../../../../kernel/database/types';
@@ -215,4 +215,52 @@ export async function deleteConversationType(db: Db, accountId: string, typeId: 
     .where('id', '=', typeId)
     .executeTakeFirst();
   return Number(result.numDeletedRows) > 0;
+}
+
+/**
+ * Makes the business's other changes to the order of its types wait their turn until the end of this transaction. Adding and
+ * reordering work out positions from what is there, so two at the same moment must not both read the same list.
+ */
+export async function lockConversationTypesOfBusiness(db: Db, accountId: string): Promise<void> {
+  await sql`select pg_advisory_xact_lock(hashtext(${`conversation_types_order:${accountId}`}))`.execute(db);
+}
+
+/** The ids of all the business's types in the order they are shown. */
+export async function listConversationTypeIdsInOrder(db: Db, accountId: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('conversation_types')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .orderBy('sort')
+    .orderBy('id')
+    .execute();
+  return rows.map((row) => row.id);
+}
+
+/** Gives each listed type its position (0, 1, 2, ...) and records who did it. */
+export async function setConversationTypePositions(
+  db: Db,
+  options: { accountId: string; typeIdsInOrder: readonly string[]; actor: Actor },
+): Promise<void> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  for (const [position, typeId] of options.typeIdsInOrder.entries()) {
+    await db
+      .updateTable('conversation_types')
+      .set({ sort: position, updated_by: actorStamp })
+      .where('account_id', '=', options.accountId)
+      .where('id', '=', typeId)
+      .execute();
+  }
+}
+
+/** The positions the business's types have now, in the order shown (to see whether they already run 0, 1, 2, ...). */
+export async function listConversationTypePositions(db: Db, accountId: string): Promise<number[]> {
+  const rows = await db
+    .selectFrom('conversation_types')
+    .select('sort')
+    .where('account_id', '=', accountId)
+    .orderBy('sort')
+    .orderBy('id')
+    .execute();
+  return rows.map((row) => row.sort);
 }

@@ -113,3 +113,12 @@ export const updateConversationTypeRequestSchema = z
     { message: 'Only a ticket outcome takes a ticket type and a priority.' },
   );
 export type UpdateConversationTypeRequest = z.infer<typeof updateConversationTypeRequestSchema>;
+
+/** The most types a reorder request may list (a guard against runaway requests; a business has far fewer). */
+export const MAX_CONVERSATION_TYPES_IN_ORDER = 200;
+
+/** Putting the types in a new order (a manager): every type of the business exactly once, in the order wanted. */
+export const reorderConversationTypesRequestSchema = z
+  .object({ typeIds: z.array(z.uuid()).min(1).max(MAX_CONVERSATION_TYPES_IN_ORDER) })
+  .strict();
+export type ReorderConversationTypesRequest = z.infer<typeof reorderConversationTypesRequestSchema>;

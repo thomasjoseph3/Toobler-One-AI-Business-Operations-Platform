@@ -2,13 +2,14 @@ import {
   MAX_ACTIVE_CONVERSATION_TYPES,
   type ConversationType,
   type ConversationTypesListResponse,
+  type ReorderConversationTypesRequest,
   type CreateConversationTypeRequest,
   type UpdateConversationTypeRequest,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
-import { badRequest, conflict, notFound } from '../../../../kernel/errors';
+import { ApiError, badRequest, conflict, notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { listStartingConversationTypes, makeTypeKeyFromLabel } from '../helpers/default-conversation-types';
@@ -124,6 +125,8 @@ export function createConversationTypesService({ database }: { database: Databas
 
       try {
         return await database.runInAccountTransaction(accountId, async (transaction) => {
+          // Adding works out the next position from what is there, so it takes its turn with reordering
+          await conversationTypesRepository.lockConversationTypesOfBusiness(transaction, accountId);
           await ensureStartingConversationTypes(transaction, { accountId, industryId: principal.industryId });
 
           const activeCount = await conversationTypesRepository.countActiveConversationTypes(transaction, accountId);
@@ -261,6 +264,66 @@ export function createConversationTypesService({ database }: { database: Databas
         if (isTooManyActiveTypesError(error)) throw tooManyTypesError();
         throw error;
       }
+    },
+
+    /**
+     * Puts the business's types in a new order: the request must list every type of the business exactly once, and nothing
+     * else, or it answers 400 (and so it never says whether an id belongs to another business). Positions become 0, 1, 2, with
+     * no gaps. Sending the order it already has changes nothing and writes no log line. Answers with the list in its new order.
+     */
+    async reorderConversationTypes(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'industryId'>,
+      request: ReorderConversationTypesRequest,
+    ): Promise<ConversationTypesListResponse> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        // Reordering works out positions from what is there, so it takes its turn with adding
+        await conversationTypesRepository.lockConversationTypesOfBusiness(transaction, accountId);
+        await ensureStartingConversationTypes(transaction, { accountId, industryId: principal.industryId });
+
+        const currentIds = await conversationTypesRepository.listConversationTypeIdsInOrder(transaction, accountId);
+        const requestedIds = new Set(request.typeIds);
+        const listsEveryTypeOnce =
+          requestedIds.size === request.typeIds.length &&
+          requestedIds.size === currentIds.length &&
+          currentIds.every((typeId) => requestedIds.has(typeId));
+        if (!listsEveryTypeOnce) {
+          throw new ApiError(
+            400,
+            'TYPES_MISMATCH',
+            'List every conversation type of the business exactly once, and nothing else.',
+            {
+              expected: currentIds.length,
+              received: request.typeIds.length,
+            },
+          );
+        }
+
+        const alreadyInThatOrder = currentIds.every((typeId, index) => request.typeIds[index] === typeId);
+        const currentPositions = await conversationTypesRepository.listConversationTypePositions(
+          transaction,
+          accountId,
+        );
+        const positionsAlreadyTidy = currentPositions.every((position, index) => position === index);
+        if (!(alreadyInThatOrder && positionsAlreadyTidy)) {
+          await conversationTypesRepository.setConversationTypePositions(transaction, {
+            accountId,
+            typeIdsInOrder: request.typeIds,
+            actor,
+          });
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'conversations.types_reordered',
+            details: { recordType: 'conversation_type', fields: ['order'] },
+          });
+        }
+
+        const rows = await conversationTypesRepository.listConversationTypes(transaction, accountId);
+        return { items: rows.map(toConversationType) };
+      });
     },
 
     /**

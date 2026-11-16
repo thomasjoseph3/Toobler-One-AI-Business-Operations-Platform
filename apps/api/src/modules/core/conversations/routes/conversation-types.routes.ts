@@ -5,12 +5,13 @@ import {
   conversationTypeSchema,
   conversationTypesListResponseSchema,
   createConversationTypeRequestSchema,
+  reorderConversationTypesRequestSchema,
   updateConversationTypeRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createConversationTypesService } from '../services/conversation-types.service';
 
-/** Registers /api/v1/conversation-types (list, add), /conversation-types/{id} (change, remove). More routes arrive with the later slices. */
+/** Registers /api/v1/conversation-types (list, add), /conversation-types/reorder, /conversation-types/{id} (change, remove). More routes arrive with the later slices. */
 export function conversationTypesRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const conversationTypesService = createConversationTypesService({ database: app.kernel.database });
@@ -36,6 +37,19 @@ export function conversationTypesRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const created = await conversationTypesService.createConversationType(request.principal, request.body);
       return reply.code(201).send(created);
+    },
+  );
+
+  // Managers only. Lists every type of the business exactly once, in the order wanted. A static address, so "reorder" is never read as an id.
+  typedApp.post(
+    '/conversation-types/reorder',
+    {
+      config: { access: 'manager' },
+      schema: { body: reorderConversationTypesRequestSchema, response: { 200: conversationTypesListResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return conversationTypesService.reorderConversationTypes(request.principal, request.body);
     },
   );
 

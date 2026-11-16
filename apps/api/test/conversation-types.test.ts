@@ -514,3 +514,115 @@ describe('DELETE /api/v1/conversation-types/{id}', () => {
     expect(JSON.stringify(lines[0])).not.toContain('Secret removed');
   });
 });
+
+/** The business's types with their positions, as the list route shows them. */
+async function readTypeKeysAndPositions(person: SignedInPerson) {
+  return (await send(person, 'GET', '/conversation-types')).json().items as Array<{
+    id: string;
+    key: string;
+    sort: number;
+  }>;
+}
+
+describe('POST /api/v1/conversation-types/reorder', () => {
+  it('puts the types in the new order, with positions 0, 1, 2 and no gaps', async () => {
+    const person = await newBusiness();
+    const before = await readTypeKeysAndPositions(person);
+    const newOrder = [...before].reverse();
+    const response = await send(person, 'POST', '/conversation-types/reorder', {
+      typeIds: newOrder.map((type) => type.id),
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    const after = response.json().items as Array<{ id: string; key: string; sort: number }>;
+    expect(after.map((type) => type.id)).toEqual(newOrder.map((type) => type.id));
+    expect(after.map((type) => type.sort)).toEqual(after.map((_type, index) => index));
+    // The list route shows the same order
+    const read = await readTypeKeysAndPositions(person);
+    expect(read.map((type) => type.id)).toEqual(newOrder.map((type) => type.id));
+  });
+
+  it('puts a type added later at the end of the new order', async () => {
+    const person = await newBusiness();
+    const before = await readTypeKeysAndPositions(person);
+    await send(person, 'POST', '/conversation-types/reorder', {
+      typeIds: [...before].reverse().map((type) => type.id),
+    });
+    const added = await addCustomType(person, { label: 'Added after reordering' });
+    const read = await readTypeKeysAndPositions(person);
+    expect(read.at(-1)!.id).toBe(added.id);
+    expect(read.map((type) => type.sort)).toEqual(read.map((_type, index) => index));
+  });
+
+  it('writes one activity-log line for a real change and none when the order is already that', async () => {
+    const person = await newBusiness();
+    const before = await readTypeKeysAndPositions(person);
+    const sameOrder = { typeIds: before.map((type) => type.id) };
+    const countLines = async () =>
+      (
+        await database.system
+          .selectFrom('activity_log')
+          .selectAll()
+          .where('account_id', '=', person.profile.business.id)
+          .where('kind', '=', 'conversations.types_reordered')
+          .execute()
+      ).length;
+    expect((await send(person, 'POST', '/conversation-types/reorder', sameOrder)).statusCode).toBe(200);
+    expect(await countLines()).toBe(0);
+    await send(person, 'POST', '/conversation-types/reorder', {
+      typeIds: [...before].reverse().map((type) => type.id),
+    });
+    expect(await countLines()).toBe(1);
+  });
+
+  it("answers 400 TYPES_MISMATCH when a type is missing, repeated, extra, unknown or another business's", async () => {
+    const person = await newBusiness();
+    const other = await newBusiness();
+    const theirs = await addCustomType(other);
+    const ids = (await readTypeKeysAndPositions(person)).map((type) => type.id);
+    const bad = [
+      ids.slice(1), // one missing
+      [...ids, ids[0]!], // one repeated
+      [...ids.slice(1), ids[1]!], // one replaced by a repeat
+      [...ids, randomUUID()], // an unknown id added
+      [...ids.slice(1), theirs.id], // another business's id in place of one of ours
+    ];
+    for (const typeIds of bad) {
+      const response = await send(person, 'POST', '/conversation-types/reorder', { typeIds });
+      expect(response.statusCode, JSON.stringify(typeIds.length)).toBe(400);
+      expect(response.json().error.code).toBe('TYPES_MISMATCH');
+    }
+    // Nothing changed, for either business
+    expect((await readTypeKeysAndPositions(person)).map((type) => type.id)).toEqual(ids);
+    expect((await readTypeKeysAndPositions(other)).some((type) => type.id === theirs.id)).toBe(true);
+  });
+
+  it('answers 400 for bad input: no list, an empty list, a bad id, an unknown field', async () => {
+    const person = await newBusiness();
+    for (const body of [{}, { typeIds: [] }, { typeIds: ['not-a-uuid'] }, { typeIds: [randomUUID()], extra: true }]) {
+      expect((await send(person, 'POST', '/conversation-types/reorder', body)).statusCode, JSON.stringify(body)).toBe(
+        400,
+      );
+    }
+  });
+
+  it('answers 403 to staff who are not managers, 401 to nobody, and 403 without the safety headers', async () => {
+    const person = await newBusiness();
+    const ids = (await readTypeKeysAndPositions(person)).map((type) => type.id);
+    expect((await send(null, 'POST', '/conversation-types/reorder', { typeIds: ids })).statusCode).toBe(401);
+    expect((await send(person, 'POST', '/conversation-types/reorder', { typeIds: ids }, false)).statusCode).toBe(403);
+    await setRole(person, 'staff');
+    expect((await send(person, 'POST', '/conversation-types/reorder', { typeIds: ids })).statusCode).toBe(403);
+  });
+
+  it('keeps the order whole when adding and reordering happen together', async () => {
+    const person = await newBusiness();
+    const ids = (await readTypeKeysAndPositions(person)).map((type) => type.id);
+    await Promise.all([
+      send(person, 'POST', '/conversation-types/reorder', { typeIds: [...ids].reverse() }),
+      send(person, 'POST', '/conversation-types', customType({ label: 'Added at the same moment' })),
+    ]);
+    const read = await readTypeKeysAndPositions(person);
+    // However the two were interleaved, positions run 0, 1, 2 with no gaps or repeats
+    expect(read.map((type) => type.sort)).toEqual(read.map((_type, index) => index));
+  });
+});
