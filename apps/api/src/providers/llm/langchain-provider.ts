@@ -1,5 +1,6 @@
 import { ChatAnthropic } from '@langchain/anthropic';
-import { AIMessage, HumanMessage, SystemMessage, type BaseMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage, ToolMessage, type BaseMessage } from '@langchain/core/messages';
+import { tool as describeToolForModel } from '@langchain/core/tools';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOpenAI } from '@langchain/openai';
 import type { ZodType } from 'zod';
@@ -10,10 +11,13 @@ import type {
   LlmProvider,
   LlmRequest,
   LlmTextResult,
+  LlmToolsRequest,
+  LlmToolsResult,
   LlmUsage,
 } from './llm-types';
 import { listProviderModels } from './list-provider-models';
 import { runWithFallback, type OneTryResult } from './run-with-fallback';
+import { runToolLoop, type LoopMessage, type ModelTurn } from './tool-loop';
 
 // The one file that knows how to talk to Gemini, OpenAI and Claude, through LangChain. A lint rule keeps every other file
 // from importing these packages. To add another AI company: add its id in llm-types.ts and one case in buildChatModel.
@@ -61,20 +65,49 @@ function buildChatModel(candidate: LlmCandidate, request: LlmRequest) {
  * and Gemini cache a long identical start by themselves, so for them it is plain text in the same order.
  */
 export function buildMessages(prompt: LlmPrompt, candidate: LlmCandidate): BaseMessage[] {
-  const changingText = prompt.changingSystemText?.trim();
-  const systemMessage =
-    candidate.provider === 'anthropic'
-      ? new SystemMessage({
-          content: [
-            { type: 'text', text: prompt.stableSystemText, cache_control: { type: 'ephemeral' } },
-            ...(changingText ? [{ type: 'text', text: changingText }] : []),
-          ],
-        })
-      : new SystemMessage(changingText ? `${prompt.stableSystemText}\n\n${changingText}` : prompt.stableSystemText);
   const conversation = prompt.messages.map((message) =>
     message.role === 'user' ? new HumanMessage(message.text) : new AIMessage(message.text),
   );
-  return [systemMessage, ...conversation];
+  return [buildSystemMessage(prompt, candidate), ...conversation];
+}
+
+/** The system message alone (the stable instructions, then the changing ones), built for the company that will read it. */
+function buildSystemMessage(prompt: LlmPrompt, candidate: LlmCandidate): SystemMessage {
+  const changingText = prompt.changingSystemText?.trim();
+  return candidate.provider === 'anthropic'
+    ? new SystemMessage({
+        content: [
+          { type: 'text', text: prompt.stableSystemText, cache_control: { type: 'ephemeral' } },
+          ...(changingText ? [{ type: 'text', text: changingText }] : []),
+        ],
+      })
+    : new SystemMessage(changingText ? `${prompt.stableSystemText}\n\n${changingText}` : prompt.stableSystemText);
+}
+
+/** Turns our plain conversation shape (with tool requests and answers) into the messages LangChain sends to the model. */
+export function buildToolConversationMessages(
+  prompt: LlmPrompt,
+  candidate: LlmCandidate,
+  loopMessages: readonly LoopMessage[],
+): BaseMessage[] {
+  const conversation = loopMessages.map((message): BaseMessage => {
+    if (message.kind === 'tool_request') {
+      return new AIMessage({
+        content: message.text,
+        tool_calls: message.calls.map((call) => ({
+          type: 'tool_call' as const,
+          id: call.callId,
+          name: call.toolName,
+          args: call.input as Record<string, unknown>,
+        })),
+      });
+    }
+    if (message.kind === 'tool_answer') {
+      return new ToolMessage({ content: message.text, tool_call_id: message.callId, name: message.toolName });
+    }
+    return message.role === 'user' ? new HumanMessage(message.text) : new AIMessage(message.text);
+  });
+  return [buildSystemMessage(prompt, candidate), ...conversation];
 }
 
 /** Tokens from the provider's own reply. A reply with no numbers is counted as zero and flagged, never guessed. */
@@ -132,6 +165,48 @@ export function createLangChainProvider(): LlmProvider {
         return { value: schema.parse(reply.parsed), usage: readUsage(reply.raw) };
       });
       return { value: outcome.value, details: outcome.details };
+    },
+
+    async generateWithTools(request: LlmToolsRequest): Promise<LlmToolsResult> {
+      // The model only needs to know each tool's name, what it is for and the shape of its input; running it is the loop's job.
+      const toolDescriptions = request.tools.map((tool) =>
+        describeToolForModel(async () => '', {
+          name: tool.name,
+          description: tool.description,
+          schema: tool.inputSchema,
+        }),
+      );
+      return runToolLoop({
+        startMessages: request.prompt.messages.map((message) => ({
+          kind: 'text' as const,
+          role: message.role,
+          text: message.text,
+        })),
+        tools: request.tools,
+        maxRounds: request.maxRounds,
+        askModelOnce: async (messagesSoFar): Promise<ModelTurn> => {
+          const outcome = await runWithFallback(
+            request.candidates,
+            async (candidate): Promise<OneTryResult<Omit<ModelTurn, 'details'>>> => {
+              const modelWithTools = buildChatModel(candidate, request).bindTools(toolDescriptions);
+              const reply = (await modelWithTools.invoke(
+                buildToolConversationMessages(request.prompt, candidate, messagesSoFar),
+                { signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) },
+              )) as AIMessage;
+              const text = readText(reply);
+              const toolCalls = (reply.tool_calls ?? []).map((call, position) => ({
+                callId: call.id ?? `call_${messagesSoFar.length}_${position}`,
+                toolName: call.name,
+                input: call.args,
+              }));
+              // A reply with neither words nor tool requests is a failed try (see requireNonEmptyAnswer)
+              if (toolCalls.length === 0) requireNonEmptyAnswer(text);
+              return { value: { text, toolCalls }, usage: readUsage(reply) };
+            },
+          );
+          return { ...outcome.value, details: outcome.details };
+        },
+      });
     },
   };
 }

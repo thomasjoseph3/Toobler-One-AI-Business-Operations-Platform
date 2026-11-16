@@ -99,7 +99,48 @@ export interface LlmObjectResult<Value> {
   details: LlmCallDetails;
 }
 
-/** The AI model layer: ask for text, or for an answer that fits a zod shape. Real in the app, scripted in tests. */
+/**
+ * One thing the model may ask the app to do (look up a price, save a detail). The model only supplies the input; what the tool
+ * does, and for which business, is fixed by the code that built it, so the model can never choose whose data a tool touches.
+ */
+export interface LlmTool {
+  /** The name the model calls it by, like `search_knowledge`. */
+  name: string;
+  /** Tells the model when to use it. */
+  description: string;
+  /** The shape of the input. The model's input is checked against it before the tool runs. */
+  inputSchema: ZodType;
+  /** Does the work and gives the model the result as text. A thrown error is told to the model as a failed try. */
+  run(input: unknown): Promise<string>;
+}
+
+/** A call to `generateWithTools`: an ordinary request plus the tools the model may use. */
+export interface LlmToolsRequest extends LlmRequest {
+  tools: LlmTool[];
+  /** The most times the model may be asked in one answer (each time it may ask for tools). Default 8. */
+  maxRounds?: number;
+}
+
+/** One tool the model asked for, for the agent's own records. `result` is what the tool answered, or why it failed. */
+export interface LlmToolCallRecord {
+  toolName: string;
+  input: unknown;
+  ok: boolean;
+  result: string;
+}
+
+export interface LlmToolsResult {
+  /** The model's final words to the customer. Empty when it never gave a final answer (see `hitRoundLimit`). */
+  text: string;
+  /** Every tool the model asked for, in order. */
+  toolCalls: LlmToolCallRecord[];
+  /** True when the model was still asking for tools after the last allowed round, so there is no answer to give. */
+  hitRoundLimit: boolean;
+  /** All the rounds together: every attempt, the tokens added up, the total time. */
+  details: LlmCallDetails;
+}
+
+/** The AI model layer: ask for text, for an answer that fits a zod shape, or for an answer that may use tools. Real in the app, scripted in tests. */
 export interface LlmProvider {
   /**
    * The names of the models a company says this key can see (its "list models" call). The list alone does not prove a model works for
@@ -108,6 +149,8 @@ export interface LlmProvider {
   listModels(provider: LlmProviderId, apiKey: string): Promise<string[]>;
   generateText(request: LlmRequest): Promise<LlmTextResult>;
   generateObject<Value>(request: LlmRequest, schema: ZodType<Value>): Promise<LlmObjectResult<Value>>;
+  /** Asks the model, runs the tools it asks for, and asks again, until it answers or the rounds run out. */
+  generateWithTools(request: LlmToolsRequest): Promise<LlmToolsResult>;
 }
 
 /** Thrown when every model and key was tried and none answered. Carries what was tried (never a key). */

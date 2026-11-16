@@ -25,7 +25,7 @@ const ROUTES_CALL_SERVICES = {
 // The AI companies' packages are used in one folder only (apps/api/src/providers/llm). Everything else asks the AI model layer
 // for a job, so switching or adding a company touches one place (docs/features/F37-ai-models-and-keys.md).
 const AI_COMPANY_PACKAGES_ONLY_IN_LLM_FOLDER = {
-  group: ['@langchain/google-genai', '@langchain/openai', '@langchain/anthropic'],
+  group: ['@langchain/google-genai', '@langchain/openai', '@langchain/anthropic', '@langchain/langgraph'],
   message: 'Only apps/api/src/providers/llm talks to the AI companies. Ask the AI service (core.ai) for a job instead.',
 };
 

@@ -1,6 +1,6 @@
-import { AIMessage } from '@langchain/core/messages';
+import { AIMessage, ToolMessage } from '@langchain/core/messages';
 import { describe, expect, it } from 'vitest';
-import { buildMessages, readUsage, requireNonEmptyAnswer } from './langchain-provider';
+import { buildMessages, buildToolConversationMessages, readUsage, requireNonEmptyAnswer } from './langchain-provider';
 import type { LlmCandidate, LlmPrompt } from './llm-types';
 
 const candidateOf = (provider: LlmCandidate['provider']): LlmCandidate => ({
@@ -90,5 +90,27 @@ describe('readUsage (tokens come from the provider, never guessed)', () => {
       cachedTokens: 0,
       usageMissing: true,
     });
+  });
+});
+
+describe('buildToolConversationMessages (a conversation with tool requests, as the model is sent it)', () => {
+  it('sends the system text, then the conversation, with a tool request as an AI message and its answer as a tool message', () => {
+    const messages = buildToolConversationMessages(prompt, candidateOf('openai'), [
+      { kind: 'text', role: 'user', text: 'Is parking free?' },
+      {
+        kind: 'tool_request',
+        text: '',
+        calls: [{ callId: 'call_1', toolName: 'search_knowledge', input: { question: 'parking' } }],
+      },
+      { kind: 'tool_answer', callId: 'call_1', toolName: 'search_knowledge', text: 'Free for guests.' },
+    ]);
+    expect(messages.map((message) => message.type)).toEqual(['system', 'human', 'ai', 'tool']);
+    const request = messages[2] as AIMessage;
+    expect(request.tool_calls).toEqual([
+      { type: 'tool_call', id: 'call_1', name: 'search_knowledge', args: { question: 'parking' } },
+    ]);
+    const answer = messages[3] as ToolMessage;
+    expect(answer.tool_call_id).toBe('call_1');
+    expect(answer.content).toBe('Free for guests.');
   });
 });

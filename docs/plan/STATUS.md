@@ -23,7 +23,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F18 | Documents, FAQs, knowledge search and unanswered questions | approved | [brief](../features/F18-faqs-and-unanswered-questions.md) | 2026-11-13 |
 | F37 | AI models and keys (built before F15) | approved | [brief](../features/F37-ai-models-and-keys.md) | 2026-11-13 |
 | F15 | Conversation types and the router | approved | [brief](../features/F15-conversation-types-and-router.md) | 2026-11-16 |
-| F19 | The AI agent (text) and Test the agent | planned | | |
+| F19 | The AI agent (text) and Test the agent | in_progress | [brief](../features/F19-ai-agent-and-test-the-agent.md) | |
 | F20 | Website chat | planned | | |
 | F31 | Setup wizard and fill from website | planned | | |
 | F02 | Team, roles, teams and the activity log | planned | | |
