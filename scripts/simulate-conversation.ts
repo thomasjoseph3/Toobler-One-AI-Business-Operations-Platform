@@ -2,7 +2,9 @@
 // npm run conversation:simulate -- --email manager@example.com --text "First line" --text "Second line" --channel whatsapp
 //
 // Makes ONE pretend conversation in a business (the one the email's person works in), puts your text in as the customer's messages, and
-// sorts it exactly as the app will when a real conversation ends: the rules first, then the AI, then the router. It prints what was decided.
+// sorts it exactly as the app will when a real conversation ends: the rules first, then the AI, then the router, then it makes the contact,
+// the lead or the ticket. It prints what was decided and what was made. The conversation has no phone or email here, so a lead or ticket
+// WAITS (nobody can be identified); add --phone <digits> or --from-email <address> to try the whole thing.
 // It is for trying the sorting before any channel (website chat, WhatsApp, email, phone) exists.
 //
 // It WRITES to the database that DATABASE_URL points to (a conversation, its messages, its outcomes and one AI call), and it makes a real AI
@@ -37,6 +39,8 @@ const isLocalDatabase = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(data
 const email = valuesOf('--email')[0]?.trim().toLowerCase();
 const texts = valuesOf('--text').filter((text) => text.trim() !== '');
 const channelArgument = valuesOf('--channel')[0] ?? 'webchat';
+const phoneKey = valuesOf('--phone')[0]?.replace(/[^0-9]/g, '');
+const fromEmail = valuesOf('--from-email')[0]?.trim().toLowerCase();
 const channels = ['webchat', 'whatsapp', 'email', 'phone'] as const;
 const channel = channels.find((candidate) => candidate === channelArgument);
 
@@ -76,7 +80,11 @@ try {
     }),
   });
 
-  const conversationId = await records.startConversation(business.account_id, { channel });
+  const conversationId = await records.startConversation(business.account_id, {
+    channel,
+    ...(phoneKey ? { fromPhoneKey: phoneKey } : {}),
+    ...(fromEmail ? { fromEmail } : {}),
+  });
   for (const text of texts)
     await records.addMessage(business.account_id, conversationId, { sender: 'customer', body: text });
 
@@ -87,10 +95,22 @@ try {
   );
   console.log(`  AI unsure:    ${result.aiUnsure ? 'yes' : 'no'}`);
   console.log(`  Needs a person: ${result.needsPerson ? 'yes' : 'no'}`);
-  console.log('  What it leads to:');
-  for (const outcome of result.outcomes)
-    console.log(`    - ${outcome.kind}  (from the type ${outcome.typeKey}${outcome.aiUnsure ? ', AI unsure' : ''})`);
-  console.log('\nThe lead or ticket itself is not created yet: that arrives with the next step of this feature.');
+  console.log('  What it led to:');
+  for (const outcome of result.outcomes) {
+    const made = outcome.leadId
+      ? `a lead (${outcome.leadId})`
+      : outcome.ticketId
+        ? `a ticket (${outcome.ticketId})`
+        : outcome.carriedOut
+          ? 'nothing to make'
+          : 'waiting: nobody could be identified (a person must look)';
+    console.log(
+      `    - ${outcome.kind} from the type ${outcome.typeKey}${outcome.aiUnsure ? ' (AI unsure)' : ''}: ${made}`,
+    );
+  }
+  console.log(
+    '\nThis made a real contact, lead or ticket in the business above (see the Leads and Tickets in the app or in Postman).',
+  );
 } catch (error) {
   if (error instanceof ApiError) {
     console.log(`\nIt did not work: ${error.code} (${error.status}): ${error.message}`);

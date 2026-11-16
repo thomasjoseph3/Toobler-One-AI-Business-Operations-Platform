@@ -140,7 +140,8 @@ describe('sorting a conversation with the AI', () => {
     expect(Number(row.type_confidence)).toBeCloseTo(0.92);
     expect(row.sorted_at).not.toBeNull();
     expect(row.ended_at).not.toBeNull();
-    // The lead and the ticket are made by the next slice: here the outcomes are recorded and not yet applied
+    // This web visitor gave no phone and no email, so nobody can be identified: the ticket and the lead wait, and a person must look
+    // (the tests of carrying outcomes out, with a phone or an email, are in conversation-outcomes.test.ts)
     const outcomes = await outcomeRows(conversationId);
     expect(outcomes).toHaveLength(2);
     expect(
@@ -211,7 +212,7 @@ describe('sorting a conversation with the AI', () => {
     nextAnswer = answerFor('new_enquiry', 0.2);
     const result = await finaliser().finaliseConversation(accountId, weak);
     expect(result).toMatchObject({ typeKey: 'unclear', needsPerson: true });
-    expect(result.outcomes).toEqual([{ typeKey: 'unclear', kind: 'review', aiUnsure: false }]);
+    expect(result.outcomes).toMatchObject([{ typeKey: 'unclear', kind: 'review', aiUnsure: false }]);
   });
 
   it('gives a business that never opened its types the starting types for its kind of business', async () => {
@@ -260,7 +261,7 @@ describe('sorting without the AI (the rules)', () => {
     const { result, aiCalls } = await finaliseAndCountAiCalls(accountId, conversationId);
     expect(aiCalls).toBe(0);
     expect(result).toMatchObject({ typeKey: 'spam', typeSource: 'rule' });
-    expect(result.outcomes).toEqual([{ typeKey: 'spam', kind: 'filter', aiUnsure: false }]);
+    expect(result.outcomes).toMatchObject([{ typeKey: 'spam', kind: 'filter', aiUnsure: false }]);
     expect(await conversationRow(conversationId)).toMatchObject({ type_reason: 'blocked', type_source: 'rule' });
     const log = await database.system
       .selectFrom('activity_log')

@@ -21,6 +21,11 @@ const NO_CONTACT_TYPE_KEYS: ReadonlySet<string> = new Set(['spam', 'wrong_number
 export type RoutedTicketType = NonNullable<ConversationType['ticketType']>;
 export type RoutedTicketPriority = NonNullable<ConversationType['priority']>;
 
+/** Whether a contact is kept for a conversation of this type that led to this kind of outcome (not for spam, wrong numbers, silence, machine mail, nor anything Filtered or Ignored). */
+export function shouldKeepContact(typeKey: string, kind: ConversationOutcome): boolean {
+  return !NO_CONTACT_TYPE_KEYS.has(typeKey) && kind !== 'filter' && kind !== 'ignore';
+}
+
 /** The parts of a business's type that the router needs. */
 export type RoutableConversationType = Pick<
   ConversationType,
@@ -117,7 +122,7 @@ function buildOutcome(
     ticket,
     reuseLeadId: kind === 'lead' ? (context.openLead?.id ?? null) : null,
     reuseTicketId,
-    keepContact: !NO_CONTACT_TYPE_KEYS.has(type.key) && kind !== 'filter' && kind !== 'ignore',
+    keepContact: shouldKeepContact(type.key, kind),
     movesLifecycleStage: kind === 'lead',
     needsPerson: type.needsPerson || kind === 'review',
     alert: type.alert,

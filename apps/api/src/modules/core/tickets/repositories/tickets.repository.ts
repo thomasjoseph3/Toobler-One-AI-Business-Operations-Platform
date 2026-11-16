@@ -45,6 +45,8 @@ export async function insertTicket(
     type: TicketType;
     priority: TicketPriority;
     ownerUserId: string | null;
+    /** Which conversation type raised it (set when the conversation engine makes the ticket); empty for tickets added by hand. */
+    conversationTypeKey?: string | null;
     actor: Actor;
   },
 ): Promise<void> {
@@ -60,6 +62,7 @@ export async function insertTicket(
       type: ticket.type,
       priority: ticket.priority,
       owner_user_id: ticket.ownerUserId,
+      conversation_type_key: ticket.conversationTypeKey ?? null,
       created_by: actorStamp,
       updated_by: actorStamp,
     })
@@ -227,4 +230,24 @@ export async function insertTicketNote(
       created_by: { kind: note.actor.kind, id: note.actor.id },
     })
     .execute();
+}
+
+/** The newest open ticket of this kind for the contact (a new conversation about the same thing joins it), or undefined. */
+export async function findNewestOpenTicketOfKindForContact(
+  db: Db,
+  accountId: string,
+  contactId: string,
+  type: TicketType,
+): Promise<{ id: string } | undefined> {
+  return db
+    .selectFrom('tickets')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('contact_id', '=', contactId)
+    .where('type', '=', type)
+    .where('status', '=', 'open')
+    .orderBy('created_at', 'desc')
+    .orderBy('id', 'desc')
+    .limit(1)
+    .executeTakeFirst();
 }

@@ -16,6 +16,7 @@ import * as conversationTypesRepository from '../repositories/conversation-types
 import * as conversationsRepository from '../repositories/conversations.repository';
 import type { ConversationRow } from '../repositories/conversations.repository';
 import { createConversationClassifier } from './conversation-classifier.service';
+import { applyPendingOutcomes } from './conversation-outcome-applier.service';
 import { ensureStartingConversationTypes } from './starting-conversation-types.service';
 
 type Classifier = ReturnType<typeof createConversationClassifier>;
@@ -40,7 +41,16 @@ export interface FinaliseResult {
   typeSource: 'rule' | 'ai_final' | 'staff';
   aiUnsure: boolean;
   needsPerson: boolean;
-  outcomes: Array<{ typeKey: string; kind: ConversationOutcome; aiUnsure: boolean }>;
+  outcomes: Array<{
+    typeKey: string;
+    kind: ConversationOutcome;
+    aiUnsure: boolean;
+    /** The lead or ticket this outcome made or joined, once carried out. */
+    leadId: string | null;
+    ticketId: string | null;
+    /** False while the outcome waits (for example, a lead was wanted but nobody could be identified). */
+    carriedOut: boolean;
+  }>;
 }
 
 /** The decision made without asking the AI, when a rule or an empty conversation settles it. */
@@ -61,26 +71,40 @@ interface GatheredConversation {
   preFilterSets: Pick<PreFilterInput, 'blockedPhoneKeys' | 'blockedEmails' | 'staffPhoneKeys' | 'staffEmails'>;
 }
 
-/** The result for a conversation that was sorted earlier: read from what was stored. */
+/** What was stored about a sorted conversation, read fresh from the database (its type, and each outcome with the lead or ticket it made). */
 async function describeSortedConversation(
   database: Database,
   accountId: string,
-  conversation: ConversationRow,
+  conversationId: string,
+  result: FinaliseResult['result'],
 ): Promise<FinaliseResult> {
-  const outcomes = await database.runInAccountTransaction(accountId, (transaction) =>
-    conversationOutcomesRepository.listOutcomesOfConversation(transaction, accountId, conversation.id),
-  );
-  return {
-    conversationId: conversation.id,
-    result: 'already_sorted',
-    typeKey: conversation.typeKey ?? 'unclear',
-    typeSource: conversation.typeSource ?? 'ai_final',
-    aiUnsure: conversation.aiUnsure,
-    needsPerson: conversation.needsPerson,
-    outcomes: outcomes
-      .filter((outcome) => outcome.supersededAt === null)
-      .map((outcome) => ({ typeKey: outcome.typeKey, kind: outcome.kind, aiUnsure: outcome.aiUnsure })),
-  };
+  return database.runInAccountTransaction(accountId, async (transaction) => {
+    const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+    if (!conversation) throw notFound('That conversation');
+    const outcomes = await conversationOutcomesRepository.listOutcomesOfConversation(
+      transaction,
+      accountId,
+      conversationId,
+    );
+    return {
+      conversationId,
+      result,
+      typeKey: conversation.typeKey ?? 'unclear',
+      typeSource: conversation.typeSource ?? 'ai_final',
+      aiUnsure: conversation.aiUnsure,
+      needsPerson: conversation.needsPerson,
+      outcomes: outcomes
+        .filter((outcome) => outcome.supersededAt === null)
+        .map((outcome) => ({
+          typeKey: outcome.typeKey,
+          kind: outcome.kind,
+          aiUnsure: outcome.aiUnsure,
+          leadId: outcome.leadId,
+          ticketId: outcome.ticketId,
+          carriedOut: outcome.appliedAt !== null,
+        })),
+    };
+  });
 }
 
 /**
@@ -188,122 +212,127 @@ export function createConversationFinaliser({ database, classifier }: { database
     return null;
   }
 
+  /**
+   * The sorting step: records the type and the outcomes (not yet carried out). Leaves a conversation that is already sorted alone.
+   * Answers whether it sorted the conversation now or found it already sorted.
+   */
+  async function sortConversation(
+    accountId: string,
+    conversationId: string,
+    options: FinaliseOptions,
+  ): Promise<FinaliseResult['result']> {
+    const read = await gather(accountId, conversationId, options);
+    if ('sorted' in read) return 'already_sorted';
+    const { gathered } = read;
+
+    // The AI is asked with no transaction open. If it cannot answer, this throws and nothing is changed.
+    let decided = decideWithoutAi(gathered, options);
+    if (decided === null) {
+      const answer = await classifier.classifyConversation({
+        accountId,
+        channel: gathered.conversation.channel,
+        conversationId,
+        types: gathered.typeDetails,
+        transcript: gathered.transcript,
+        ...(gathered.conversation.contactId !== null ? { facts: { isExistingContact: true } } : {}),
+      });
+      decided = {
+        classification: answer.classification,
+        source: 'ai_final',
+        reason: answer.reason,
+        actor: { kind: 'agent', id: 'classifier' },
+      };
+    }
+    const { classification, source, reason, actor } = decided;
+
+    return database.runInAccountTransaction(accountId, async (transaction) => {
+      // Two sortings at the same moment take turns here: the second finds it already sorted
+      const locked = await conversationsRepository.lockConversationById(transaction, accountId, conversationId);
+      if (!locked) throw notFound('That conversation');
+      if (locked.status === 'sorted' && options.force !== true) return 'already_sorted' as const;
+
+      // The router decides the kinds of outcome. The leads and tickets modules decide, with fresh facts and under a lock, whether an
+      // open lead or ticket takes it, so the open-record facts are not passed here. A lead is always possible: that module is core.
+      const decision = decide(
+        gathered.types,
+        classification,
+        { openLead: null, openTicket: null },
+        { leadsActive: true },
+      );
+      const sortedAt = new Date();
+      await conversationsRepository.saveSortedConversation(transaction, {
+        accountId,
+        conversationId,
+        sorted: {
+          typeKey: decision.primaryTypeKey,
+          typeConfidence: Math.min(1, Math.max(0, classification.primary.confidence)),
+          typeSource: source,
+          typeReason: reason,
+          aiUnsure: decision.aiUnsure,
+          needsPerson: decision.needsPerson,
+          sortedAt,
+          actor,
+        },
+      });
+      for (const outcome of decision.outcomes) {
+        await conversationOutcomesRepository.upsertOutcome(transaction, {
+          id: uuidv7(),
+          accountId,
+          conversationId,
+          typeKey: outcome.typeKey,
+          kind: outcome.kind,
+          confidence: outcome.confidence,
+          aiUnsure: outcome.aiUnsure,
+        });
+      }
+      // Sorting again (a correction) leaves out what no longer applies
+      await conversationOutcomesRepository.supersedeOutcomesExceptTypes(transaction, {
+        accountId,
+        conversationId,
+        typeKeysToKeep: decision.outcomes.map((outcome) => outcome.typeKey),
+        at: sortedAt,
+      });
+
+      await writeActivityLog(transaction, {
+        accountId,
+        actor,
+        kind: 'conversations.sorted',
+        // Which conversation, never what was said
+        details: { recordType: 'conversation', recordId: conversationId, fields: ['type'] },
+      });
+      await publishEvent(transaction, {
+        accountId,
+        eventName: 'conversation.sorted',
+        payload: {
+          conversationId,
+          typeKey: decision.primaryTypeKey,
+          typeSource: source,
+          outcomeKinds: decision.outcomes.map((outcome) => outcome.kind),
+          needsPerson: decision.needsPerson,
+        },
+      });
+      return 'sorted' as const;
+    });
+  }
+
   return {
     /**
-     * Sorts the conversation (see above). 404 when it is unknown or another business's. Answers with what was decided, or with what
-     * was decided earlier when it was already sorted.
+     * Sorts the conversation (see above) and then carries out what it led to: finds or makes the contact, makes the lead, makes or joins the
+     * ticket. 404 when the conversation is unknown or another business's. Answers with what was decided and which lead or ticket each outcome
+     * made. Safe to run again after a failure: a conversation already sorted is not sorted again (no new AI call), and only the outcomes not
+     * yet carried out are carried out.
      */
     async finaliseConversation(
       accountId: string,
       conversationId: string,
       options: FinaliseOptions = {},
     ): Promise<FinaliseResult> {
-      const read = await gather(accountId, conversationId, options);
-      if ('sorted' in read) return describeSortedConversation(database, accountId, read.sorted);
-      const { gathered } = read;
-
-      // The AI is asked with no transaction open. If it cannot answer, this throws and nothing is changed.
-      let decided = decideWithoutAi(gathered, options);
-      if (decided === null) {
-        const answer = await classifier.classifyConversation({
-          accountId,
-          channel: gathered.conversation.channel,
-          conversationId,
-          types: gathered.typeDetails,
-          transcript: gathered.transcript,
-          ...(gathered.conversation.contactId !== null ? { facts: { isExistingContact: true } } : {}),
-        });
-        decided = {
-          classification: answer.classification,
-          source: 'ai_final',
-          reason: answer.reason,
-          actor: { kind: 'agent', id: 'classifier' },
-        };
-      }
-      const { classification, source, reason, actor } = decided;
-
-      return database.runInAccountTransaction(accountId, async (transaction) => {
-        // Two sortings at the same moment take turns here: the second finds it already sorted
-        const locked = await conversationsRepository.lockConversationById(transaction, accountId, conversationId);
-        if (!locked) throw notFound('That conversation');
-        if (locked.status === 'sorted' && options.force !== true) {
-          return describeSortedConversation(database, accountId, locked);
-        }
-
-        // The decision (no open lead or ticket is known yet; the next slice adds them). A lead is always possible: that module is core.
-        const decision = decide(
-          gathered.types,
-          classification,
-          { openLead: null, openTicket: null },
-          { leadsActive: true },
-        );
-        const sortedAt = new Date();
-        await conversationsRepository.saveSortedConversation(transaction, {
-          accountId,
-          conversationId,
-          sorted: {
-            typeKey: decision.primaryTypeKey,
-            typeConfidence: Math.min(1, Math.max(0, classification.primary.confidence)),
-            typeSource: source,
-            typeReason: reason,
-            aiUnsure: decision.aiUnsure,
-            needsPerson: decision.needsPerson,
-            sortedAt,
-            actor,
-          },
-        });
-        for (const outcome of decision.outcomes) {
-          await conversationOutcomesRepository.upsertOutcome(transaction, {
-            id: uuidv7(),
-            accountId,
-            conversationId,
-            typeKey: outcome.typeKey,
-            kind: outcome.kind,
-            confidence: outcome.confidence,
-            aiUnsure: outcome.aiUnsure,
-          });
-        }
-        // Sorting again (a correction) leaves out what no longer applies
-        await conversationOutcomesRepository.supersedeOutcomesExceptTypes(transaction, {
-          accountId,
-          conversationId,
-          typeKeysToKeep: decision.outcomes.map((outcome) => outcome.typeKey),
-          at: sortedAt,
-        });
-
-        await writeActivityLog(transaction, {
-          accountId,
-          actor,
-          kind: 'conversations.sorted',
-          // Which conversation, never what was said
-          details: { recordType: 'conversation', recordId: conversationId, fields: ['type'] },
-        });
-        await publishEvent(transaction, {
-          accountId,
-          eventName: 'conversation.sorted',
-          payload: {
-            conversationId,
-            typeKey: decision.primaryTypeKey,
-            typeSource: source,
-            outcomeKinds: decision.outcomes.map((outcome) => outcome.kind),
-            needsPerson: decision.needsPerson,
-          },
-        });
-
-        return {
-          conversationId,
-          result: 'sorted' as const,
-          typeKey: decision.primaryTypeKey,
-          typeSource: source,
-          aiUnsure: decision.aiUnsure,
-          needsPerson: decision.needsPerson,
-          outcomes: decision.outcomes.map((outcome) => ({
-            typeKey: outcome.typeKey,
-            kind: outcome.kind,
-            aiUnsure: outcome.aiUnsure,
-          })),
-        };
-      });
+      const sortedNow = await sortConversation(accountId, conversationId, options);
+      // Carrying out is its own transaction: if it fails, the sorting above is already saved and a retry does not ask the AI again
+      await database.runInAccountTransaction(accountId, (transaction) =>
+        applyPendingOutcomes(transaction, { accountId, conversationId }),
+      );
+      return describeSortedConversation(database, accountId, conversationId, sortedNow);
     },
   };
 }

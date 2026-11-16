@@ -95,3 +95,16 @@ export async function supersedeOutcomesExceptTypes(
   if (options.typeKeysToKeep.length > 0) query = query.where('type_key', 'not in', [...options.typeKeysToKeep]);
   await query.execute();
 }
+
+/** Records that an outcome was carried out, and which lead or ticket it made or joined (neither for an outcome that makes nothing). */
+export async function markOutcomeApplied(
+  db: Db,
+  options: { accountId: string; outcomeId: string; leadId: string | null; ticketId: string | null; appliedAt: Date },
+): Promise<void> {
+  await db
+    .updateTable('conversation_outcomes')
+    .set({ lead_id: options.leadId, ticket_id: options.ticketId, applied_at: options.appliedAt })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.outcomeId)
+    .execute();
+}

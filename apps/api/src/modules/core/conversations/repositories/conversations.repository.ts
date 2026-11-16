@@ -171,3 +171,29 @@ export async function countConversations(db: Db, accountId: string): Promise<num
     .executeTakeFirstOrThrow();
   return Number(row.total);
 }
+
+/** Links the conversation to the contact (the person on the other end), once the contact is known or made. */
+export async function linkContactToConversation(
+  db: Db,
+  options: { accountId: string; conversationId: string; contactId: string; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('conversations')
+    .set({ contact_id: options.contactId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.conversationId)
+    .execute();
+}
+
+/** Says that a person must look at the conversation (for example, a lead was wanted but nobody could be identified). */
+export async function markConversationNeedsPerson(
+  db: Db,
+  options: { accountId: string; conversationId: string; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('conversations')
+    .set({ needs_person: true, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.conversationId)
+    .execute();
+}

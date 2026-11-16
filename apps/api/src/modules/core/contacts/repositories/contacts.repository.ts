@@ -72,6 +72,32 @@ export async function insertContact(
   return toContact(row);
 }
 
+/**
+ * Adds a contact unless a live contact already has this phone or email (the database's unique rules decide, so two requests at the same
+ * moment cannot both add it, and a refusal does not break the caller's transaction). Returns true when the contact was added.
+ */
+export async function insertContactIfFree(
+  db: Db,
+  contact: { id: string; accountId: string; phone: string | null; email: string | null; actor: Actor },
+): Promise<boolean> {
+  const actorStamp = { kind: contact.actor.kind, id: contact.actor.id };
+  const result = await db
+    .insertInto('contacts')
+    .values({
+      id: contact.id,
+      account_id: contact.accountId,
+      name: null,
+      phone: contact.phone,
+      email: contact.email,
+      language: null,
+      created_by: actorStamp,
+      updated_by: actorStamp,
+    })
+    .onConflict((conflict) => conflict.doNothing())
+    .executeTakeFirst();
+  return Number(result.numInsertedOrUpdatedRows ?? 0) > 0;
+}
+
 /** The id of the live contact with this phone key (the digits of the international number), or undefined. */
 export async function findContactIdByPhoneKey(
   db: Db,
