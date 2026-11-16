@@ -61,13 +61,23 @@ The agent has no public route in F19; the channels (F20 onward) call the runtime
 1. **The model layer can call tools** (no route): `@langchain/langgraph` 1.6.0 installed (16 days old, 5 M a week, MIT; only its core graph API, because its ready-made agent is deprecated), `generateWithTools` added to `core.ai` and the LLM provider, with the scripted provider able to script a tool call. Tests only. **Built, waiting for the owner.**
 2. **The agent's building blocks, part a** (no route, **built, waiting for the owner**): the new module `core.agents` with the pure parts: the prompt builder, the promise chooser (with the opening hours in the business's time zone) and the amount check; plus the readers that give the agent only what it may know (confirmed answers and situations from knowledge, offerings and current offers from offerings, the business's name and time zone from auth).
 2b. **The tools and the loop** (no route, **built, waiting for the owner**): the six tools (each in its own file), the agent runtime, the promise inside the tool results, the amount check on the answer, and the plug-and-play hook `agentTools` in the module manifest. Tests with the scripted provider.
-3. **Facts and the promise are stored, and the first route:** migration 038, `POST /agent/test-chat`. Postman folder.
+3. **Facts and the promise are stored, and the first route** (**built, waiting for the owner**): migration 038 (`conversations.is_test`, `conversation_facts`) and `POST /agent/test-chat`.
 4. **Reading a test chat back, and the summary:** `GET /agent/test-chats/{conversationId}`, the `summarise` job writes the summary, sorting skips test conversations.
 5. **Evals and hand-off:** `evals/agent`, the full test suite, the Feature guide, the manual script.
 
 ## Screens
 
 Parked with the designer (same as F06, F14, F16, F17, F18). Planned: a **Test the agent** panel on every knowledge base tab, each answer with its source and the type it detected. Until then the Postman collection *Toobler One - F19 agent (run in order)* tests the API.
+
+## Slice 3 decisions (16 Nov 2026, owner to confirm)
+
+- **The answer has no `detectedType`.** The brief planned "the type it detected" next to each answer, but R58 moved the live type to after Phase 1: the conversation is sorted only after it ends. The answer shows where it came from, the tools used, what was saved and the promise.
+- **Nothing is saved when the AI fails.** A failed message leaves no conversation, no message and no facts, so it can simply be sent again.
+- **The agent is shown the last 30 messages** of the chat; a chat of 200 messages is refused ("Start a new one"). A summary of older messages arrives in slice 4.
+- **The own-leads-only role gets 403** (a test chat is a saved conversation, the same rule as R60). Managers and staff may use it.
+- **20 messages a minute** per address (each one is a real AI call).
+- **Known limit:** two messages sent at the very same moment to the same test chat can overwrite each other's saved details (a test tool, one tester at a time). Real channels (F20) will take turns per conversation.
+- The conversation is saved as channel `webchat` with `is_test` true; the staff member who tested is recorded as its creator.
 
 ## Rules to enforce
 

@@ -22,6 +22,8 @@ export interface ConversationRow {
   typeReason: string | null;
   aiUnsure: boolean;
   needsPerson: boolean;
+  /** A test chat from "Test the agent". */
+  isTest: boolean;
   status: 'open' | 'sorted';
   endedAt: Date | null;
   sortedAt: Date | null;
@@ -42,6 +44,7 @@ function toConversationRow(row: Selectable<ConversationsTable>): ConversationRow
     typeReason: row.type_reason,
     aiUnsure: row.ai_unsure,
     needsPerson: row.needs_person,
+    isTest: row.is_test,
     status: row.status,
     endedAt: row.ended_at,
     sortedAt: row.sorted_at,
@@ -59,6 +62,8 @@ export async function insertConversation(
     fromPhoneKey: string | null;
     fromEmail: string | null;
     contactId: string | null;
+    /** True for a test chat ("Test the agent"). */
+    isTest: boolean;
     actor: Actor;
   },
 ): Promise<void> {
@@ -72,6 +77,7 @@ export async function insertConversation(
       from_phone_key: conversation.fromPhoneKey,
       from_email: conversation.fromEmail,
       contact_id: conversation.contactId,
+      is_test: conversation.isTest,
       created_by: actorStamp,
       updated_by: actorStamp,
     })

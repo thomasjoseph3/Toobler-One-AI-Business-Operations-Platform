@@ -21,3 +21,4 @@ export * from './ai-access';
 export * from './ai-usage';
 export * from './ai-calls';
 export * from './ai-models-admin';
+export * from './agent-test-chat';

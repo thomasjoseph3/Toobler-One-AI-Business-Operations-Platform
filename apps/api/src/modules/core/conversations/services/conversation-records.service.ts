@@ -18,6 +18,10 @@ export interface StartConversationInput {
   fromEmail?: string | undefined;
   /** The contact, when the channel already knows who this is. */
   contactId?: string | undefined;
+  /** True for a test chat ("Test the agent"): it is never sorted into a lead or a ticket. */
+  isTest?: boolean | undefined;
+  /** Who started it, when it is a person (a staff member testing the agent). Default: the engine. */
+  actor?: Actor | undefined;
 }
 
 /** What a channel tells us about one message. */
@@ -52,10 +56,26 @@ export function createConversationRecordsService({ database }: { database: Datab
           fromPhoneKey: input.fromPhoneKey ?? null,
           fromEmail: input.fromEmail ?? null,
           contactId: input.contactId ?? null,
-          actor: ENGINE_ACTOR,
+          isTest: input.isTest ?? false,
+          actor: input.actor ?? ENGINE_ACTOR,
         });
       });
       return conversationId;
+    },
+
+    /**
+     * The messages of a TEST chat, oldest first, or undefined when the id is unknown, another business's, or not a test chat. "Test the
+     * agent" reads the history through this, so it can never read a real customer's conversation.
+     */
+    async readMessagesOfTestConversation(
+      accountId: string,
+      conversationId: string,
+    ): Promise<Array<{ sender: MessageSender; body: string; createdAt: Date }> | undefined> {
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+        if (!conversation?.isTest) return undefined;
+        return conversationMessagesRepository.listMessagesOfConversation(transaction, accountId, conversationId);
+      });
     },
 
     /**

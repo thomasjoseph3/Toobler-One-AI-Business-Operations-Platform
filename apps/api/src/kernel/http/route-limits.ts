@@ -23,6 +23,8 @@ export const ROUTE_LIMITS = {
   testAiKey: { max: 10, timeWindow: '1 minute' },
   // Each "Try it" on a conversation type makes a real call to an AI company (and may cost a little)
   tryConversationType: { max: 10, timeWindow: '1 minute' },
+  // Each "Test the agent" message makes real calls to an AI company (and costs a little)
+  testAgentChat: { max: 20, timeWindow: '1 minute' },
 } as const satisfies Record<string, RouteLimit>;
 
 /**
