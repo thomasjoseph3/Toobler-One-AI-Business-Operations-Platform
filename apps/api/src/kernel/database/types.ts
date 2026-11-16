@@ -457,8 +457,23 @@ export interface ConversationOutcomesTable {
   ticket_id: string | null;
   applied_at: Date | null;
   superseded_at: Date | null;
+  /** True when the conversation itself made the lead or ticket (not when it only joined or reopened one). */
+  created_record: Generated<boolean>;
+  /** The order the outcomes were decided in (the main type first). */
+  sort: Generated<number>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
+}
+
+/** A person changing a conversation's type. Written once. Fenced by account_id. */
+export interface ClassificationCorrectionsTable {
+  id: string;
+  account_id: string;
+  conversation_id: string;
+  from_type_key: string;
+  to_type_key: string;
+  by_user_id: string;
+  created_at: Generated<Date>;
 }
 
 /** A phone number or an email a manager never wants treated as a customer. Fenced by account_id. */
@@ -619,6 +634,7 @@ export interface DB {
   conversations: ConversationsTable;
   conversation_messages: ConversationMessagesTable;
   conversation_outcomes: ConversationOutcomesTable;
+  classification_corrections: ClassificationCorrectionsTable;
   business_answers: BusinessAnswersTable;
   situations: SituationsTable;
   offerings: OfferingsTable;

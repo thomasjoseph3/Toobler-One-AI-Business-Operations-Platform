@@ -56,6 +56,7 @@ async function sendOk(person: SignedInPerson, method: string, url: string, paylo
 
 /** Everything business A owns that business B will aim at. */
 interface BusinessAData {
+  conversationId: string;
   conversationTypeId: string;
   contactId: string;
   leadId: string;
@@ -193,6 +194,7 @@ beforeAll(async () => {
     })
     .execute();
   dataOfA = {
+    conversationId: conversationOfA,
     conversationTypeId: conversationType.id,
     contactId: contact.id,
     leadId: lead.id,
@@ -465,6 +467,22 @@ const attempts: Attempt[] = [
       payload: { items: [{ email: 'bob-blocks@spam.example' }] },
     }),
     expectedStatus: 200,
+  },
+  {
+    route: 'GET /api/v1/conversations/{id}',
+    what: "read A's conversation (its messages)",
+    request: () => ({ method: 'GET', url: `/conversations/${dataOfA.conversationId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/type',
+    what: "change the type of A's conversation",
+    request: () => ({
+      method: 'POST',
+      url: `/conversations/${dataOfA.conversationId}/type`,
+      payload: { typeKey: 'complaint' },
+    }),
+    expectedStatus: 404,
   },
   {
     route: 'POST /api/v1/conversation-types/reorder',

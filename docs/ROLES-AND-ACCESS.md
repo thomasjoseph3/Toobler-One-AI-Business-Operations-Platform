@@ -1,6 +1,6 @@
 # Roles and access: who can sign in, and who can do what
 
-*The one page that answers "who is who in Toobler One". Written for the owner and the team; plain English first, the exact route table at the end. Last checked against the code on 16 Nov 2026 (91 routes). The rules themselves live in `docs/SECURITY.md` §2 and are enforced in `apps/api/src/kernel/http/guard.ts`.*
+*The one page that answers "who is who in Toobler One". Written for the owner and the team; plain English first, the exact route table at the end. Last checked against the code on 16 Nov 2026 (93 routes). The rules themselves live in `docs/SECURITY.md` §2 and are enforced in `apps/api/src/kernel/http/guard.ts`.*
 
 ## 1. The hierarchy in one picture
 
@@ -53,6 +53,7 @@ Every sign-in is the same screen for every kind of person. What a person can do 
 | Modules: switch a part of the product on or off | **Yes** | View the list | View the list |
 | AI settings: models, the business's own keys, usage, the call log | **Yes** | No | No |
 | Conversation types: see the list | Yes | Yes | Yes |
+| Conversations: read one, and change its type ("this isn't a lead") | Yes | Yes | No (a conversation has no owner yet, so who sees which one is decided with the inbox, F21) |
 | Conversation types: add, change, remove, reorder, and "Try it" (test a message with the AI) | **Yes** | No | No |
 | Block list (numbers and emails treated as spam) | **Yes** | No | No (it holds personal data) |
 | Own profile and password | Yes | Yes | Yes |
@@ -217,6 +218,8 @@ Every route must say who may call it (a route without that declaration does not 
 | GET | `/api/v1/conversation-types` | Any signed-in person (every role) |
 | POST | `/api/v1/conversation-types` | Managers only |
 | POST | `/api/v1/conversation-types/test` | Managers only ("Try it": makes one real AI call, limited to 10 a minute) |
+| GET | `/api/v1/conversations/{id}` | Any signed-in person, except the "own leads only" role (403) |
+| POST | `/api/v1/conversations/{id}/type` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversation-types/reorder` | Managers only |
 | PATCH | `/api/v1/conversation-types/:id` | Managers only |
 | DELETE | `/api/v1/conversation-types/:id` | Managers only |

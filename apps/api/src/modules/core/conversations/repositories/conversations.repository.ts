@@ -197,3 +197,37 @@ export async function markConversationNeedsPerson(
     .where('id', '=', options.conversationId)
     .execute();
 }
+
+/**
+ * A conversation type was removed: its conversations move to another type (the type "unclear"), and a person is asked to look, because the
+ * reason for the old type no longer exists. Returns how many conversations moved.
+ */
+export async function moveConversationsToType(
+  db: Db,
+  options: { accountId: string; fromTypeKey: string; toTypeKey: string; actor: Actor },
+): Promise<number> {
+  const result = await db
+    .updateTable('conversations')
+    .set({
+      type_key: options.toTypeKey,
+      needs_person: true,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('type_key', '=', options.fromTypeKey)
+    .executeTakeFirst();
+  return Number(result.numUpdatedRows);
+}
+
+/** A person confirmed the type the AI was only fairly sure about: it is no longer "AI unsure", and now a person decided it. */
+export async function confirmConversationType(
+  db: Db,
+  options: { accountId: string; conversationId: string; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('conversations')
+    .set({ ai_unsure: false, type_source: 'staff', updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.conversationId)
+    .execute();
+}

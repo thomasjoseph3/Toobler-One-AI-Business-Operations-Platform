@@ -13,6 +13,7 @@ import { uuidv7 } from '../../../../kernel/ids';
 import { isTooManyActiveTypesError, tooManyTypesError } from '../helpers/conversation-type-errors';
 import { makeTypeKeyFromLabel } from '../helpers/default-conversation-types';
 import * as conversationTypesRepository from '../repositories/conversation-types.repository';
+import * as conversationsRepository from '../repositories/conversations.repository';
 import type { ConversationTypeRow } from '../repositories/conversation-types.repository';
 import { ensureStartingConversationTypes } from './starting-conversation-types.service';
 
@@ -125,9 +126,9 @@ export function createConversationTypesService({ database }: { database: Databas
     },
 
     /**
-     * Removes a custom type. 404 for an unknown type or another business's; the built-in types cannot be removed, 409. A
-     * conversation that already has this type keeps its own record (when conversations arrive, slice 7, they move to
-     * "unclear"). Writes an activity-log line. Answers with nothing.
+     * Removes a custom type. 404 for an unknown type or another business's; the built-in types cannot be removed, 409. The
+     * conversations already sorted as this type move to "unclear" and are marked as needing a person (what they made is kept).
+     * Writes an activity-log line. Answers with nothing.
      */
     async deleteConversationType(principal: Pick<Principal, 'accountId' | 'userId'>, typeId: string): Promise<void> {
       const accountId = principal.accountId;
@@ -143,6 +144,13 @@ export function createConversationTypesService({ database }: { database: Databas
           );
         }
         await conversationTypesRepository.deleteConversationType(transaction, accountId, typeId);
+        // The conversations that were sorted as this type move to "unclear" and ask for a person to look
+        await conversationsRepository.moveConversationsToType(transaction, {
+          accountId,
+          fromTypeKey: current.key,
+          toTypeKey: 'unclear',
+          actor,
+        });
         await writeActivityLog(transaction, {
           accountId,
           actor,

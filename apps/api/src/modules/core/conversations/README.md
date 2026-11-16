@@ -9,6 +9,7 @@ Built in slices of at most 2 API routes (see `docs/features/F15-conversation-typ
 | `routes/`       | `block-list.routes.ts`: `GET /block-list`, `PUT /block-list`                                                                                                                                           |
 | `services/`     | `block-list.service.ts`: read and save the whole block list (a number as its digits, an email in lower case)                                                                                           |
 | `services/`     | `conversation-types.service.ts`: list the business's types (giving a business its starting types the first time), add a custom type, change a type, put the types in a new order, remove a custom type |
+| `repositories/` | `classification-corrections.repository.ts`: the SQL for `classification_corrections` |
 | `repositories/` | `conversations.repository.ts`, `conversation-messages.repository.ts`, `conversation-outcomes.repository.ts`: the SQL for the conversation tables |
 | `repositories/` | `block-list.repository.ts`: the SQL for `block_list`                                                                                                                                                   |
 | `repositories/` | `conversation-types.repository.ts`: the SQL for `conversation_types`                                                                                                                                   |

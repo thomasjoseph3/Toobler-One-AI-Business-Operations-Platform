@@ -93,6 +93,7 @@ export async function applyPendingOutcomes(
         outcomeId: outcome.id,
         leadId: lead.leadId,
         ticketId: null,
+        createdRecord: lead.action === 'created',
         appliedAt,
       });
     } else if (outcome.kind === 'ticket') {
@@ -131,6 +132,7 @@ export async function applyPendingOutcomes(
         outcomeId: outcome.id,
         leadId: null,
         ticketId: ticket.ticketId,
+        createdRecord: ticket.action === 'created',
         appliedAt,
       });
     } else {

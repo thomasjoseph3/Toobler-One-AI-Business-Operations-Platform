@@ -14,6 +14,8 @@ export interface ConversationOutcomeRow {
   ticketId: string | null;
   appliedAt: Date | null;
   supersededAt: Date | null;
+  /** True when the conversation itself made the lead or ticket (not when it only joined or reopened one). */
+  createdRecord: boolean;
 }
 
 /** All the outcomes of a conversation, in the order they were made. */
@@ -27,6 +29,7 @@ export async function listOutcomesOfConversation(
     .selectAll()
     .where('account_id', '=', accountId)
     .where('conversation_id', '=', conversationId)
+    .orderBy('sort')
     .orderBy('created_at')
     .orderBy('id')
     .execute();
@@ -40,6 +43,7 @@ export async function listOutcomesOfConversation(
     ticketId: row.ticket_id,
     appliedAt: row.applied_at,
     supersededAt: row.superseded_at,
+    createdRecord: row.created_record,
   }));
 }
 
@@ -57,6 +61,8 @@ export async function upsertOutcome(
     kind: ConversationOutcome;
     confidence: number;
     aiUnsure: boolean;
+    /** Its place among the conversation's outcomes (0 for the main type). */
+    sort: number;
   },
 ): Promise<void> {
   await db
@@ -69,12 +75,14 @@ export async function upsertOutcome(
       kind: outcome.kind,
       confidence: outcome.confidence,
       ai_unsure: outcome.aiUnsure,
+      sort: outcome.sort,
     })
     .onConflict((conflict) =>
       conflict.columns(['conversation_id', 'type_key']).doUpdateSet({
         kind: outcome.kind,
         confidence: outcome.confidence,
         ai_unsure: outcome.aiUnsure,
+        sort: outcome.sort,
         superseded_at: null,
       }),
     )
@@ -99,12 +107,58 @@ export async function supersedeOutcomesExceptTypes(
 /** Records that an outcome was carried out, and which lead or ticket it made or joined (neither for an outcome that makes nothing). */
 export async function markOutcomeApplied(
   db: Db,
-  options: { accountId: string; outcomeId: string; leadId: string | null; ticketId: string | null; appliedAt: Date },
+  options: {
+    accountId: string;
+    outcomeId: string;
+    leadId: string | null;
+    ticketId: string | null;
+    createdRecord?: boolean;
+    appliedAt: Date;
+  },
 ): Promise<void> {
   await db
     .updateTable('conversation_outcomes')
-    .set({ lead_id: options.leadId, ticket_id: options.ticketId, applied_at: options.appliedAt })
+    .set({
+      lead_id: options.leadId,
+      ticket_id: options.ticketId,
+      created_record: options.createdRecord ?? false,
+      applied_at: options.appliedAt,
+    })
     .where('account_id', '=', options.accountId)
     .where('id', '=', options.outcomeId)
+    .execute();
+}
+
+/**
+ * How many OTHER conversations' current outcomes are linked to the same lead or ticket. A lead or ticket that another conversation joined
+ * must not be closed because one conversation was corrected.
+ */
+export async function countOtherCurrentOutcomesLinkedTo(
+  db: Db,
+  options: { accountId: string; exceptConversationId: string; leadId?: string; ticketId?: string },
+): Promise<number> {
+  let query = db
+    .selectFrom('conversation_outcomes')
+    .select((expressionBuilder) => expressionBuilder.fn.countAll<string>().as('total'))
+    .where('account_id', '=', options.accountId)
+    .where('conversation_id', '!=', options.exceptConversationId)
+    .where('superseded_at', 'is', null);
+  if (options.leadId !== undefined) query = query.where('lead_id', '=', options.leadId);
+  if (options.ticketId !== undefined) query = query.where('ticket_id', '=', options.ticketId);
+  const row = await query.executeTakeFirstOrThrow();
+  return Number(row.total);
+}
+
+/** Says the AI is no longer unsure about this type's outcome on the conversation (a person confirmed it). */
+export async function clearOutcomeUnsure(
+  db: Db,
+  options: { accountId: string; conversationId: string; typeKey: string },
+): Promise<void> {
+  await db
+    .updateTable('conversation_outcomes')
+    .set({ ai_unsure: false })
+    .where('account_id', '=', options.accountId)
+    .where('conversation_id', '=', options.conversationId)
+    .where('type_key', '=', options.typeKey)
     .execute();
 }

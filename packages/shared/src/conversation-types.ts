@@ -185,3 +185,67 @@ export const tryConversationTypeResponseSchema = z.object({
   servedBy: z.object({ provider: z.string(), modelName: z.string() }),
 });
 export type TryConversationTypeResponse = z.infer<typeof tryConversationTypeResponseSchema>;
+
+/** The address part naming a conversation. */
+export const conversationIdParamsSchema = z.object({ id: z.uuid() });
+
+/** One message of a conversation. */
+export const conversationMessageSchema = z.object({
+  id: z.string(),
+  sender: z.enum(['customer', 'agent', 'staff', 'system']),
+  body: z.string(),
+  createdAt: z.string(),
+});
+
+/** What a conversation led to, once per type. */
+export const conversationOutcomeViewSchema = z.object({
+  typeKey: z.string(),
+  typeLabel: z.string(),
+  kind: conversationOutcomeSchema,
+  confidence: z.number(),
+  aiUnsure: z.boolean(),
+  /** The lead or ticket this outcome made or joined, once carried out. */
+  leadId: z.string().nullable(),
+  ticketId: z.string().nullable(),
+  /** False while it waits (for example, nobody could be identified). */
+  carriedOut: z.boolean(),
+  /** False for an outcome that no longer applies after a correction (what it made is kept). */
+  isCurrent: z.boolean(),
+});
+
+/** One conversation with its messages and what it led to, for staff. */
+export const conversationDetailSchema = z.object({
+  id: z.string(),
+  channel: conversationChannelSchema,
+  /** The other person's phone with the plus (as the channel saw it), and/or their email. */
+  fromPhone: z.string().nullable(),
+  fromEmail: z.string().nullable(),
+  contact: z
+    .object({ id: z.string(), name: z.string().nullable(), phone: z.string().nullable(), email: z.string().nullable() })
+    .nullable(),
+  status: z.enum(['open', 'sorted']),
+  /** Null until the conversation is sorted. */
+  type: z
+    .object({
+      key: z.string(),
+      label: z.string(),
+      confidence: z.number(),
+      /** A rule in code, the AI, or a person. */
+      source: z.enum(['rule', 'ai_final', 'staff']),
+      /** The AI's one-line reason, or the rule's name. */
+      reason: z.string().nullable(),
+      aiUnsure: z.boolean(),
+    })
+    .nullable(),
+  needsPerson: z.boolean(),
+  endedAt: z.string().nullable(),
+  sortedAt: z.string().nullable(),
+  createdAt: z.string(),
+  messages: z.array(conversationMessageSchema),
+  outcomes: z.array(conversationOutcomeViewSchema),
+});
+export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
+
+/** A person changing a conversation's type to one of the business's switched-on types. Choosing the type it already has confirms it. */
+export const setConversationTypeRequestSchema = z.object({ typeKey: z.string().trim().min(1).max(60) }).strict();
+export type SetConversationTypeRequest = z.infer<typeof setConversationTypeRequestSchema>;

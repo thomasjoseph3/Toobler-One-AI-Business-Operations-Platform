@@ -274,7 +274,7 @@ export function createConversationFinaliser({ database, classifier }: { database
           actor,
         },
       });
-      for (const outcome of decision.outcomes) {
+      for (const [position, outcome] of decision.outcomes.entries()) {
         await conversationOutcomesRepository.upsertOutcome(transaction, {
           id: uuidv7(),
           accountId,
@@ -283,6 +283,7 @@ export function createConversationFinaliser({ database, classifier }: { database
           kind: outcome.kind,
           confidence: outcome.confidence,
           aiUnsure: outcome.aiUnsure,
+          sort: position,
         });
       }
       // Sorting again (a correction) leaves out what no longer applies

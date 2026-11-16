@@ -4,6 +4,7 @@ import { createConversationClassifier } from './services/conversation-classifier
 import { createConversationFinaliser } from './services/conversation-finaliser.service';
 import { blockListRoutes } from './routes/block-list.routes';
 import { conversationTypesRoutes } from './routes/conversation-types.routes';
+import { conversationsRoutes } from './routes/conversations.routes';
 
 /**
  * Conversations: how every conversation, on any channel, is sorted into a type and what happens next (a lead, a ticket, a log
@@ -46,5 +47,6 @@ export default defineModule({
   routes: (app) => {
     conversationTypesRoutes(app);
     blockListRoutes(app);
+    conversationsRoutes(app);
   },
 });

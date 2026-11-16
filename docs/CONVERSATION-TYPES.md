@@ -248,7 +248,7 @@ The morning summary splits by type: "Overnight: 6 enquiries (2 hot), 2 service r
 
 ## What is built so far (F15, 16 Nov 2026) and where it differs from the design above
 
-The design above is the plan; this section says what the code does today. Slices 1 to 6, 7a and 7b are built (8 of the 9 routes): the types, the block list, the pre-filter, the router, the AI sorting, "Try it", the example set, the storing and sorting of conversations, and making the contact, lead and ticket. Reading a conversation and the staff correction (7c) are still to come. Who may call each route is in [ROLES-AND-ACCESS.md](ROLES-AND-ACCESS.md).
+The design above is the plan; this section says what the code does today. All slices are built (the 9 routes): the types, the block list, the pre-filter, the router, the AI sorting, "Try it", the example set, the storing and sorting of conversations, making the contact, lead and ticket, and reading and correcting a conversation (7c). The screens wait for the designer. Who may call each route is in [ROLES-AND-ACCESS.md](ROLES-AND-ACCESS.md).
 
 | Topic | What the code does |
 | --- | --- |
@@ -269,6 +269,7 @@ The design above is the plan; this section says what the code does today. Slices
 | "Try it" | `POST /conversation-types/test` (managers, 10 a minute): the classifier plus the router on a pasted message, nothing saved, the AI call record holds no text. |
 | Measurement | `evals/classification/hotel_resort.jsonl` (58 labelled English examples) and `npm run eval:types`, with the targets from "How we test it". |
 | Conversations (7a) | Tables `conversations`, `conversation_messages` and `conversation_outcomes` (migration 035), one set for every channel. `createConversationFinaliser` sorts a conversation after it ends: rules first, then the AI, then the router, then the type and one outcome per type are saved under a row lock; it is safe to run twice and to retry. A channel queues the job `conversations.sort_conversation` when a conversation ends. The contact, lead and ticket an outcome asks for are made right after sorting (7b: a second transaction, safe to retry; an open lead or ticket takes the new conversation, a lead lost under 60 days ago is reopened, and an anonymous visitor waits for a person); the staff correction is 7c. Differences from the plan above: no `held_by_user_id`, `held_until`, `summary` or `done_at` yet (staff takeover, summaries and "done" belong to F21 and F19). |
+| Staff correction (7c) | `GET /conversations/{id}` and `POST /conversations/{id}/type` (managers and staff; the "own leads only" role is refused until the inbox decides who sees which conversation). The router runs again with the chosen type as the main one (source "staff", confidence 1). What the conversation itself made for outcomes that no longer apply is taken off but kept: the lead is lost as "Reclassified (not a sale)", the ticket is closed with a note; a lead or ticket it only joined, or another conversation also counts on, is left alone. Choosing the type it already has confirms an "AI unsure" type. Each change is a row in `classification_corrections`. Removing a custom type moves its conversations to "unclear". |
 | Who can do what | Everyone signed in can read the types. Only managers add, change, remove or reorder types, and only managers see or change the block list. |
 
 ## Screens
