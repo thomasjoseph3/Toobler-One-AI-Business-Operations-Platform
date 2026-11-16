@@ -244,6 +244,25 @@ The morning summary splits by type: "Overnight: 6 enquiries (2 hot), 2 service r
 | POST | `/conversations/{id}/type` | Staff correction: set the type, which re-runs the router | Staff |
 | GET, PUT | `/block-list` | Numbers and emails to treat as spam | Manager |
 
+## What is built so far (F15, 16 Nov 2026) and where it differs from the design above
+
+The design above is the plan; this section says what the code does today. Slices 1 to 4 are built (7 of the 9 routes): the types, the block list, and their rules. The pre-filter, the router, the AI sorting, the "Try it" route and the staff correction are slices 5 to 7. Who may call each route is in [ROLES-AND-ACCESS.md](ROLES-AND-ACCESS.md).
+
+| Topic | What the code does |
+| --- | --- |
+| Where the starting types are defined | In code, in `apps/api/src/modules/core/conversations/helpers/default-conversation-types.ts` (13 system types, plus extras for hotel, clinic, car dealer, school, travel agent and real estate). A business gets its own copy **the first time its list is read**, so new and existing businesses are treated alike. Adding a new industry preset means adding it to that file; businesses that already have their copy do not receive it automatically (a manager adds the type by hand). |
+| Table | `conversation_types` (migration 031). Every business has its own rows. |
+| `route` (who owns what the router raises) | **Left out for now.** The business's sharing rule decides the owner until teams exist (F02). |
+| `alert` | `{ "who": ..., "when": ... }` only (`who`: owner, manager, alert number, service team, front desk, doctor on call; `when`: now or office hours). Sending alerts is F23. The hot-lead alert for `new_enquiry` depends on the lead's score, so it is not stored on the type. |
+| The 13 system types | Can be renamed, re-described and re-routed. **They are always on and can never be removed**: the router needs them as fallbacks. The database refuses to delete one (migration 033), not only the service. |
+| Custom types | A manager adds them; the **key is made from the label** ("Wedding enquiry" gives `wedding_enquiry`) and a name that gives an existing key answers 409. They can be switched off, changed and removed. |
+| The limit of 25 active types | Enforced **in the database** (migration 032) with a per-business lock, so two requests at the same moment cannot pass it; the service checks first to give a friendly 409. Types that are switched off do not count. |
+| Ticket fields | A type with the outcome "ticket" must have a ticket type and a priority; any other outcome has none. Moving between them is handled by the edit route, and the database enforces it too. |
+| Order | `POST /conversation-types/reorder` takes every type of the business exactly once; anything else is 400 `TYPES_MISMATCH`. Adding and reordering take turns. |
+| Removing a type | History is left alone. When conversations exist (slice 7), a conversation whose type was removed moves to `unclear`. |
+| Block list | Table `block_list` (migration 034). One row is **either** a phone number **or** an email, never both. A number is kept as its digits (`phone_key`, the form contacts use, so every way of writing a number matches) and the number with its plus is worked out when shown, so nothing is stored twice; an email is kept in lower case. A number or email can be on a business's list once. `PUT /block-list` saves the **whole list**: what is sent is what the business has afterwards; an entry already there keeps its id, date and author, only its reason can change; a number typed without a country code is read as the business's country. Managers only, because it holds personal data. The numbers and emails are never written to the activity log. |
+| Who can do what | Everyone signed in can read the types. Only managers add, change, remove or reorder types, and only managers see or change the block list. |
+
 ## Screens
 
 - **Settings → Conversation types:** each type with its outcome as a plain sentence ("Complaints → a ticket for the

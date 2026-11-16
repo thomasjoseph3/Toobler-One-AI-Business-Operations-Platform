@@ -6,7 +6,59 @@
 
 ## Feature guide
 
-*To be written before hand-off (rule: every feature file starts with a plain-English guide; F18's is the model).*
+*Draft written at slice 4 so the rules are not lost; it is checked and finished again at hand-off, when the router and the AI sorting exist. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+People contact a business for many reasons, and only some of them want to buy. This feature gives every business a list of **conversation types** (new enquiry, complaint, supplier, job seeker, spam and so on). Each type says **what should happen** to a conversation of that kind: it becomes a lead, it becomes a ticket for someone to handle, it is only noted, it goes to the Filtered tab, it is ignored, or a person looks at it. So complaints do not clutter the sales board, and real enquiries are not buried under spam.
+
+*So far (slices 1 to 4)* the business can see and manage its list of types and its block list. *Still to come in this feature:* the code that decides what happens (the router), the AI that reads a conversation and names its type, the "Try it" test box, and the staff correction ("this is not a lead, it is a service request").
+
+### Why it is useful
+- The sales board stays trustworthy: only real enquiries become leads.
+- A complaint becomes a high-priority ticket for the manager instead of being lost.
+- Each business decides what happens to each kind of conversation, in its own words, without a developer.
+- A known spammer or a salesperson who keeps calling can be blocked once and never reaches the AI.
+
+### How it works: a day in the life
+1. A hotel signs up. The first time the manager opens the list, the business is given 13 built-in types and three hotel extras ("In-house guest request", "Lost and found", "Event or group enquiry").
+2. The manager finds that "General question" fills the board with cold leads. They change what happens to it to "only note it".
+3. They add their own type, "Wedding enquiry", that becomes a lead and tells the owner at once.
+4. A number keeps calling to sell insurance. The manager adds it to the block list with the reason "insurance seller". From now on that number is treated as spam before any AI is asked.
+5. They drag "Complaint" to the top of the list. Later, when the router is built, a guest complaint becomes a high-priority ticket and the manager is alerted at once.
+
+### Who can do what
+| | Manager | Staff | Own-leads-only staff |
+| --- | --- | --- | --- |
+| See the types | Yes | Yes | Yes |
+| Add, change, switch off, remove or reorder types | Yes | No | No |
+| See and change the block list | Yes | No | No |
+
+(The full picture of roles is in `docs/ROLES-AND-ACCESS.md`.)
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| Built-in types | 13 for every business, plus extras for hotel, clinic, car dealer, school, travel agent and real estate. They can be renamed and re-routed, but never switched off or removed. |
+| Your own types | Up to 25 types can be switched on at once (the AI reads all of them each time, so more would make it slower and less accurate). Types switched off do not count. |
+| A type's words | Name up to 80 characters, description up to 500, up to 5 examples of up to 300 each |
+| What can happen | Make a lead, make a ticket (with its kind and priority), only note it, send to Filtered, ignore, or ask a person to look |
+| Block list | Up to 500 numbers or emails, each with an optional reason of up to 200 characters |
+
+### What it never does
+- Show or change another business's types or block list.
+- Remove or switch off a built-in type.
+- Write a blocked number, email or reason into the activity log.
+- Decide anything with the AI alone: the AI only says what a conversation was about, and fixed rules decide what to do about it.
+
+### What is not part of it
+Sending the alerts (F23), the inbox and staff takeover (F21), the AI agent that talks to customers (F19), the channels that bring conversations in (F20 onward), and the screens (waiting for the designer).
+
+### For the tech team
+- **Module:** `core.conversations` (core, always on; requires contacts, leads, tickets and AI).
+- **Tables:** `conversation_types` (031; 032 adds the active-types limit trigger; 033 allows deleting custom types and blocks deleting system ones), `block_list` (034).
+- **Routes so far (7):** `GET, POST /conversation-types`, `POST /conversation-types/reorder`, `PATCH, DELETE /conversation-types/{id}`, `GET, PUT /block-list`. Who may call each: `docs/ROLES-AND-ACCESS.md` section 5.
+- **How it works inside:** starting types come from `helpers/default-conversation-types.ts` and are copied per business on first read; the limit of 25, the ticket-field rule, the one-of-phone-or-email rule and the protection of system types are database rules, not only service checks; reorder and the block-list save take a per-business advisory lock.
+- **Known limits:** presets for a new industry reach only businesses that have not read their list yet; no `route` column until teams exist (F02); a removed type's conversations move to `unclear` once conversations exist (slice 7); see R57 for the design review.
 
 ## Decisions made at the start (owner, 16 Nov 2026)
 
@@ -25,14 +77,14 @@
 - **Changed:** the old project had no classifier and no router: every conversation was handled inside each channel. Here one shared engine decides the type for every channel. Types, outcomes and the router are new work, written to docs/CONVERSATION-TYPES.md.
 - **Left behind:** hotel-only prompt text and the per-channel conversation handling (it moves into the engine).
 
-## Database (forward-only, one migration per change: `031_conversation_types.sql` and `032_conversation_types_active_limit.sql` and `033_conversation_types_delete.sql` so far; the others with the slice that needs them)
+## Database (forward-only, one migration per change: `031_conversation_types.sql`, `032_conversation_types_active_limit.sql`, `033_conversation_types_delete.sql` and `034_block_list.sql` so far; the others with the slice that needs them)
 Every table has `account_id`, RLS enabled and forced, `created_by` / actor where a person or the system changes it.
 - `conversation_types`: `key`, `label`, `description`, `examples` jsonb (up to 5), `system` bool, `outcome` (`lead` / `ticket` / `log` / `filter` / `ignore` / `review`), `ticket_type`, `priority`, `route` jsonb, `needs_person`, `alert` jsonb, `playbook`, `active`, `sort`. Unique per (business, key). Up to 25 active per business.
 - `conversations`: one row per conversation on any channel (`channel`, `contact_id`, `type_key`, `type_confidence`, `type_source` = `rule` / `ai_live` / `ai_final` / `staff`, `ai_unsure`, `needs_person`, `status`, `held_by_user_id`, `held_until`, `summary`, `ended_at`, `done_at`).
 - `messages`: `conversation_id`, `direction`, `sender` (customer / agent / staff / system), `body`, `channel_message_id`, `created_at`. Text only; no secrets. Retention to decide with F21.
 - `conversation_outcomes`: `conversation_id`, `type_key`, `outcome`, `lead_id`, `ticket_id`, `applied_at`. Unique per (conversation, type), so running the router again updates instead of duplicating.
 - `classification_corrections`: `conversation_id`, `from_type`, `to_type`, `by_user_id`, `created_at`.
-- `block_list`: `phone_key` or `email`, `reason`.
+- `block_list`: **either** `phone_key` (digits, the form contacts use) **or** `email` (lower case), never both (a database rule), plus `reason`; unique per business. The number with its plus is worked out when shown, so nothing is stored twice. Saved as a whole list by `PUT /block-list` (an entry already there keeps its id and date); managers only; numbers and emails never reach the activity log.
 - Business code cannot delete a conversation, a message or an outcome, nor change the business or `created_at` (column grants, as in F14).
 - **Starting types are written the first time the list is read** (a business with none is given the 13 system types plus its industry's extras, in one transaction). New and existing businesses are treated alike, and no sign-up change or backfill is needed. Slice 1 also leaves out `route` (who owns what the router raises): the business's existing sharing rule decides until teams exist (F02).
 - `alert` holds `{ who, when }` only; sending alerts is F23.
@@ -56,7 +108,7 @@ Every table has `account_id`, RLS enabled and forced, `created_by` / actor where
 | 1 | **Built, waiting for the owner's check.** Migration 031, the system types and industry presets, the types list and add | `GET /conversation-types`, `POST /conversation-types` |
 | 2 | **Built, waiting for the owner's check.** Edit and remove a type (migration 033) | `PATCH /conversation-types/{id}`, `DELETE /conversation-types/{id}` |
 | 3 | **Built, waiting for the owner's check.** Reorder | `POST /conversation-types/reorder` |
-| 4 | Block list | `GET /block-list`, `PUT /block-list` |
+| 4 | **Built, waiting for the owner's check.** Block list (migration 034) | `GET /block-list`, `PUT /block-list` |
 | 5 | The pre-filter and `router.decide` (pure code, unit tests for every row of the design; no route) | none |
 | 6 | The classifier through the AI service, the "Try it" route and the classification eval set v1 | `POST /conversation-types/test` |
 | 7 | Finalise: store, classify, route, apply outcomes (lead, ticket, log, filter, ignore, review) and the staff correction | `POST /conversations/{id}/type` |

@@ -141,6 +141,14 @@ beforeAll(async () => {
       status: 'check',
     })
     .execute();
+  // A blocks a number and an email, with the secret words as the reason; B must never see them
+  await sendOk(
+    businessA,
+    'PUT',
+    '/block-list',
+    { items: [{ phone: uniqueUaeNumber(), reason: secretWords }, { email: `${secretWords}@spam.example` }] },
+    200,
+  );
   // A adds its own conversation type; B must never see it or its words
   const conversationType = await sendOk(
     businessA,
@@ -414,6 +422,16 @@ const attempts: Attempt[] = [
     expectedStatus: 201,
   },
   {
+    route: 'PUT /api/v1/block-list',
+    what: "save B's own block list (it replaces only B's list), and A's list must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/block-list',
+      payload: { items: [{ email: 'bob-blocks@spam.example' }] },
+    }),
+    expectedStatus: 200,
+  },
+  {
     route: 'POST /api/v1/conversation-types/reorder',
     what: "put A's conversation type in B's order (B must list only its own types)",
     request: () => ({
@@ -583,6 +601,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/leads', url: '/leads?view=board' },
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
   { route: 'GET /api/v1/conversation-types', url: '/conversation-types' },
+  { route: 'GET /api/v1/block-list', url: '/block-list' },
   { route: 'GET /api/v1/pipeline', url: '/pipeline' },
   { route: 'GET /api/v1/lost-reasons', url: '/lost-reasons' },
   { route: 'GET /api/v1/assignment-rules', url: '/assignment-rules' },
@@ -627,6 +646,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
   'GET /api/v1/conversation-types': 'covered by the list check',
+  'GET /api/v1/block-list': 'covered by the list check',
   'GET /api/v1/pipeline': 'covered by the list check',
   'GET /api/v1/lost-reasons': 'covered by the list check',
   'GET /api/v1/assignment-rules': 'covered by the list check',

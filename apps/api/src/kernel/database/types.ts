@@ -408,6 +408,20 @@ export interface ConversationTypesTable {
   updated_at: Generated<Date>;
 }
 
+/** A phone number or an email a manager never wants treated as a customer. Fenced by account_id. */
+export interface BlockListTable {
+  id: string;
+  account_id: string;
+  /** The number as digits only (the same form contacts use); the number with its plus is worked out from it. */
+  phone_key: string | null;
+  email: string | null;
+  reason: string | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** A note on a ticket. Written once, never edited. Fenced by account_id. */
 export interface TicketNotesTable {
   id: string;
@@ -548,6 +562,7 @@ export interface DB {
   tickets: TicketsTable;
   ticket_notes: TicketNotesTable;
   conversation_types: ConversationTypesTable;
+  block_list: BlockListTable;
   business_answers: BusinessAnswersTable;
   situations: SituationsTable;
   offerings: OfferingsTable;

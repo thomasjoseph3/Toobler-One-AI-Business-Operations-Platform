@@ -17,6 +17,7 @@ engine and the CRM core**.
 | `docs/FRONTEND.md` | How we apply it in code, proposed extensions, contrast findings, front-end rules |
 | `docs/SECURITY.md` | Controls and the per-feature security checklist |
 | `docs/CONVERSATION-TYPES.md` | How conversations are classified and routed (not every call is a lead) |
+| `docs/ROLES-AND-ACCESS.md` | Who can sign in, the roles and the hierarchy, and who can call every route |
 | `docs/DEVELOPMENT.md` | The one-feature-at-a-time process |
 | `docs/plan/PHASE-1.md`, `docs/plan/STATUS.md` | The feature plan and its status |
 | `docs/REQUIREMENTS-REVIEW.md` | Gaps and decisions; record new ones here |

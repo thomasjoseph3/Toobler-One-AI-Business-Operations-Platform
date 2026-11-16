@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { blockListRoutes } from './routes/block-list.routes';
 import { conversationTypesRoutes } from './routes/conversation-types.routes';
 
 /**
@@ -13,5 +14,6 @@ export default defineModule({
   requires: ['core.contacts', 'core.leads', 'core.tickets', 'core.ai'],
   routes: (app) => {
     conversationTypesRoutes(app);
+    blockListRoutes(app);
   },
 });
