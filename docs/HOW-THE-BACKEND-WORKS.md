@@ -233,6 +233,43 @@ Active = entitled and enabled (and ready). A module with no row is simply "not i
 
 ---
 
+## 7a. Sorting conversations (F15) in this picture
+
+*The module is `core.conversations`. The design is `docs/CONVERSATION-TYPES.md`; who can call what is `docs/ROLES-AND-ACCESS.md`; the feature file is `docs/features/F15-conversation-types-and-router.md`.*
+
+**The idea.** Every conversation, on any channel, is stored the same way and sorted into a **type** (new enquiry, complaint, spam, ...). The **AI only says what it was about**. **Plain code decides what to do about it.** The same type always gives the same result, and the business controls that result through its list of types.
+
+**What happens when a conversation ends** (a channel queues the job `conversations.sort_conversation`; nothing slow ever runs inside the channel's own request):
+
+```text
+ 1. READ        one transaction: the conversation, its messages, the business's types, the block list, the team's own numbers
+ 2. DECIDE      no transaction open:
+                  rules in code (pre-filter): silent call, empty chat, machine-made email, blocked, our own team  -> type decided, no AI
+                  nothing from the customer                                                                  -> "no conversation", no AI
+                  otherwise the AI reads the whole conversation through core.ai (job classify_conversation)  -> a type, how sure, a reason
+ 3. ROUTE+SAVE  one transaction with a row lock: router.decide (pure code) turns the answer into outcomes (lead, ticket, log, filter, ignore, review);
+                  the type and one outcome per type are saved; log line and event written
+ 4. CARRY OUT   another transaction: find or make the contact (phone or email), then make or join the lead (rule R6) or the ticket
+                  (an open ticket of the same kind takes a note), through the leads and tickets modules' own entry points
+```
+
+**Why four steps.** The AI call is slow and costs money, so it never runs while a database transaction is open. Saving the type is separate from carrying it out, so if making the lead fails, a retry does **not** ask the AI again; it only carries out what is left. Each step is safe to run twice, and the row lock makes two runs for one conversation take turns.
+
+**Who owns what.**
+- `core.conversations` owns the types, the block list, the conversations, messages, outcomes and corrections, the pre-filter, the router and the classifier prompt.
+- `core.ai` owns "how to call an AI" (models, keys, fallbacks, cost). The classifier asks it for a job and never names a model.
+- `core.contacts`, `core.leads` and `core.tickets` own their own rules and expose one small entry point each (`findOrCreateContactFromIdentity`, `applyLeadFromConversation`, `applyTicketFromConversation`, and the two "reclassified" closers). `core.auth` shares the business's industry and the team's phone numbers and emails. Modules reach each other only through `index.ts`.
+
+**The pure files** (no database, no AI, easy to read and to test): `helpers/pre-filter.ts`, `helpers/router.ts`, `helpers/classifier-prompt.ts`, `helpers/classification-eval.ts`, `helpers/default-conversation-types.ts`.
+
+**A person can correct a type** (`POST /conversations/{id}/type`). The router runs again with that type as the main one; what the conversation itself made for the outcomes that no longer apply is taken off but **kept** (a lead is lost as "Reclassified (not a sale)", a ticket is closed with a note); the correction is written down for the accuracy report.
+
+**What is deliberately not here yet:** the channels that start conversations (F20 onward), the AI agent that talks (F19), the inbox and who sees which conversation (F21), alerts (F23), the live type during a call (after Phase 1), and the screens.
+
+**Trying it without a channel:** `npm run conversation:simulate` makes a pretend conversation in a business and sorts it for real; `npm run eval:types` measures the AI against 58 labelled examples.
+
+---
+
 ## 8. The rules of the codebase (what the tests and lint enforce)
 
 | Rule | Enforced by |

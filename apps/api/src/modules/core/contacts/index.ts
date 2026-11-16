@@ -3,3 +3,10 @@
 export { applyLeadFactsToContact } from './services/contact-lifecycle.service';
 export { findContactSummaries } from './services/contact-summaries.service';
 export type { ContactSummary } from './services/contact-summaries.service';
+// The conversation engine finds or makes the contact for the person on the other end of a conversation.
+export {
+  findContactIdByIdentity,
+  findOrCreateContactFromIdentity,
+  lockContactForUpdate,
+} from './services/contact-identity.service';
+export type { ContactIdentity } from './services/contact-identity.service';

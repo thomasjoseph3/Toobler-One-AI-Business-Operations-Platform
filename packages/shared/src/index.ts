@@ -8,6 +8,8 @@ export * from './lost-reasons';
 export * from './leads';
 export * from './assignment-rules';
 export * from './tickets';
+export * from './conversation-types';
+export * from './block-list';
 export * from './knowledge';
 export * from './offerings';
 export * from './faqs';

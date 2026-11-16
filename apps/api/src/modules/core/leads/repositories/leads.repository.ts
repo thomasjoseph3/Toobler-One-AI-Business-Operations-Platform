@@ -185,6 +185,8 @@ export async function insertLead(
     callbackAt: Date | null;
     ownerUserId: string | null;
     offeringId: string | null;
+    /** The channel the lead first came in on; leads added by hand are `manual`. */
+    firstChannel?: LeadRow['firstChannel'];
     actor: Actor;
   },
 ): Promise<void> {
@@ -205,7 +207,7 @@ export async function insertLead(
       callback_at: lead.callbackAt,
       owner_user_id: lead.ownerUserId,
       offering_id: lead.offeringId,
-      first_channel: 'manual',
+      first_channel: lead.firstChannel ?? 'manual',
       created_by: actorStamp,
       updated_by: actorStamp,
     })

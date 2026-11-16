@@ -21,6 +21,8 @@ export const ROUTE_LIMITS = {
   changePassword: { max: 5, timeWindow: '10 minutes' },
   // Each test of an AI key makes a real call to the AI company (and may cost a little)
   testAiKey: { max: 10, timeWindow: '1 minute' },
+  // Each "Try it" on a conversation type makes a real call to an AI company (and may cost a little)
+  tryConversationType: { max: 10, timeWindow: '1 minute' },
 } as const satisfies Record<string, RouteLimit>;
 
 /**

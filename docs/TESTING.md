@@ -21,6 +21,13 @@ module, so your work joins the same safety net.
   lifecycle stages, leads and tickets pointing at another business, missing log lines, personal data in the log, ...). An empty list is the goal.
 - `app.ts`, `auth.ts`, `browser.ts`, `harness.ts`: the app, a signed-in person, a pretend browser, the database.
 
+## Testing AI features without calling an AI
+No automated test ever calls a real AI. `createScriptedLlmProvider` (in `apps/api/src/providers/llm`) answers from a script and keeps every request it was given, so a test can check the prompt, the job, the temperature and what was **not** sent. The pattern (see `conversation-types-try-it.test.ts`, `conversation-finalise.test.ts`, `conversation-outcomes.test.ts`): build the test app with a config that has a made-up platform key (unique per file, because key pools are shared) and `llmProvider: pretendAiCompany`, give the business an `ai_settings` row, set `nextAnswer`, then call the route or the service. Failure paths are tested by throwing from the script; a database failure in the middle of a step is tested with a temporary trigger that raises an error, then dropped.
+
+Two things that are measured by hand, with a real AI, and cost a few thousand tokens: `npm run eval:types` (how often the AI is right on 58 labelled examples, against the targets in the design) and `npm run conversation:simulate` (one real conversation, sorted and carried out).
+
+**Order is not luck.** Rows saved in one transaction share one timestamp, so a list that is read back by "created at" alone has no fixed order. Every list the API shows has an explicit order (a `sort` column, or a fixed secondary order); two tests were once flaky because of this.
+
 ## When you add something
 1. **A route:** write its route test; add an attempt (or an exemption with a reason) in `isolation.test.ts`, or `npm test` fails.
 2. **A table:** it must have `account_id` and forced RLS (the schema test checks). If rows of it can disagree with other tables, add a rule to

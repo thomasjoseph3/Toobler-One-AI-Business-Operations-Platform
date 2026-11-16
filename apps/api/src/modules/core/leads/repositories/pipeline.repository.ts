@@ -279,3 +279,19 @@ export async function listStagesInOrder(
     .orderBy('sort')
     .execute();
 }
+
+/** The pipeline's Won or Lost stage (there is exactly one of each), or undefined. */
+export async function findClosingStageOfKind(
+  db: Db,
+  accountId: string,
+  pipelineId: string,
+  kind: 'won' | 'lost',
+): Promise<{ id: string } | undefined> {
+  return db
+    .selectFrom('pipeline_stages')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('pipeline_id', '=', pipelineId)
+    .where('kind', '=', kind)
+    .executeTakeFirst();
+}

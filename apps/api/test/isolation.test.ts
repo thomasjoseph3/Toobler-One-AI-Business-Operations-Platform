@@ -56,6 +56,8 @@ async function sendOk(person: SignedInPerson, method: string, url: string, paylo
 
 /** Everything business A owns that business B will aim at. */
 interface BusinessAData {
+  conversationId: string;
+  conversationTypeId: string;
   contactId: string;
   leadId: string;
   ticketId: string;
@@ -140,7 +142,60 @@ beforeAll(async () => {
       status: 'check',
     })
     .execute();
+  // A blocks a number and an email, with the secret words as the reason; B must never see them
+  await sendOk(
+    businessA,
+    'PUT',
+    '/block-list',
+    { items: [{ phone: uniqueUaeNumber(), reason: secretWords }, { email: `${secretWords}@spam.example` }] },
+    200,
+  );
+  // A adds its own conversation type; B must never see it or its words
+  const conversationType = await sendOk(
+    businessA,
+    'POST',
+    '/conversation-types',
+    { label: `Type ${secretWords}`, description: `Description ${secretWords}`, outcome: 'log' },
+    201,
+  );
+  // A has a conversation with a message and an outcome (no route reads them yet, so the database-level check below is what proves B cannot)
+  const conversationOfA = randomUUID();
+  await database.system
+    .insertInto('conversations')
+    .values({
+      id: conversationOfA,
+      account_id: businessA.profile.business.id,
+      channel: 'webchat',
+      from_phone_key: null,
+      from_email: null,
+      contact_id: null,
+    })
+    .execute();
+  await database.system
+    .insertInto('conversation_messages')
+    .values({
+      id: randomUUID(),
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      sender: 'customer',
+      body: `Message ${secretWords}`,
+      channel_message_id: null,
+    })
+    .execute();
+  await database.system
+    .insertInto('conversation_outcomes')
+    .values({
+      id: randomUUID(),
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      type_key: 'new_enquiry',
+      kind: 'lead',
+      confidence: 0.9,
+    })
+    .execute();
   dataOfA = {
+    conversationId: conversationOfA,
+    conversationTypeId: conversationType.id,
     contactId: contact.id,
     leadId: lead.id,
     ticketId: ticket.id,
@@ -392,6 +447,69 @@ const attempts: Attempt[] = [
     }),
     expectedStatus: 201,
   },
+  // ---- conversation types (every business has its own list; the business comes from the session)
+  {
+    route: 'POST /api/v1/conversation-types',
+    what: "add a conversation type of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/conversation-types',
+      payload: { label: 'Bob type', description: 'Only for Bob', outcome: 'log' },
+    }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'PUT /api/v1/block-list',
+    what: "save B's own block list (it replaces only B's list), and A's list must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/block-list',
+      payload: { items: [{ email: 'bob-blocks@spam.example' }] },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'GET /api/v1/conversations/{id}',
+    what: "read A's conversation (its messages)",
+    request: () => ({ method: 'GET', url: `/conversations/${dataOfA.conversationId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/type',
+    what: "change the type of A's conversation",
+    request: () => ({
+      method: 'POST',
+      url: `/conversations/${dataOfA.conversationId}/type`,
+      payload: { typeKey: 'complaint' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversation-types/reorder',
+    what: "put A's conversation type in B's order (B must list only its own types)",
+    request: () => ({
+      method: 'POST',
+      url: '/conversation-types/reorder',
+      payload: { typeIds: [dataOfA.conversationTypeId] },
+    }),
+    expectedStatus: 400,
+  },
+  {
+    route: 'PATCH /api/v1/conversation-types/{id}',
+    what: "change A's conversation type",
+    request: () => ({
+      method: 'PATCH',
+      url: `/conversation-types/${dataOfA.conversationTypeId}`,
+      payload: { label: 'Hacked' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/conversation-types/{id}',
+    what: "remove A's conversation type",
+    request: () => ({ method: 'DELETE', url: `/conversation-types/${dataOfA.conversationTypeId}` }),
+    expectedStatus: 404,
+  },
   {
     route: 'PATCH /api/v1/knowledge/faqs/{id}',
     what: "change A's FAQ",
@@ -535,6 +653,8 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/leads', url: '/leads?limit=100' },
   { route: 'GET /api/v1/leads', url: '/leads?view=board' },
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
+  { route: 'GET /api/v1/conversation-types', url: '/conversation-types' },
+  { route: 'GET /api/v1/block-list', url: '/block-list' },
   { route: 'GET /api/v1/pipeline', url: '/pipeline' },
   { route: 'GET /api/v1/lost-reasons', url: '/lost-reasons' },
   { route: 'GET /api/v1/assignment-rules', url: '/assignment-rules' },
@@ -578,6 +698,10 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/conversation-types': 'covered by the list check',
+  'GET /api/v1/block-list': 'covered by the list check',
+  'POST /api/v1/conversation-types/test':
+    "answers only about the caller's own types: the business comes from the session, nothing is saved, and the AI is only told the caller's own types (tested in conversation-types-try-it)",
   'GET /api/v1/pipeline': 'covered by the list check',
   'GET /api/v1/lost-reasons': 'covered by the list check',
   'GET /api/v1/assignment-rules': 'covered by the list check',
