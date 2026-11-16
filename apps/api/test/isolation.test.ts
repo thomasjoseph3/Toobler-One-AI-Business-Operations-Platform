@@ -502,6 +502,16 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'PATCH /api/v1/channels/webchat',
+    what: "change the chat settings (B's own only, with B's own website), and A's key, greeting and websites must stay as they were",
+    request: () => ({
+      method: 'PATCH',
+      url: '/channels/webchat',
+      payload: { greeting: 'Bob changes his own greeting', allowedWebsites: ['https://bob-hotel.example'] },
+    }),
+    expectedStatus: 200,
+  },
+  {
     route: 'GET /api/v1/agent/test-chats/{conversationId}',
     what: "read A's test chat back (its messages, what the agent learned, its promise)",
     request: () => ({ method: 'GET', url: `/agent/test-chats/${dataOfA.testChatId}` }),
@@ -739,6 +749,8 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/tickets': 'covered by the list check',
   'GET /api/v1/conversation-types': 'covered by the list check',
   'GET /api/v1/block-list': 'covered by the list check',
+  'GET /api/v1/channels/webchat':
+    "shows only the caller's own chat settings and key: the business comes from the session, nothing in the request names one (tested in webchat-settings, including that two businesses never share a key)",
   'POST /api/v1/conversation-types/test':
     "answers only about the caller's own types: the business comes from the session, nothing is saved, and the AI is only told the caller's own types (tested in conversation-types-try-it)",
   'GET /api/v1/pipeline': 'covered by the list check',

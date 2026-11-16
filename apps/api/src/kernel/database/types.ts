@@ -435,6 +435,29 @@ export interface ConversationsTable {
   updated_at: Generated<Date>;
 }
 
+/** The settings of a business's website chat bubble: one row per business, made the first time they are read. Fenced by account_id. */
+export interface WebchatSettingsTable {
+  account_id: string;
+  /** What a visitor's browser knows: finds the business in the public chat routes. Never changes. */
+  widget_key: string;
+  colour: Generated<string>;
+  greeting: Generated<string>;
+  position: Generated<'bottom_right' | 'bottom_left'>;
+  /** A list of origins like https://nairstays.example. Written as JSON text, read back as a list. */
+  allowed_websites: ColumnType<string[], string | undefined, string>;
+  phone_number: string | null;
+  whatsapp_number: string | null;
+  whatsapp_message: string | null;
+  /** Which buttons show and in what order (some of chat, call, whatsapp). Written as JSON text, read back as a list. */
+  button_order: ColumnType<string[], string | undefined, string>;
+  last_seen_website: string | null;
+  last_seen_at: Date | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** What the AI agent learned in one conversation: the details, the one promise. One row per conversation. Fenced by account_id. */
 export interface ConversationFactsTable {
   conversation_id: string;
@@ -659,6 +682,7 @@ export interface DB {
   conversations: ConversationsTable;
   conversation_messages: ConversationMessagesTable;
   conversation_facts: ConversationFactsTable;
+  webchat_settings: WebchatSettingsTable;
   conversation_outcomes: ConversationOutcomesTable;
   classification_corrections: ClassificationCorrectionsTable;
   business_answers: BusinessAnswersTable;
