@@ -9,6 +9,7 @@ import knowledge from './core/knowledge/module';
 import offerings from './core/offerings/module';
 import industries from './core/industries/module';
 import ai from './core/ai/module';
+import agents from './core/agents/module';
 import accountModules from './core/module-switches/module';
 
 // Every module in the product. Adding a module = one line here (see the plug-in-module skill).
@@ -24,4 +25,5 @@ export const modules: readonly ModuleManifest[] = [
   knowledge,
   offerings,
   ai,
+  agents,
 ];

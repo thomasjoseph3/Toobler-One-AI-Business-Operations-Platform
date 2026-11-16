@@ -4,3 +4,8 @@
 export { countActiveOfferingsOfBusiness } from './services/offering-counts.service';
 export { findOfferingForLead, findOfferingSummaries } from './services/offering-summaries.service';
 export type { OfferingSummary } from './services/offering-summaries.service';
+// The AI agent (F19) reads what it may say about the offerings and offers through this one function.
+export { findWhatTheAgentMaySee } from './services/agent-offerings.service';
+export type { WhatTheAgentMaySee, OfferingForTheAgent, OfferForTheAgent } from './helpers/what-the-ai-may-see';
+// Turns an amount in paise into words like "₹4,000": other modules show prices the same way the offerings do.
+export { formatRupees } from './helpers/money-in-words';
