@@ -2,7 +2,7 @@
 
 **Requirements:** [docs/CONVERSATION-TYPES.md](../CONVERSATION-TYPES.md) (the design; replaces three lists in scoring, email and tickets, see R1 and R21); `requirements/phase-1-lead-engine/2-crm-core/07-lead-scoring-and-filtering.md`, `3-ai-agents-and-channels/06-email.md`, `4-staff-workspace/06-tickets.md`; docs/plan/PHASE-1.md (F15)
 **Depends on:** F00, F01, F03, F04, F06, F14, F37 (the AI service)      **Module:** `core.conversations` (core: always on; requires `core.auth`, `core.contacts`, `core.leads`, `core.tickets`, `core.ai`)
-**Status:** `in_review` (built 16 Nov 2026 in slices 1 to 7c; the owner tested slices 1 to 4 as they were built; slices 5 to 7c wait for the owner's check). The screens wait for the designer.
+**Status:** approved by the owner on 16 Nov 2026 (backend, built in slices 1 to 7c; the screens wait for the designer). The choices in R59 and R60 stand as built.
 
 ## Feature guide
 
