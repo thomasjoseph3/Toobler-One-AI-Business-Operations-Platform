@@ -56,6 +56,7 @@ async function sendOk(person: SignedInPerson, method: string, url: string, paylo
 
 /** Everything business A owns that business B will aim at. */
 interface BusinessAData {
+  conversationTypeId: string;
   contactId: string;
   leadId: string;
   ticketId: string;
@@ -140,7 +141,16 @@ beforeAll(async () => {
       status: 'check',
     })
     .execute();
+  // A adds its own conversation type; B must never see it or its words
+  const conversationType = await sendOk(
+    businessA,
+    'POST',
+    '/conversation-types',
+    { label: `Type ${secretWords}`, description: `Description ${secretWords}`, outcome: 'log' },
+    201,
+  );
   dataOfA = {
+    conversationTypeId: conversationType.id,
     contactId: contact.id,
     leadId: lead.id,
     ticketId: ticket.id,
@@ -392,6 +402,17 @@ const attempts: Attempt[] = [
     }),
     expectedStatus: 201,
   },
+  // ---- conversation types (every business has its own list; the business comes from the session)
+  {
+    route: 'POST /api/v1/conversation-types',
+    what: "add a conversation type of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/conversation-types',
+      payload: { label: 'Bob type', description: 'Only for Bob', outcome: 'log' },
+    }),
+    expectedStatus: 201,
+  },
   {
     route: 'PATCH /api/v1/knowledge/faqs/{id}',
     what: "change A's FAQ",
@@ -535,6 +556,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/leads', url: '/leads?limit=100' },
   { route: 'GET /api/v1/leads', url: '/leads?view=board' },
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
+  { route: 'GET /api/v1/conversation-types', url: '/conversation-types' },
   { route: 'GET /api/v1/pipeline', url: '/pipeline' },
   { route: 'GET /api/v1/lost-reasons', url: '/lost-reasons' },
   { route: 'GET /api/v1/assignment-rules', url: '/assignment-rules' },
@@ -578,6 +600,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/conversation-types': 'covered by the list check',
   'GET /api/v1/pipeline': 'covered by the list check',
   'GET /api/v1/lost-reasons': 'covered by the list check',
   'GET /api/v1/assignment-rules': 'covered by the list check',

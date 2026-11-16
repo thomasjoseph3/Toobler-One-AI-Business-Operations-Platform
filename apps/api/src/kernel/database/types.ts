@@ -383,6 +383,31 @@ export interface TicketsTable {
   updated_at: Generated<Date>;
 }
 
+/** One reason a person gets in touch, and what happens to such a conversation (docs/CONVERSATION-TYPES.md). Fenced by account_id. */
+export interface ConversationTypesTable {
+  id: string;
+  account_id: string;
+  key: string;
+  label: string;
+  description: string;
+  /** A JSON list of short example messages; written as JSON text, read back as a list. */
+  examples: ColumnType<unknown, string, string>;
+  is_system: Generated<boolean>;
+  outcome: 'lead' | 'ticket' | 'log' | 'filter' | 'ignore' | 'review';
+  ticket_type: 'callback' | 'question' | 'complaint' | 'existing_customer' | 'other' | null;
+  priority: 'low' | 'normal' | 'high' | 'urgent' | null;
+  needs_person: Generated<boolean>;
+  /** Who to tell and when, as JSON text when written, an object when read. */
+  alert: ColumnType<Json | null, string | null, string | null>;
+  playbook: Generated<'sales' | 'service' | 'brief_end' | 'emergency'>;
+  is_active: Generated<boolean>;
+  sort: Generated<number>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** A note on a ticket. Written once, never edited. Fenced by account_id. */
 export interface TicketNotesTable {
   id: string;
@@ -522,6 +547,7 @@ export interface DB {
   leads: LeadsTable;
   tickets: TicketsTable;
   ticket_notes: TicketNotesTable;
+  conversation_types: ConversationTypesTable;
   business_answers: BusinessAnswersTable;
   situations: SituationsTable;
   offerings: OfferingsTable;

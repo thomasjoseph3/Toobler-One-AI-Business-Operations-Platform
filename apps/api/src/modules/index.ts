@@ -4,6 +4,7 @@ import contacts from './core/contacts/module';
 import health from './core/health/module';
 import leads from './core/leads/module';
 import tickets from './core/tickets/module';
+import conversations from './core/conversations/module';
 import knowledge from './core/knowledge/module';
 import offerings from './core/offerings/module';
 import industries from './core/industries/module';
@@ -19,6 +20,7 @@ export const modules: readonly ModuleManifest[] = [
   contacts,
   leads,
   tickets,
+  conversations,
   knowledge,
   offerings,
   ai,
