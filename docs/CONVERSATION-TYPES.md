@@ -248,7 +248,7 @@ The morning summary splits by type: "Overnight: 6 enquiries (2 hot), 2 service r
 
 ## What is built so far (F15, 16 Nov 2026) and where it differs from the design above
 
-The design above is the plan; this section says what the code does today. All slices are built (the 9 routes): the types, the block list, the pre-filter, the router, the AI sorting, "Try it", the example set, the storing and sorting of conversations, making the contact, lead and ticket, and reading and correcting a conversation (7c). The screens wait for the designer. Who may call each route is in [ROLES-AND-ACCESS.md](ROLES-AND-ACCESS.md).
+The design above is the plan; this section says what the code does today. All slices are built (the 10 routes): the types, the block list, the pre-filter, the router, the AI sorting, "Try it", the example set, the storing and sorting of conversations, making the contact, lead and ticket, and reading and correcting a conversation (7c). The screens wait for the designer. Who may call each route is in [ROLES-AND-ACCESS.md](ROLES-AND-ACCESS.md).
 
 | Topic | What the code does |
 | --- | --- |

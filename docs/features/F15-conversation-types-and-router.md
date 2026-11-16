@@ -1,37 +1,49 @@
 # F15: Conversation types and the router
 
 **Requirements:** [docs/CONVERSATION-TYPES.md](../CONVERSATION-TYPES.md) (the design; replaces three lists in scoring, email and tickets, see R1 and R21); `requirements/phase-1-lead-engine/2-crm-core/07-lead-scoring-and-filtering.md`, `3-ai-agents-and-channels/06-email.md`, `4-staff-workspace/06-tickets.md`; docs/plan/PHASE-1.md (F15)
-**Depends on:** F00, F01, F03, F04, F06, F14, F37 (the AI service)      **Module:** `core.conversations` (core: always on; requires `core.contacts`, `core.leads`, `core.tickets`, `core.ai`)
-**Status:** `in_progress` (started 16 Nov 2026). Built in slices of at most 2 routes. The screens wait for the designer.
+**Depends on:** F00, F01, F03, F04, F06, F14, F37 (the AI service)      **Module:** `core.conversations` (core: always on; requires `core.auth`, `core.contacts`, `core.leads`, `core.tickets`, `core.ai`)
+**Status:** `in_review` (built 16 Nov 2026 in slices 1 to 7c; the owner tested slices 1 to 4 as they were built; slices 5 to 7c wait for the owner's check). The screens wait for the designer.
 
 ## Feature guide
 
-*Draft written at slice 4 so the rules are not lost; it is checked and finished again at hand-off, when the router and the AI sorting exist. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
 
 ### What it does
-People contact a business for many reasons, and only some of them want to buy. This feature gives every business a list of **conversation types** (new enquiry, complaint, supplier, job seeker, spam and so on). Each type says **what should happen** to a conversation of that kind: it becomes a lead, it becomes a ticket for someone to handle, it is only noted, it goes to the Filtered tab, it is ignored, or a person looks at it. So complaints do not clutter the sales board, and real enquiries are not buried under spam.
+People contact a business for many reasons, and only some of them want to buy. This feature decides **what each conversation was about** and **what should happen because of it**, the same way for every way a person can get in touch (website chat, WhatsApp, email, phone).
 
-*So far (slices 1 to 4)* the business can see and manage its list of types and its block list. *Still to come in this feature:* the code that decides what happens (the router), the AI that reads a conversation and names its type, the "Try it" test box, and the staff correction ("this is not a lead, it is a service request").
+Every business has a list of **conversation types**: new enquiry, general question, existing customer, complaint, callback request, supplier, job seeker, spam, wrong number, and a few more, plus extras for its industry (a hotel gets "In-house guest request", a clinic gets "Emergency"). Each type says what happens next: it becomes a **lead**, a **ticket** for someone to handle, it is only **noted**, it goes to the **Filtered** tab, it is **ignored**, or **a person looks at it**.
+
+When a conversation ends, the system sorts it:
+1. **Rules first, no AI.** Silent calls, empty chats, machine-made emails, blocked numbers and the business's own team are recognised straight away.
+2. **Then the AI reads the whole conversation** and names its type, how sure it is, and whether a person should step in. It can only choose from the business's own list.
+3. **Then fixed rules decide what to do.** The AI never decides what happens next, so the same kind of conversation always gets the same result, and the business controls that result.
+4. **The contact, lead or ticket is made** (or the person's open one is used). A person can correct the type afterwards, and everything follows.
 
 ### Why it is useful
-- The sales board stays trustworthy: only real enquiries become leads.
-- A complaint becomes a high-priority ticket for the manager instead of being lost.
+- The sales board stays trustworthy: complaints, job seekers, suppliers and spam do not become leads.
+- A complaint becomes a high-priority ticket for the manager instead of being lost among enquiries.
+- A conversation that is both a complaint and a price request gives both a ticket and a lead.
 - Each business decides what happens to each kind of conversation, in its own words, without a developer.
-- A known spammer or a salesperson who keeps calling can be blocked once and never reaches the AI.
+- A known spammer can be blocked once and never reaches the AI, so it costs nothing.
+- Staff can correct the AI with one step, and the lead or ticket follows the correction.
 
 ### How it works: a day in the life
-1. A hotel signs up. The first time the manager opens the list, the business is given 13 built-in types and three hotel extras ("In-house guest request", "Lost and found", "Event or group enquiry").
-2. The manager finds that "General question" fills the board with cold leads. They change what happens to it to "only note it".
-3. They add their own type, "Wedding enquiry", that becomes a lead and tells the owner at once.
-4. A number keeps calling to sell insurance. The manager adds it to the block list with the reason "insurance seller". From now on that number is treated as spam before any AI is asked.
-5. They drag "Complaint" to the top of the list. Later, when the router is built, a guest complaint becomes a high-priority ticket and the manager is alerted at once.
+1. A hotel signs up. The first time its manager opens the list, the hotel gets 13 built-in types and three hotel extras.
+2. The manager sees that "General question" fills the board with cold leads, so they change what happens to it to "only note it". They add their own type, "Wedding enquiry", that becomes a lead and tells the owner.
+3. A number keeps calling to sell insurance. The manager adds it to the block list with a reason.
+4. At 9 pm a guest writes on WhatsApp: "The AC in room 204 did not work all night. Also, what would March cost?" When the chat ends, the AI says: complaint (sure) and new enquiry (fairly sure). The system makes the guest a contact (from the WhatsApp number), opens a **high-priority complaint ticket** for the manager, and makes a **lead** for the March price.
+5. The next day the same guest writes again about the AC. The new conversation is added to the **same ticket as a note**, not a second ticket.
+6. A week later a message arrives that the AI sorted as an enquiry but was only fairly sure about. In the inbox it shows "AI unsure". A staff member sees it is really a supplier, changes its type, and the lead it made is taken off the board (kept in the history as "Reclassified (not a sale)").
+7. A person who tried the chat but gave no phone and no email cannot become a lead: the conversation is marked "needs a person" so staff can follow up.
 
 ### Who can do what
 | | Manager | Staff | Own-leads-only staff |
 | --- | --- | --- | --- |
-| See the types | Yes | Yes | Yes |
+| See the list of types | Yes | Yes | Yes |
 | Add, change, switch off, remove or reorder types | Yes | No | No |
+| Test a message with "Try it" (uses the AI) | Yes | No | No |
 | See and change the block list | Yes | No | No |
+| Read a conversation and change its type | Yes | Yes | No (until the inbox decides who sees which conversation) |
 
 (The full picture of roles is in `docs/ROLES-AND-ACCESS.md`.)
 
@@ -39,26 +51,35 @@ People contact a business for many reasons, and only some of them want to buy. T
 | What | Value |
 | --- | --- |
 | Built-in types | 13 for every business, plus extras for hotel, clinic, car dealer, school, travel agent and real estate. They can be renamed and re-routed, but never switched off or removed. |
-| Your own types | Up to 25 types can be switched on at once (the AI reads all of them each time, so more would make it slower and less accurate). Types switched off do not count. |
+| Your own types | Up to 25 types switched on at once (the AI reads all of them each time, so more would make it slower and less accurate). Types switched off do not count. |
 | A type's words | Name up to 80 characters, description up to 500, up to 5 examples of up to 300 each |
 | What can happen | Make a lead, make a ticket (with its kind and priority), only note it, send to Filtered, ignore, or ask a person to look |
+| How sure the AI must be | 70% or more: applied. 40% to 70%: applied and marked "AI unsure". Below 40%: "unclear", a person looks, and no lead or ticket is made |
 | Block list | Up to 500 numbers or emails, each with an optional reason of up to 200 characters |
+| "Try it" | Up to 10 a minute; each try is one real AI call; nothing is saved |
+| Re-enquiry rule | A lead lost less than 60 days ago is reopened; an open lead takes the new enquiry; otherwise a new lead is made |
 
 ### What it never does
-- Show or change another business's types or block list.
+- Show or change another business's types, block list or conversations.
 - Remove or switch off a built-in type.
-- Write a blocked number, email or reason into the activity log.
-- Decide anything with the AI alone: the AI only says what a conversation was about, and fixed rules decide what to do about it.
+- Let the AI decide what happens next, or invent a type the business does not have.
+- Follow instructions hidden in what a customer wrote.
+- Write what a customer said into the activity log, an event, a ticket or the AI usage record.
+- Make a contact for spam, wrong numbers, silent calls or machine email.
+- Delete a lead or ticket when a person corrects a type: it is kept and taken off the board or closed with a note.
+- Make up a contact: a conversation with no phone and no email waits for a person.
 
 ### What is not part of it
-Sending the alerts (F23), the inbox and staff takeover (F21), the AI agent that talks to customers (F19), the channels that bring conversations in (F20 onward), and the screens (waiting for the designer).
+Sending the alerts (F23), the inbox and staff takeover (F21), the AI agent that talks to customers (F19), the channels that bring conversations in (F20 onward), the timeline (F07), the accuracy report (F28), the screens (waiting for the designer), and the live type during a call (after Phase 1, R58). Until a channel exists, conversations are made by the test script `npm run conversation:simulate`.
 
 ### For the tech team
-- **Module:** `core.conversations` (core, always on; requires contacts, leads, tickets and AI).
-- **Tables:** `conversation_types` (031; 032 adds the active-types limit trigger; 033 allows deleting custom types and blocks deleting system ones), `block_list` (034).
-- **Routes so far (7):** `GET, POST /conversation-types`, `POST /conversation-types/reorder`, `PATCH, DELETE /conversation-types/{id}`, `GET, PUT /block-list`. Who may call each: `docs/ROLES-AND-ACCESS.md` section 5.
-- **How it works inside:** starting types come from `helpers/default-conversation-types.ts` and are copied per business on first read; the limit of 25, the ticket-field rule, the one-of-phone-or-email rule and the protection of system types are database rules, not only service checks; reorder and the block-list save take a per-business advisory lock.
-- **Known limits:** presets for a new industry reach only businesses that have not read their list yet; no `route` column until teams exist (F02); a removed type's conversations move to `unclear` once conversations exist (slice 7); see R57 for the design review.
+- **Module:** `core.conversations` (core, always on; requires auth, contacts, leads, tickets and AI). Public entry points (`index.ts`): `createConversationRecordsService`, `createConversationFinaliser`, `createConversationClassifier`; job `conversations.sort_conversation`; event `conversation.sorted` (and `conversation.type_corrected`).
+- **Tables (migrations 031 to 037):** `conversation_types`, `block_list`, `conversations`, `conversation_messages`, `conversation_outcomes`, `classification_corrections`. All have row-level security (forced). Database rules back the code: at most 25 active types, system types cannot be deleted, a ticket type needs a ticket kind and priority, a block list entry is a number or an email never both, a sorted conversation has a type and a time, messages and corrections are written once.
+- **Routes (10):** `GET, POST /conversation-types`, `POST /conversation-types/test`, `POST /conversation-types/reorder`, `PATCH, DELETE /conversation-types/{id}`, `GET, PUT /block-list`, `GET /conversations/{id}`, `POST /conversations/{id}/type`. Who may call each: `docs/ROLES-AND-ACCESS.md`.
+- **How a conversation is sorted:** read (one transaction) → rules or the AI (no transaction open) → save type and outcomes (one transaction, row lock) → carry out the outcomes (another transaction: contact, then lead or ticket through the leads and tickets modules). Safe to run twice and to retry; a retry does not ask the AI again.
+- **The AI:** the job `classify_conversation` through the F37 service (model order and keys per business; defaults Gemini Flash-Lite then GPT-4o mini); the answer must fit a shape built from the business's own type keys; tokens and cost are recorded per call with no text.
+- **Measure it:** `npm run eval:types` (58 labelled English hotel examples, targets 90% / 95% / 5%). Try it by hand: `npm run conversation:simulate`.
+- **Known limits:** presets for a new industry reach only businesses that have not read their list yet (see the design note in `CONVERSATION-TYPES.md`); two sortings of one conversation at the same moment both ask the AI (only one is saved); messages in one conversation have no explicit order beyond their time (fine one at a time; add an order when a channel adds several at once); message retention is decided with the inbox (F21); no `route` column until teams exist (F02); the AI sees customers' words (sent to the company whose key is used), so the privacy notice and the processing agreement are part of F24; see R57 (database review), R58 (live type later), R59 (carrying out), R60 (who can read conversations).
 
 ## Decisions made at the start (owner, 16 Nov 2026)
 
@@ -90,7 +111,7 @@ Every table has `account_id`, RLS enabled and forced, `created_by` / actor where
 - `alert` holds `{ who, when }` only; sending alerts is F23.
 - **At most 25 active types per business, enforced by the database** (migration 032: a trigger with a per-business lock, so two requests at once cannot both pass). The service checks first for a friendly answer and also turns the database's refusal into the same 409 `TOO_MANY_TYPES`. Design review: R57.
 
-## API (9 routes)
+## API (10 routes)
 | Method | Address | Who | Notes |
 | --- | --- | --- | --- |
 | GET | `/conversation-types` | staff | The business's types with outcomes and alerts |
@@ -100,7 +121,8 @@ Every table has `account_id`, RLS enabled and forced, `created_by` / actor where
 | POST | `/conversation-types/reorder` | manager | Reorder |
 | GET, PUT | `/block-list` | manager | Numbers and emails treated as spam |
 | POST | `/conversation-types/test` | manager | Classify a sample text, save nothing |
-| POST | `/conversations/{id}/type` | staff | Staff correction; re-runs the router |
+| GET | `/conversations/{id}` | staff (not the own-leads-only role) | One conversation with its messages and what it led to |
+| POST | `/conversations/{id}/type` | staff (not the own-leads-only role) | Staff correction; re-runs the router; confirms an AI-unsure type |
 
 ## Slices (each at most 2 routes; stop after each for the owner to verify; slice 7 was split into 7a, 7b and 7c at the owner's choice, 16 Nov 2026)
 | Slice | Builds | Routes |
@@ -174,16 +196,46 @@ Settings → Conversation types (each type as a sentence, edit form, Try it box)
 - **The measurement:** `npm run eval:types` sorts the labelled English examples with the real AI and prints three numbers against the targets (main type right 90%, complaints kept 95%, non-sales made leads at most 5%). It needs an AI key in `.env`, costs a few thousand tokens, and does not touch the database. The example file has 58 hotel examples, including complaints that also ask a price and messages that try to give the AI orders. Malayalam and Hindi sets come with voice (F29).
 
 ## Tests
-- **Unit:** `router.decide` (every threshold, multi-type, fallback and re-run case); pre-filter rules (silent call, each auto-email header, block list, staff number); the schema built from a business's type keys.
-- **API:** every route works / 401 / 403 / 404 (another business) / 400; types are per business (isolation); system types cannot be deleted; a correction moves lead ↔ ticket and keeps the timeline.
-- **Evals:** `evals/classification/<industry>.jsonl`, English. Targets: primary type right ≥ 90%; complaint recall ≥ 95%; false lead rate ≤ 5%. Needs an AI key in `.env`; never run against `DATABASE_URL`.
+- **Unit (no database, no AI):** `router.decide` (every threshold, multi-type, fallback, module-off and re-run case); the pre-filter rules; the classifier prompt and the shape of the AI's answer; the example set and its scoring.
+- **API (local test database, scripted AI):** every route works / 401 / 403 / 404 (another business) / 400 / 409; types and the block list per business; the 25-type limit under parallel requests and directly in the database; the sorting (rules, AI, retry, concurrent, AI failure); making the contact, lead and ticket (R6 reopen and new, join, concurrent, failure rolled back, retry); the correction (lead to ticket, ticket to lead, filtered to enquiry, shared and joined records left alone, confirm); nothing of what was said in the log, events, tickets or AI records; the database refusing edits to messages and corrections.
+- **Isolation:** the new routes and tables are registered in `isolation.test.ts`.
+- **Evals:** `npm run eval:types` (needs an AI key in `.env`; run by the owner; never against `DATABASE_URL` data except through the script's own AI calls, which touch no database).
+- **Counts at hand-off:** the full API suite passes (115 files, 1,515 tests); see the hand-off message for the full `npm run verify`.
 
-## Manual test script (written fully at hand-off; slice by slice until then)
-Each slice hand-off gives the Postman steps. At the end: use **Try it** with a booking enquiry, a complaint, a supplier pitch and a job request, and see each type and what would happen; change "General question" to log only and try again.
+## Manual test script
+Prepare once: `npm run db:migrate` (migrations 031 to 037), `npm run dev`, and in Postman open the collection **Toobler One - F15 conversation types (run in order)** with the environment **Toobler One - local dev** (a manager of a verified business, with an AI key or the platform's AI switched on for it).
+
+1. **Types.** Run folders 0 to 3. You should see 13 types (16 for a hotel), a custom type added, and the refusals (409, 400).
+2. **Change and remove (folders 4 to 6).** Rename a custom type: the key stays. Make it a ticket without a kind: 400. Switch a built-in type off: 409. Remove a custom type: 204; remove it again: 404; remove a built-in one: 409.
+3. **Reorder (folder 7)** reverses the list and puts it back; leaving one type out gives 400.
+4. **Block list (folder 8).** Save a number in different ways: it comes back as `+919847012345`; the email in lower case; the same number twice gives 400.
+5. **Try it (folder 9).** Paste a booking enquiry (a lead), a complaint (a high-priority ticket and an alert to the manager), a supplier pitch and a job request (only logged), and "hello" (unclear, a person looks). Change "General question" to log only (`PATCH /conversation-types/{id}` with `{"outcome":"log"}`) and try a general question again.
+6. **A whole conversation.** Run `npm run conversation:simulate -- --email <your manager email> --text "The AC in room 204 broke last night. Also what does a March stay cost?" --phone 919847012345 --allow-remote`. It prints the type and the lead and ticket it made. In the app, or `GET /leads` and `GET /tickets`, you should see a lead and a high-priority ticket for a contact with only that phone number. Run it again with the same phone and a similar text: the enquiry joins the same lead and a repeat complaint adds a note to the same ticket.
+7. **Without a phone.** Run the same command without `--phone`: the lead and the ticket wait, and the conversation is marked "needs a person" (nobody could be identified).
+8. **Correct it (folder 10).** Set the Postman variable `conversationId` to the id the script printed. Read the conversation; correct it to a complaint, then back to a new enquiry. The lead the conversation made is lost as "Reclassified (not a sale)" and a complaint ticket appears; correcting back closes that ticket with a note and opens a lead. Choosing the type it already has changes nothing.
+9. **Measure it (optional, spends a few thousand tokens):** `npm run eval:types`.
+
+There is no browser screen for this feature: the screens wait for the designer.
 
 ## Security checklist
-To be ticked at hand-off with the `api-security` skill (account fence on every table; roles on every route; no text of messages in logs; the Try it route spends AI quota, so it is rate limited and manager only).
+Reviewed on 16 Nov 2026 with the `api-security` skill.
+- [x] Every new table has `account_id`, row-level security enabled **and forced**, and a policy (checked in the database for all six tables; the schema test enforces it).
+- [x] The business comes from the session, the job's business context or the caller, never from a body, query or address part. Another business's conversation, type or id gives 404 (the isolation suite and each feature test prove it); the reorder answers 400 for any list that is not exactly the business's own types, so it never says whether an id exists.
+- [x] Every query filters by the business as well as the id (checked by script on every by-id query in the module); raw SQL is only the per-business advisory locks, with the value passed as a parameter.
+- [x] Roles on the route: all type changes, "Try it" and the block list are manager only; reading and correcting a conversation is managers and staff, and the "own leads only" role is refused (R60).
+- [x] Validation (zod, strict, with limits) on every body and address part; the AI's answer is validated against a shape built from the business's own keys.
+- [x] The AI is told that the conversation is data, a closing marker typed by a customer is removed, the AI only names a type (it never decides actions or sees tools), and "Try it" is limited to 10 a minute because each try spends AI quota.
+- [x] Nothing of what a customer said, and no phone number, email or blocked entry, is written to the activity log, an event, a ticket, a note or the AI usage record (tests assert this); no `console` or logger use in the module; `process.env` only in `kernel/config.ts`.
+- [x] Records are never deleted by a correction (a lead is lost as "Reclassified", a ticket closed with a note); messages and corrections cannot be edited or deleted by business code (the database refuses).
+- [x] Concurrency: advisory locks and row locks for reorder, the block list save, sorting, and the contact-first lock for leads and tickets; the 25-type limit is also a database rule.
+- [ ] Customers' words are sent to the AI company whose key is used (the business's own or the platform's). This is by design for every AI feature, but the privacy notice, the data processing agreement and message retention belong to F24 and F21: **not done here, recorded in the known limits.**
+- [x] `npm audit --audit-level=high` is clean (9 moderate findings remain, R44); no new package was added.
 
 ## Decisions and differences from the requirements
-- R1 and R21 (one list of types, one `conversations` table) are built here as designed.
-- R56 (this brief, 16 Nov 2026): messages stored now; models by F37 order, defaults Gemini Flash-Lite then GPT-4o mini; no separate test feed.
+- R1 and R21 (one list of types, one `conversations` table) are built here as designed; the design document `docs/CONVERSATION-TYPES.md` lists where the code differs (no `route` column, alerts hold only who and when, system types always on, starting types written on first read, the limit of 25 as a database rule, conversations without `held_*`, `summary` and `done_at` yet).
+- **R56** (start of F15): messages stored now; models by the F37 order; no separate test feed.
+- **R57:** the database design review and the limit of 25 enforced in the database.
+- **R58:** the first release sorts only after a conversation ends; the live type comes after Phase 1; the classifier lives in `core.conversations` (ARCHITECTURE.md §3 updated).
+- **R59:** how the contact, lead and ticket are made, the anonymous visitor, the re-enquiry rule, and what is recorded.
+- **R60:** who can read and correct conversations, and what a correction does.
+- Owner choice (16 Nov 2026): slice 7 was built as 7a, 7b and 7c, with a simulate script instead of a channel.
