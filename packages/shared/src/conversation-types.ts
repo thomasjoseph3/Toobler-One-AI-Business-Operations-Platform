@@ -78,3 +78,38 @@ export const createConversationTypeRequestSchema = z
     { message: 'A ticket outcome needs a ticket type and a priority, and no other outcome takes them.' },
   );
 export type CreateConversationTypeRequest = z.infer<typeof createConversationTypeRequestSchema>;
+
+/** The address part naming a conversation type. */
+export const conversationTypeIdParamsSchema = z.object({ id: z.uuid() });
+
+/**
+ * Changing a type (a manager). Only the fields sent change; the key and the system flag can never be sent. Sending `alert: null`
+ * clears the alert. Moving to a ticket outcome needs a ticket kind and priority (sent now, or already on the type); moving to any
+ * other outcome clears them, and sending them with another outcome is refused. The service checks the final result.
+ */
+export const updateConversationTypeRequestSchema = z
+  .object({
+    label: trimmedText(80),
+    description: trimmedText(500),
+    examples: z.array(trimmedText(300)).max(5),
+    outcome: conversationOutcomeSchema,
+    ticketType: conversationTicketTypeSchema,
+    priority: conversationTicketPrioritySchema,
+    needsPerson: z.boolean(),
+    alert: conversationAlertSchema.nullable(),
+    playbook: conversationPlaybookSchema,
+    isActive: z.boolean(),
+  })
+  .partial()
+  .strict()
+  .refine((request) => Object.values(request).some((value) => value !== undefined), {
+    message: 'Send at least one thing to change.',
+  })
+  .refine(
+    (request) =>
+      request.outcome === undefined ||
+      request.outcome === 'ticket' ||
+      (request.ticketType === undefined && request.priority === undefined),
+    { message: 'Only a ticket outcome takes a ticket type and a priority.' },
+  );
+export type UpdateConversationTypeRequest = z.infer<typeof updateConversationTypeRequestSchema>;

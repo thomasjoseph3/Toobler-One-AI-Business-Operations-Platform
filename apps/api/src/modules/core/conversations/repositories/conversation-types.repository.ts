@@ -160,3 +160,59 @@ export async function insertConversationTypeIfKeyIsFree(db: Db, type: NewConvers
     .executeTakeFirst();
   return Number(result.numInsertedOrUpdatedRows ?? 0) > 0;
 }
+
+/** The columns a manager can change. A field that is left out stays as it is; `null` clears a field that can be empty. */
+export interface ConversationTypeChanges {
+  label?: string;
+  description?: string;
+  examples?: string[];
+  outcome?: ConversationOutcome;
+  ticketType?: TicketTypeWord | null;
+  priority?: TicketPriorityWord | null;
+  needsPerson?: boolean;
+  alert?: ConversationAlert | null;
+  playbook?: ConversationPlaybook;
+  isActive?: boolean;
+  actor: Actor;
+}
+
+/**
+ * Changes the fields that were sent on one type of the business. Returns false when no such type exists (unknown id, or
+ * another business's). Fails with a "check" error when switching the type on would pass the limit of active types.
+ */
+export async function updateConversationType(
+  db: Db,
+  accountId: string,
+  typeId: string,
+  changes: ConversationTypeChanges,
+): Promise<boolean> {
+  const result = await db
+    .updateTable('conversation_types')
+    .set({
+      ...(changes.label !== undefined ? { label: changes.label } : {}),
+      ...(changes.description !== undefined ? { description: changes.description } : {}),
+      ...(changes.examples !== undefined ? { examples: JSON.stringify(changes.examples) } : {}),
+      ...(changes.outcome !== undefined ? { outcome: changes.outcome } : {}),
+      ...(changes.ticketType !== undefined ? { ticket_type: changes.ticketType } : {}),
+      ...(changes.priority !== undefined ? { priority: changes.priority } : {}),
+      ...(changes.needsPerson !== undefined ? { needs_person: changes.needsPerson } : {}),
+      ...(changes.alert !== undefined ? { alert: changes.alert === null ? null : JSON.stringify(changes.alert) } : {}),
+      ...(changes.playbook !== undefined ? { playbook: changes.playbook } : {}),
+      ...(changes.isActive !== undefined ? { is_active: changes.isActive } : {}),
+      updated_by: { kind: changes.actor.kind, id: changes.actor.id },
+    })
+    .where('account_id', '=', accountId)
+    .where('id', '=', typeId)
+    .executeTakeFirst();
+  return Number(result.numUpdatedRows) > 0;
+}
+
+/** Removes one type of the business. Returns false when no such type exists. Fails with a "check" error for a system type. */
+export async function deleteConversationType(db: Db, accountId: string, typeId: string): Promise<boolean> {
+  const result = await db
+    .deleteFrom('conversation_types')
+    .where('account_id', '=', accountId)
+    .where('id', '=', typeId)
+    .executeTakeFirst();
+  return Number(result.numDeletedRows) > 0;
+}

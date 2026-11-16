@@ -414,6 +414,22 @@ const attempts: Attempt[] = [
     expectedStatus: 201,
   },
   {
+    route: 'PATCH /api/v1/conversation-types/{id}',
+    what: "change A's conversation type",
+    request: () => ({
+      method: 'PATCH',
+      url: `/conversation-types/${dataOfA.conversationTypeId}`,
+      payload: { label: 'Hacked' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/conversation-types/{id}',
+    what: "remove A's conversation type",
+    request: () => ({ method: 'DELETE', url: `/conversation-types/${dataOfA.conversationTypeId}` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'PATCH /api/v1/knowledge/faqs/{id}',
     what: "change A's FAQ",
     request: () => ({ method: 'PATCH', url: `/knowledge/faqs/${dataOfA.faqId}`, payload: { answer: 'Hacked' } }),

@@ -3,16 +3,17 @@ import {
   type ConversationType,
   type ConversationTypesListResponse,
   type CreateConversationTypeRequest,
+  type UpdateConversationTypeRequest,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
-import { conflict } from '../../../../kernel/errors';
+import { badRequest, conflict, notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { listStartingConversationTypes, makeTypeKeyFromLabel } from '../helpers/default-conversation-types';
 import * as conversationTypesRepository from '../repositories/conversation-types.repository';
-import type { ConversationTypeRow } from '../repositories/conversation-types.repository';
+import type { ConversationTypeChanges, ConversationTypeRow } from '../repositories/conversation-types.repository';
 
 // The database error code for "a check failed", which the active-types rule (migration 032) uses when a business would go over 25.
 const CHECK_VIOLATION = '23514';
@@ -171,6 +172,123 @@ export function createConversationTypesService({ database }: { database: Databas
         if (isTooManyActiveTypesError(error)) throw tooManyTypesError();
         throw error;
       }
+    },
+
+    /**
+     * Changes the fields that were sent on one type. 404 for an unknown type or another business's. The system types can be
+     * renamed and re-routed but never switched off (the router needs them), 409. A ticket outcome needs a ticket kind and
+     * priority; a move to any other outcome clears them, 400 when they are sent anyway. Switching a type on past the limit of
+     * 25 active types answers 409. Writes an activity-log line naming the fields, never their words. Answers with the type.
+     */
+    async updateConversationType(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      typeId: string,
+      request: UpdateConversationTypeRequest,
+    ): Promise<ConversationType> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      try {
+        return await database.runInAccountTransaction(accountId, async (transaction) => {
+          const current = await conversationTypesRepository.findConversationTypeById(transaction, accountId, typeId);
+          if (!current) throw notFound('That conversation type');
+
+          if (current.isSystem && request.isActive === false) {
+            throw conflict(
+              'SYSTEM_TYPE_ALWAYS_ON',
+              'The built-in conversation types stay switched on. You can rename one or change what happens to it.',
+            );
+          }
+
+          // The ticket fields that go with the outcome (a ticket needs both; anything else has none)
+          const newOutcome = request.outcome ?? current.outcome;
+          const ticketFieldsSent = request.ticketType !== undefined || request.priority !== undefined;
+          let ticketFieldChanges: Pick<ConversationTypeChanges, 'ticketType' | 'priority'> = {};
+          if (newOutcome === 'ticket') {
+            const ticketType = request.ticketType ?? current.ticketType;
+            const priority = request.priority ?? current.priority;
+            if (ticketType === null || priority === null) {
+              throw badRequest('A ticket outcome needs a ticket type and a priority.');
+            }
+            ticketFieldChanges = { ticketType, priority };
+          } else if (ticketFieldsSent) {
+            throw badRequest('Only a ticket outcome takes a ticket type and a priority.');
+          } else if (current.outcome === 'ticket') {
+            // Moving away from a ticket outcome: the ticket fields no longer apply
+            ticketFieldChanges = { ticketType: null, priority: null };
+          }
+
+          // Switching a type on again counts towards the limit of 25 (the database enforces it too)
+          if (request.isActive === true && !current.isActive) {
+            const activeCount = await conversationTypesRepository.countActiveConversationTypes(transaction, accountId);
+            if (activeCount >= MAX_ACTIVE_CONVERSATION_TYPES) throw tooManyTypesError();
+          }
+
+          const changes: ConversationTypeChanges = {
+            ...(request.label !== undefined ? { label: request.label } : {}),
+            ...(request.description !== undefined ? { description: request.description } : {}),
+            ...(request.examples !== undefined ? { examples: request.examples } : {}),
+            ...(request.outcome !== undefined ? { outcome: request.outcome } : {}),
+            ...ticketFieldChanges,
+            ...(request.needsPerson !== undefined ? { needsPerson: request.needsPerson } : {}),
+            ...(request.alert !== undefined ? { alert: request.alert } : {}),
+            ...(request.playbook !== undefined ? { playbook: request.playbook } : {}),
+            ...(request.isActive !== undefined ? { isActive: request.isActive } : {}),
+            actor,
+          };
+          await conversationTypesRepository.updateConversationType(transaction, accountId, typeId, changes);
+
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'conversations.type_updated',
+            // Which fields were sent, never their values
+            details: {
+              recordType: 'conversation_type',
+              recordId: typeId,
+              fields: Object.keys(request).filter(
+                (field) => request[field as keyof UpdateConversationTypeRequest] !== undefined,
+              ),
+            },
+          });
+
+          const updated = await conversationTypesRepository.findConversationTypeById(transaction, accountId, typeId);
+          if (!updated) throw new Error('The conversation type that was just changed could not be read back.');
+          return toConversationType(updated);
+        });
+      } catch (error) {
+        // Two requests at the same moment can both pass the check above; the database's own rule (migration 032) stops the second
+        if (isTooManyActiveTypesError(error)) throw tooManyTypesError();
+        throw error;
+      }
+    },
+
+    /**
+     * Removes a custom type. 404 for an unknown type or another business's; the built-in types cannot be removed, 409. A
+     * conversation that already has this type keeps its own record (when conversations arrive, slice 7, they move to
+     * "unclear"). Writes an activity-log line. Answers with nothing.
+     */
+    async deleteConversationType(principal: Pick<Principal, 'accountId' | 'userId'>, typeId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        const current = await conversationTypesRepository.findConversationTypeById(transaction, accountId, typeId);
+        if (!current) throw notFound('That conversation type');
+        if (current.isSystem) {
+          throw conflict(
+            'SYSTEM_TYPE_CANNOT_BE_REMOVED',
+            'The built-in conversation types cannot be removed. You can rename one or change what happens to it.',
+          );
+        }
+        await conversationTypesRepository.deleteConversationType(transaction, accountId, typeId);
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'conversations.type_removed',
+          details: { recordType: 'conversation_type', recordId: typeId },
+        });
+      });
     },
   };
 }

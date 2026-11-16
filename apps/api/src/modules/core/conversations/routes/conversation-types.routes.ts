@@ -1,14 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  conversationTypeIdParamsSchema,
   conversationTypeSchema,
   conversationTypesListResponseSchema,
   createConversationTypeRequestSchema,
+  updateConversationTypeRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createConversationTypesService } from '../services/conversation-types.service';
 
-/** Registers /api/v1/conversation-types (list, add). More routes arrive with the later slices. */
+/** Registers /api/v1/conversation-types (list, add), /conversation-types/{id} (change, remove). More routes arrive with the later slices. */
 export function conversationTypesRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const conversationTypesService = createConversationTypesService({ database: app.kernel.database });
@@ -34,6 +36,34 @@ export function conversationTypesRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const created = await conversationTypesService.createConversationType(request.principal, request.body);
       return reply.code(201).send(created);
+    },
+  );
+
+  // Managers only. Only the fields sent change. The built-in types can be renamed and re-routed but not switched off.
+  typedApp.patch(
+    '/conversation-types/:id',
+    {
+      config: { access: 'manager' },
+      schema: {
+        params: conversationTypeIdParamsSchema,
+        body: updateConversationTypeRequestSchema,
+        response: { 200: conversationTypeSchema },
+      },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return conversationTypesService.updateConversationType(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // Managers only. A custom type only: the built-in types answer 409. (The screen asks "Are you sure?" first.)
+  typedApp.delete(
+    '/conversation-types/:id',
+    { config: { access: 'manager' }, schema: { params: conversationTypeIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await conversationTypesService.deleteConversationType(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }

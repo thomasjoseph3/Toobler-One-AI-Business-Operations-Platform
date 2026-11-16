@@ -25,7 +25,7 @@
 - **Changed:** the old project had no classifier and no router: every conversation was handled inside each channel. Here one shared engine decides the type for every channel. Types, outcomes and the router are new work, written to docs/CONVERSATION-TYPES.md.
 - **Left behind:** hotel-only prompt text and the per-channel conversation handling (it moves into the engine).
 
-## Database (forward-only, one migration per change: `031_conversation_types.sql` and `032_conversation_types_active_limit.sql` so far; the others with the slice that needs them)
+## Database (forward-only, one migration per change: `031_conversation_types.sql` and `032_conversation_types_active_limit.sql` and `033_conversation_types_delete.sql` so far; the others with the slice that needs them)
 Every table has `account_id`, RLS enabled and forced, `created_by` / actor where a person or the system changes it.
 - `conversation_types`: `key`, `label`, `description`, `examples` jsonb (up to 5), `system` bool, `outcome` (`lead` / `ticket` / `log` / `filter` / `ignore` / `review`), `ticket_type`, `priority`, `route` jsonb, `needs_person`, `alert` jsonb, `playbook`, `active`, `sort`. Unique per (business, key). Up to 25 active per business.
 - `conversations`: one row per conversation on any channel (`channel`, `contact_id`, `type_key`, `type_confidence`, `type_source` = `rule` / `ai_live` / `ai_final` / `staff`, `ai_unsure`, `needs_person`, `status`, `held_by_user_id`, `held_until`, `summary`, `ended_at`, `done_at`).
@@ -54,7 +54,7 @@ Every table has `account_id`, RLS enabled and forced, `created_by` / actor where
 | Slice | Builds | Routes |
 | --- | --- | --- |
 | 1 | **Built, waiting for the owner's check.** Migration 031, the system types and industry presets, the types list and add | `GET /conversation-types`, `POST /conversation-types` |
-| 2 | Edit and remove a type | `PATCH /conversation-types/{id}`, `DELETE /conversation-types/{id}` |
+| 2 | **Built, waiting for the owner's check.** Edit and remove a type (migration 033) | `PATCH /conversation-types/{id}`, `DELETE /conversation-types/{id}` |
 | 3 | Reorder | `POST /conversation-types/reorder` |
 | 4 | Block list | `GET /block-list`, `PUT /block-list` |
 | 5 | The pre-filter and `router.decide` (pure code, unit tests for every row of the design; no route) | none |
@@ -65,6 +65,8 @@ Every table has `account_id`, RLS enabled and forced, `created_by` / actor where
 Settings → Conversation types (each type as a sentence, edit form, Try it box); block list; Change type on the inbox, lead and ticket pages; the Filtered tab. No screen is built now.
 
 ## Rules to enforce
+- **The built-in (system) types are always on and cannot be removed** (decided at slice 2, owner to confirm): the router needs them as its fallbacks (`unclear` for low confidence, `spam` for the block list, `no_conversation`, `automated` and `internal` for the code rules). They can be renamed and re-routed. Switching one off answers 409 `SYSTEM_TYPE_ALWAYS_ON`; removing one answers 409 `SYSTEM_TYPE_CANNOT_BE_REMOVED`, and the database refuses it too (migration 033).
+- Removing a custom type leaves history alone (a ticket keeps its type key as text). When conversations arrive (slice 7), a conversation whose type was removed moves to `unclear`.
 - The AI says what it was about; **code decides what to do** (the router is pure and has a unit test per row).
 - Confidence ≥ 0.70 apply; 0.40 to 0.70 apply and mark "AI unsure"; below 0.40 treat as `unclear` (needs review, no lead or ticket yet).
 - More than one reason can give more than one outcome, each stored once per conversation and type.
