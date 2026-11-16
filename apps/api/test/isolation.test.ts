@@ -57,6 +57,8 @@ async function sendOk(person: SignedInPerson, method: string, url: string, paylo
 /** Everything business A owns that business B will aim at. */
 interface BusinessAData {
   conversationId: string;
+  /** A's test chat ("Test the agent"). */
+  testChatId: string;
   conversationTypeId: string;
   contactId: string;
   leadId: string;
@@ -193,8 +195,23 @@ beforeAll(async () => {
       confidence: 0.9,
     })
     .execute();
+  // A also has a test chat, which B must not be able to carry on
+  const testChatOfA = randomUUID();
+  await database.system
+    .insertInto('conversations')
+    .values({
+      id: testChatOfA,
+      account_id: businessA.profile.business.id,
+      channel: 'webchat',
+      from_phone_key: null,
+      from_email: null,
+      contact_id: null,
+      is_test: true,
+    })
+    .execute();
   dataOfA = {
     conversationId: conversationOfA,
+    testChatId: testChatOfA,
     conversationTypeId: conversationType.id,
     contactId: contact.id,
     leadId: lead.id,
@@ -472,6 +489,28 @@ const attempts: Attempt[] = [
     route: 'GET /api/v1/conversations/{id}',
     what: "read A's conversation (its messages)",
     request: () => ({ method: 'GET', url: `/conversations/${dataOfA.conversationId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/agent/test-chat',
+    what: "carry on A's test chat (the AI must never be shown A's messages, and nothing may be added to it)",
+    request: () => ({
+      method: 'POST',
+      url: '/agent/test-chat',
+      payload: { conversationId: dataOfA.testChatId, message: 'Hello' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/agent/test-chats/{conversationId}',
+    what: "read A's test chat back (its messages, what the agent learned, its promise)",
+    request: () => ({ method: 'GET', url: `/agent/test-chats/${dataOfA.testChatId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/agent/test-chats/{conversationId}/summary',
+    what: "summarise A's test chat (the AI must never be shown A's messages)",
+    request: () => ({ method: 'POST', url: `/agent/test-chats/${dataOfA.testChatId}/summary` }),
     expectedStatus: 404,
   },
   {

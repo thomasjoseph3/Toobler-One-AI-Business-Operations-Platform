@@ -19,6 +19,8 @@ import {
   type LlmProviderId,
   type LlmRequest,
   type LlmTextResult,
+  type LlmTool,
+  type LlmToolsResult,
 } from '../../../../providers/llm';
 import { buildCandidates, chooseModelsForTask, chooseOrderForTask } from '../helpers/choose-models-for-task';
 import { decideKeySources, type KeySourceDecision } from '../helpers/decide-key-sources';
@@ -38,6 +40,14 @@ export interface AiCallInput {
   prompt: LlmPrompt;
   temperature?: number;
   maxOutputTokens?: number;
+}
+
+/** An ordinary call plus the tools the model may use (the AI agent's way of asking). */
+export interface AiToolsCallInput extends AiCallInput {
+  /** What the model may ask the app to do. Each tool is built by the caller for one business and one conversation. */
+  tools: LlmTool[];
+  /** The most times the model may be asked in one answer. Default 8. */
+  maxRounds?: number;
 }
 
 /** One finished call, for the usage records. Never holds any text of the conversation or any key. */
@@ -327,5 +337,18 @@ export function createAiService(dependencies: AiServiceDependencies) {
     /** Asks the AI for an answer that fits a shape (checked again here). Returns the value and the call's details. */
     generateObject: <Value>(input: AiCallInput, schema: ZodType<Value>): Promise<LlmObjectResult<Value>> =>
       run(input, (request) => llm.generateObject(request, schema)),
+
+    /**
+     * Asks the AI for an answer that may use tools: the model asks, the app runs the tools, the model asks again, until it answers
+     * or the rounds run out. All the rounds are one call in the usage records. Returns the words, the tool calls and the details.
+     */
+    generateWithTools: (input: AiToolsCallInput): Promise<LlmToolsResult> =>
+      run(input, (request) =>
+        llm.generateWithTools({
+          ...request,
+          tools: input.tools,
+          ...(input.maxRounds !== undefined ? { maxRounds: input.maxRounds } : {}),
+        }),
+      ),
   };
 }

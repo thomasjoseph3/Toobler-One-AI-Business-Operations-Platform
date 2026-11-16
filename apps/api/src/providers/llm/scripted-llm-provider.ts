@@ -1,4 +1,5 @@
 import type { ZodType } from 'zod';
+import { runToolLoop, type LoopMessage, type ModelTurn } from './tool-loop';
 import type {
   LlmCandidate,
   LlmObjectResult,
@@ -6,6 +7,8 @@ import type {
   LlmProviderId,
   LlmRequest,
   LlmTextResult,
+  LlmToolsRequest,
+  LlmToolsResult,
   LlmUsage,
 } from './llm-types';
 import { runWithFallback } from './run-with-fallback';
@@ -19,8 +22,25 @@ export interface ScriptedAnswer {
   usage?: Partial<LlmUsage>;
 }
 
-/** The script: called for each try with the candidate and the request. Return an answer or throw an Error. */
-export type LlmScript = (candidate: LlmCandidate, request: LlmRequest) => ScriptedAnswer | Promise<ScriptedAnswer>;
+/**
+ * What a scripted model says in one round of a tool conversation (the `answer` of a ScriptedAnswer): plain words end the
+ * conversation, and `toolCalls` asks for tools to be run first.
+ */
+export interface ScriptedToolTurn {
+  text?: string;
+  toolCalls?: { name: string; input: unknown }[];
+}
+
+/**
+ * The script: called for each try with the candidate and the request. Return an answer or throw an Error.
+ * For `generateWithTools` it is called once per round, and `messagesSoFar` is the conversation so far including the tool results,
+ * so a test can say what the model does in each round (an answer may be a string or a ScriptedToolTurn).
+ */
+export type LlmScript = (
+  candidate: LlmCandidate,
+  request: LlmRequest,
+  messagesSoFar?: LoopMessage[],
+) => ScriptedAnswer | Promise<ScriptedAnswer>;
 
 const DEFAULT_USAGE: LlmUsage = { inputTokens: 12, outputTokens: 4, cachedTokens: 0, usageMissing: false };
 
@@ -31,8 +51,8 @@ export function createScriptedLlmProvider(
   listModelsScript: (provider: LlmProviderId, apiKey: string) => string[] | Promise<string[]> = () => [],
 ): LlmProvider & { requests: LlmRequest[] } {
   const requests: LlmRequest[] = [];
-  const answerOnce = async (candidate: LlmCandidate, request: LlmRequest) => {
-    const scripted = await script(candidate, request);
+  const answerOnce = async (candidate: LlmCandidate, request: LlmRequest, messagesSoFar?: LoopMessage[]) => {
+    const scripted = await script(candidate, request, messagesSoFar);
     return { value: scripted.answer, usage: { ...DEFAULT_USAGE, ...scripted.usage } };
   };
   return {
@@ -50,6 +70,36 @@ export function createScriptedLlmProvider(
         return { value: schema.parse(answered.value), usage: answered.usage };
       });
       return { value: outcome.value, details: outcome.details };
+    },
+    async generateWithTools(request: LlmToolsRequest): Promise<LlmToolsResult> {
+      requests.push(request);
+      // The same loop as the real provider runs here; only the "ask the model once" step is the script.
+      return runToolLoop({
+        startMessages: request.prompt.messages.map((message) => ({
+          kind: 'text' as const,
+          role: message.role,
+          text: message.text,
+        })),
+        tools: request.tools,
+        maxRounds: request.maxRounds,
+        askModelOnce: async (messagesSoFar): Promise<ModelTurn> => {
+          const outcome = await runWithFallback(request.candidates, (candidate) =>
+            answerOnce(candidate, request, messagesSoFar),
+          );
+          const scripted = outcome.value;
+          const turn: ScriptedToolTurn =
+            typeof scripted === 'string' ? { text: scripted } : (scripted as ScriptedToolTurn);
+          return {
+            text: turn.text ?? '',
+            toolCalls: (turn.toolCalls ?? []).map((call, position) => ({
+              callId: `call_${messagesSoFar.length}_${position}`,
+              toolName: call.name,
+              input: call.input,
+            })),
+            details: outcome.details,
+          };
+        },
+      });
     },
   };
 }

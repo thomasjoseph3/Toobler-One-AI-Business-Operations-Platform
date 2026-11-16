@@ -424,9 +424,34 @@ export interface ConversationsTable {
   type_reason: string | null;
   ai_unsure: Generated<boolean>;
   needs_person: Generated<boolean>;
+  /** A test chat from "Test the agent": never sorted into a lead or a ticket. */
+  is_test: Generated<boolean>;
   status: Generated<'open' | 'sorted'>;
   ended_at: Date | null;
   sorted_at: Date | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** What the AI agent learned in one conversation: the details, the one promise. One row per conversation. Fenced by account_id. */
+export interface ConversationFactsTable {
+  conversation_id: string;
+  account_id: string;
+  /** What the customer said, by label. Written as JSON text, read back as an object. */
+  details: ColumnType<Json, string, string>;
+  situation: Generated<'sale_enquiry' | 'ready_to_book' | 'not_a_sale'>;
+  promise_kind: 'call_back_open' | 'call_back_closed' | 'send_confirmation' | 'passed_to_manager' | null;
+  promise_sentence: string | null;
+  promise_due_at: Date | null;
+  promise_made_at: Date | null;
+  callback_reason: string | null;
+  /** The short summary of the conversation, written once it has ended. */
+  summary: string | null;
+  summarised_at: Date | null;
+  /** A list of texts the tools gave back lately. Written as JSON text, read back as a list. */
+  earlier_tool_results: ColumnType<unknown[], string, string>;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;
@@ -633,6 +658,7 @@ export interface DB {
   block_list: BlockListTable;
   conversations: ConversationsTable;
   conversation_messages: ConversationMessagesTable;
+  conversation_facts: ConversationFactsTable;
   conversation_outcomes: ConversationOutcomesTable;
   classification_corrections: ClassificationCorrectionsTable;
   business_answers: BusinessAnswersTable;

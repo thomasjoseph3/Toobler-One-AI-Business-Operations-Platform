@@ -22,3 +22,16 @@ export async function findStaffContactPoints(
   const points = await usersRepository.listStaffContactPoints(transaction, accountId);
   return { phoneKeys: new Set(points.phoneKeys), emails: new Set(points.emails) };
 }
+
+/** What the AI agent needs to know about the business itself: its name, its kind and the time zone its hours are in. */
+export interface BusinessIdentity {
+  name: string;
+  industry: string;
+  timeZone: string;
+}
+
+/** The business's name, kind of business and time zone, or undefined when the business does not exist. Runs in the business's own transaction. */
+export async function findBusinessIdentity(transaction: Db, accountId: string): Promise<BusinessIdentity | undefined> {
+  const account = await accountsRepository.findAccountById(transaction, accountId);
+  return account ? { name: account.name, industry: account.industry, timeZone: account.timeZone } : undefined;
+}

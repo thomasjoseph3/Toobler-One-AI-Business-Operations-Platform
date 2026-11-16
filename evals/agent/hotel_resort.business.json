@@ -1,0 +1,61 @@
+{
+  "businessName": "Nair Stays",
+  "timeZone": "Asia/Kolkata",
+  "facts": [
+    { "question": "What is your address?", "answer": "Beach Road, Fort Kochi, Kerala" },
+    { "question": "Opening hours, and days you're closed", "answer": "Open all day, every day." },
+    { "question": "What payment methods do you accept?", "answer": "UPI, cards and cash at the desk." },
+    { "question": "Cancellation policy", "answer": "Free cancellation up to 48 hours before check-in." }
+  ],
+  "situations": [
+    {
+      "key": "discount_request",
+      "whenItHappens": "A customer asks for a discount",
+      "handling": "Prices are fixed",
+      "handlingKey": "prices_are_fixed"
+    },
+    {
+      "key": "not_available",
+      "whenItHappens": "You don't have what they want, or you're full",
+      "handling": "Take details, staff call back",
+      "handlingKey": "take_details_staff_call_back"
+    },
+    {
+      "key": "speak_to_person",
+      "whenItHappens": "A customer asks to speak to a person",
+      "handling": "Always promise a callback",
+      "handlingKey": "always_promise_callback"
+    },
+    {
+      "key": "complaint",
+      "whenItHappens": "A customer complains",
+      "handling": "Apologise, pass to the manager, raise a ticket",
+      "handlingKey": "apologise_pass_to_manager_raise_ticket"
+    }
+  ],
+  "offerings": [
+    {
+      "name": "Deluxe room",
+      "description": "Sea view room for two",
+      "priceInWords": "from ₹4,000 a night plus GST",
+      "seasonNote": null,
+      "includes": "Breakfast and Wi-Fi",
+      "details": []
+    },
+    {
+      "name": "Family suite",
+      "description": "Two bedrooms, sleeps four",
+      "priceInWords": "from ₹7,500 a night plus GST",
+      "seasonNote": "Rates are higher from 20 December to 5 January",
+      "includes": "Breakfast and Wi-Fi",
+      "details": []
+    }
+  ],
+  "offers": [{ "text": "10% off stays of 3 nights or more in January", "endsOn": "2027-01-31" }],
+  "faqs": [
+    { "question": "Do you have parking?", "answer": "Yes, free parking for guests." },
+    { "question": "Is breakfast included?", "answer": "Yes, breakfast is included with every room." },
+    { "question": "What time is check-in?", "answer": "Check-in is from 2 PM and check-out is by 11 AM." },
+    { "question": "Are pets allowed?", "answer": "Small pets are welcome with a prior note." }
+  ]
+}

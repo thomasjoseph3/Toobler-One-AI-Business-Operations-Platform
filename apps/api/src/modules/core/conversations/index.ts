@@ -5,3 +5,5 @@ export type { AddMessageInput, StartConversationInput } from './services/convers
 export { createConversationFinaliser } from './services/conversation-finaliser.service';
 export type { FinaliseOptions, FinaliseResult } from './services/conversation-finaliser.service';
 export { createConversationClassifier } from './services/conversation-classifier.service';
+// "Test the agent" (F19) saves its chats as conversations, so it follows the same rule about who may read them.
+export { refuseOwnLeadsOnlyRole } from './services/conversation-reader.service';

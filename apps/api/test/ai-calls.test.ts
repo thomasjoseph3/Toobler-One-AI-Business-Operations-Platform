@@ -209,6 +209,64 @@ describe('the AI service on the platform’s keys', () => {
     expect(llm.requests[0]).toMatchObject({ tag, temperature: 0, maxOutputTokens: 200, prompt });
   });
 
+  it('runs the tools the model asks for through the service: the rounds are one recorded call, with the key and model chosen as usual', async () => {
+    const { accountId } = await newBusiness();
+    const lookedUp: unknown[] = [];
+    const { service, records } = serviceWith({ gemini: ['calls-t1'] }, (_tried, _request, messagesSoFar = []) =>
+      messagesSoFar.some((message) => message.kind === 'tool_answer')
+        ? { answer: 'Parking is free.' }
+        : { answer: { toolCalls: [{ name: 'search_knowledge', input: { question: 'parking' } }] } },
+    );
+    const result = await service.generateWithTools({
+      accountId,
+      tag,
+      prompt,
+      tools: [
+        {
+          name: 'search_knowledge',
+          description: 'Looks up an answer.',
+          inputSchema: z.object({ question: z.string() }),
+          run: async (input) => {
+            lookedUp.push(input);
+            return 'Free parking for guests.';
+          },
+        },
+      ],
+    });
+    expect(result.text).toBe('Parking is free.');
+    expect(lookedUp).toEqual([{ question: 'parking' }]);
+    expect(result.details.servedBy).toMatchObject({ provider: 'gemini', keySource: 'platform' });
+    // Two rounds, one record
+    expect(records).toHaveLength(1);
+    expect(records[0]?.details?.attempts).toHaveLength(2);
+  });
+
+  it('answers 503 when no key is set up for a tool call, and never runs a tool', async () => {
+    const manager = await createSignedInPerson(app, database);
+    const accountId = manager.profile.business.id;
+    const { service } = serviceWith({}, () => ({ answer: 'x' }));
+    let toolRan = false;
+    await expect(
+      service.generateWithTools({
+        accountId,
+        tag,
+        prompt,
+        tools: [
+          {
+            name: 'search_knowledge',
+            description: 'x',
+            inputSchema: z.object({}),
+            run: async () => {
+              toolRan = true;
+              return 'x';
+            },
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ status: 503, code: 'AI_NOT_AVAILABLE' });
+    expect(toolRan).toBe(false);
+  });
+
   it('answers 503 for a job no model is set for', async () => {
     const { accountId } = await newBusiness();
     const { service } = serviceWith({ gemini: ['calls-e1'] }, () => ({ answer: 'never' }));
