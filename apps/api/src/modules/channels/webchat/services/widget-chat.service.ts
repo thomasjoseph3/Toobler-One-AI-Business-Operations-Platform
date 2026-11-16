@@ -1,5 +1,5 @@
 import type { CountryCode } from 'libphonenumber-js';
-import type { WidgetConfig, WidgetMessageResponse } from '@toobler-one/shared';
+import type { WidgetChat, WidgetConfig, WidgetMessageResponse } from '@toobler-one/shared';
 import type { Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
 import { ApiError, notFound, tooMany } from '../../../../kernel/errors';
@@ -11,6 +11,7 @@ import { readVisitorContact } from '../helpers/read-visitor-contact';
 import { isWebsiteAllowed } from '../helpers/website-origin';
 import { signVisitorToken, verifyVisitorToken } from '../helpers/visitor-token';
 import type { WindowLimiter } from '../helpers/window-limiter';
+import { handOverChat } from './chat-hand-over.service';
 import * as webchatSettingsRepository from '../repositories/webchat-settings.repository';
 import type { SettingsFoundByKey } from '../repositories/webchat-settings.repository';
 
@@ -52,12 +53,24 @@ export function createWidgetChatService(input: {
   publicBaseUrl: string;
   appSecret: string;
   savedTurns: SavedTurnService;
+  /** Queues a background job (the sorting and the summary when a chat ends). */
+  enqueueJob: (jobName: string, data: { accountId: string; conversationId: string }) => Promise<void>;
   limiters?: WidgetLimiters | undefined;
   now?: () => Date;
 }) {
   const { database, gate, savedTurns } = input;
   const now = input.now ?? (() => new Date());
   const conversationRecords = createConversationRecordsService({ database });
+
+  /** Finds the chat a visitor token names, or throws 401 when the token is not ours, has run out, or names no web chat of this business. */
+  async function findChatOfVisitor(widget: OpenedWidget, visitorToken: string | undefined) {
+    if (visitorToken === undefined) throw invalidVisitorToken();
+    const claims = await verifyVisitorToken({ appSecret: input.appSecret, token: visitorToken, now: now() });
+    if (!claims || claims.accountId !== widget.accountId) throw invalidVisitorToken();
+    const chat = await conversationRecords.findChat(widget.accountId, claims.conversationId, 'webchat');
+    if (!chat) throw invalidVisitorToken();
+    return chat;
+  }
 
   return {
     /**
@@ -90,6 +103,30 @@ export function createWidgetChatService(input: {
       return describeWidgetConfig(widget.settings, input.publicBaseUrl);
     },
 
+    /** The chat so far, for a visitor coming back after a page reload. 401 without a good token. Does not change anything. */
+    async readChat(options: { widget: OpenedWidget; visitorToken: string | undefined }): Promise<WidgetChat> {
+      const chat = await findChatOfVisitor(options.widget, options.visitorToken);
+      const messages = await conversationRecords.readChatMessages(options.widget.accountId, chat.id);
+      return {
+        messages: messages.map((message) => ({
+          sender: message.sender,
+          body: message.body,
+          createdAt: message.createdAt.toISOString(),
+        })),
+        ended: chat.ended,
+      };
+    },
+
+    /**
+     * The visitor closes the bubble: the chat ends and is handed on for sorting and summary. 401 without a good token. Closing a chat that
+     * has already ended changes nothing and queues nothing, so closing twice (or a repeated request) costs nothing.
+     */
+    async endChat(options: { widget: OpenedWidget; visitorToken: string | undefined }): Promise<void> {
+      const chat = await findChatOfVisitor(options.widget, options.visitorToken);
+      if (chat.ended) return;
+      await handOverChat({ database, enqueueJob: input.enqueueJob }, options.widget.accountId, chat.id);
+    },
+
     /**
      * A visitor's message. Without a token it starts a new chat; with one it carries on the chat the token names (401 when the token is
      * not ours, has run out, belongs to another business, or names a chat that is not this business's web chat). When the chat has ended,
@@ -111,14 +148,7 @@ export function createWidgetChatService(input: {
       // Which chat this message belongs to: the one the token names, or none (a new chat)
       let conversationId: string | null = null;
       if (options.visitorToken !== undefined) {
-        const claims = await verifyVisitorToken({
-          appSecret: input.appSecret,
-          token: options.visitorToken,
-          now: now(),
-        });
-        if (!claims || claims.accountId !== accountId) throw invalidVisitorToken();
-        const chat = await conversationRecords.findChat(accountId, claims.conversationId, 'webchat');
-        if (!chat) throw invalidVisitorToken();
+        const chat = await findChatOfVisitor(widget, options.visitorToken);
         if (!chat.ended) conversationId = chat.id;
       }
       if (

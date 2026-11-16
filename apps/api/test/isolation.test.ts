@@ -755,6 +755,10 @@ const exemptRoutes: Record<string, string> = {
     "public: the business comes only from the widget key and nothing in the request can name another; it shows only that business's own look (tested in webchat-widget, including that a key never reaches another business)",
   'POST /api/v1/public/widget/{key}/messages':
     "public: the business comes only from the widget key, and a visitor token made for another business or chat is refused with 401 (tested in webchat-widget: another business's token, a test chat, another channel, an unknown chat)",
+  'GET /api/v1/public/widget/{key}/messages':
+    'public: reads only the one chat the visitor token names, and a token made for another business, a test chat or another channel is refused with 401 (tested in webchat-chat-end)',
+  'POST /api/v1/public/widget/{key}/end':
+    "public: ends only the one chat the visitor token names; another business's token is refused with 401 and ends nothing (tested in webchat-chat-end)",
   'POST /api/v1/conversation-types/test':
     "answers only about the caller's own types: the business comes from the session, nothing is saved, and the AI is only told the caller's own types (tested in conversation-types-try-it)",
   'GET /api/v1/pipeline': 'covered by the list check',

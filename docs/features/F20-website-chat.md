@@ -123,3 +123,11 @@ Differences from the requirements: the **Call** button is a plain `tel:` link no
   4. A token for an ended chat starts a new chat (answer says `newChat: true`).
 - **Open for slice 4:** the chat window runs on the API's own address, so its calls are same-origin and carry the API's own address as `Origin`, not the customer's website. Slice 4 must decide how those calls prove which website framed them (the framing rule `frame-ancestors` already limits who can show the window). Also the API sends `Cross-Origin-Resource-Policy: same-origin` (helmet default), which must be relaxed for `/widget/loader.js`.
 
+
+## Slice 3 build notes (16 Nov 2026)
+
+- **Built:** `GET /public/widget/{key}/messages` (the chat so far, for a reload), `POST /public/widget/{key}/end` (the visitor closes the bubble), their browser permission check, and two jobs: `webchat.find_idle_chats` (every minute, no business: finds businesses that have chats quiet for 15 minutes) and `webchat.end_idle_chats` (one business: ends its idle chats). No migration.
+- **Ending a chat** (by the visitor or by silence) is one step, `handOverChat`: queue `conversations.sort_conversation` and `agents.summarise_conversation`, then note `ended_at`. The jobs are queued first, so a failure leaves the chat open to try again; closing an ended chat queues nothing, and the sort and summary are safe to run twice.
+- **Idle means:** a real (not test) web chat, not ended, not sorted, whose last message (or start, when nothing was said) is more than 15 minutes old. Up to 50 per business per minute. While a business has the chat switched off its idle chats are left alone (the job runner skips the job) and are ended when it is back on.
+- **New plumbing:** `app.kernel.enqueueJob`, so a route can queue a job (server.ts sets it when the job runner starts; tests pass a recording one). This also gives the "nothing queues the summary yet" known limit of F19 its answer for web chat.
+- **Known limit:** a visitor who closes the browser without the bubble's Close is ended by the 15-minute rule only.

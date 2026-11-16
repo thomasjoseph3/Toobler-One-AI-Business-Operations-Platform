@@ -7,13 +7,13 @@ live and how a request travels, so you can find any piece quickly.
 
 Open the folder named for the layer. The feature's name is in the file name.
 
-| Folder | What is in it |
-| --- | --- |
-| `routes/` | `sign-up.routes.ts` (`POST /auth/signup`), `sessions.routes.ts` (`POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`), `profile.routes.ts` (`GET /me`, `PATCH /me`), `password.routes.ts` (`POST /me/password`), `email-verification.routes.ts` (`POST /auth/verify-email`, `POST /auth/resend-email`), `password-reset.routes.ts` (`POST /auth/forgot-password`, `POST /auth/reset-password`) |
-| `services/` | `sign-up.service.ts`, `sessions.service.ts`, `profile.service.ts`, `email-verification.service.ts`, `password-reset.service.ts`, `password.service.ts`: the rules and the steps |
-| `repositories/` | One file per table: `accounts`, `users`, `credentials`, `sessions`, `auth-tokens`, `login-attempts` |
-| `helpers/` | Shared tools with no routes: `passwords.ts`, `phone.ts`, `tokens.ts`, `cookies.ts`, `verification-email.ts` (the email's text), `common-passwords.ts` (passwords sign-up refuses) |
-| `authenticator.ts` | Tells the kernel who is signed in on every request |
+| Folder             | What is in it                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `routes/`          | `sign-up.routes.ts` (`POST /auth/signup`), `sessions.routes.ts` (`POST /auth/login`, `POST /auth/logout`, `POST /auth/refresh`), `profile.routes.ts` (`GET /me`, `PATCH /me`), `password.routes.ts` (`POST /me/password`), `email-verification.routes.ts` (`POST /auth/verify-email`, `POST /auth/resend-email`), `password-reset.routes.ts` (`POST /auth/forgot-password`, `POST /auth/reset-password`) |
+| `services/`        | `sign-up.service.ts`, `sessions.service.ts`, `profile.service.ts`, `email-verification.service.ts`, `password-reset.service.ts`, `password.service.ts`: the rules and the steps                                                                                                                                                                                                                          |
+| `repositories/`    | One file per table: `accounts`, `users`, `credentials`, `sessions`, `auth-tokens`, `login-attempts`                                                                                                                                                                                                                                                                                                      |
+| `helpers/`         | Shared tools with no routes: `passwords.ts`, `phone.ts`, `tokens.ts`, `cookies.ts`, `verification-email.ts` (the email's text), `common-passwords.ts` (passwords sign-up refuses)                                                                                                                                                                                                                        |
+| `authenticator.ts` | Tells the kernel who is signed in on every request                                                                                                                                                                                                                                                                                                                                                       |
 
 ## How a request travels
 

@@ -100,3 +100,14 @@ export const widgetMessageResponseSchema = z.object({
   newChat: z.boolean(),
 });
 export type WidgetMessageResponse = z.infer<typeof widgetMessageResponseSchema>;
+
+/** The chat so far, for a visitor coming back to it (after a page reload). */
+export const widgetChatSchema = z.object({
+  messages: z.array(z.object({ sender: z.enum(['customer', 'agent']), body: z.string(), createdAt: z.string() })),
+  /** True when the chat has ended: the browser should show it as finished and start a new one with the next message. */
+  ended: z.boolean(),
+});
+export type WidgetChat = z.infer<typeof widgetChatSchema>;
+
+/** The answer to "close the chat". */
+export const widgetEndResponseSchema = z.object({ ended: z.literal(true) });

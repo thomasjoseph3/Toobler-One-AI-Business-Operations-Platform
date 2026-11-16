@@ -38,6 +38,7 @@ const jobRunner = createJobRunner({
 });
 app.kernel.healthChecks.push(eventDispatcher.healthCheck, jobRunner.healthCheck);
 await jobRunner.start();
+app.kernel.enqueueJob = jobRunner.enqueueJob; // routes can queue jobs from here on
 eventDispatcher.start();
 
 // Shuts down once, cleanly: stop taking requests, close database connections, then exit.

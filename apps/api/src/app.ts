@@ -36,6 +36,11 @@ export interface Kernel {
   llm: LlmProvider;
   /** Whether the per-route limits (login, sign-up, ...) apply. On unless a test turns it off. */
   strictRouteLimits: boolean;
+  /**
+   * Queues a background job (a module must have declared it). The job runner starts after the web server is built, so server.ts sets this
+   * once the runner is running; until then (and in tests that bring no runner) it refuses, so a missing runner is never silently ignored.
+   */
+  enqueueJob: (jobName: string, data: { accountId?: string } & Record<string, unknown>) => Promise<void>;
 }
 
 declare module 'fastify' {
@@ -55,6 +60,8 @@ export interface AppDeps {
   healthChecks?: HealthCheck[];
   /** Replaces the mail sender the settings choose. Tests pass a recording one so no email is really sent. */
   mailSender?: MailSender;
+  /** Replaces the job queue: tests pass one that records what was queued. */
+  enqueueJob?: Kernel['enqueueJob'];
   /** Replaces the real AI model layer. Tests pass a scripted one so no model is ever called. */
   llmProvider?: LlmProvider;
   /** Turn the per-route limits off (default on). Tests that create many people from one address use this. */
@@ -99,6 +106,11 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     contextFor: createContextFactory(database),
     healthChecks: dependencies.healthChecks ?? [],
     strictRouteLimits: dependencies.strictRouteLimits ?? true,
+    enqueueJob:
+      dependencies.enqueueJob ??
+      (async () => {
+        throw new Error('Background jobs are not running, so this job cannot be queued.');
+      }),
     mail: dependencies.mailSender ?? createMailSender(config, (line) => app.log.info(line)),
     llm: dependencies.llmProvider ?? createLangChainProvider(),
   });

@@ -171,6 +171,35 @@ export function createConversationRecordsService({ database }: { database: Datab
       });
     },
 
+    /** The businesses that have a real chat of the channel gone quiet since `idleSince` (ids only). For a scheduled job with no business. */
+    async listAccountsWithIdleChats(channel: ConversationChannel, idleSince: Date): Promise<string[]> {
+      return conversationsRepository.listAccountIdsWithIdleChats(database.system, { channel, idleSince });
+    },
+
+    /** The ids of the business's real chats of the channel gone quiet since `idleSince`, oldest first (at most `limit`). */
+    async listIdleChats(
+      accountId: string,
+      channel: ConversationChannel,
+      idleSince: Date,
+      limit: number,
+    ): Promise<string[]> {
+      return database.runInAccountTransaction(accountId, (transaction) =>
+        conversationsRepository.listIdleChatIds(transaction, { accountId, channel, idleSince, limit }),
+      );
+    },
+
+    /** Notes that a conversation has ended (only the first time: one that already ended keeps its time). */
+    async markEnded(accountId: string, conversationId: string): Promise<void> {
+      await database.runInAccountTransaction(accountId, (transaction) =>
+        conversationsRepository.markConversationEnded(transaction, {
+          accountId,
+          conversationId,
+          endedAt: new Date(),
+          actor: ENGINE_ACTOR,
+        }),
+      );
+    },
+
     /**
      * Adds a message to a conversation of the business. 404 when the conversation is unknown or another business's. A message whose
      * channel id is already stored for this conversation is ignored. Answers true when the message was added, false when it was a repeat.

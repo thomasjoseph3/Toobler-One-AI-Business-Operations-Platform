@@ -132,6 +132,54 @@ export async function markConversationEnded(
     .execute();
 }
 
+/** SQL for "the last thing said in this chat (or its start, when nothing was said) is older than the given time". */
+const lastActivityIsBefore = (idleSince: Date) =>
+  sql<boolean>`coalesce(
+    (select max(created_at) from conversation_messages where conversation_messages.conversation_id = conversations.id),
+    conversations.created_at
+  ) < ${idleSince}`;
+
+/**
+ * The businesses that have a real chat of the channel that has gone quiet since `idleSince` and is not ended or sorted. Looks across ALL
+ * businesses on purpose (a scheduled job has no business yet), so it takes the unfenced handle and answers business ids only.
+ */
+export async function listAccountIdsWithIdleChats(
+  systemDb: Db,
+  options: { channel: ConversationChannelWord; idleSince: Date },
+): Promise<string[]> {
+  const rows = await systemDb
+    .selectFrom('conversations')
+    .select('account_id')
+    .distinct()
+    .where('channel', '=', options.channel)
+    .where('is_test', '=', false)
+    .where('ended_at', 'is', null)
+    .where('status', '=', 'open')
+    .where(lastActivityIsBefore(options.idleSince))
+    .execute();
+  return rows.map((row) => row.account_id);
+}
+
+/** The ids of a business's real chats of the channel that have gone quiet since `idleSince` and are not ended or sorted, oldest first. */
+export async function listIdleChatIds(
+  db: Db,
+  options: { accountId: string; channel: ConversationChannelWord; idleSince: Date; limit: number },
+): Promise<string[]> {
+  const rows = await db
+    .selectFrom('conversations')
+    .select('id')
+    .where('account_id', '=', options.accountId)
+    .where('channel', '=', options.channel)
+    .where('is_test', '=', false)
+    .where('ended_at', 'is', null)
+    .where('status', '=', 'open')
+    .where(lastActivityIsBefore(options.idleSince))
+    .orderBy('created_at')
+    .limit(options.limit)
+    .execute();
+  return rows.map((row) => row.id);
+}
+
 /** What sorting decided about a conversation. */
 export interface SortedConversation {
   typeKey: string;

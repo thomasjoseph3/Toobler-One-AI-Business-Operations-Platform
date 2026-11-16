@@ -96,4 +96,27 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
       "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
       "business's allowed list. Each address is limited to 60 a minute.",
   },
+  {
+    method: 'GET',
+    path: '/api/v1/public/widget/:key/messages',
+    reason:
+      'A visitor whose page was reloaded gets their own chat back. The business comes only from the widget key, the website must be on the ' +
+      "business's allowed list, and the signed visitor token names the one chat that may be read (401 without a good one, for another " +
+      'business or a test chat). It changes nothing. Each address is limited to 60 a minute.',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/public/widget/:key/end',
+    reason:
+      "The visitor closes the bubble, so their chat ends and is sorted. Same checks as the messages: the widget key, the business's allowed " +
+      'websites and the signed visitor token. Closing a chat that already ended does nothing, so a repeat costs nothing. Each address is ' +
+      'limited to 10 a minute. The CSRF check does not apply (no cookie is used).',
+  },
+  {
+    method: 'OPTIONS',
+    path: '/api/v1/public/widget/:key/end',
+    reason:
+      "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
+      "business's allowed list. Each address is limited to 60 a minute.",
+  },
 ];

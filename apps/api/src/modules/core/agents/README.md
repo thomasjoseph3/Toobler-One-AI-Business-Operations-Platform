@@ -2,15 +2,15 @@
 
 Built in slices (see `docs/features/F19-ai-agent-and-test-the-agent.md`). Text replies are English only.
 
-| Folder      | What is in it                                                                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `helpers/`  | `build-agent-prompt.ts`: the agent's instructions in a steady part (rules and the business's facts) and a changing part (time, open or closed, details so far) (pure)          |
-| `helpers/`  | `choose-promise.ts`: the one promise a conversation ends with and when it falls due, chosen by code from the opening hours (pure)                                              |
-| `helpers/`  | `opening-hours.ts`: is the business open now, and when does it open next, in the business's time zone (pure)                                                                   |
-| `helpers/`  | `agent-conversation-state.ts`: what the agent remembers about one conversation, and the rules for saving details and asking for a person (where the promise is chosen) (pure)                |
-| `services/` | `agent-runtime.service.ts`: one turn of the agent: read what it may know, build the tools, let the model answer, check the amounts, give back the reply and the new state                       |
-| `services/` | `agent-tool-*.service.ts`: the six tools, one file each: `get_business_info`, `list_offerings`, `search_knowledge`, `log_unanswered_question`, `save_details`, `request_human_callback`          |
-| `helpers/`  | `check-amounts.ts`: catches an answer that holds an amount of money no source gave, such as a total the AI worked out (pure)                                                   |
+| Folder      | What is in it                                                                                                                                                                           |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `helpers/`  | `build-agent-prompt.ts`: the agent's instructions in a steady part (rules and the business's facts) and a changing part (time, open or closed, details so far) (pure)                   |
+| `helpers/`  | `choose-promise.ts`: the one promise a conversation ends with and when it falls due, chosen by code from the opening hours (pure)                                                       |
+| `helpers/`  | `opening-hours.ts`: is the business open now, and when does it open next, in the business's time zone (pure)                                                                            |
+| `helpers/`  | `agent-conversation-state.ts`: what the agent remembers about one conversation, and the rules for saving details and asking for a person (where the promise is chosen) (pure)           |
+| `services/` | `agent-runtime.service.ts`: one turn of the agent: read what it may know, build the tools, let the model answer, check the amounts, give back the reply and the new state               |
+| `services/` | `agent-tool-*.service.ts`: the six tools, one file each: `get_business_info`, `list_offerings`, `search_knowledge`, `log_unanswered_question`, `save_details`, `request_human_callback` |
+| `helpers/`  | `check-amounts.ts`: catches an answer that holds an amount of money no source gave, such as a total the AI worked out (pure)                                                            |
 
 The AI states facts; code decides. The agent never picks the promise, never works out a time, and never says a total.
 

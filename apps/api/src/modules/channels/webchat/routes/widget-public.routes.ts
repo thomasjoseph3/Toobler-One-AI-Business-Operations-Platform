@@ -1,7 +1,9 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
+  widgetChatSchema,
   widgetConfigSchema,
+  widgetEndResponseSchema,
   widgetKeyParamsSchema,
   widgetMessageRequestSchema,
   widgetMessageResponseSchema,
@@ -45,6 +47,8 @@ export function widgetPublicRoutes(app: FastifyInstance) {
     publicBaseUrl: config.publicBaseUrl,
     appSecret: config.auth.jwtSecret,
     savedTurns: createAgentSavedTurnService({ database, runtime }),
+    // Looked up when a chat ends, so the runner that server.ts starts later is the one used
+    enqueueJob: (jobName, data) => app.kernel.enqueueJob(jobName, data),
     // Tests that switch the route limits off switch these off too
     limiters: app.kernel.strictRouteLimits
       ? {
@@ -86,6 +90,12 @@ export function widgetPublicRoutes(app: FastifyInstance) {
     async (request, reply) => answerPermissionCheck(request.params.key, request.headers.origin, reply),
   );
 
+  typedApp.options(
+    '/public/widget/:key/end',
+    { config: { access: 'public', ...routeLimit(app, 'widgetConfig') }, schema: { params: widgetKeyParamsSchema } },
+    async (request, reply) => answerPermissionCheck(request.params.key, request.headers.origin, reply),
+  );
+
   // Public. How the bubble should look and which buttons it shows. The business comes only from the key; 404 for an unknown key or a
   // switched-off chat; 403 for a website that is not on the business's list.
   typedApp.get(
@@ -122,6 +132,35 @@ export function widgetPublicRoutes(app: FastifyInstance) {
         message: request.body.message,
         address: request.ip,
       });
+    },
+  );
+
+  // Public. The chat so far, for a visitor whose page was reloaded. Needs the visitor token (401 without a good one). Changes nothing.
+  typedApp.get(
+    '/public/widget/:key/messages',
+    {
+      config: { access: 'public', ...routeLimit(app, 'widgetConfig') },
+      schema: { params: widgetKeyParamsSchema, response: { 200: widgetChatSchema } },
+    },
+    async (request, reply) => {
+      const widget = await widgetChatService.openWidget(request.params.key, request.headers.origin);
+      allowTheWebsiteToReadTheAnswer(reply, widget.origin);
+      return widgetChatService.readChat({ widget, visitorToken: readBearerToken(request.headers.authorization) });
+    },
+  );
+
+  // Public. The visitor closes the bubble: the chat ends and is sorted and summarised. Needs the visitor token. Closing twice is harmless.
+  typedApp.post(
+    '/public/widget/:key/end',
+    {
+      config: { access: 'public', ...routeLimit(app, 'widgetEnd') },
+      schema: { params: widgetKeyParamsSchema, response: { 200: widgetEndResponseSchema } },
+    },
+    async (request, reply) => {
+      const widget = await widgetChatService.openWidget(request.params.key, request.headers.origin);
+      allowTheWebsiteToReadTheAnswer(reply, widget.origin);
+      await widgetChatService.endChat({ widget, visitorToken: readBearerToken(request.headers.authorization) });
+      return { ended: true as const };
     },
   );
 }
