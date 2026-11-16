@@ -502,6 +502,18 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'GET /api/v1/agent/test-chats/{conversationId}',
+    what: "read A's test chat back (its messages, what the agent learned, its promise)",
+    request: () => ({ method: 'GET', url: `/agent/test-chats/${dataOfA.testChatId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/agent/test-chats/{conversationId}/summary',
+    what: "summarise A's test chat (the AI must never be shown A's messages)",
+    request: () => ({ method: 'POST', url: `/agent/test-chats/${dataOfA.testChatId}/summary` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/conversations/{id}/type',
     what: "change the type of A's conversation",
     request: () => ({

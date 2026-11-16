@@ -79,6 +79,36 @@ export function createConversationRecordsService({ database }: { database: Datab
     },
 
     /**
+     * A conversation's messages (customer and agent, oldest first) and whether it is a test chat, or undefined when the id is unknown or
+     * another business's. The agent's summary job reads a conversation through this. Staff messages and system notes are left out: the
+     * summary is about what the customer and the agent said.
+     */
+    async readMessagesForSummary(
+      accountId: string,
+      conversationId: string,
+    ): Promise<
+      | { isTest: boolean; channel: ConversationChannel; messages: Array<{ sender: MessageSender; body: string }> }
+      | undefined
+    > {
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+        if (!conversation) return undefined;
+        const messages = await conversationMessagesRepository.listMessagesOfConversation(
+          transaction,
+          accountId,
+          conversationId,
+        );
+        return {
+          isTest: conversation.isTest,
+          channel: conversation.channel,
+          messages: messages
+            .filter((message) => message.sender === 'customer' || message.sender === 'agent')
+            .map((message) => ({ sender: message.sender, body: message.body })),
+        };
+      });
+    },
+
+    /**
      * Adds a message to a conversation of the business. 404 when the conversation is unknown or another business's. A message whose
      * channel id is already stored for this conversation is ignored. Answers true when the message was added, false when it was a repeat.
      */

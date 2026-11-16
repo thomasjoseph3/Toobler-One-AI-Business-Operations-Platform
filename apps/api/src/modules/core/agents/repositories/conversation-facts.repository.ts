@@ -91,3 +91,47 @@ export async function saveConversationState(
     )
     .execute();
 }
+
+/** The saved summary of a conversation and when it was written, or undefined when the conversation has no facts row yet. */
+export async function findConversationSummary(
+  db: Db,
+  accountId: string,
+  conversationId: string,
+): Promise<{ summary: string | null; summarisedAt: Date | null } | undefined> {
+  const row = await db
+    .selectFrom('conversation_facts')
+    .select(['summary', 'summarised_at'])
+    .where('account_id', '=', accountId)
+    .where('conversation_id', '=', conversationId)
+    .executeTakeFirst();
+  return row ? { summary: row.summary, summarisedAt: row.summarised_at } : undefined;
+}
+
+/**
+ * Saves the summary of a conversation. A conversation the agent never spoke in has no facts row yet, so one is made (with nothing saved in
+ * it). Writing it again replaces the earlier summary (a conversation that carried on after it was summarised).
+ */
+export async function saveConversationSummary(
+  db: Db,
+  options: { accountId: string; conversationId: string; summary: string; summarisedAt: Date; actor: Actor },
+): Promise<void> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  await db
+    .insertInto('conversation_facts')
+    .values({
+      conversation_id: options.conversationId,
+      account_id: options.accountId,
+      details: '{}',
+      earlier_tool_results: '[]',
+      summary: options.summary,
+      summarised_at: options.summarisedAt,
+      created_by: actorStamp,
+      updated_by: actorStamp,
+    })
+    .onConflict((conflict) =>
+      conflict
+        .column('conversation_id')
+        .doUpdateSet({ summary: options.summary, summarised_at: options.summarisedAt, updated_by: actorStamp }),
+    )
+    .execute();
+}

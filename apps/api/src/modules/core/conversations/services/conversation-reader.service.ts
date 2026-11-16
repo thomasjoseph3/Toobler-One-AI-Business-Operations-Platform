@@ -27,7 +27,8 @@ export async function readConversationDetail(
   conversationId: string,
 ): Promise<ConversationDetail> {
   const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
-  if (!conversation) throw notFound('That conversation');
+  // A test chat is read in "Test the agent", never as a real conversation
+  if (!conversation || conversation.isTest) throw notFound('That conversation');
   const messages = await conversationMessagesRepository.listMessagesOfConversation(
     transaction,
     accountId,

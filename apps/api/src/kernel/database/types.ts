@@ -447,6 +447,9 @@ export interface ConversationFactsTable {
   promise_due_at: Date | null;
   promise_made_at: Date | null;
   callback_reason: string | null;
+  /** The short summary of the conversation, written once it has ended. */
+  summary: string | null;
+  summarised_at: Date | null;
   /** A list of texts the tools gave back lately. Written as JSON text, read back as a list. */
   earlier_tool_results: ColumnType<unknown[], string, string>;
   created_by: Json | null;

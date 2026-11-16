@@ -50,3 +50,35 @@ export const agentTestChatResponseSchema = z.object({
   heldBackAmounts: z.array(z.number()),
 });
 export type AgentTestChatResponse = z.infer<typeof agentTestChatResponseSchema>;
+
+/** The address of one test chat. */
+export const agentTestChatParamsSchema = z.object({ conversationId: z.uuid() });
+
+/** A saved test chat read back: what was said, what the agent learned, the promise, and the summary once there is one. */
+export const agentTestChatDetailSchema = z.object({
+  conversationId: z.uuid(),
+  messages: z.array(
+    z.object({
+      sender: z.enum(['customer', 'agent']),
+      body: z.string(),
+      createdAt: z.string(),
+    }),
+  ),
+  detailsSaved: z.record(z.string(), z.string()),
+  situation: z.enum(['sale_enquiry', 'ready_to_book', 'not_a_sale']),
+  promise: agentPromiseSchema.nullable(),
+  /** The summary the inbox would show, or null until the chat has been summarised. */
+  summary: z.string().nullable(),
+  summarisedAt: z.string().nullable(),
+});
+export type AgentTestChatDetail = z.infer<typeof agentTestChatDetailSchema>;
+
+/** The summary of a test chat, just written. */
+export const agentTestChatSummarySchema = z.object({
+  conversationId: z.uuid(),
+  summary: z.string(),
+  summarisedAt: z.string(),
+  /** False when code wrote it from what was saved (nothing said, or the AI's own held an amount nobody gave). */
+  writtenByAi: z.boolean(),
+});
+export type AgentTestChatSummary = z.infer<typeof agentTestChatSummarySchema>;

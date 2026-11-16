@@ -36,7 +36,8 @@ export interface FinaliseOptions {
 export interface FinaliseResult {
   conversationId: string;
   /** `already_sorted` when it was sorted before and nothing was done. */
-  result: 'sorted' | 'already_sorted';
+  /** `test_chat`: a chat from "Test the agent", which is never sorted into a lead or a ticket, so nothing was done. */
+  result: 'sorted' | 'already_sorted' | 'test_chat';
   typeKey: string;
   typeSource: 'rule' | 'ai_final' | 'staff';
   aiUnsure: boolean;
@@ -328,6 +329,23 @@ export function createConversationFinaliser({ database, classifier }: { database
       conversationId: string,
       options: FinaliseOptions = {},
     ): Promise<FinaliseResult> {
+      // A test chat belongs to "Test the agent": it is never sorted, so it can never make a lead, a ticket or a contact
+      const isTestChat = await database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+        if (!conversation) throw notFound('That conversation');
+        return conversation.isTest;
+      });
+      if (isTestChat) {
+        return {
+          conversationId,
+          result: 'test_chat',
+          typeKey: 'test_chat',
+          typeSource: 'rule',
+          aiUnsure: false,
+          needsPerson: false,
+          outcomes: [],
+        };
+      }
       const sortedNow = await sortConversation(accountId, conversationId, options);
       // Carrying out is its own transaction: if it fails, the sorting above is already saved and a retry does not ask the AI again
       await database.runInAccountTransaction(accountId, (transaction) =>
