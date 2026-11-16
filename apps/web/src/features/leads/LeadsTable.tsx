@@ -17,6 +17,7 @@ import {
   Tag,
 } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
+import { LeadNameLink } from './LeadNameLink';
 import {
   findChannelLabel,
   findLeadDisplayName,
@@ -102,7 +103,9 @@ export function LeadsTable({
                   />
                 </div>
               </TableCell>
-              <TableCell className="text-text-primary">{displayName}</TableCell>
+              <TableCell className="text-text-primary">
+                <LeadNameLink lead={lead}>{displayName}</LeadNameLink>
+              </TableCell>
               <TableCell>{lead.contact?.email}</TableCell>
               <TableCell className="whitespace-nowrap">{lead.contact?.phone}</TableCell>
               <TableCell>
@@ -158,7 +161,9 @@ export function LeadCards({
           <li key={lead.id}>
             <Card isCompact className="flex flex-col gap-2">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-body-md-semibold min-w-0 text-text-primary">{findLeadDisplayName(lead.contact)}</p>
+                <p className="text-body-md-semibold min-w-0 text-text-primary">
+                  <LeadNameLink lead={lead}>{findLeadDisplayName(lead.contact)}</LeadNameLink>
+                </p>
                 <div className="flex shrink-0 items-center gap-1">
                   <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
                   {renderRowMenu(lead, findLeadDisplayName(lead.contact))}

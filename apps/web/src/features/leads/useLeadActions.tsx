@@ -12,14 +12,23 @@ export interface LeadNotice {
   text: string;
 }
 
+/** Reads the message another page left behind in the navigation (for example "The lead for Priya was deleted."), or nothing. */
+export function readNoticeFromState(state: unknown): LeadNotice | null {
+  const notice = (state as { notice?: LeadNotice } | null)?.notice;
+  const isNotice = notice && typeof notice.text === 'string' && (notice.tone === 'success' || notice.tone === 'error');
+  return isNotice ? notice : null;
+}
+
 export interface LeadActionsOptions {
   /** Every stage of the pipeline: a lead can be moved to any of them. */
   stages: readonly PipelineStage[];
   signedInUser: { id: string; role: string };
   /** Called after an action worked, or when a lead turned out to be gone, so the screen loads its data again. */
   onChanged: () => void;
-  /** Called after a lead was deleted (the lead page uses it to go back to the list). */
-  onDeleted?: () => void;
+  /** Called after a lead was deleted, with the confirmation words (the lead page uses it to go back to the list). Without it, `onChanged` is called. */
+  onDeleted?: (confirmation: string) => void;
+  /** A message to show from the start, for example the one the previous page left behind. */
+  initialNotice?: LeadNotice | null;
 }
 
 /**
@@ -28,9 +37,15 @@ export interface LeadActionsOptions {
  * speak the same. It gives back the message to show (`notice`), the "…" menu for one lead (`renderRowMenu`), and the two
  * questions that can be open (`dialogs`, drawn once by the screen).
  */
-export function useLeadActions({ stages, signedInUser, onChanged, onDeleted }: LeadActionsOptions) {
+export function useLeadActions({
+  stages,
+  signedInUser,
+  onChanged,
+  onDeleted,
+  initialNotice = null,
+}: LeadActionsOptions) {
   // The message after an action, and the two questions that can be open: why lost, and are you sure
-  const [notice, setNotice] = useState<LeadNotice | null>(null);
+  const [notice, setNotice] = useState<LeadNotice | null>(initialNotice);
   const [pendingLostMove, setPendingLostMove] = useState<{
     lead: Lead;
     displayName: string;
@@ -55,13 +70,17 @@ export function useLeadActions({ stages, signedInUser, onChanged, onDeleted }: L
 
   // Does one action on a lead: shows it is busy, says in words what happened (or what went wrong), and loads the data again.
   // Returns true when the action worked.
-  const performLeadAction = async (action: () => Promise<unknown>, successText: string): Promise<boolean> => {
+  const performLeadAction = async (
+    action: () => Promise<unknown>,
+    successText: string,
+    shouldLoadAgain = true,
+  ): Promise<boolean> => {
     setIsActing(true);
     setNotice(null);
     try {
       await action();
       setNotice({ tone: 'success', text: successText });
-      onChanged();
+      if (shouldLoadAgain) onChanged();
       return true;
     } catch (error) {
       setNotice({ tone: 'error', text: describeActionError(error) });
@@ -99,12 +118,11 @@ export function useLeadActions({ stages, signedInUser, onChanged, onDeleted }: L
   const confirmDelete = async () => {
     if (pendingDelete === null) return;
     const { lead, displayName } = pendingDelete;
-    const worked = await performLeadAction(
-      () => apiRequest('DELETE', `/leads/${lead.id}`),
-      formatMessage('leads.notice.deleted', { name: displayName }),
-    );
+    const confirmation = formatMessage('leads.notice.deleted', { name: displayName });
+    // A deleted lead cannot be loaded again, so a screen that handles the deletion itself is told instead
+    const worked = await performLeadAction(() => apiRequest('DELETE', `/leads/${lead.id}`), confirmation, !onDeleted);
     setPendingDelete(null);
-    if (worked) onDeleted?.();
+    if (worked) onDeleted?.(confirmation);
   };
 
   /** The "…" menu of one lead, with what each choice does. `triggerText` draws it as a labelled button instead of the icon. */

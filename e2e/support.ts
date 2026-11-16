@@ -54,6 +54,13 @@ export interface PretendApi {
   deletedLeadIds: string[];
   /** When set, moving, assigning or deleting a lead is refused with this status and code. */
   leadActionRefusal: { status: number; code: string; message: string } | null;
+  /** The edits the page sent with `PATCH /leads/{id}`, and what the pretend API holds for a lead after them. */
+  patchedLeads: Array<{ leadId: string; body: Record<string, unknown> }>;
+  leadEdits: Record<string, Record<string, unknown>>;
+  /** Ids of leads that "do not exist" (the page gets a 404 for them). */
+  missingLeadIds: string[];
+  /** When set, `PATCH /leads/{id}` is refused with this status and code. */
+  leadEditRefusal: { status: number; code: string; message: string } | null;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -171,6 +178,10 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         assignedLeads: [],
         deletedLeadIds: [],
         leadActionRefusal: null,
+        patchedLeads: [],
+        leadEdits: {},
+        missingLeadIds: [],
+        leadEditRefusal: null,
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -184,6 +195,30 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           );
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
+        // One lead, and editing its details
+        const oneLeadMatch = /^\/leads\/(lead-(\d+))$/.exec(path);
+        if (oneLeadMatch && (request.method() === 'GET' || request.method() === 'PATCH')) {
+          const leadId = oneLeadMatch[1]!;
+          if (pretendApi.missingLeadIds.includes(leadId)) {
+            return route.fulfill(json(404, { error: { code: 'NOT_FOUND', message: 'That lead does not exist.' } }));
+          }
+          if (request.method() === 'PATCH') {
+            if (pretendApi.leadEditRefusal) {
+              const { status, code, message } = pretendApi.leadEditRefusal;
+              return route.fulfill(json(status, { error: { code, message } }));
+            }
+            const body = request.postDataJSON() as Record<string, unknown>;
+            pretendApi.patchedLeads.push({ leadId, body });
+            pretendApi.leadEdits[leadId] = {
+              ...(pretendApi.leadEdits[leadId] ?? {}),
+              ...body,
+              updatedAt: `edited-${pretendApi.patchedLeads.length}`,
+            };
+          }
+          return route.fulfill(
+            json(200, { ...pretendLead(Number(oneLeadMatch[2])), ...(pretendApi.leadEdits[leadId] ?? {}) }),
+          );
+        }
         const leadActionMatch = /^\/leads\/([^/]+?)(\/move|\/assign)?$/.exec(path);
         if (leadActionMatch && request.method() !== 'GET') {
           const leadId = leadActionMatch[1]!;

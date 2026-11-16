@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import type { LeadsResponse, Pipeline } from '@toobler-one/shared';
 import { Alert, Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
@@ -19,7 +19,7 @@ import {
   writeLeadsView,
   type LeadsView,
 } from './leads-view';
-import { useLeadActions } from './useLeadActions';
+import { readNoticeFromState, useLeadActions } from './useLeadActions';
 
 /** The Leads page fills the main area from 768 px, so the toolbar stays on top, the leads scroll and the footer stays at the bottom. */
 const PAGE_FRAME_CLASSES = 'md:flex md:h-full md:min-h-0 md:flex-col';
@@ -34,6 +34,7 @@ const PAGE_FRAME_CLASSES = 'md:flex md:h-full md:min-h-0 md:flex-col';
 export function LeadsPage() {
   const { sessionState } = useSession();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const [selectedLeadIds, setSelectedLeadIds] = useState<ReadonlySet<string>>(new Set());
   // The Create lead panel: open or shut, and a counter so each opening starts with an empty form
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
@@ -47,7 +48,13 @@ export function LeadsPage() {
   const pipelineResource = useApiResource<Pipeline>('/pipeline');
   const stages = pipelineResource.state.status === 'ready' ? pipelineResource.state.data.stages : [];
   // Moving, assigning and deleting a lead, shared with the board and the lead page
-  const actions = useLeadActions({ stages, signedInUser, onChanged: leadsResource.reload });
+  // A confirmation the lead page left behind ("The lead for Priya was deleted.") shows here first
+  const actions = useLeadActions({
+    stages,
+    signedInUser,
+    onChanged: leadsResource.reload,
+    initialNotice: readNoticeFromState(location.state),
+  });
 
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
   if (sessionState.status !== 'signedIn') return null;

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { BoardColumn, Lead } from '@toobler-one/shared';
 import { ActivityIcon, CalendarIcon, IconButton, MoreIcon, PhoneIcon, Tag } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
+import { LeadNameLink } from './LeadNameLink';
 import {
   findChannelLabel,
   findLeadDisplayName,
@@ -32,7 +33,9 @@ function LeadCard({
   return (
     <li className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface p-3 shadow-sm">
       <div className="flex items-start justify-between gap-2">
-        <p className="text-body-md-semibold min-w-0 break-words text-text-primary">{displayName}</p>
+        <p className="text-body-md-semibold min-w-0 break-words text-text-primary">
+          <LeadNameLink lead={lead}>{displayName}</LeadNameLink>
+        </p>
         {renderRowMenu(lead, displayName)}
       </div>
       <div className="flex items-center justify-between gap-2">

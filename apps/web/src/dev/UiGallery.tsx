@@ -8,6 +8,7 @@ import {
   Alert,
   Badge,
   Button,
+  ButtonLink,
   Card,
   Checkbox,
   ConfirmDialog,
@@ -224,6 +225,9 @@ export function UiGallery() {
             Destructive
           </Button>
           <Button variant="link">Link</Button>
+          <ButtonLink href="https://example.com" leadingIcon={<PlusIcon size={16} />}>
+            Link drawn as a button
+          </ButtonLink>
           <Button variant="primary" isLoading>
             Loading
           </Button>
