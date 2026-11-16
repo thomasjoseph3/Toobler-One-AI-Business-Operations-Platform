@@ -106,4 +106,10 @@ describe('buildAgentPrompt', () => {
       expect(prompt.stableSystemText).toContain(rule);
     }
   });
+
+  it('adds what the channel says about itself to the steady part, and nothing when it says nothing', () => {
+    const withNote = buildAgentPrompt({ ...input, channelNote: 'WhatsApp shows no tables.' }, conversation);
+    expect(withNote.stableSystemText).toContain('THIS CHANNEL\nWhatsApp shows no tables.');
+    expect(buildAgentPrompt(input, conversation).stableSystemText).not.toContain('THIS CHANNEL');
+  });
 });

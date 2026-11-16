@@ -34,6 +34,7 @@
   - the sliding window of recent messages plus a running summary of the older ones;
   - the **amount check**: an answer that has a number no tool or business fact gave goes back once, then is replaced by a safe sentence ("The AI states facts; code decides").
 - **Changed:** tools are defined once in our module and checked by module and playbook, not fetched from an MCP server; the tool identity (`accountId`, `conversationId`) comes from the server, never the model; the business facts come from F16, F17 and F18 (not hotel data); the amount check is stricter (no totals at all, R-rule "never does maths").
+- **Also taken after the owner asked to look again (16 Nov 2026):** a per-channel note in the prompt (the old WhatsApp note), the earlier tool results counting as sources for the amount check, a safe reply when the model fails after a tool already acted, and a tool declaring what it does (`effect`).
 - **Left behind:** booking, cancellation and payment-link tools and prompts, the voice speaking style, Malayalam number words (voice only, F29), the MCP client.
 - **Where the old way is better:** none that changes a decision. The loop uses LangGraph (R49, ARCHITECTURE.md §3) rather than LangChain's `createAgent`; the old code needed `modelFallbackMiddleware`, which our `core.ai` already does on a lower layer.
 
@@ -59,7 +60,7 @@ The agent has no public route in F19; the channels (F20 onward) call the runtime
 
 1. **The model layer can call tools** (no route): `@langchain/langgraph` 1.6.0 installed (16 days old, 5 M a week, MIT; only its core graph API, because its ready-made agent is deprecated), `generateWithTools` added to `core.ai` and the LLM provider, with the scripted provider able to script a tool call. Tests only. **Built, waiting for the owner.**
 2. **The agent's building blocks, part a** (no route, **built, waiting for the owner**): the new module `core.agents` with the pure parts: the prompt builder, the promise chooser (with the opening hours in the business's time zone) and the amount check; plus the readers that give the agent only what it may know (confirmed answers and situations from knowledge, offerings and current offers from offerings, the business's name and time zone from auth).
-2b. **The tools and the loop** (no route): the six tools (each in its own file), the agent runtime that runs the loop with them, the promise inside the tool results, the amount check on the answer. Unit tests with the scripted provider.
+2b. **The tools and the loop** (no route, **built, waiting for the owner**): the six tools (each in its own file), the agent runtime, the promise inside the tool results, the amount check on the answer, and the plug-and-play hook `agentTools` in the module manifest. Tests with the scripted provider.
 3. **Facts and the promise are stored, and the first route:** migration 038, `POST /agent/test-chat`. Postman folder.
 4. **Reading a test chat back, and the summary:** `GET /agent/test-chats/{conversationId}`, the `summarise` job writes the summary, sorting skips test conversations.
 5. **Evals and hand-off:** `evals/agent`, the full test suite, the Feature guide, the manual script.

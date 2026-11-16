@@ -23,6 +23,11 @@ export interface AgentPromptInput {
   timeZone: string;
   isOpenNow: boolean;
   detailsSoFar: DetailsSoFar;
+  /**
+   * What is special about the channel this conversation is on (WhatsApp shows no tables; the customer's number is already known). It is
+   * written by the channel, so the agent never names a channel. Part of the steady text: a conversation stays on one channel.
+   */
+  channelNote?: string | undefined;
 }
 
 /** The rules every agent follows, whatever the business. Plain text: the AI reads it as written. */
@@ -58,20 +63,20 @@ SAFETY
 }
 
 /** The business's answers to its profile questions, as "question: answer" lines. */
-function writeBusinessFacts(knowledge: BusinessKnowledgeForTheAgent): string {
+export function describeBusinessFacts(knowledge: BusinessKnowledgeForTheAgent): string {
   if (knowledge.facts.length === 0) return 'BUSINESS FACTS\n(The business has not told you anything yet.)';
   const lines = knowledge.facts.map((fact) => `- ${fact.question}\n  ${fact.answer.replaceAll('\n', '\n  ')}`);
   return `BUSINESS FACTS\n${lines.join('\n')}`;
 }
 
 /** How the business wants common moments handled, one line each. */
-function writeSituations(knowledge: BusinessKnowledgeForTheAgent): string {
+export function describeSituations(knowledge: BusinessKnowledgeForTheAgent): string {
   const lines = knowledge.situations.map((situation) => `- ${situation.whenItHappens}: ${situation.handling}`);
   return `SITUATIONS (how this business wants common moments handled)\n${lines.join('\n')}`;
 }
 
 /** What the business sells, with its prices in words as the offerings page wrote them. */
-function writeWhatWeSell(whatWeSell: WhatTheAgentMaySee): string {
+export function describeWhatWeSell(whatWeSell: WhatTheAgentMaySee): string {
   if (whatWeSell.offerings.length === 0) return 'WHAT WE SELL\n(Nothing is listed yet.)';
   const blocks = whatWeSell.offerings.map((offering) => {
     const lines = [`- ${offering.name}`];
@@ -86,7 +91,7 @@ function writeWhatWeSell(whatWeSell: WhatTheAgentMaySee): string {
 }
 
 /** The offers that have not ended. */
-function writeOffers(whatWeSell: WhatTheAgentMaySee): string {
+export function describeOffers(whatWeSell: WhatTheAgentMaySee): string {
   if (whatWeSell.offers.length === 0) return 'OFFERS\n(No offers right now.)';
   return `OFFERS (current)\n${whatWeSell.offers.map((offer) => `- ${offer.text} (until ${offer.endsOn})`).join('\n')}`;
 }
@@ -119,10 +124,11 @@ function writeDetailsSoFar(detailsSoFar: DetailsSoFar): string {
 export function buildAgentPrompt(input: AgentPromptInput, conversation: LlmPrompt['messages']): LlmPrompt {
   const stableSystemText = [
     writeRules(input.businessName),
-    writeBusinessFacts(input.knowledge),
-    writeSituations(input.knowledge),
-    writeWhatWeSell(input.whatWeSell),
-    writeOffers(input.whatWeSell),
+    describeBusinessFacts(input.knowledge),
+    describeSituations(input.knowledge),
+    describeWhatWeSell(input.whatWeSell),
+    describeOffers(input.whatWeSell),
+    ...(input.channelNote ? [`THIS CHANNEL\n${input.channelNote}`] : []),
   ].join('\n\n');
   const changingSystemText = [
     `RIGHT NOW\nIt is ${describeNow(input.now, input.timeZone)} (${input.timeZone}). The business is ${input.isOpenNow ? 'open' : 'closed'} right now.`,
