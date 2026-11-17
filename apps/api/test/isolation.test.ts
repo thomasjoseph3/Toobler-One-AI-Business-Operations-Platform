@@ -647,6 +647,12 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'GET /api/v1/activities/counts',
+    what: "ask how many notes A's lead has (B must get 0, never A's real count)",
+    request: () => ({ method: 'GET', url: `/activities/counts?lead_ids=${dataOfA.leadId}` }),
+    expectedStatus: 200,
+  },
+  {
     route: 'POST /api/v1/setup/chat',
     what: "answer a question in the setup chat as B (B's own answer is saved; A's answers must stay as they were)",
     request: () => ({

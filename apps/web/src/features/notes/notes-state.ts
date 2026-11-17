@@ -78,3 +78,27 @@ export function canEditNote(note: Activity, signedInUserId: string): boolean {
 export function canDeleteNote(role: string): boolean {
   return role === 'manager';
 }
+
+/** What a set of notes belongs to: one lead, or one person (whose notes include those on all their leads). */
+export type NotesTarget = { kind: 'lead'; id: string } | { kind: 'contact'; id: string };
+
+/** The API address that lists the notes of a target, newest first (up to 100). */
+export function buildNotesPath(target: NotesTarget): string {
+  const filter = target.kind === 'lead' ? `lead_id=${target.id}` : `contact_id=${target.id}`;
+  return `/activities?${filter}&limit=100`;
+}
+
+/** The request body that adds a note to a target: the words and exactly one of `leadId` or `contactId`. */
+export function buildNoteRequest(
+  target: NotesTarget,
+  noteText: string,
+): { leadId?: string; contactId?: string; body: string } {
+  const body = noteText.trim();
+  return target.kind === 'lead' ? { leadId: target.id, body } : { contactId: target.id, body };
+}
+
+/** The API address that counts the notes of some leads (for the orange notes icon), or null when there are no leads to ask about. */
+export function buildNoteCountsPath(leadIds: readonly string[]): string | null {
+  const ids = [...new Set(leadIds)].slice(0, 100);
+  return ids.length === 0 ? null : `/activities/counts?lead_ids=${ids.join(',')}`;
+}

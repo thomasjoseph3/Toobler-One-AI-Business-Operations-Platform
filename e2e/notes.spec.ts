@@ -147,3 +147,50 @@ test.describe('Notes: changing and deleting', () => {
     await expect(page.getByText('This lead no longer exists.')).toBeVisible();
   });
 });
+
+test.describe('Notes: the orange notes icon and the contact page', () => {
+  test('a lead with notes shows the orange icon all the time, and it follows adding and deleting', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row icons are for tablets and desktops');
+    await page.goto('/leads');
+    // Lead 0 already has one note: its icon is there without hovering; lead 1 has none
+    const icon = page.getByRole('button', { name: 'Notes for Priya Menon 0: 1' });
+    await expect(icon).toBeVisible();
+    await expect(page.getByRole('button', { name: /Notes for \+919847010001/ })).toBeHidden();
+    // Add a note on lead 1 from its hover icon: the orange icon appears
+    const row = page.getByRole('row', { name: /\+919847010001/ });
+    await row.hover();
+    await row.getByRole('button', { name: 'Notes for +919847010001' }).click();
+    const panel = page.getByRole('dialog', { name: 'Notes' });
+    await panel.getByPlaceholder('Enter here').fill('First note on this lead');
+    await panel.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(panel).toContainText('First note on this lead');
+    await panel.getByRole('button', { name: 'Close the notes' }).click();
+    await expect(page.getByRole('button', { name: 'Notes for +919847010001: 1' })).toBeVisible();
+    // Delete lead 0's only note (a manager): its icon goes away
+    await icon.click();
+    await page.getByRole('dialog', { name: 'Notes' }).getByRole('button', { name: 'Delete', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Delete the note by Maya Chen?' })
+      .getByRole('button', { name: 'Delete note' })
+      .click();
+    await page.getByRole('dialog', { name: 'Notes' }).getByRole('button', { name: 'Close the notes' }).click();
+    await expect(page.getByRole('button', { name: /Notes for Priya Menon 0: / })).toBeHidden();
+  });
+
+  test('the contact page shows the notes on the person and their leads, and adds a note on the person', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/contacts/contact-0');
+    await expect(page.getByRole('heading', { name: 'Notes' })).toBeVisible();
+    await expect(page.getByText('Great insights on the project, looking forward to the next steps!')).toBeVisible();
+    await page.getByPlaceholder('Enter here').fill('Regular guest, likes the lake view');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Regular guest, likes the lake view')).toBeVisible();
+    expect(pretendApi.notes.postedNotes).toEqual([
+      { contactId: 'contact-0', body: 'Regular guest, likes the lake view' },
+    ]);
+  });
+});

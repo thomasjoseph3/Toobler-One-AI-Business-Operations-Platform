@@ -92,6 +92,7 @@ const englishMessages = {
   'notes.problem.generic': 'Something went wrong. Please try again.',
   'leads.row.addNote': 'Add a note',
   'leads.row.addNoteFor': 'Notes for {name}',
+  'leads.row.notesCount': 'Notes for {name}: {count}',
   'leads.row.more': 'More actions for {name}',
   'leads.filter.title': 'Filter leads',
   'leads.filter.status': 'Show',

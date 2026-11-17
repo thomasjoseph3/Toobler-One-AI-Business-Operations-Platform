@@ -190,3 +190,18 @@ export async function findNoteById(db: Db, accountId: string, noteId: string): P
     .executeTakeFirst();
   return row ? toActivityRow(row) : undefined;
 }
+
+/** How many live notes each of these leads has (a lead with none is missing from the answer). */
+export async function countNotesByLead(db: Db, accountId: string, leadIds: string[]): Promise<Map<string, number>> {
+  if (leadIds.length === 0) return new Map();
+  const rows = await db
+    .selectFrom('activities')
+    .select(['lead_id', sql<string>`count(*)`.as('total')])
+    .where('account_id', '=', accountId)
+    .where('kind', '=', 'note')
+    .where('deleted_at', 'is', null)
+    .where('lead_id', 'in', leadIds)
+    .groupBy('lead_id')
+    .execute();
+  return new Map(rows.flatMap((row) => (row.lead_id === null ? [] : [[row.lead_id, Number(row.total)] as const])));
+}

@@ -4,13 +4,15 @@ import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { NotesList } from './NotesList';
 import { sortNotes, type NotesOrder } from './notes-state';
-import { useLeadNotes } from './useLeadNotes';
+import { useNotes } from './useNotes';
 
 export interface NotesPanelProps {
   leadId: string;
   /** The lead's name, shown under the title as "@Name". */
   leadName: string;
   onClose: () => void;
+  /** Called after a note was added, changed or deleted, so the list behind the panel can show the new count. */
+  onChanged?: () => void;
 }
 
 /**
@@ -18,8 +20,8 @@ export interface NotesPanelProps {
  * "Recent first"), the notes, and a box to write a new one with Cancel and Save at the bottom. It loads the notes when it opens, keeps them
  * on screen while it loads again, and shows the new note as soon as it is saved. Show it only while it is open.
  */
-export function NotesPanel({ leadId, leadName, onClose }: NotesPanelProps) {
-  const notes = useLeadNotes(leadId);
+export function NotesPanel({ leadId, leadName, onClose, onChanged }: NotesPanelProps) {
+  const notes = useNotes({ kind: 'lead', id: leadId }, onChanged);
   const { sessionState } = useSession();
   const signedInUserId = sessionState.status === 'signedIn' ? sessionState.profile.user.id : '';
   const signedInRole = sessionState.status === 'signedIn' ? sessionState.profile.user.role : '';

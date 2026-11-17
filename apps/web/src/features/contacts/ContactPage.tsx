@@ -23,6 +23,7 @@ import { useSession } from '../../auth/session';
 import { findLeadDisplayName, toWhatsappDigits, formatMoment } from '../leads/lead-display';
 import { findLifecycleLabelKey, findLifecycleTagTone } from './contacts-view';
 import { describeContactSaveProblem } from './contact-problem';
+import { ContactNotesCard } from '../notes/ContactNotesCard';
 import { EditContactPanel } from './EditContactPanel';
 
 /** One small label and value in the details card. */
@@ -213,10 +214,7 @@ export function ContactPage() {
             <Row label={t('contactPage.details.updated')}>{formatMoment(contact.updatedAt, timeZone)}</Row>
           </dl>
         </Card>
-        <Card>
-          <h3 className="text-heading-sm mb-2 text-text-primary">{t('contactPage.timeline.title')}</h3>
-          <p className="text-body-md text-text-secondary">{t('contactPage.timeline.soon')}</p>
-        </Card>
+        <ContactNotesCard contactId={contact.id} />
       </div>
       <ConfirmDialog
         isOpen={isDeleteAsked}

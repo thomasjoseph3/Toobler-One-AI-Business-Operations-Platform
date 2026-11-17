@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '@toobler-one/shared';
 import {
+  buildNoteCountsPath,
+  buildNoteRequest,
+  buildNotesPath,
   canDeleteNote,
   canEditNote,
   checkNote,
@@ -90,5 +93,23 @@ describe('who may change a note', () => {
     expect(canDeleteNote('manager')).toBe(true);
     expect(canDeleteNote('staff')).toBe(false);
     expect(canDeleteNote('staff_own')).toBe(false);
+  });
+});
+
+describe('addresses and requests', () => {
+  it('lists the notes of a lead or of a person', () => {
+    expect(buildNotesPath({ kind: 'lead', id: 'L1' })).toBe('/activities?lead_id=L1&limit=100');
+    expect(buildNotesPath({ kind: 'contact', id: 'C1' })).toBe('/activities?contact_id=C1&limit=100');
+  });
+
+  it('adds a note with exactly one of leadId or contactId, trimmed', () => {
+    expect(buildNoteRequest({ kind: 'lead', id: 'L1' }, '  Hello ')).toEqual({ leadId: 'L1', body: 'Hello' });
+    expect(buildNoteRequest({ kind: 'contact', id: 'C1' }, 'Hi')).toEqual({ contactId: 'C1', body: 'Hi' });
+  });
+
+  it('asks for the counts of the leads on the page once each, and not at all when there are none', () => {
+    expect(buildNoteCountsPath(['a', 'b', 'a'])).toBe('/activities/counts?lead_ids=a,b');
+    expect(buildNoteCountsPath([])).toBeNull();
+    expect(buildNoteCountsPath(Array.from({ length: 150 }, (_, index) => `id${index}`))!.split(',').length).toBe(100);
   });
 });

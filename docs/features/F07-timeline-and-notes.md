@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/04-activity-timeline-and-notes.md`; `requirements/API.md` (Activity timeline and notes); the designer's frames `docs/design/screens/leads-note-panel.png` ("Leads - Note", Figma node 2024:3774) and `docs/design/screens/leads-list-with-activity-menu.png` (Figma node 2024:2730).
 **Depends on:** F04 contacts, F06 leads.      **Module:** `core.activities` (core).
-**Status:** `in_progress`: slices 1 and 2 built (17 Nov 2026). Pulled ahead of F02 because the designer delivered the screen and the owner asked for it (R69, 17 Nov 2026).
+**Status:** `in_progress`: slices 1, 2 and 3 built (17 Nov 2026). Pulled ahead of F02 because the designer delivered the screen and the owner asked for it (R69, 17 Nov 2026).
 
 ## What the designer drew (17 Nov 2026, new)
 - **Notes panel** (a side panel, "Leads - Note"): a title "Notes" with a count badge; the lead's name under it; a sort "Recent Last"; the list of notes, each with the writer's round initials, their name, their role, how long ago, and the note in a bubble; a text box "Enter here"; an attach (paperclip) button; Cancel and Save. Opened from the **add-note icon** in a lead's row (and on the lead page).
@@ -39,3 +39,9 @@
 - **Screens:** under each note, the writer sees **Edit** (the words change in place with Save changes and Cancel; Edited shows afterwards) and a manager sees **Delete** (asks "Delete the note by <writer>?" naming the writer). A refusal is shown in plain words. Works in the Notes panel and on the lead page.
 - **Tests:** 9 more API tests (edit own with log and event, same words change nothing, 403 for someone else's note even to a manager, 404s, 400s, 401, own-leads-only role, manager delete is soft and logged, 404/403/401/400 on delete), isolation entries (B cannot edit or delete A's note), web rule tests, and 4 more browser specs.
 - **Decision (to confirm):** a manager cannot change someone else's note, only delete it (the requirement says edit by the writer, delete by a manager).
+
+### Slice 3: the orange notes icon and the notes on the contact page (built 17 Nov 2026)
+- **Route (1):** `GET /activities/counts?lead_ids=a,b,c` (1 to 100 ids; staff and managers). Answers `{ counts: { <leadId>: <number> } }` with a number for every lead asked about, 0 for none. A lead the person cannot see (unknown, deleted, another business's, or, for the "own leads only" role, not theirs) counts 0, so asking tells nothing. Deleted notes are not counted. The leads module gives the visible ids through its `index.ts` (`findVisibleLeadIds`); the leads list itself is unchanged (no cross-module join).
+- **Screens:** on the Leads list a lead that has notes shows the small orange notes icon beside the date chip **all the time** (Figma), not only on hover; it opens the Notes panel, and its name says how many ("Notes for Priya: 3"). A lead without notes still shows the add-note icon only on hover. The counts are asked once for the leads on the page and again after a note is added, changed or deleted. On a contact's page the placeholder Timeline card is now a Notes card: every note on the person and on all their leads, newest first, with a box to write a note on the person (`POST /notes` with `contactId`); it is not shown to the "own leads only" role.
+- **Fix found on the way:** closing a dialog inside a dialog (the "Are you sure?" over the Notes panel) also closed the outer one. `Dialog` and `SidePanel` now react only to their own close event.
+- **Tests:** 4 API tests for the counts (counts and deleted notes, 0 for others' leads, own-leads-only role, 400s and 401), an isolation entry, 3 web rule tests, and 2 browser specs (icon follows adding and deleting; contact page notes).

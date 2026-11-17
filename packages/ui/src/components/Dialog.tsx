@@ -34,7 +34,10 @@ export function Dialog({ isOpen, onClose, title, closeLabel, footer, children }:
     <dialog
       ref={dialogRef}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onClose={(event) => {
+        // A dialog inside this one (such as an "Are you sure?" over a panel) also reports its own closing here; only this dialog's own counts
+        if (event.target === event.currentTarget) onClose();
+      }}
       onClick={(event) => {
         // A press on the dimmed page (the dialog's own backdrop) closes it; presses inside the box do not
         if (event.target === event.currentTarget) onClose();

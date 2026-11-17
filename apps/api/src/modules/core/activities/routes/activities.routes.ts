@@ -5,6 +5,8 @@ import {
   activitySchema,
   createNoteRequestSchema,
   listActivitiesQuerySchema,
+  noteCountsQuerySchema,
+  noteCountsResponseSchema,
   noteIdParamsSchema,
   updateNoteRequestSchema,
 } from '@toobler-one/shared';
@@ -61,6 +63,20 @@ export function activitiesRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       await activitiesService.deleteNote(request.principal, request.params.id);
       return reply.code(204).send();
+    },
+  );
+
+  // For any signed-in, verified person. A plain read: how many notes each of the asked-about leads has (`/activities/counts` is its own
+  // address, so it is never mistaken for an id).
+  typedApp.get(
+    '/activities/counts',
+    {
+      config: { access: 'staff' },
+      schema: { querystring: noteCountsQuerySchema, response: { 200: noteCountsResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return activitiesService.getNoteCounts(request.principal, request.query.lead_ids);
     },
   );
 }

@@ -7,7 +7,7 @@ export interface PretendNotes {
   /** The notes the pretend API has, newest first, as the real API sends them. */
   notes: Array<Record<string, unknown>>;
   /** What the page sent to add a note. */
-  postedNotes: Array<{ leadId?: string; body?: string }>;
+  postedNotes: Array<{ leadId?: string; contactId?: string; body?: string }>;
   /** What the page sent to change a note's words, and which notes it deleted. */
   editedNotes: Array<{ noteId: string; body: string }>;
   deletedNoteIds: string[];
@@ -50,9 +50,39 @@ export function answerNotesCall(
     role: string;
   },
 ): PretendAnswer | undefined {
+  // How many notes each asked-about lead has (for the orange notes icon in the list)
+  if (call.path === '/activities/counts' && call.method === 'GET') {
+    const leadIds = (new URLSearchParams(call.search).get('lead_ids') ?? '').split(',').filter((id) => id !== '');
+    const counts = Object.fromEntries(
+      leadIds.map((leadId) => [leadId, state.notes.filter((note) => note['leadId'] === leadId).length]),
+    );
+    return { status: 200, body: { counts } };
+  }
+  // A person's own page (the contact the notes belong to)
+  const contactMatch = /^\/contacts\/(contact-\d+)$/.exec(call.path);
+  if (contactMatch && call.method === 'GET') {
+    const index = contactMatch[1]!.replace('contact-', '');
+    return {
+      status: 200,
+      body: {
+        id: contactMatch[1],
+        name: `Priya Menon ${index}`,
+        phone: '+919847010000',
+        email: 'person0@example.com',
+        language: null,
+        lifecycleStage: 'lead',
+        createdAt: '2026-11-10T08:00:00.000Z',
+        updatedAt: '2026-11-16T09:30:00.000Z',
+      },
+    };
+  }
   if (call.path === '/activities' && call.method === 'GET') {
-    const leadId = new URLSearchParams(call.search).get('lead_id');
-    const items = state.notes.filter((note) => note['leadId'] === leadId);
+    const params = new URLSearchParams(call.search);
+    const leadId = params.get('lead_id');
+    const contactId = params.get('contact_id');
+    const items = state.notes.filter((note) =>
+      leadId !== null ? note['leadId'] === leadId : note['contactId'] === contactId,
+    );
     return { status: 200, body: { items, total: items.length, page: 1, limit: 100 } };
   }
   if (call.path === '/notes' && call.method === 'POST') {
@@ -61,13 +91,21 @@ export function answerNotesCall(
       state.refusal = null;
       return { status, body: { error: { code, message } } };
     }
-    const leadId = String(call.body?.['leadId']);
+    const leadId = call.body?.['leadId'] === undefined ? null : String(call.body['leadId']);
+    const contactId =
+      call.body?.['contactId'] === undefined
+        ? `contact-${(leadId ?? 'lead-0').replace('lead-', '')}`
+        : String(call.body['contactId']);
     const body = String(call.body?.['body']);
-    state.postedNotes.push({ leadId, body });
+    state.postedNotes.push({
+      ...(leadId === null ? {} : { leadId }),
+      ...(call.body?.['contactId'] === undefined ? {} : { contactId }),
+      body,
+    });
     const note = {
       id: `note-${state.notes.length + 1}`,
       kind: 'note',
-      contactId: 'contact-0',
+      contactId,
       leadId,
       body,
       writtenBy: { kind: 'user', userId: call.userId, name: call.userName, role: 'manager' },

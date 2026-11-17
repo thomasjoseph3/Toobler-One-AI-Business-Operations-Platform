@@ -39,6 +39,8 @@ export interface LeadsTableProps {
   renderRowMenu: (lead: Lead, displayName: string) => ReactNode;
   /** Opens the Notes panel of one lead (the add-note icon of its row). */
   onOpenNotes: (lead: Lead, displayName: string) => void;
+  /** How many notes each lead has (a lead missing here has none shown): a lead with notes shows the orange notes icon all the time. */
+  noteCounts: Readonly<Record<string, number>>;
 }
 
 /** The small green chip with the callback date (Figma "Next activity"); the calendar icon and the date both show. */
@@ -62,6 +64,7 @@ export function LeadsTable({
   onToggleAllLeads,
   renderRowMenu,
   onOpenNotes,
+  noteCounts,
 }: LeadsTableProps) {
   const areAllSelected = leads.length > 0 && leads.every((lead) => selectedLeadIds.has(lead.id));
   return (
@@ -96,6 +99,7 @@ export function LeadsTable({
         {leads.map((lead) => {
           const displayName = findLeadDisplayName(lead.contact);
           const callbackDate = formatCallbackDate(lead.callbackAt, timeZone);
+          const noteCount = noteCounts[lead.id] ?? 0;
           return (
             <TableRow key={lead.id} isSelected={selectedLeadIds.has(lead.id)}>
               <TableCell className="w-10 !pr-0">
@@ -112,6 +116,18 @@ export function LeadsTable({
                 {/* Next activity (Figma: right after the select box): the callback date, and the quick actions when the row is hovered or focused */}
                 <div className="flex items-center gap-1">
                   {callbackDate ? <CallbackChip date={callbackDate} /> : null}
+                  {noteCount > 0 ? (
+                    // A lead with notes shows this small orange icon all the time (Figma), not only on hover; it opens the same Notes panel
+                    <button
+                      type="button"
+                      aria-label={formatMessage('leads.row.notesCount', { name: displayName, count: noteCount })}
+                      title={formatMessage('leads.row.notesCount', { name: displayName, count: noteCount })}
+                      onClick={() => onOpenNotes(lead, displayName)}
+                      className="inline-flex size-7 items-center justify-center rounded-sm bg-warning-bg text-warning hover:opacity-80"
+                    >
+                      <AddNoteIcon size={16} />
+                    </button>
+                  ) : null}
                   <div className="invisible flex items-center gap-1 group-focus-within:visible group-hover:visible">
                     {callbackDate ? null : (
                       <IconButton
@@ -122,12 +138,14 @@ export function LeadsTable({
                         title={t('leads.notYet')}
                       />
                     )}
-                    <IconButton
-                      label={formatMessage('leads.row.addNoteFor', { name: displayName })}
-                      size="compact"
-                      icon={<AddNoteIcon size={18} />}
-                      onClick={() => onOpenNotes(lead, displayName)}
-                    />
+                    {noteCount > 0 ? null : (
+                      <IconButton
+                        label={formatMessage('leads.row.addNoteFor', { name: displayName })}
+                        size="compact"
+                        icon={<AddNoteIcon size={18} />}
+                        onClick={() => onOpenNotes(lead, displayName)}
+                      />
+                    )}
                   </div>
                 </div>
               </TableCell>

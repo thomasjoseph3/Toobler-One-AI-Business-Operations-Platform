@@ -226,7 +226,13 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
         }
-        if (path === '/activities' || path === '/notes' || path.startsWith('/notes/')) {
+        if (
+          path === '/activities' ||
+          path === '/activities/counts' ||
+          path === '/notes' ||
+          path.startsWith('/notes/') ||
+          /^\/contacts\/contact-\d+$/.test(path)
+        ) {
           const notesAnswer = answerNotesCall(pretendApi.notes, {
             method: request.method(),
             path,

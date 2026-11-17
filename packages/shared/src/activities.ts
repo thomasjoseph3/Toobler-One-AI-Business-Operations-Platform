@@ -84,3 +84,19 @@ export const updateNoteRequestSchema = z
   })
   .strict();
 export type UpdateNoteRequest = z.infer<typeof updateNoteRequestSchema>;
+
+/** The most leads one count request may ask about (a page of the list is 25). */
+export const MAX_LEADS_PER_COUNT_REQUEST = 100;
+
+/** The leads to count notes for: their ids, separated by commas (`lead_ids=a,b,c`). */
+export const noteCountsQuerySchema = z.object({
+  lead_ids: z
+    .string()
+    .transform((text) => text.split(',').filter((id) => id.trim() !== ''))
+    .pipe(z.array(z.uuid()).min(1).max(MAX_LEADS_PER_COUNT_REQUEST)),
+});
+export type NoteCountsQuery = z.infer<typeof noteCountsQuerySchema>;
+
+/** How many notes each asked-about lead has (0 when none, and for a lead the person cannot see). Deleted notes are not counted. */
+export const noteCountsResponseSchema = z.object({ counts: z.record(z.string(), z.number().int()) });
+export type NoteCountsResponse = z.infer<typeof noteCountsResponseSchema>;

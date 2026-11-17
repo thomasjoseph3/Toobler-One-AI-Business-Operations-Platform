@@ -472,3 +472,60 @@ describe('DELETE /api/v1/notes/{id}', () => {
     expect(await response(owner, 'not-an-id')).toBe(400);
   });
 });
+
+describe('GET /api/v1/activities/counts', () => {
+  it('counts the notes of each asked-about lead, 0 for none, and leaves out deleted notes', async () => {
+    const owner = await signUpAndSignIn();
+    const first = await addContactAndLead(owner, 'Priya Menon');
+    const second = await addContactAndLead(owner, 'Rahul Kumar');
+    const third = await addContactAndLead(owner, 'Deepa Kurian');
+    await sendOk(owner, 'POST', '/notes', { leadId: first.leadId, body: 'One' }, 201);
+    const gone = await sendOk(owner, 'POST', '/notes', { leadId: first.leadId, body: 'Two' }, 201);
+    await sendOk(owner, 'POST', '/notes', { leadId: second.leadId, body: 'Three' }, 201);
+    await sendOk(owner, 'DELETE', `/notes/${gone.id}`, undefined, 204);
+    const answer = await sendOk(
+      owner,
+      'GET',
+      `/activities/counts?lead_ids=${first.leadId},${second.leadId},${third.leadId}`,
+    );
+    expect(answer.counts).toEqual({ [first.leadId]: 1, [second.leadId]: 1, [third.leadId]: 0 });
+  });
+
+  it('counts 0 for an unknown lead, a deleted lead and another business’s lead, so asking tells nothing', async () => {
+    const first = await signUpAndSignIn();
+    const second = await signUpAndSignIn();
+    const mine = await addContactAndLead(first, 'Priya Menon');
+    const theirs = await addContactAndLead(second, 'Their Guest');
+    await sendOk(second, 'POST', '/notes', { leadId: theirs.leadId, body: 'Their private note' }, 201);
+    const unknown = randomUUID();
+    const answer = await sendOk(first, 'GET', `/activities/counts?lead_ids=${theirs.leadId},${unknown},${mine.leadId}`);
+    expect(answer.counts).toEqual({ [theirs.leadId]: 0, [unknown]: 0, [mine.leadId]: 0 });
+    await sendOk(first, 'POST', '/notes', { leadId: mine.leadId, body: 'Mine' }, 201);
+    await sendOk(first, 'DELETE', `/leads/${mine.leadId}`, undefined, 204);
+    expect((await sendOk(first, 'GET', `/activities/counts?lead_ids=${mine.leadId}`)).counts).toEqual({
+      [mine.leadId]: 0,
+    });
+  });
+
+  it('counts only the own leads of the own-leads-only role', async () => {
+    const owner = await signUpAndSignIn();
+    const { leadId } = await addContactAndLead(owner, 'Priya Menon');
+    await sendOk(owner, 'POST', '/notes', { leadId, body: 'A note' }, 201);
+    await setRole(owner, 'staff_own');
+    expect((await sendOk(owner, 'GET', `/activities/counts?lead_ids=${leadId}`)).counts[leadId]).toBe(1);
+    await database.system.updateTable('leads').set({ owner_user_id: null }).where('id', '=', leadId).execute();
+    expect((await sendOk(owner, 'GET', `/activities/counts?lead_ids=${leadId}`)).counts[leadId]).toBe(0);
+  });
+
+  it('answers 400 for no ids, an id that is not an id, and more than 100 ids, and 401 when nobody is signed in', async () => {
+    const owner = await signUpAndSignIn();
+    expect((await refused(owner, 'GET', '/activities/counts')).status).toBe(400);
+    expect((await refused(owner, 'GET', '/activities/counts?lead_ids=')).status).toBe(400);
+    expect((await refused(owner, 'GET', '/activities/counts?lead_ids=nope')).status).toBe(400);
+    const tooMany = Array.from({ length: 101 }, () => randomUUID()).join(',');
+    expect((await refused(owner, 'GET', `/activities/counts?lead_ids=${tooMany}`)).status).toBe(400);
+    expect(
+      (await createPretendBrowser(app).send('GET', `/api/v1/activities/counts?lead_ids=${randomUUID()}`)).statusCode,
+    ).toBe(401);
+  });
+});

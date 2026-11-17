@@ -17,6 +17,7 @@ import { useKeptData } from '../knowledge/use-kept-resource';
 import { moveLeadInColumns } from './board-move';
 import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
+import { useNoteCounts } from '../notes/useNoteCounts';
 import { NotesPanel } from '../notes/NotesPanel';
 import { LeadsBoard } from './LeadsBoard';
 import { DeleteStageDialog } from './DeleteStageDialog';
@@ -53,10 +54,10 @@ export function LeadsPage() {
   // The Create lead panel: open or shut, and a counter so each opening starts with an empty form
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
-  // The box for naming a column: closed, adding a new one, or renaming one
   // The lead whose Notes panel is open (the add-note icon of its row), or none
   const [notesLead, setNotesLead] = useState<{ id: string; displayName: string } | null>(null);
   const [stageToDelete, setStageToDelete] = useState<PipelineStage | null>(null);
+  // The box for naming a column: closed, adding a new one, or renaming one
   const [stageDialog, setStageDialog] = useState<{ stageToRename: PipelineStage | null } | null>(null);
   const view = readLeadsView(searchParams);
   const signedInUser =
@@ -68,6 +69,10 @@ export function LeadsPage() {
   // What is on screen while a reload is under way: the last good answer, so the board never blanks out and flashes
   const leadsData = useKeptData(leadsResource.state);
   const pipelineData = useKeptData(pipelineResource.state);
+  // How many notes each lead on the list has, for the orange notes icon (asked again after a note is added or deleted)
+  const listedLeadIds =
+    leadsData.data !== null && leadsData.data.view === 'list' ? leadsData.data.items.map((lead) => lead.id) : [];
+  const noteCounts = useNoteCounts(listedLeadIds);
   const stages = pipelineData.data?.stages ?? [];
   // The board as the person has just changed it, before the server has answered; it is dropped as soon as a newer answer arrives
   const [boardOverride, setBoardOverride] = useState<{ source: LeadsBoardResponse; columns: BoardColumn[] } | null>(
@@ -177,6 +182,7 @@ export function LeadsPage() {
           leadId={notesLead.id}
           leadName={notesLead.displayName}
           onClose={() => setNotesLead(null)}
+          onChanged={noteCounts.reload}
         />
       ) : null}
       {stageToDelete !== null ? (
@@ -354,6 +360,7 @@ export function LeadsPage() {
           onToggleAllLeads={toggleAllLeads}
           renderRowMenu={actions.renderRowMenu}
           onOpenNotes={(lead, displayName) => setNotesLead({ id: lead.id, displayName })}
+          noteCounts={noteCounts.counts}
         />
         {footer}
       </Card>

@@ -3,6 +3,7 @@ import type {
   ActivitiesListResponse,
   CreateNoteRequest,
   ListActivitiesQuery,
+  NoteCountsResponse,
   UpdateNoteRequest,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
@@ -15,7 +16,7 @@ import { uuidv7 } from '../../../../kernel/ids';
 import { findPeopleSummaries } from '../../auth';
 import type { PersonSummary } from '../../auth';
 import { findContactSummaries } from '../../contacts';
-import { findLeadReference } from '../../leads';
+import { findLeadReference, findVisibleLeadIds } from '../../leads';
 import * as activitiesRepository from '../repositories/activities.repository';
 import type { ActivityRow } from '../repositories/activities.repository';
 
@@ -177,6 +178,27 @@ export function createActivitiesService({ database }: { database: Database }) {
           details: { recordType: 'activity', recordId: noteId },
         });
         await publishEvent(transaction, { accountId, eventName: 'note.deleted', payload: { activityId: noteId } });
+      });
+    },
+
+    /**
+     * How many notes each of these leads has, for the orange notes icon on the Leads list: a number for every lead asked about (0 for
+     * none). A lead the person cannot see (deleted, unknown, another business's, or, for the "own leads only" role, not theirs) counts 0,
+     * so asking about it tells nothing. Deleted notes are not counted.
+     */
+    async getNoteCounts(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
+      leadIds: string[],
+    ): Promise<NoteCountsResponse> {
+      const accountId = principal.accountId;
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const visibleLeadIds = await findVisibleLeadIds(transaction, {
+          accountId,
+          leadIds,
+          ...(principal.role === 'staff_own' ? { visibleToUserId: principal.userId } : {}),
+        });
+        const countsByLead = await activitiesRepository.countNotesByLead(transaction, accountId, visibleLeadIds);
+        return { counts: Object.fromEntries(leadIds.map((leadId) => [leadId, countsByLead.get(leadId) ?? 0])) };
       });
     },
 

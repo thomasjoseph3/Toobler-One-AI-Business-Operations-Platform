@@ -4,7 +4,7 @@ import { ApiRequestError, apiRequest } from '../../api/client';
 import { useApiResource, type LoadState } from '../../api/useApiResource';
 import { t } from '../../app/i18n';
 import { useKeptData } from '../knowledge/use-kept-resource';
-import { checkNote } from './notes-state';
+import { buildNoteRequest, buildNotesPath, checkNote, type NotesTarget } from './notes-state';
 
 /** One plain sentence for a failed note. Never a code or a status number. */
 function describeNoteProblem(error: unknown): string {
@@ -18,10 +18,15 @@ function describeNoteProblem(error: unknown): string {
 }
 
 /**
- * One lead's notes: loads them (`GET /activities?lead_id=`), keeps what is on screen while they load again, and adds a note
- * (`POST /notes`). The note box is checked on the device first. A failed note keeps its words so it can be sent again.
+ * The notes of a lead or of a person: loads them (`GET /activities?lead_id=` or `?contact_id=`), keeps what is on screen while they load
+ * again, adds a note (`POST /notes`), changes one and deletes one. The note box is checked on the device first. A failed note keeps its
+ * words so it can be sent again. `onChanged` is called after any note was added, changed or deleted, so a screen that shows a count can
+ * ask again.
  */
-export function useLeadNotes(leadId: string): {
+export function useNotes(
+  target: NotesTarget,
+  onChanged?: () => void,
+): {
   state: LoadState<ActivitiesListResponse>;
   data: ActivitiesListResponse | null;
   isFirstLoad: boolean;
@@ -38,7 +43,7 @@ export function useLeadNotes(leadId: string): {
   /** Deletes one note (`DELETE /notes/{id}`, managers). Returns the problem in words, or null when it worked. */
   deleteNote: (noteId: string) => Promise<string | null>;
 } {
-  const resource = useApiResource<ActivitiesListResponse>(`/activities?lead_id=${leadId}&limit=100`);
+  const resource = useApiResource<ActivitiesListResponse>(buildNotesPath(target));
   const kept = useKeptData(resource.state);
   const [noteText, setNoteTextState] = useState('');
   const [noteProblem, setNoteProblem] = useState<string | null>(null);
@@ -57,10 +62,11 @@ export function useLeadNotes(leadId: string): {
     }
     setIsSaving(true);
     try {
-      await apiRequest('POST', '/notes', { leadId, body: noteText.trim() });
+      await apiRequest('POST', '/notes', buildNoteRequest(target, noteText));
       setNoteTextState('');
       setNoteProblem(null);
       resource.reload();
+      onChanged?.();
       return true;
     } catch (error) {
       setNoteProblem(describeNoteProblem(error));
@@ -77,6 +83,7 @@ export function useLeadNotes(leadId: string): {
     try {
       await apiRequest('PATCH', `/notes/${noteId}`, { body: text.trim() });
       resource.reload();
+      onChanged?.();
       return null;
     } catch (error) {
       return describeNoteProblem(error);
@@ -88,6 +95,7 @@ export function useLeadNotes(leadId: string): {
     try {
       await apiRequest('DELETE', `/notes/${noteId}`);
       resource.reload();
+      onChanged?.();
       return null;
     } catch (error) {
       return describeNoteProblem(error);

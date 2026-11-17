@@ -3,14 +3,14 @@ import { t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { NotesList } from './NotesList';
 import { sortNotes } from './notes-state';
-import { useLeadNotes } from './useLeadNotes';
+import { useNotes } from './useNotes';
 
 /**
  * The notes of a lead on its own page (the Timeline card): the notes, newest first, and a box to write a new one. The same notes and
  * the same checks as the Notes panel of the Leads list. It keeps the notes on screen while they load again.
  */
-export function LeadNotesCard({ leadId }: { leadId: string }) {
-  const notes = useLeadNotes(leadId);
+export function LeadNotesCard({ leadId, onChanged }: { leadId: string; onChanged?: () => void }) {
+  const notes = useNotes({ kind: 'lead', id: leadId }, onChanged);
   const { sessionState } = useSession();
   const signedInUserId = sessionState.status === 'signedIn' ? sessionState.profile.user.id : '';
   const signedInRole = sessionState.status === 'signedIn' ? sessionState.profile.user.role : '';

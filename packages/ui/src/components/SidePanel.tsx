@@ -37,7 +37,10 @@ export function SidePanel({ isOpen, onClose, title, titleExtra, closeLabel, foot
     <dialog
       ref={panelRef}
       aria-labelledby={titleId}
-      onClose={onClose}
+      onClose={(event) => {
+        // A dialog inside this one (such as an "Are you sure?" over a panel) also reports its own closing here; only this dialog's own counts
+        if (event.target === event.currentTarget) onClose();
+      }}
       onClick={(event) => {
         // A press on the dimmed page (the dialog's own backdrop) closes it; presses inside the panel's content do not
         if (event.target === event.currentTarget) onClose();

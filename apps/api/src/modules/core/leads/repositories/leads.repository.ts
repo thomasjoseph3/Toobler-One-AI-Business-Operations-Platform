@@ -445,3 +445,21 @@ export async function softDeleteLead(
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** The ids, among these, of live leads of the business; with `visibleToUserId` (the "own leads only" role) only the ones that person owns. */
+export async function listVisibleLeadIds(
+  db: Db,
+  accountId: string,
+  leadIds: string[],
+  visibleToUserId?: string,
+): Promise<string[]> {
+  if (leadIds.length === 0) return [];
+  let query = db
+    .selectFrom('leads')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .where('id', 'in', leadIds);
+  if (visibleToUserId !== undefined) query = query.where('owner_user_id', '=', visibleToUserId);
+  return (await query.execute()).map((row) => row.id);
+}
