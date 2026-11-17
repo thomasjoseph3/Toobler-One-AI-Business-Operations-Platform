@@ -3,6 +3,7 @@ import type { Lead, PipelineStage } from '@toobler-one/shared';
 import { ConfirmDialog } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { formatMessage, t } from '../../app/i18n';
+import { ChangeStatusMenu } from './ChangeStatusMenu';
 import { LeadRowMenu } from './LeadRowMenu';
 import { MoveToLostDialog } from './MoveToLostDialog';
 
@@ -140,6 +141,11 @@ export function useLeadActions({
     />
   );
 
+  /** The "Change status" button for a lead's page (shown on a phone): pick the new status from a list. */
+  const renderChangeStatusMenu = (lead: Lead, displayName: string): ReactNode => (
+    <ChangeStatusMenu lead={lead} displayName={displayName} stages={stages} onMoveToStage={(stage) => moveToStage(lead, displayName, stage)} />
+  );
+
   const dialogs = (
     <>
       {pendingLostMove !== null ? (
@@ -165,5 +171,14 @@ export function useLeadActions({
     </>
   );
 
-  return { notice, showNotice: setNotice, dismissNotice: () => setNotice(null), renderRowMenu, dialogs };
+  return {
+    notice,
+    showNotice: setNotice,
+    dismissNotice: () => setNotice(null),
+    renderRowMenu,
+    renderChangeStatusMenu,
+    /** Moves a lead to a stage (Lost asks why first). The board calls it when a card is dropped on a column. */
+    moveLeadToStage: moveToStage,
+    dialogs,
+  };
 }

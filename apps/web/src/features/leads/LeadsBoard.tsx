@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import type { BoardColumn, Lead } from '@toobler-one/shared';
+import { useState, type ReactNode } from 'react';
+import type { BoardColumn, Lead, PipelineStage } from '@toobler-one/shared';
 import { ActivityIcon, CalendarIcon, IconButton, MoreIcon, PhoneIcon, Tag } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import { LeadNameLink } from './LeadNameLink';
@@ -17,8 +17,12 @@ export interface LeadsBoardProps {
   signedInUserId: string;
   /** The business's time zone, for the callback dates. */
   timeZone: string;
-  /** Draws the "…" menu of one lead (move to another stage, take it, delete). */
+  /** Every stage of the pipeline, to find the stage a card is dropped on. */
+  stages: readonly PipelineStage[];
+  /** Draws the "…" menu of one lead (move to another stage, take it, delete). Shown from tablet up: on a phone a card is opened and "Change status" is used. */
   renderRowMenu: (lead: Lead, displayName: string) => ReactNode;
+  /** Moves a lead to a stage: called when a card is dropped on another column (Lost asks why first). */
+  onMoveLead: (lead: Lead, displayName: string, stage: PipelineStage) => void;
 }
 
 /** One lead as a card (Figma pipeline card): name and menu, the source and the phone, the owner, and the callback date or the activity shortcut. */
@@ -27,16 +31,30 @@ function LeadCard({
   signedInUserId,
   timeZone,
   renderRowMenu,
-}: { lead: Lead } & Pick<LeadsBoardProps, 'signedInUserId' | 'timeZone' | 'renderRowMenu'>) {
+  onDragStart,
+  onDragEnd,
+}: { lead: Lead; onDragStart: (lead: Lead) => void; onDragEnd: () => void } & Pick<LeadsBoardProps, 'signedInUserId' | 'timeZone' | 'renderRowMenu'>) {
   const displayName = findLeadDisplayName(lead.contact);
   const callbackDate = formatCallbackDate(lead.callbackAt, timeZone);
   return (
-    <li className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-surface p-3 shadow-sm">
+    <li
+      // A card can be dragged to another column on a computer; on a phone it is tapped to open (the whole card is the link)
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/plain', lead.id);
+        event.dataTransfer.effectAllowed = 'move';
+        onDragStart(lead);
+      }}
+      onDragEnd={onDragEnd}
+      className="relative flex cursor-grab flex-col gap-2 rounded-lg border border-border-subtle bg-surface p-3 shadow-sm active:cursor-grabbing"
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-body-md-semibold min-w-0 break-words text-text-primary">
-          <LeadNameLink lead={lead}>{displayName}</LeadNameLink>
+          <LeadNameLink lead={lead} className="max-md:after:absolute max-md:after:inset-0">
+            {displayName}
+          </LeadNameLink>
         </p>
-        {renderRowMenu(lead, displayName)}
+        <span className="hidden md:block">{renderRowMenu(lead, displayName)}</span>
       </div>
       <div className="flex items-center justify-between gap-2">
         <span className="text-label-xs rounded-sm bg-hover px-2 py-1 text-text-secondary">
@@ -81,7 +99,22 @@ function LeadCard({
  * with how many leads it holds, and its newest leads as cards (up to 50: if there are more, it says so). The board scrolls
  * sideways when the stages do not fit, and each column scrolls up and down on its own, so the toolbar above stays in view.
  */
-export function LeadsBoard({ columns, signedInUserId, timeZone, renderRowMenu }: LeadsBoardProps) {
+export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRowMenu, onMoveLead }: LeadsBoardProps) {
+  // The card being dragged and the column it is over, so the column can show where it would land
+  const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
+  const [columnUnderCard, setColumnUnderCard] = useState<string | null>(null);
+  const stopDragging = () => {
+    setDraggedLead(null);
+    setColumnUnderCard(null);
+  };
+  // A card dropped on a column moves the lead there, unless it is already in that column
+  const dropOnColumn = (stageId: string) => {
+    const lead = draggedLead;
+    const stage = stages.find((candidate) => candidate.id === stageId);
+    stopDragging();
+    if (lead === null || stage === undefined || lead.stage.id === stageId) return;
+    onMoveLead(lead, findLeadDisplayName(lead.contact), stage);
+  };
   const openStageIdsInOrder = columns.filter((column) => column.stage.kind === 'open').map((column) => column.stage.id);
   return (
     <div
@@ -94,7 +127,24 @@ export function LeadsBoard({ columns, signedInUserId, timeZone, renderRowMenu }:
           role="listitem"
           key={column.stage.id}
           aria-label={column.stage.name}
-          className="flex w-[296px] shrink-0 snap-start flex-col rounded-xl border border-border-subtle bg-surface-subtle p-3"
+          onDragOver={(event) => {
+            // Needed so the column accepts a drop
+            if (draggedLead === null) return;
+            event.preventDefault();
+            setColumnUnderCard(column.stage.id);
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setColumnUnderCard(null);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            dropOnColumn(column.stage.id);
+          }}
+          className={`flex w-[296px] shrink-0 snap-start flex-col rounded-xl border bg-surface-subtle p-3 ${
+            columnUnderCard === column.stage.id && draggedLead?.stage.id !== column.stage.id
+              ? 'border-action ring-2 ring-action'
+              : 'border-border-subtle'
+          }`}
         >
           <header className="mb-3 flex items-center justify-between gap-2">
             <Tag tone={findStageTagTone(column.stage, openStageIdsInOrder)}>
@@ -114,7 +164,9 @@ export function LeadsBoard({ columns, signedInUserId, timeZone, renderRowMenu }:
             />
           </header>
           {column.leads.length === 0 ? (
-            <p className="text-body-sm px-1 text-text-tertiary">{t('leads.board.empty')}</p>
+            <p className="text-body-sm px-1 text-text-tertiary">
+              {columnUnderCard === column.stage.id && draggedLead !== null ? t('leads.board.dropHere') : t('leads.board.empty')}
+            </p>
           ) : (
             <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
               {column.leads.map((lead) => (
@@ -124,6 +176,8 @@ export function LeadsBoard({ columns, signedInUserId, timeZone, renderRowMenu }:
                   signedInUserId={signedInUserId}
                   timeZone={timeZone}
                   renderRowMenu={renderRowMenu}
+                  onDragStart={setDraggedLead}
+                  onDragEnd={stopDragging}
                 />
               ))}
             </ul>

@@ -198,6 +198,8 @@ export function LeadPage() {
                 {t('leadPage.emailPerson')}
               </ButtonLink>
             ) : null}
+            {/* On a phone the designer's "Change status" button moves the lead (cards cannot be dragged there) */}
+            <span className="md:hidden">{actions.renderChangeStatusMenu(lead, displayName)}</span>
             {actions.renderRowMenu(lead, displayName, t('leadPage.actions'))}
           </div>
         </div>

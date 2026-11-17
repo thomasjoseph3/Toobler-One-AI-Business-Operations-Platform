@@ -187,7 +187,9 @@ export function LeadsPage() {
           columns={answer.columns}
           signedInUserId={user.id}
           timeZone={business.timeZone}
+          stages={stages}
           renderRowMenu={actions.renderRowMenu}
+          onMoveLead={actions.moveLeadToStage}
         />
       </div>
     );
