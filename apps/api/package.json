@@ -17,7 +17,7 @@
     "@toobler-one/shared": "*",
     "fastify": "5.12.7",
     "fastify-type-provider-zod": "7.0.0",
-    "jose": "6.2.13",
+    "jose": "6.2.15",
     "kysely": "0.29.7",
     "nodemailer": "10.2.1",
     "pg": "8.23.1",
