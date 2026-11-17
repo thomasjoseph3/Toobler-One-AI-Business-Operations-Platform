@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test';
 import { expect, test } from './support';
 
 /** The text as it shows on screen: the page holds both the table and the cards, and CSS hides the one that does not fit. */
-const shown = (page: Page, text: string) => page.getByText(text).locator('visible=true');
+const shown = (page: Page, text: string) => page.getByText(text, { exact: true }).locator('visible=true');
 
 // Tasks, in a real browser at phone and desktop size, against the pretend API (e2e/pretend-tasks.ts): the Tasks page with its four tabs,
 // the Add task form, the Create Task choice in a lead's row, and the tasks on the lead's own page.
@@ -83,6 +83,83 @@ test.describe('Tasks page', () => {
   });
 });
 
+test.describe('Changing tasks', () => {
+  test('ticks a task off and it moves to Done, and ticking it again opens it again', async ({ page, pretendApi }) => {
+    await page.goto('/tasks');
+    await page.getByRole('checkbox', { name: 'Mark done: Send the brochure' }).first().click({ force: true });
+    await expect(shown(page, 'Send the brochure')).toHaveCount(0);
+    expect(pretendApi.tasks.patchedTasks).toEqual([{ taskId: 'task-today', body: { done: true } }]);
+    await page.getByRole('button', { name: /^Done 2/ }).click();
+    await expect(shown(page, 'Send the brochure')).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Open again: Send the brochure' }).first().click({ force: true });
+    expect(pretendApi.tasks.patchedTasks[1]).toEqual({ taskId: 'task-today', body: { done: false } });
+  });
+
+  test('snoozes a task from its menu with a new due time', async ({ page, pretendApi }) => {
+    await page.goto('/tasks');
+    await page
+      .getByRole('button', { name: 'More actions for the task Send the brochure' })
+      .locator('visible=true')
+      .click();
+    await page.getByRole('button', { name: 'Tomorrow morning' }).click();
+    await expect(shown(page, 'Send the brochure')).toHaveCount(0);
+    expect(pretendApi.tasks.patchedTasks).toHaveLength(1);
+    const sent = pretendApi.tasks.patchedTasks[0]!;
+    expect(sent.taskId).toBe('task-today');
+    // 9:00 in India is 03:30 UTC
+    expect(String(sent.body['dueAt'])).toMatch(/T03:30:00\.000Z$/);
+  });
+
+  test('edits a task’s words and time in the same form, and sends only what changed', async ({ page, pretendApi }) => {
+    await page.goto('/tasks');
+    await page
+      .getByRole('button', { name: 'More actions for the task Send the brochure' })
+      .locator('visible=true')
+      .click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    const panel = page.getByRole('dialog', { name: 'Edit task' });
+    await expect(panel.getByLabel('What needs doing?')).toHaveValue('Send the brochure');
+    await expect(panel.getByLabel('Who is it about?')).toHaveCount(0);
+    await panel.getByLabel('What needs doing?').fill('Send the new brochure');
+    await panel.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('Task updated: Send the new brochure')).toBeVisible();
+    expect(pretendApi.tasks.patchedTasks).toEqual([{ taskId: 'task-today', body: { title: 'Send the new brochure' } }]);
+  });
+
+  test('asks "Are you sure?" naming the task before deleting it, and Cancel keeps it', async ({ page, pretendApi }) => {
+    await page.goto('/tasks');
+    await page
+      .getByRole('button', { name: 'More actions for the task Send the brochure' })
+      .locator('visible=true')
+      .click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: /Delete the task/ });
+    await expect(dialog).toContainText('Send the brochure');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    expect(pretendApi.tasks.deletedTaskIds).toEqual([]);
+    await expect(shown(page, 'Send the brochure')).toBeVisible();
+
+    await page
+      .getByRole('button', { name: 'More actions for the task Send the brochure' })
+      .locator('visible=true')
+      .click();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: /Delete the task/ })
+      .getByRole('button', { name: 'Delete task' })
+      .click();
+    await expect(shown(page, 'Send the brochure')).toHaveCount(0);
+    expect(pretendApi.tasks.deletedTaskIds).toEqual(['task-today']);
+  });
+
+  test('says in words when a change is refused', async ({ page, pretendApi }) => {
+    pretendApi.tasks.refusal = { status: 404, code: 'NOT_FOUND', message: 'That task was not found.' };
+    await page.goto('/tasks');
+    await page.getByRole('checkbox', { name: 'Mark done: Send the brochure' }).first().click({ force: true });
+    await expect(page.getByText('That task is no longer there. The list is updated.')).toBeVisible();
+  });
+});
+
 test.describe('Tasks on a lead', () => {
   test('Create Task in the activity icon of a lead’s row opens the form about that lead', async ({
     page,
@@ -115,7 +192,7 @@ test.describe('Tasks on a lead', () => {
     const panel = page.getByRole('dialog', { name: 'Add task for Priya Menon 0' });
     await panel.getByLabel('What needs doing?').fill('Follow up on Friday');
     await panel.getByRole('button', { name: 'Add task', exact: true }).click();
-    await expect(page.getByText('Follow up on Friday')).toBeVisible();
+    await expect(shown(page, 'Follow up on Friday')).toBeVisible();
     expect(pretendApi.tasks.postedTasks[0]).toMatchObject({ leadId: 'lead-0', title: 'Follow up on Friday' });
   });
 });

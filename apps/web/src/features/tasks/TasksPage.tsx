@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
-import type { TasksListResponse } from '@toobler-one/shared';
+import type { Task, TasksListResponse } from '@toobler-one/shared';
 import {
   Alert,
   Button,
@@ -20,8 +20,9 @@ import { useSession } from '../../auth/session';
 import { describeShownRange } from '../leads/lead-display';
 import { useKeptData } from '../knowledge/use-kept-resource';
 import { ListFilterPopover } from '../shared/ListFilterPopover';
-import { CreateTaskPanel } from './CreateTaskPanel';
+import { TaskFormPanel } from './TaskFormPanel';
 import { TaskCards, TasksTable } from './TasksList';
+import { useTaskActions } from './useTaskActions';
 import {
   buildTasksPath,
   countActiveTaskFilters,
@@ -51,6 +52,13 @@ export function TasksPage() {
   // A counter so each opening of the panel starts with a fresh form
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  // The task whose Edit form is open (from its "…" menu)
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const actions = useTaskActions({
+    timeZone: sessionState.status === 'signedIn' ? sessionState.profile.business.timeZone : 'UTC',
+    onChanged: () => tasksResource.reload(),
+    onEdit: setEditingTask,
+  });
 
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
   if (sessionState.status !== 'signedIn') return null;
@@ -116,7 +124,23 @@ export function TasksPage() {
           {t('tasks.add')}
         </Button>
       </div>
-      <CreateTaskPanel
+      {actions.problemNotice}
+      {actions.dialogs}
+      {editingTask !== null ? (
+        <TaskFormPanel
+          key={editingTask.id}
+          isOpen
+          onClose={() => setEditingTask(null)}
+          timeZone={business.timeZone}
+          editingTask={editingTask}
+          onCreated={(title) => {
+            setEditingTask(null);
+            setNotice(formatMessage('tasks.edit.saved', { title }));
+            tasksResource.reload();
+          }}
+        />
+      ) : null}
+      <TaskFormPanel
         key={createPanelOpenCount}
         isOpen={isCreatePanelOpen}
         onClose={() => setIsCreatePanelOpen(false)}
@@ -192,11 +216,23 @@ export function TasksPage() {
     <div className={PAGE_FRAME_CLASSES}>
       {toolbar}
       <div className="md:hidden">
-        <TaskCards tasks={items} signedInUserId={user.id} timeZone={business.timeZone} />
+        <TaskCards
+          tasks={items}
+          signedInUserId={user.id}
+          timeZone={business.timeZone}
+          onToggleDone={(task) => void actions.toggleDone(task)}
+          renderRowMenu={actions.renderRowMenu}
+        />
         <div className="mt-3 overflow-hidden rounded-lg border border-border-default">{footer}</div>
       </div>
       <Card isFlush className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col">
-        <TasksTable tasks={items} signedInUserId={user.id} timeZone={business.timeZone} />
+        <TasksTable
+          tasks={items}
+          signedInUserId={user.id}
+          timeZone={business.timeZone}
+          onToggleDone={(task) => void actions.toggleDone(task)}
+          renderRowMenu={actions.renderRowMenu}
+        />
         {footer}
       </Card>
     </div>

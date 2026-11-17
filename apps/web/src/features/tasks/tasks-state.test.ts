@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildCreateTaskRequest, buildEmptyTaskForm, checkTaskForm } from './task-form';
+import type { Task } from '@toobler-one/shared';
+import {
+  buildCreateTaskRequest,
+  buildEmptyTaskForm,
+  buildTaskFormFromTask,
+  buildUpdateTaskRequest,
+  checkTaskForm,
+} from './task-form';
+import { computeSnoozeMoment } from './task-snooze';
 import {
   buildLeadTasksPath,
   buildTasksPath,
@@ -97,5 +105,76 @@ describe('the Tasks view', () => {
   it('has words for every kind', () => {
     expect(findKindLabelKey('call')).toBe('tasks.kind.call');
     expect(findKindLabelKey('todo')).toBe('tasks.kind.todo');
+  });
+});
+
+describe('snoozing', () => {
+  // Tuesday 17 Nov 2026, 10:20 in India
+  const now = new Date('2026-11-17T04:50:00Z');
+
+  it('an hour from now is exactly an hour later', () => {
+    expect(computeSnoozeMoment('hour', now, 'Asia/Kolkata')).toBe('2026-11-17T05:50:00.000Z');
+  });
+
+  it('tomorrow morning is 9:00 on the business wall clock the next day', () => {
+    expect(computeSnoozeMoment('tomorrow', now, 'Asia/Kolkata')).toBe('2026-11-18T03:30:00.000Z');
+  });
+
+  it('next week is the coming Monday at 9:00, and a Monday means a week away', () => {
+    expect(computeSnoozeMoment('nextWeek', now, 'Asia/Kolkata')).toBe('2026-11-23T03:30:00.000Z');
+    // Monday 23 Nov 2026 at 10:20 India -> Monday 30 Nov
+    expect(computeSnoozeMoment('nextWeek', new Date('2026-11-23T04:50:00Z'), 'Asia/Kolkata')).toBe(
+      '2026-11-30T03:30:00.000Z',
+    );
+  });
+
+  it('counts the day in the business time zone, not UTC (late evening India is still the same day)', () => {
+    // 23:30 in India on 17 Nov is 18:00 UTC; tomorrow is still 18 Nov
+    expect(computeSnoozeMoment('tomorrow', new Date('2026-11-17T18:00:00Z'), 'Asia/Kolkata')).toBe(
+      '2026-11-18T03:30:00.000Z',
+    );
+  });
+});
+
+describe('editing a task', () => {
+  const task: Task = {
+    id: 't1',
+    kind: 'call',
+    title: 'Call Priya',
+    dueAt: '2026-11-17T05:30:00.000Z',
+    bucket: 'today',
+    doneAt: null,
+    contact: { id: 'c1', name: 'Priya' },
+    leadId: 'l1',
+    owner: { userId: 'u1', name: 'Anita' },
+    createdByAgent: null,
+    createdAt: '2026-11-16T10:00:00.000Z',
+  };
+
+  it('fills the form with the task, the due time on the wall clock', () => {
+    expect(buildTaskFormFromTask(task, 'Asia/Kolkata')).toEqual({
+      contactId: 'c1',
+      kind: 'call',
+      title: 'Call Priya',
+      dueDate: '2026-11-17',
+      dueTime: '11:00',
+    });
+  });
+
+  it('does not move a due time that has seconds when only the words change', () => {
+    const withSeconds = { ...task, dueAt: '2026-11-17T05:30:41.123Z' };
+    const fields = { ...buildTaskFormFromTask(withSeconds, 'Asia/Kolkata'), title: 'New words' };
+    expect(buildUpdateTaskRequest(fields, withSeconds, 'Asia/Kolkata')).toEqual({ title: 'New words' });
+  });
+
+  it('sends only what changed, and nothing when nothing changed', () => {
+    const fields = buildTaskFormFromTask(task, 'Asia/Kolkata');
+    expect(buildUpdateTaskRequest(fields, task, 'Asia/Kolkata')).toEqual({});
+    expect(
+      buildUpdateTaskRequest({ ...fields, title: ' Call Priya back ', dueTime: '12:30' }, task, 'Asia/Kolkata'),
+    ).toEqual({
+      title: 'Call Priya back',
+      dueAt: '2026-11-17T07:00:00.000Z',
+    });
   });
 });

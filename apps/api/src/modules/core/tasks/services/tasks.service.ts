@@ -1,4 +1,10 @@
-import type { CreateTaskRequest, ListTasksQuery, Task, TasksListResponse } from '@toobler-one/shared';
+import type {
+  CreateTaskRequest,
+  ListTasksQuery,
+  Task,
+  TasksListResponse,
+  UpdateTaskRequest,
+} from '@toobler-one/shared';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
 import { ApiError, notFound } from '../../../../kernel/errors';
@@ -201,6 +207,131 @@ export function createTasksService({ database }: { database: Database }) {
           limit: query.limit,
           counts,
         };
+      });
+    },
+
+    /**
+     * Changes a task: its words, kind, due time (this is how a task is snoozed; the reminder and late alert then fire again for the new
+     * time), done or open again, or its owner (hands it to another person of the business: an unknown person answers 404). The "own
+     * leads only" role can change only tasks it owns (another's answer 404) and cannot hand a task to anyone else (403). An unknown,
+     * deleted or another business's task answers 404. Sending what the task already has changes nothing and writes nothing. Writes one
+     * log line (which fields, never the words) and the events `task.updated`, plus `task.completed`, `task.reopened` or
+     * `task.reassigned` when those happened.
+     */
+    async updateTask(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
+      taskId: string,
+      request: UpdateTaskRequest,
+    ): Promise<Task> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      const isOwnLeadsOnly = principal.role === 'staff_own';
+      if (isOwnLeadsOnly && request.ownerUserId !== undefined && request.ownerUserId !== principal.userId) {
+        throw forbiddenForOwnLeadsOnly();
+      }
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const current = await tasksRepository.lockTaskForChange(transaction, accountId, taskId);
+        // A task that belongs to someone else looks like an unknown one to the "own leads only" role
+        if (!current || (isOwnLeadsOnly && current.ownerUserId !== principal.userId)) throw notFound('That task');
+        if (request.ownerUserId !== undefined && request.ownerUserId !== current.ownerUserId) {
+          const [newOwner] = await findPeopleSummaries(transaction, { accountId, userIds: [request.ownerUserId] });
+          if (!newOwner) throw notFound('That person');
+        }
+
+        // Work out what really changes: asking for what the task already has is not a change
+        const changes: Parameters<typeof tasksRepository.updateTask>[1]['changes'] = {};
+        const changedFields: string[] = [];
+        if (request.title !== undefined && request.title !== current.title) {
+          changes.title = request.title;
+          changedFields.push('title');
+        }
+        if (request.kind !== undefined && request.kind !== current.kind) {
+          changes.kind = request.kind;
+          changedFields.push('kind');
+        }
+        if (request.dueAt !== undefined && new Date(request.dueAt).getTime() !== current.dueAt.getTime()) {
+          changes.dueAt = new Date(request.dueAt);
+          changedFields.push('dueAt');
+        }
+        const wasDone = current.doneAt !== null;
+        if (request.done !== undefined && request.done !== wasDone) {
+          changes.doneAt = request.done ? new Date() : null;
+          changedFields.push('done');
+        }
+        if (request.ownerUserId !== undefined && request.ownerUserId !== current.ownerUserId) {
+          changes.ownerUserId = request.ownerUserId;
+          changedFields.push('ownerUserId');
+        }
+
+        const now = new Date();
+        const startOfTomorrow = await findStartOfTomorrow(transaction, accountId, now);
+        if (changedFields.length === 0) {
+          const [unchanged] = await withPeople(
+            transaction,
+            accountId,
+            [{ ...current, createdByAgent: null, createdAt: now }],
+            now,
+            startOfTomorrow,
+          );
+          return unchanged!;
+        }
+        const row = await tasksRepository.updateTask(transaction, { accountId, taskId, changes, actor });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'tasks.updated',
+          // Which fields changed, never their values
+          details: { recordType: 'task', recordId: taskId, fields: changedFields },
+        });
+        const eventPayload = { taskId, leadId: row.leadId, contactId: row.contactId };
+        await publishEvent(transaction, {
+          accountId,
+          eventName: 'task.updated',
+          payload: { ...eventPayload, fields: changedFields },
+        });
+        if (changedFields.includes('done')) {
+          await publishEvent(transaction, {
+            accountId,
+            eventName: row.doneAt !== null ? 'task.completed' : 'task.reopened',
+            payload: eventPayload,
+          });
+        }
+        if (changedFields.includes('ownerUserId')) {
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'task.reassigned',
+            payload: { ...eventPayload, fromUserId: current.ownerUserId, toUserId: row.ownerUserId },
+          });
+        }
+        const [task] = await withPeople(transaction, accountId, [row], now, startOfTomorrow);
+        return task!;
+      });
+    },
+
+    /**
+     * Deletes a task the soft way: it leaves every list, its row is kept. The "own leads only" role can delete only tasks it owns
+     * (another's answer 404). An unknown, already deleted or another business's task answers 404. Writes one log line and `task.deleted`.
+     */
+    async deleteTask(principal: Pick<Principal, 'accountId' | 'userId' | 'role'>, taskId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        const current = await tasksRepository.lockTaskForChange(transaction, accountId, taskId);
+        if (!current || (principal.role === 'staff_own' && current.ownerUserId !== principal.userId)) {
+          throw notFound('That task');
+        }
+        await tasksRepository.softDeleteTask(transaction, { accountId, taskId, actor });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'tasks.deleted',
+          details: { recordType: 'task', recordId: taskId },
+        });
+        await publishEvent(transaction, {
+          accountId,
+          eventName: 'task.deleted',
+          payload: { taskId, leadId: current.leadId, contactId: current.contactId },
+        });
       });
     },
   };

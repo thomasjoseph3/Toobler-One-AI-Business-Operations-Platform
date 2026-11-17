@@ -7,7 +7,7 @@ import { createSignedInPerson } from './support/auth';
 import { createPretendBrowser, type PretendBrowser } from './support/browser';
 import { openTestDatabase } from './support/harness';
 
-// F08 slice 1: adding a task and listing tasks by tab. Whole stories in pretend browsers that keep cookies like real ones, plus the usual
+// F08 slices 1 and 2: adding a task, listing tasks by tab, and changing or deleting one. Whole stories in pretend browsers that keep cookies like real ones, plus the usual
 // refusals (401, 403, 404, 400) and the fence between businesses.
 
 let database: Database;
@@ -40,14 +40,20 @@ const uniqueUaeNumber = () => `+9715${String(Math.floor(Math.random() * 90_000_0
 const inHours = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
 
 /** Sends a request and checks it answered with the expected status, returning the body. */
-async function sendOk(person: Person, method: 'GET' | 'POST', url: string, payload?: object, status = 200) {
+async function sendOk(
+  person: Person,
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE',
+  url: string,
+  payload?: object,
+  status = 200,
+) {
   const response = await person.browser.send(method, `/api/v1${url}`, payload);
   expect(response.statusCode, `${method} ${url}: ${response.body}`).toBe(status);
-  return response.json();
+  return status === 204 ? undefined : response.json();
 }
 
 /** The status and error code of a request that is expected to be refused. */
-async function refused(person: Person, method: 'GET' | 'POST', url: string, payload?: object) {
+async function refused(person: Person, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, payload?: object) {
   const response = await person.browser.send(method, `/api/v1${url}`, payload);
   return { status: response.statusCode, code: response.json()?.error?.code as string | undefined };
 }
@@ -323,5 +329,229 @@ describe('GET /api/v1/tasks', () => {
     expect(mineOnly.items.map((item: { title: string }) => item.title)).toEqual(['Mine']);
     expect((await refused(owner, 'GET', `/tasks?owner=${randomUUID()}`)).status).toBe(403);
     expect((await refused(owner, 'GET', `/tasks?contact_id=${contactId}`)).status).toBe(403);
+  });
+});
+
+/** Adds a second person of the same business directly in the database (the team screens come with F02). */
+async function addColleague(person: Person, role: 'manager' | 'staff' | 'staff_own' = 'staff'): Promise<string> {
+  const colleague = await database.system
+    .insertInto('users')
+    .values({
+      id: randomUUID(),
+      account_id: person.businessId,
+      name: 'Ravi Kumar',
+      email: `ravi-${randomUUID()}@example.com`,
+      role,
+    } as never)
+    .returning('id')
+    .executeTakeFirstOrThrow();
+  return colleague.id;
+}
+
+/** Adds a lead and one task on it, returning the task. */
+async function addTask(person: Person, title = 'Call Priya') {
+  const { leadId } = await addContactAndLead(person, 'Priya Menon');
+  const task = await sendOk(person, 'POST', '/tasks', { leadId, title, dueAt: inHours(30) }, 201);
+  return { task, leadId };
+}
+
+describe('PATCH /api/v1/tasks/{id}', () => {
+  it('ticks a task off and opens it again, with one log line (field names only) and the events', async () => {
+    const owner = await signUpAndSignIn();
+    const { task } = await addTask(owner, 'Secret-title-words');
+    const done = await sendOk(owner, 'PATCH', `/tasks/${task.id}`, { done: true });
+    expect(done).toMatchObject({ id: task.id, bucket: 'done' });
+    expect(done.doneAt).not.toBeNull();
+    const reopened = await sendOk(owner, 'PATCH', `/tasks/${task.id}`, { done: false });
+    expect(reopened).toMatchObject({ bucket: 'upcoming', doneAt: null });
+    const logs = await database.system
+      .selectFrom('activity_log')
+      .select(['kind', 'fields'])
+      .where('record_id', '=', task.id)
+      .where('kind', '=', 'tasks.updated')
+      .execute();
+    expect(logs).toHaveLength(2);
+    expect(logs[0]!.fields).toEqual(['done']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .select(['name', 'payload'])
+      .where('account_id', '=', owner.businessId)
+      .where('name', 'in', ['task.completed', 'task.reopened', 'task.updated'])
+      .execute();
+    expect(events.map((event) => event.name).sort()).toEqual([
+      'task.completed',
+      'task.reopened',
+      'task.updated',
+      'task.updated',
+    ]);
+    expect(JSON.stringify(logs) + JSON.stringify(events)).not.toContain('Secret-title-words');
+  });
+
+  it('snoozes by giving a new due time, which clears the reminder and late-alert marks', async () => {
+    const owner = await signUpAndSignIn();
+    const { task } = await addTask(owner);
+    await database.system
+      .updateTable('tasks')
+      .set({ reminded_at: new Date(), overdue_alerted_at: new Date() })
+      .where('id', '=', task.id)
+      .execute();
+    const newDue = inHours(60);
+    const snoozed = await sendOk(owner, 'PATCH', `/tasks/${task.id}`, { dueAt: newDue });
+    expect(new Date(snoozed.dueAt).getTime()).toBe(new Date(newDue).getTime());
+    const stored = await database.system
+      .selectFrom('tasks')
+      .select(['reminded_at', 'overdue_alerted_at'])
+      .where('id', '=', task.id)
+      .executeTakeFirstOrThrow();
+    expect(stored).toEqual({ reminded_at: null, overdue_alerted_at: null });
+  });
+
+  it('edits the words and the kind, and hands the task to another person of the business', async () => {
+    const owner = await signUpAndSignIn();
+    const { task } = await addTask(owner);
+    const colleagueId = await addColleague(owner);
+    const changed = await sendOk(owner, 'PATCH', `/tasks/${task.id}`, {
+      title: '  Email the rates  ',
+      kind: 'email',
+      ownerUserId: colleagueId,
+    });
+    expect(changed).toMatchObject({
+      title: 'Email the rates',
+      kind: 'email',
+      owner: { userId: colleagueId, name: 'Ravi Kumar' },
+    });
+    const events = await database.system
+      .selectFrom('domain_events')
+      .select('payload')
+      .where('account_id', '=', owner.businessId)
+      .where('name', '=', 'task.reassigned')
+      .execute();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.payload).toMatchObject({ fromUserId: owner.userId, toUserId: colleagueId });
+  });
+
+  it('changes nothing and writes nothing when asked for what the task already has', async () => {
+    const owner = await signUpAndSignIn();
+    const { task } = await addTask(owner, 'Same words');
+    await sendOk(owner, 'PATCH', `/tasks/${task.id}`, {
+      title: 'Same words',
+      kind: 'todo',
+      done: false,
+      dueAt: task.dueAt,
+      ownerUserId: owner.userId,
+    });
+    const logs = await database.system
+      .selectFrom('activity_log')
+      .select('id')
+      .where('record_id', '=', task.id)
+      .where('kind', '=', 'tasks.updated')
+      .execute();
+    expect(logs).toHaveLength(0);
+  });
+
+  it('answers 400 for nothing to change, empty or too long words, a bad kind, a bad date and fields it does not know', async () => {
+    const owner = await signUpAndSignIn();
+    const { task } = await addTask(owner);
+    const bad: object[] = [
+      {},
+      { title: '  ' },
+      { title: 'x'.repeat(201) },
+      { kind: 'meeting' },
+      { dueAt: 'soon' },
+      { done: 'yes' },
+      { ownerUserId: 'me' },
+      { leadId: randomUUID() },
+      { accountId: randomUUID() },
+    ];
+    for (const payload of bad)
+      expect((await refused(owner, 'PATCH', `/tasks/${task.id}`, payload)).status, JSON.stringify(payload)).toBe(400);
+    expect((await refused(owner, 'PATCH', '/tasks/not-an-id', { done: true })).status).toBe(400);
+  });
+
+  it('answers 404 for an unknown task, a deleted one, another business’s task and an owner who is not in the business, and 401 without signing in', async () => {
+    const first = await signUpAndSignIn();
+    const second = await signUpAndSignIn();
+    const { task } = await addTask(first);
+    const theirs = await addTask(second);
+    expect((await refused(first, 'PATCH', `/tasks/${randomUUID()}`, { done: true })).status).toBe(404);
+    expect((await refused(first, 'PATCH', `/tasks/${theirs.task.id}`, { done: true })).status).toBe(404);
+    expect((await refused(first, 'PATCH', `/tasks/${task.id}`, { ownerUserId: second.userId })).status).toBe(404);
+    await sendOk(first, 'DELETE', `/tasks/${task.id}`, undefined, 204);
+    expect((await refused(first, 'PATCH', `/tasks/${task.id}`, { done: true })).status).toBe(404);
+    const untouched = await database.system
+      .selectFrom('tasks')
+      .select('done_at')
+      .where('id', '=', theirs.task.id)
+      .executeTakeFirstOrThrow();
+    expect(untouched.done_at).toBeNull();
+    expect((await createPretendBrowser(app).send('PATCH', `/api/v1/tasks/${task.id}`, { done: true })).statusCode).toBe(
+      401,
+    );
+  });
+
+  it('lets the "own leads only" role change only its own tasks, and never hand one to someone else', async () => {
+    const owner = await signUpAndSignIn();
+    const { task: mine, leadId } = await addTask(owner);
+    const colleagueId = await addColleague(owner);
+    const others = await sendOk(
+      owner,
+      'POST',
+      '/tasks',
+      { leadId, title: 'Ravi’s', dueAt: inHours(5), ownerUserId: colleagueId },
+      201,
+    );
+    await setRole(owner, 'staff_own');
+    await sendOk(owner, 'PATCH', `/tasks/${mine.id}`, { done: true });
+    expect((await refused(owner, 'PATCH', `/tasks/${others.id}`, { done: true })).status).toBe(404);
+    expect((await refused(owner, 'PATCH', `/tasks/${mine.id}`, { ownerUserId: colleagueId })).status).toBe(403);
+    expect((await refused(owner, 'DELETE', `/tasks/${others.id}`)).status).toBe(404);
+  });
+});
+
+describe('DELETE /api/v1/tasks/{id}', () => {
+  it('deletes the soft way: the task leaves every list and its row is kept, with one log line and one event', async () => {
+    const owner = await signUpAndSignIn();
+    const { task, leadId } = await addTask(owner);
+    await sendOk(owner, 'DELETE', `/tasks/${task.id}`, undefined, 204);
+    expect((await sendOk(owner, 'GET', `/tasks?lead_id=${leadId}`)).total).toBe(0);
+    const row = await database.system
+      .selectFrom('tasks')
+      .select('deleted_at')
+      .where('id', '=', task.id)
+      .executeTakeFirstOrThrow();
+    expect(row.deleted_at).not.toBeNull();
+    const logs = await database.system
+      .selectFrom('activity_log')
+      .select('kind')
+      .where('record_id', '=', task.id)
+      .where('kind', '=', 'tasks.deleted')
+      .execute();
+    expect(logs).toHaveLength(1);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .select('name')
+      .where('account_id', '=', owner.businessId)
+      .where('name', '=', 'task.deleted')
+      .execute();
+    expect(events).toHaveLength(1);
+  });
+
+  it('answers 404 for an unknown, already deleted or another business’s task, 400 for a bad id and 401 without signing in', async () => {
+    const first = await signUpAndSignIn();
+    const second = await signUpAndSignIn();
+    const { task } = await addTask(first);
+    const theirs = await addTask(second);
+    expect((await refused(first, 'DELETE', `/tasks/${randomUUID()}`)).status).toBe(404);
+    expect((await refused(first, 'DELETE', `/tasks/${theirs.task.id}`)).status).toBe(404);
+    expect((await refused(first, 'DELETE', '/tasks/nope')).status).toBe(400);
+    await sendOk(first, 'DELETE', `/tasks/${task.id}`, undefined, 204);
+    expect((await refused(first, 'DELETE', `/tasks/${task.id}`)).status).toBe(404);
+    expect((await createPretendBrowser(app).send('DELETE', `/api/v1/tasks/${task.id}`)).statusCode).toBe(401);
+    const stillThere = await database.system
+      .selectFrom('tasks')
+      .select('deleted_at')
+      .where('id', '=', theirs.task.id)
+      .executeTakeFirstOrThrow();
+    expect(stillThere.deleted_at).toBeNull();
   });
 });

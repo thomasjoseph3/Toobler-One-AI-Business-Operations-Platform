@@ -3,13 +3,15 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   createTaskRequestSchema,
   listTasksQuerySchema,
+  taskIdParamsSchema,
   taskSchema,
   tasksListResponseSchema,
+  updateTaskRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createTasksService } from '../services/tasks.service';
 
-/** Registers /api/v1/tasks (add a task, list tasks). */
+/** Registers /api/v1/tasks (add a task, list tasks) and /api/v1/tasks/{id} (change or delete one). */
 export function tasksRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const tasksService = createTasksService({ database: app.kernel.database });
@@ -35,6 +37,30 @@ export function tasksRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return tasksService.listTasks(request.principal, request.query);
+    },
+  );
+
+  // For any signed-in, verified person: complete, snooze (a new due time), reassign or edit. The service keeps the "own leads only" role to its own tasks.
+  typedApp.patch(
+    '/tasks/:id',
+    {
+      config: { access: 'staff' },
+      schema: { params: taskIdParamsSchema, body: updateTaskRequestSchema, response: { 200: taskSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return tasksService.updateTask(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // For any signed-in, verified person (API.md: Staff). A soft delete: the task disappears, its row is kept.
+  typedApp.delete(
+    '/tasks/:id',
+    { config: { access: 'staff' }, schema: { params: taskIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await tasksService.deleteTask(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }

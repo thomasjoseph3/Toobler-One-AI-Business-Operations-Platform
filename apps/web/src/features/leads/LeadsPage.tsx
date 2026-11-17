@@ -19,7 +19,7 @@ import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
 import { useNoteCounts } from '../notes/useNoteCounts';
 import { NotesPanel } from '../notes/NotesPanel';
-import { CreateTaskPanel } from '../tasks/CreateTaskPanel';
+import { TaskFormPanel } from '../tasks/TaskFormPanel';
 import { LeadsBoard } from './LeadsBoard';
 import { DeleteStageDialog } from './DeleteStageDialog';
 import { StageNameDialog } from './StageNameDialog';
@@ -180,7 +180,7 @@ export function LeadsPage() {
       />
       {actions.dialogs}
       {taskLead !== null ? (
-        <CreateTaskPanel
+        <TaskFormPanel
           key={taskLead.id}
           isOpen
           onClose={() => setTaskLead(null)}

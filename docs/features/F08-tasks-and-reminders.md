@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/05-tasks-and-reminders.md`; `requirements/API.md` (Tasks and reminders); the designer's activity menu (Create Task, Create Meeting, Create Call) in the Leads list frame `docs/design/screens/leads-list-with-activity-menu.png`.
 **Depends on:** F04 contacts, F06 leads, F07 timeline.      **Module:** `core.tasks` (core).
-**Status:** `in_progress`: slice 1 built (17 Nov 2026).
+**Status:** `in_progress`: slices 1 and 2 built (17 Nov 2026).
 
 ## Feature guide
 
@@ -20,7 +20,7 @@
 
 **What it never does.** It never shows another business's tasks. It never keeps a task's words in the activity log or in events (ids only).
 
-**Not part of it (yet).** Completing, snoozing, reassigning, editing and deleting (slice 2); reminders and late alerts (slice 3); asking whether to close open tasks when a lead is won or lost, and tasks on the timeline (slice 4); Create Meeting and Create Call in the activity menu (later phases, they are not drawn dead).
+**Not part of it (yet).** Handing a task to a colleague from the screens (the API does it; the screen waits for the team list of F02); reminders and late alerts (slice 3); asking whether to close open tasks when a lead is won or lost, and tasks on the timeline (slice 4); Create Meeting and Create Call in the activity menu (later phases, they are not drawn dead).
 
 ### For the tech team
 - **Module:** `core.tasks` (requires `core.auth`, `core.contacts`, `core.leads`). Table `tasks` (migration 050): kind `call | whatsapp | email | todo`, `due_at`, `owner_user_id`, `done_at`, `created_by_agent`, `reminded_at`, `overdue_alerted_at`, `deleted_at`. Composite keys keep a task, its lead and its owner in one business.
@@ -49,3 +49,11 @@
 - **Screens:** the Tasks page (tabs with numbers in the designer's segmented control, Filter for Everyone / Mine, Add task, table or cards, paging, loading / error / empty states), the Add task side panel (person search or the given lead, kind, words, due date and time typed in the business's time zone), the activity icon in a lead's row now opens a menu with Create Task, and a Tasks card on the lead page.
 - **Tests:** 11 API tests (`test/tasks.test.ts`), isolation entries for both routes, 9 tests for the day and tab rules, 11 web rule tests (time zone conversion, the form, the view) and 10 browser specs (`e2e/tasks.spec.ts`, pretend API `e2e/pretend-tasks.ts`).
 - **Found by the tests:** "next whole hour" was counted in UTC hours, wrong for India (half-hour zone); it is counted on the wall clock now.
+
+### Slice 2: tick off, snooze, edit, hand over, delete (built 17 Nov 2026)
+- **Routes (2):** `PATCH /tasks/{id}` (any of `title`, `kind`, `dueAt`, `done`, `ownerUserId`; at least one; sending what the task already has changes nothing and writes nothing; a new due time is how a task is snoozed and clears the reminder and late-alert marks so both fire again; the row is locked first so two changes take turns) and `DELETE /tasks/{id}` (a soft delete). The "own leads only" role can change or delete only tasks it owns (another's answers 404) and cannot hand a task to anyone else (403). 404 for unknown, deleted or another business's task, or an owner who is not in the business; 400 for bad input.
+- **Log and events:** `tasks.updated` (which fields, never the words) with `task.updated`, plus `task.completed`, `task.reopened` or `task.reassigned` when those happened; `tasks.deleted` with `task.deleted`. Ids only.
+- **Screens:** a tick box on every task (ticking moves it to Done; ticking a done task opens it again), a "…" menu on every task with Edit, Snooze (In 1 hour, Tomorrow morning, Next week: 9:00 on the business's clock, next Monday) and Delete ("Delete the task “…”?" naming it), the Add task panel doubling as the Edit form (sends only what changed), on the Tasks page and in the lead page's Tasks card. A refusal is said in plain words.
+- **Decision:** reassigning has no button yet because there is no team list to choose from until F02; the API is ready and tested.
+- **Found by the tests:** saving an edit that only changed the words would also have sent the due time, shifted by its dropped seconds; the form now sends the due time only when the date or time box really changed.
+- **Tests:** 12 more API tests (tick and reopen with log and events without the words, snooze clears the marks, edit and hand over, no-op writes nothing, 400s, 404s and 401, own-leads-only role, soft delete with log and event, delete refusals), isolation entries for both routes, 7 more web rule tests (snooze moments in the business time zone, editing) and 10 more browser specs.

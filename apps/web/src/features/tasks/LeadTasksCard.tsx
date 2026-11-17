@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import type { TasksListResponse } from '@toobler-one/shared';
+import type { Task, TasksListResponse } from '@toobler-one/shared';
 import { Button, Card, ErrorState, LoadingState, PlusIcon } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
 import { t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { useKeptData } from '../knowledge/use-kept-resource';
-import { CreateTaskPanel } from './CreateTaskPanel';
+import { TaskFormPanel } from './TaskFormPanel';
 import { TaskCards } from './TasksList';
+import { useTaskActions } from './useTaskActions';
 import { buildLeadTasksPath } from './tasks-view';
 
 /**
@@ -19,6 +20,12 @@ export function LeadTasksCard({ leadId, leadDisplayName }: { leadId: string; lea
   const kept = useKeptData(resource.state);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [panelOpenCount, setPanelOpenCount] = useState(0);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const actions = useTaskActions({
+    timeZone: sessionState.status === 'signedIn' ? sessionState.profile.business.timeZone : 'UTC',
+    onChanged: () => resource.reload(),
+    onEdit: setEditingTask,
+  });
   if (sessionState.status !== 'signedIn') return null;
   const { user, business } = sessionState.profile;
   const items = kept.data?.items ?? [];
@@ -48,8 +55,31 @@ export function LeadTasksCard({ leadId, leadDisplayName }: { leadId: string; lea
       {kept.data !== null && items.length === 0 ? (
         <p className="text-body-md text-text-secondary">{t('leadPage.tasks.empty')}</p>
       ) : null}
-      {items.length > 0 ? <TaskCards tasks={items} signedInUserId={user.id} timeZone={business.timeZone} /> : null}
-      <CreateTaskPanel
+      {actions.problemNotice}
+      {items.length > 0 ? (
+        <TaskCards
+          tasks={items}
+          signedInUserId={user.id}
+          timeZone={business.timeZone}
+          onToggleDone={(task) => void actions.toggleDone(task)}
+          renderRowMenu={actions.renderRowMenu}
+        />
+      ) : null}
+      {actions.dialogs}
+      {editingTask !== null ? (
+        <TaskFormPanel
+          key={editingTask.id}
+          isOpen
+          onClose={() => setEditingTask(null)}
+          timeZone={business.timeZone}
+          editingTask={editingTask}
+          onCreated={() => {
+            setEditingTask(null);
+            resource.reload();
+          }}
+        />
+      ) : null}
+      <TaskFormPanel
         key={panelOpenCount}
         isOpen={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}

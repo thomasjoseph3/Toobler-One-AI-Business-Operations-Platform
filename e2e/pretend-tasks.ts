@@ -8,6 +8,9 @@ export interface PretendTasks {
   tasks: Array<Record<string, unknown>>;
   /** What the page sent to add a task. */
   postedTasks: Array<Record<string, unknown>>;
+  /** What the page sent to change a task, and which tasks it deleted. */
+  patchedTasks: Array<{ taskId: string; body: Record<string, unknown> }>;
+  deletedTaskIds: string[];
   /** When set, the next task is refused with this status and code. */
   refusal: { status: number; code: string; message: string } | null;
 }
@@ -50,6 +53,8 @@ export function startingTasks(signedInUserId: string, signedInUserName: string):
       pretendTask('task-done', 'Confirm the dates', 'done', mine),
     ],
     postedTasks: [],
+    patchedTasks: [],
+    deletedTaskIds: [],
     refusal: null,
   };
 }
@@ -66,6 +71,8 @@ export function answerTasksCall(
     userId: string;
   },
 ): PretendAnswer | undefined {
+  const idMatch = /^\/tasks\/([\w-]+)$/u.exec(call.path);
+  if (idMatch) return answerOneTaskCall(state, idMatch[1]!, call);
   if (call.path !== '/tasks') return undefined;
   if (call.method === 'POST') {
     if (state.refusal) {
@@ -114,4 +121,42 @@ export function answerTasksCall(
       },
     },
   };
+}
+
+/** Answers a change or delete of one task: the pretend API does what the real one does to the list (done moves it to Done, a new due time moves it between tabs). */
+function answerOneTaskCall(
+  state: PretendTasks,
+  taskId: string,
+  call: { method: string; body: Record<string, unknown> | null },
+): PretendAnswer | undefined {
+  const task = state.tasks.find((candidate) => candidate['id'] === taskId);
+  if (!task) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'That task was not found.' } } };
+  if (call.method === 'DELETE') {
+    state.deletedTaskIds.push(taskId);
+    state.tasks = state.tasks.filter((candidate) => candidate['id'] !== taskId);
+    return { status: 204, body: undefined };
+  }
+  if (call.method !== 'PATCH') return undefined;
+  if (state.refusal) {
+    const { status, code, message } = state.refusal;
+    state.refusal = null;
+    return { status, body: { error: { code, message } } };
+  }
+  const body = call.body ?? {};
+  state.patchedTasks.push({ taskId, body });
+  if (typeof body['title'] === 'string') task['title'] = body['title'];
+  if (typeof body['kind'] === 'string') task['kind'] = body['kind'];
+  if (typeof body['dueAt'] === 'string') {
+    task['dueAt'] = body['dueAt'];
+    task['bucket'] = new Date(body['dueAt']).getTime() > Date.now() + 2 * 3_600_000 ? 'upcoming' : 'today';
+  }
+  if (body['done'] === true) {
+    task['bucket'] = 'done';
+    task['doneAt'] = new Date().toISOString();
+  }
+  if (body['done'] === false) {
+    task['bucket'] = 'today';
+    task['doneAt'] = null;
+  }
+  return { status: 200, body: task };
 }

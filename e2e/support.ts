@@ -230,7 +230,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
         }
-        if (path === '/tasks') {
+        if (path === '/tasks' || path.startsWith('/tasks/')) {
           const profile = profileFor(pretendApi);
           const tasksAnswer = answerTasksCall(pretendApi.tasks, {
             method: request.method(),
@@ -240,7 +240,13 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             userName: profile.user.name,
             userId: profile.user.id,
           });
-          if (tasksAnswer) return route.fulfill(json(tasksAnswer.status, tasksAnswer.body));
+          if (tasksAnswer) {
+            return route.fulfill(
+              tasksAnswer.body === undefined
+                ? { status: tasksAnswer.status }
+                : json(tasksAnswer.status, tasksAnswer.body),
+            );
+          }
         }
         if (
           path === '/activities' ||

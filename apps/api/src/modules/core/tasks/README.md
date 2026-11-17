@@ -4,8 +4,8 @@ Built in slices of at most 2 API routes (see `docs/features/F08-tasks-and-remind
 
 | Folder          | What is in it                                                                                       |
 | --------------- | --------------------------------------------------------------------------------------------------- |
-| `routes/`       | `tasks.routes.ts`: `POST /tasks`, `GET /tasks`                                                       |
-| `services/`     | `tasks.service.ts`: add a task, list one tab of tasks with the tab numbers, log and events          |
+| `routes/`       | `tasks.routes.ts`: `POST /tasks`, `GET /tasks`, `PATCH /tasks/{id}`, `DELETE /tasks/{id}`                                                       |
+| `services/`     | `tasks.service.ts`: add, list one tab with the tab numbers, change (done, snooze, reassign, edit) and soft-delete, with log and events          |
 | `repositories/` | `tasks.repository.ts`: the SQL for `tasks`                                                           |
 | `helpers/`      | `day-bounds.ts`: where "today" ends in the business's time zone, and which tab a task is in (pure)  |
 
@@ -15,4 +15,4 @@ worked out from the due time and the business's time zone every time, never stor
 Reads the lead (leads `findLeadReference`), the person (contacts `findContactSummaries`), the owner's name and the business's time zone
 (auth `findPeopleSummaries`, `findBusinessIdentity`), always through those modules' `index.ts`.
 
-Events published (ids only, never the title): `task.created`.
+Events published (ids only, never the title): `task.created`, `task.updated`, `task.completed`, `task.reopened`, `task.reassigned`, `task.deleted`.

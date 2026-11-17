@@ -82,3 +82,30 @@ export const tasksListResponseSchema = z.object({
   }),
 });
 export type TasksListResponse = z.infer<typeof tasksListResponseSchema>;
+
+/** The address part naming a task. */
+export const taskIdParamsSchema = z.object({ id: z.uuid() });
+
+/**
+ * What staff send to change a task: any of the words, the kind, the due time (this is also how a task is snoozed), `done` (true ticks it
+ * off, false opens it again) and the owner (hands the task to another person of the business). At least one is needed. The business, the
+ * person, the lead and who made it never change. Anything else in the body is refused.
+ */
+export const updateTaskRequestSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      .min(1, 'Write what needs doing')
+      .max(MAX_TASK_TITLE_LENGTH, 'That title is too long')
+      .optional(),
+    kind: taskKindSchema.optional(),
+    dueAt: z.iso.datetime({ offset: true }).optional(),
+    done: z.boolean().optional(),
+    ownerUserId: z.uuid().optional(),
+  })
+  .strict()
+  .refine((request) => Object.values(request).some((value) => value !== undefined), {
+    message: 'Send at least one thing to change',
+  });
+export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;

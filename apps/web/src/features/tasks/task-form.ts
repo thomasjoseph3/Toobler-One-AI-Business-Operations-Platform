@@ -1,9 +1,9 @@
 // The rules of the Add task form: what is chosen or typed, checking it, and turning it into what the API takes.
 // Pure functions (no screen, no network), so each rule can be tested alone.
-import type { CreateTaskRequest, TaskKind } from '@toobler-one/shared';
+import type { CreateTaskRequest, Task, TaskKind, UpdateTaskRequest } from '@toobler-one/shared';
 import { MAX_TASK_TITLE_LENGTH } from '@toobler-one/shared';
 import type { MessageKey } from '../../app/i18n';
-import { suggestDueWallClock, wallClockToIsoMoment } from './zoned-time';
+import { readWallClock, suggestDueWallClock, wallClockToIsoMoment } from './zoned-time';
 
 /** Everything chosen or typed in the Add task form. */
 export interface TaskFormFields {
@@ -59,4 +59,25 @@ export function buildCreateTaskRequest(
     title: fields.title.trim(),
     dueAt: wallClockToIsoMoment(fields.dueDate, fields.dueTime, timeZone) ?? '',
   };
+}
+
+/** Fills the form with what a task has now, the due time on the business's wall clock (for editing). */
+export function buildTaskFormFromTask(task: Task, timeZone: string): TaskFormFields {
+  const due = readWallClock(new Date(task.dueAt), timeZone);
+  return { contactId: task.contact.id, kind: task.kind, title: task.title, dueDate: due.date, dueTime: due.time };
+}
+
+/** Turns the edit form into the request body with only what changed. An empty body means nothing changed. Call it only after `checkTaskForm` found nothing. */
+export function buildUpdateTaskRequest(fields: TaskFormFields, task: Task, timeZone: string): UpdateTaskRequest {
+  const request: UpdateTaskRequest = {};
+  if (fields.title.trim() !== task.title) request.title = fields.title.trim();
+  if (fields.kind !== task.kind) request.kind = fields.kind;
+  // The boxes show the due time to the minute, so a task due at 10:00:30 would look changed if its seconds were compared. Only a date or
+  // time box that really changed moves the due time.
+  const original = buildTaskFormFromTask(task, timeZone);
+  if (fields.dueDate !== original.dueDate || fields.dueTime !== original.dueTime) {
+    const dueAt = wallClockToIsoMoment(fields.dueDate, fields.dueTime, timeZone);
+    if (dueAt !== null) request.dueAt = dueAt;
+  }
+  return request;
 }

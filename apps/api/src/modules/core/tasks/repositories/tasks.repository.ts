@@ -169,3 +169,89 @@ export async function listTasks(
   const rows = await orderedQuery.select(TASK_COLUMNS).limit(options.limit).offset(options.offset).execute();
   return { items: rows.map(toTaskRow), total, counts };
 }
+
+/** What the service needs to decide whether and how a task may be changed. */
+export interface TaskForChange {
+  id: string;
+  kind: TaskKind;
+  title: string;
+  dueAt: Date;
+  doneAt: Date | null;
+  contactId: string;
+  leadId: string | null;
+  ownerUserId: string;
+}
+
+/** Finds a live task and locks its row until the transaction ends, so two changes at the same moment take turns. */
+export async function lockTaskForChange(db: Db, accountId: string, taskId: string): Promise<TaskForChange | undefined> {
+  const row = await db
+    .selectFrom('tasks')
+    .select(['id', 'kind', 'title', 'due_at', 'done_at', 'contact_id', 'lead_id', 'owner_user_id'])
+    .where('account_id', '=', accountId)
+    .where('id', '=', taskId)
+    .where('deleted_at', 'is', null)
+    .forUpdate()
+    .executeTakeFirst();
+  return row
+    ? {
+        id: row.id,
+        kind: row.kind,
+        title: row.title,
+        dueAt: row.due_at,
+        doneAt: row.done_at,
+        contactId: row.contact_id,
+        leadId: row.lead_id,
+        ownerUserId: row.owner_user_id,
+      }
+    : undefined;
+}
+
+/**
+ * Changes a task and gives it back. Only what is in `changes` changes. A new due time also clears the reminder and late-alert marks, so
+ * both fire again for the new time.
+ */
+export async function updateTask(
+  db: Db,
+  options: {
+    accountId: string;
+    taskId: string;
+    changes: {
+      title?: string;
+      kind?: TaskKind;
+      dueAt?: Date;
+      doneAt?: Date | null;
+      ownerUserId?: string;
+    };
+    actor: Actor;
+  },
+): Promise<TaskRow> {
+  const { changes } = options;
+  const row = await db
+    .updateTable('tasks')
+    .set({
+      ...(changes.title !== undefined ? { title: changes.title } : {}),
+      ...(changes.kind !== undefined ? { kind: changes.kind } : {}),
+      ...(changes.dueAt !== undefined ? { due_at: changes.dueAt, reminded_at: null, overdue_alerted_at: null } : {}),
+      ...(changes.doneAt !== undefined ? { done_at: changes.doneAt } : {}),
+      ...(changes.ownerUserId !== undefined ? { owner_user_id: changes.ownerUserId } : {}),
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.taskId)
+    .returning(TASK_COLUMNS)
+    .executeTakeFirstOrThrow();
+  return toTaskRow(row);
+}
+
+/** Deletes a task the soft way: it leaves every list, its row is kept. */
+export async function softDeleteTask(
+  db: Db,
+  options: { accountId: string; taskId: string; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('tasks')
+    .set({ deleted_at: new Date(), updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.taskId)
+    .execute();
+}

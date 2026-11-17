@@ -67,6 +67,7 @@ interface BusinessAData {
   leadId: string;
   ticketId: string;
   noteId: string;
+  taskId: string;
   stageId: string;
   offeringId: string;
   offerId: string;
@@ -226,6 +227,14 @@ beforeAll(async () => {
     .execute();
   // A has a note on its lead, which B must not be able to read, change or delete
   const noteOfA = await sendOk(businessA, 'POST', '/notes', { leadId: lead.id, body: 'A private note' }, 201);
+  // A has a task on its lead, which B must not be able to change or delete
+  const taskOfA = await sendOk(
+    businessA,
+    'POST',
+    '/tasks',
+    { leadId: lead.id, title: 'A private task', dueAt: '2030-01-01T10:00:00Z' },
+    201,
+  );
   dataOfA = {
     conversationId: conversationOfA,
     testChatId: testChatOfA,
@@ -234,6 +243,7 @@ beforeAll(async () => {
     leadId: lead.id,
     ticketId: ticket.id,
     noteId: noteOfA.id,
+    taskId: taskOfA.id,
     stageId: stage.id,
     offeringId: offering.id,
     offerId: offer.id,
@@ -666,6 +676,18 @@ const attempts: Attempt[] = [
     route: 'GET /api/v1/tasks',
     what: "read the tasks of A's lead",
     request: () => ({ method: 'GET', url: `/tasks?lead_id=${dataOfA.leadId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/tasks/{id}',
+    what: "tick off A's task",
+    request: () => ({ method: 'PATCH', url: `/tasks/${dataOfA.taskId}`, payload: { done: true } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/tasks/{id}',
+    what: "delete A's task",
+    request: () => ({ method: 'DELETE', url: `/tasks/${dataOfA.taskId}` }),
     expectedStatus: 404,
   },
   {
