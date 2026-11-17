@@ -78,7 +78,7 @@ export function createJobRunner(dependencies: {
 
   const enqueueJob = async (jobName: string, data: JobData): Promise<void> => {
     if (!declaredJobsByName.has(jobName)) throw new Error(`Job "${jobName}" is not declared by any module.`);
-    if (data.accountId !== undefined && !isUuid(data.accountId))
+    if (data?.accountId !== undefined && !isUuid(data.accountId))
       throw new Error(`Job "${jobName}" needs a valid accountId.`);
     await boss.send(jobName, data);
   };
@@ -86,7 +86,8 @@ export function createJobRunner(dependencies: {
   // Runs one declared job: skips it when its module is off for the business, otherwise gives it its context.
   const runDeclaredJob = async (jobName: string, data: JobData): Promise<void> => {
     const declared = declaredJobsByName.get(jobName)!;
-    const accountId = data.accountId;
+    // A cron-scheduled job arrives from pg-boss with no data at all (null), so read it carefully.
+    const accountId = data?.accountId;
     if (accountId !== undefined) {
       if (!isUuid(accountId)) throw new Error(`Job "${jobName}" has no valid accountId.`);
       if (!(await gate.isActive(accountId, declared.moduleId))) {
@@ -95,7 +96,7 @@ export function createJobRunner(dependencies: {
       }
     }
     await declared.definition.run({
-      data,
+      data: data ?? {},
       accountContext: accountId === undefined ? undefined : contextFor(accountId, { kind: 'system', id: jobName }),
       enqueueJob,
       listAccountIds,

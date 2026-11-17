@@ -23,10 +23,18 @@ let runner: JobRunner;
 
 // Everything the probe job saw, in the order it ran.
 const probeRuns: JobRun[] = [];
+// Runs of the job that stands in for a cron-scheduled job (which pg-boss starts with no data).
+const scheduledProbeRuns: JobRun[] = [];
 const probeModule = defineModule({
   id: 'feature.probe',
   kind: 'feature',
   jobs: [
+    {
+      name: 'probe.scheduled',
+      run: async (job) => {
+        scheduledProbeRuns.push(job);
+      },
+    },
     {
       name: 'probe.record',
       run: async (job) => {
@@ -93,6 +101,14 @@ describe('job runner', () => {
     await runner.enqueueJob('probe.record', jobForNormalBusiness);
     await waitFor(() => ranForData(jobForNormalBusiness) !== undefined);
     expect(ranForData(jobForBusinessWithProbeOff)).toBeUndefined();
+  });
+
+  it('runs a job that arrives with no data at all, like a cron-scheduled job', async () => {
+    // pg-boss hands a scheduled job `null` as its data; the runner must not crash on it.
+    await runner.enqueueJob('probe.scheduled', null as unknown as JobData);
+    await waitFor(() => scheduledProbeRuns.length === 1);
+    expect(scheduledProbeRuns[0]?.data).toEqual({});
+    expect(scheduledProbeRuns[0]?.accountContext).toBeUndefined();
   });
 
   it('refuses a job nobody declared and a job with a bad business id', async () => {
