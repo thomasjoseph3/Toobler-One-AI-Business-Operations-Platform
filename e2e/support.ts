@@ -1,4 +1,5 @@
 import { test as base, expect } from '@playwright/test';
+import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
 
 /** The person the pretend API signs in. */
 export const PRETEND_PROFILE = {
@@ -61,6 +62,8 @@ export interface PretendApi {
   missingLeadIds: string[];
   /** When set, `PATCH /leads/{id}` is refused with this status and code. */
   leadEditRefusal: { status: number; code: string; message: string } | null;
+  /** The business profile (Knowledge base): questions, answers, situations, settings and the reading of the website. */
+  knowledge: PretendKnowledge;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -182,6 +185,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         leadEdits: {},
         missingLeadIds: [],
         leadEditRefusal: null,
+        knowledge: startingKnowledge(),
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -193,6 +197,19 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path.startsWith('/knowledge/')) {
+          const knowledgeAnswer = answerKnowledgeCall(pretendApi.knowledge, {
+            method: request.method(),
+            path,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            role: pretendApi.role,
+          });
+          if (knowledgeAnswer) {
+            return route.fulfill(
+              knowledgeAnswer.body === undefined ? { status: knowledgeAnswer.status } : json(knowledgeAnswer.status, knowledgeAnswer.body),
+            );
+          }
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details

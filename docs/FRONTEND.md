@@ -220,3 +220,6 @@ choice fails contrast).
 - A unit test checks every token pair we use for contrast in light and dark (see §5).
 - Each feature's manual test script includes a phone check; screenshots are taken with the browser tools at hand-off.
 - Visual checks per feature: light and dark, empty, loading and error states, a 60-character name, a Malayalam name.
+
+### Screens designed by us for the UI catch-up block (17 Nov 2026, for the designer to replace or confirm)
+- **Knowledge base → Business profile (C1):** progress card with a bar, "Fill this in from your website", settings card, one card per section, an answer editor that fits each question's type (opening hours: one row per day, times side by side; lists: one block per row), "Please check" warning badge with Yes and Change. Uses Card, Badge, Button, TextField, SelectField, Checkbox, SegmentedControl, Alert from `packages/ui`. No new components; plain radio inputs (accent colour) are used for single choices because the design system has no radio yet: **proposal: add a Radio**.
