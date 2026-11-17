@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { answerFaqsCall, startingFaqs, type PretendFaqs } from './pretend-faqs';
 import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
+import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
 import { answerSalesCall, startingSales, type PretendSales } from './pretend-sales';
 import { answerSetupCall, startingSetup, type PretendSetup } from './pretend-setup';
 
@@ -76,6 +77,8 @@ export interface PretendApi {
   sales: PretendSales;
   /** FAQs and unanswered questions. */
   faqs: PretendFaqs;
+  /** The website chat settings (Channels). */
+  webchat: PretendWebchat;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -202,6 +205,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         agent: startingAgent(),
         sales: startingSales(),
         faqs: startingFaqs(),
+        webchat: startingWebchat(),
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -213,6 +217,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path === '/channels/webchat') {
+          const webchatAnswer = answerWebchatCall(pretendApi.webchat, {
+            method: request.method(),
+            path,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            role: pretendApi.role,
+          });
+          if (webchatAnswer) return route.fulfill(json(webchatAnswer.status, webchatAnswer.body));
         }
         if (path.startsWith('/offerings') || path.startsWith('/offers')) {
           const salesAnswer = answerSalesCall(pretendApi.sales, {

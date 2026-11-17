@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { ChannelsPage } from '../features/channels/ChannelsPage';
 import { FaqsPage } from '../features/faqs/FaqsPage';
 import { KnowledgePage } from '../features/knowledge/KnowledgePage';
 import { LeadPage } from '../features/leads/LeadPage';
@@ -28,6 +29,7 @@ function pageFor(item: NavigationItem) {
   if (item.id === 'leads') return <LeadsPage />;
   if (item.id === 'knowledge') return <KnowledgePage />;
   if (item.id === 'setup') return <SetupPage />;
+  if (item.id === 'channels') return <ChannelsPage />;
   return <PlaceholderPage item={item} />;
 }
 

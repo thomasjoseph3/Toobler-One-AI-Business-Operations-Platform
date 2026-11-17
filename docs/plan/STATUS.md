@@ -75,7 +75,7 @@ Before more backend features, the missing staff screens are built (existing rout
 | C2 | **Setup page** (steps and progress bar, "Read my website" with the reading status, the checklist of what stops going live, apply industry words, Go live) in form mode | C3 | **Test the agent** (a chat the owner tries; needed before going live) | F19 `/agent/test-chat` | built, waiting for the owner's check ([notes](../features/C2-setup-guide.md)) |
 | C4 | **What you sell** (offerings and offers) and **suggested offerings** from the website reading | F17 | built, waiting for the owner's check ([notes](../features/C4-what-you-sell.md)) |
 | C5 | **FAQs and unanswered questions** | F18 | built, waiting for the owner's check ([notes](../features/C5-faqs.md)) |
-| C6 | **Settings → Website chat** (colour, greeting, buttons, allowed websites, the line to copy, Check installation, test page link) | F20 | planned |
+| C6 | **Settings → Website chat** (colour, greeting, buttons, allowed websites, the line to copy, Check installation, test page link) | F20 | built, waiting for the owner's check ([notes](../features/C6-channels-website-chat.md)) |
 | C7 | **Settings → AI keys and models**, and Settings → Modules | F37, F03 | planned |
 | C8 | **Contacts** (list, page, add, edit) | F04 | planned |
 | C9 | **Tickets** (list, page) | F14 | planned |
