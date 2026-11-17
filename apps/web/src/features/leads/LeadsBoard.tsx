@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { BoardColumn, Lead, PipelineStage } from '@toobler-one/shared';
-import { ActivityIcon, CalendarIcon, IconButton, MoreIcon, PhoneIcon, Tag } from '@toobler-one/ui';
+import { ActionMenu, ActivityIcon, Button, CalendarIcon, IconButton, PhoneIcon, PlusIcon, Tag } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import { LeadNameLink } from './LeadNameLink';
 import {
@@ -23,6 +23,12 @@ export interface LeadsBoardProps {
   renderRowMenu: (lead: Lead, displayName: string) => ReactNode;
   /** Moves a lead to a stage: called when a card is dropped on another column (Lost asks why first). */
   onMoveLead: (lead: Lead, displayName: string, stage: PipelineStage) => void;
+  /** Whether the signed-in person may change the columns (managers only): shows the column menu and the Add column button. */
+  canEditColumns: boolean;
+  /** Opens the box to rename a column. */
+  onRenameColumn: (stage: PipelineStage) => void;
+  /** Opens the box to add a column. */
+  onAddColumn: () => void;
 }
 
 /** One lead as a card (Figma pipeline card): name and menu, the source and the phone, the owner, and the callback date or the activity shortcut. */
@@ -99,7 +105,7 @@ function LeadCard({
  * with how many leads it holds, and its newest leads as cards (up to 50: if there are more, it says so). The board scrolls
  * sideways when the stages do not fit, and each column scrolls up and down on its own, so the toolbar above stays in view.
  */
-export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRowMenu, onMoveLead }: LeadsBoardProps) {
+export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRowMenu, onMoveLead, canEditColumns, onRenameColumn, onAddColumn }: LeadsBoardProps) {
   // The card being dragged and the column it is over, so the column can show where it would land
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [columnUnderCard, setColumnUnderCard] = useState<string | null>(null);
@@ -154,14 +160,22 @@ export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRo
               </span>
               <span className="sr-only">{formatMessage('leads.board.count', { count: column.leadCount })}</span>
             </Tag>
-            {/* Column actions (rename and so on) are drawn as designed and do nothing yet */}
-            <IconButton
-              label={formatMessage('leads.board.columnMore', { stage: column.stage.name })}
-              size="compact"
-              icon={<MoreIcon size={20} />}
-              aria-disabled
-              title={t('leads.notYet')}
-            />
+            {canEditColumns ? (
+              <ActionMenu
+                triggerLabel={formatMessage('leads.board.columnMore', { stage: column.stage.name })}
+                panelLabel={formatMessage('leads.board.columnMenu', { stage: column.stage.name })}
+                items={[
+                  {
+                    id: 'rename',
+                    label: t('pipeline.rename.title'),
+                    onSelect: () => {
+                      const stage = stages.find((candidate) => candidate.id === column.stage.id);
+                      if (stage) onRenameColumn(stage);
+                    },
+                  },
+                ]}
+              />
+            ) : null}
           </header>
           {column.leads.length === 0 ? (
             <p className="text-body-sm px-1 text-text-tertiary">
@@ -189,6 +203,13 @@ export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRo
           ) : null}
         </section>
       ))}
+      {canEditColumns ? (
+        <div className="flex w-[296px] shrink-0 snap-start items-start">
+          <Button leadingIcon={<PlusIcon size={16} />} onClick={onAddColumn}>
+            {t('pipeline.add.title')}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

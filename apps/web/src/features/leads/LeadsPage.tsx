@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
-import type { LeadsResponse, Pipeline } from '@toobler-one/shared';
+import type { LeadsResponse, Pipeline, PipelineStage } from '@toobler-one/shared';
 import { Alert, Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
@@ -8,6 +8,7 @@ import { useSession } from '../../auth/session';
 import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
 import { LeadsBoard } from './LeadsBoard';
+import { StageNameDialog } from './StageNameDialog';
 import { LeadCards, LeadsTable } from './LeadsTable';
 import { LeadsToolbar } from './LeadsToolbar';
 import {
@@ -39,6 +40,8 @@ export function LeadsPage() {
   // The Create lead panel: open or shut, and a counter so each opening starts with an empty form
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
+  // The box for naming a column: closed, adding a new one, or renaming one
+  const [stageDialog, setStageDialog] = useState<{ stageToRename: PipelineStage | null } | null>(null);
   const view = readLeadsView(searchParams);
   const signedInUser =
     sessionState.status === 'signedIn'
@@ -112,6 +115,17 @@ export function LeadsPage() {
         onCreated={handleLeadCreated}
       />
       {actions.dialogs}
+      {stageDialog !== null ? (
+        <StageNameDialog
+          stageToRename={stageDialog.stageToRename}
+          onClose={() => setStageDialog(null)}
+          onSaved={(stageName) => {
+            setStageDialog(null);
+            actions.showNotice({ tone: 'success', text: formatMessage(stageDialog.stageToRename ? 'pipeline.notice.renamed' : 'pipeline.notice.added', { name: stageName }) });
+            reloadAll();
+          }}
+        />
+      ) : null}
     </>
   );
 
@@ -145,7 +159,8 @@ export function LeadsPage() {
   const totalLeads =
     answer.view === 'list' ? answer.total : answer.columns.reduce((total, column) => total + column.leadCount, 0);
 
-  if (totalLeads === 0) {
+  // The board is still shown when there are no leads, so its columns can be set up (and it says "No leads here yet" in each); only the list has an empty state
+  if (totalLeads === 0 && answer.view === 'list') {
     const hasFilters = countActiveFilters(view) > 0;
     return (
       <div className={PAGE_FRAME_CLASSES}>
@@ -190,6 +205,9 @@ export function LeadsPage() {
           stages={stages}
           renderRowMenu={actions.renderRowMenu}
           onMoveLead={actions.moveLeadToStage}
+          canEditColumns={user.role === 'manager'}
+          onRenameColumn={(stage) => setStageDialog({ stageToRename: stage })}
+          onAddColumn={() => setStageDialog({ stageToRename: null })}
         />
       </div>
     );
