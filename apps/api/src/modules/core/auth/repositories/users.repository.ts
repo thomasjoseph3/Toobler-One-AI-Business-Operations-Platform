@@ -223,3 +223,35 @@ export async function listPeopleByIds(
     .where('id', 'in', userIds)
     .execute();
 }
+
+/** Where to send an email to a person: their name and the address they confirmed. */
+export interface PersonToEmail {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** The confirmed email addresses of some people of the business (people without a confirmed address, unknown ids and other businesses' people are missing). Run it inside the business's own transaction. */
+export async function listPeopleToEmailByIds(db: Db, accountId: string, userIds: string[]): Promise<PersonToEmail[]> {
+  if (userIds.length === 0) return [];
+  const rows = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', userIds)
+    .where('email_verified_at', 'is not', null)
+    .execute();
+  return rows.map((row) => ({ id: row.id, name: row.name, email: row.email }));
+}
+
+/** The confirmed email addresses of the business's managers. Run it inside the business's own transaction. */
+export async function listManagersToEmail(db: Db, accountId: string): Promise<PersonToEmail[]> {
+  const rows = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email'])
+    .where('account_id', '=', accountId)
+    .where('role', '=', 'manager')
+    .where('email_verified_at', 'is not', null)
+    .execute();
+  return rows.map((row) => ({ id: row.id, name: row.name, email: row.email }));
+}

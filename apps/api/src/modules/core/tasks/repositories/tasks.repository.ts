@@ -255,3 +255,81 @@ export async function softDeleteTask(
     .where('id', '=', options.taskId)
     .execute();
 }
+
+/**
+ * The open tasks whose reminder is due: not yet reminded, still ahead (a task already past is the late alert's business), and due within
+ * `reminderMinutes` from now. Soonest first, at most 200 at a time (the next minute picks up the rest).
+ */
+export async function listTasksToRemind(
+  db: Db,
+  options: { accountId: string; now: Date; reminderMinutes: number },
+): Promise<TaskRow[]> {
+  const remindUntil = new Date(options.now.getTime() + options.reminderMinutes * 60_000);
+  const rows = await db
+    .selectFrom('tasks')
+    .select(TASK_COLUMNS)
+    .where('account_id', '=', options.accountId)
+    .where('deleted_at', 'is', null)
+    .where('done_at', 'is', null)
+    .where('reminded_at', 'is', null)
+    .where('due_at', '>', options.now)
+    .where('due_at', '<=', remindUntil)
+    .orderBy('due_at', 'asc')
+    .limit(200)
+    .execute();
+  return rows.map(toTaskRow);
+}
+
+/** How long after it was due a task can still raise a late alert; an older one is stale and stays quiet. */
+const LATE_ALERT_WINDOW_HOURS = 24;
+
+/**
+ * The open tasks whose late alert is due: not yet alerted, due at least `lateAlertMinutes` ago, and not more than a day late (a task
+ * that has been forgotten for days is not news). Oldest first, at most 200 at a time.
+ */
+export async function listTasksToAlertLate(
+  db: Db,
+  options: { accountId: string; now: Date; lateAlertMinutes: number },
+): Promise<TaskRow[]> {
+  const lateSince = new Date(options.now.getTime() - options.lateAlertMinutes * 60_000);
+  const staleBefore = new Date(options.now.getTime() - LATE_ALERT_WINDOW_HOURS * 3_600_000);
+  const rows = await db
+    .selectFrom('tasks')
+    .select(TASK_COLUMNS)
+    .where('account_id', '=', options.accountId)
+    .where('deleted_at', 'is', null)
+    .where('done_at', 'is', null)
+    .where('overdue_alerted_at', 'is', null)
+    .where('due_at', '<=', lateSince)
+    .where('due_at', '>', staleBefore)
+    .orderBy('due_at', 'asc')
+    .limit(200)
+    .execute();
+  return rows.map(toTaskRow);
+}
+
+/** Notes that a task's reminder went out, so it is never sent twice for the same due time. */
+export async function markReminded(
+  db: Db,
+  options: { accountId: string; taskId: string; at: Date; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('tasks')
+    .set({ reminded_at: options.at, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.taskId)
+    .execute();
+}
+
+/** Notes that a task's late alert went out, so it is never sent twice for the same due time. */
+export async function markLateAlerted(
+  db: Db,
+  options: { accountId: string; taskId: string; at: Date; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('tasks')
+    .set({ overdue_alerted_at: options.at, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.taskId)
+    .execute();
+}

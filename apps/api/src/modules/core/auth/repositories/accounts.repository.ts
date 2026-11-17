@@ -101,3 +101,22 @@ export async function updateAccountSettings(
     .where('id', '=', accountId)
     .execute();
 }
+
+/** When task reminders and late alerts go out for a business, and the time zone its times are shown in. Undefined when there is no such business. */
+export async function findTaskAlertSettings(
+  db: Db,
+  accountId: string,
+): Promise<{ reminderMinutes: number; lateAlertMinutes: number; timeZone: string } | undefined> {
+  const row = await db
+    .selectFrom('accounts')
+    .select(['task_reminder_minutes', 'task_late_alert_minutes', 'time_zone'])
+    .where('id', '=', accountId)
+    .executeTakeFirst();
+  return row
+    ? {
+        reminderMinutes: row.task_reminder_minutes,
+        lateAlertMinutes: row.task_late_alert_minutes,
+        timeZone: row.time_zone,
+      }
+    : undefined;
+}

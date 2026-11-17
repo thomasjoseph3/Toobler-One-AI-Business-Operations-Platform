@@ -61,3 +61,11 @@ export async function markBusinessLive(
 ): Promise<Date | null> {
   return accountsRepository.markLive(transaction, accountId, actor);
 }
+
+/** When task reminders and late alerts go out for the business, and the time zone its times are shown in (the tasks module's jobs read it). */
+export async function findTaskAlertSettings(
+  transaction: Db,
+  accountId: string,
+): Promise<{ reminderMinutes: number; lateAlertMinutes: number; timeZone: string } | undefined> {
+  return accountsRepository.findTaskAlertSettings(transaction, accountId);
+}

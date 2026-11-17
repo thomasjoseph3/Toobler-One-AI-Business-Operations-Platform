@@ -180,6 +180,10 @@ export interface AccountsTable {
   default_country: Generated<string>;
   /** How many minutes the business promises to call back within while it is open (5 to 120). */
   callback_promise_minutes: Generated<number>;
+  /** How many minutes before a task is due its owner is reminded (1 to 1440). */
+  task_reminder_minutes: Generated<number>;
+  /** How many minutes after a task was due, still open, the managers are told (1 to 1440). */
+  task_late_alert_minutes: Generated<number>;
   /** When the business went live (started answering real customers); null until then. */
   live_at: Date | null;
   live_by: Json | null;

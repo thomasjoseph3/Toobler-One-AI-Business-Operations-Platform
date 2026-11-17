@@ -18,3 +18,23 @@ export async function findPeopleSummaries(
 ): Promise<PersonSummary[]> {
   return usersRepository.listPeopleByIds(transaction, options.accountId, [...new Set(options.userIds)]);
 }
+
+/** A person to send an email to: their name and confirmed address. Used only to send; never logged or put in an event. */
+export interface PersonToEmail {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** The people among these ids who have a confirmed email address (the tasks module's reminder goes to the task's owner). Run it inside the business's own transaction. */
+export async function findPeopleToEmail(
+  transaction: Db,
+  options: { accountId: string; userIds: string[] },
+): Promise<PersonToEmail[]> {
+  return usersRepository.listPeopleToEmailByIds(transaction, options.accountId, [...new Set(options.userIds)]);
+}
+
+/** The business's managers who have a confirmed email address (the tasks module's late alert goes to them). Run it inside the business's own transaction. */
+export async function findManagersToEmail(transaction: Db, options: { accountId: string }): Promise<PersonToEmail[]> {
+  return usersRepository.listManagersToEmail(transaction, options.accountId);
+}
