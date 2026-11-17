@@ -30,6 +30,12 @@ export interface LeadActionsOptions {
   onDeleted?: (confirmation: string) => void;
   /** A message to show from the start, for example the one the previous page left behind. */
   initialNotice?: LeadNotice | null;
+  /**
+   * Lets a screen show a move at once, before the server answers (the Pipeline board). It is called with the lead and the new stage, and
+   * gives back a function that puts the card back. When it is given, a move that worked does not load the data again (the screen
+   * already shows it) and a move that failed calls the "put it back" function.
+   */
+  applyMoveLocally?: (lead: Lead, stage: PipelineStage) => () => void;
 }
 
 /**
@@ -44,6 +50,7 @@ export function useLeadActions({
   onChanged,
   onDeleted,
   initialNotice = null,
+  applyMoveLocally,
 }: LeadActionsOptions) {
   // The message after an action, and the two questions that can be open: why lost, and are you sure
   const [notice, setNotice] = useState<LeadNotice | null>(initialNotice);
@@ -91,25 +98,32 @@ export function useLeadActions({
     }
   };
 
+  // Moves a lead. The screen may show the move at once; if the server then says no, the card is put back and the reason is shown.
+  const performMove = async (lead: Lead, displayName: string, stage: PipelineStage, lostReason?: string) => {
+    const putBack = applyMoveLocally?.(lead, stage);
+    const body = lostReason === undefined ? { stageId: stage.id } : { stageId: stage.id, lostReason };
+    const worked = await performLeadAction(
+      () => apiRequest('POST', `/leads/${lead.id}/move`, body),
+      formatMessage('leads.notice.moved', { name: displayName, stage: stage.name }),
+      // A screen that already shows the move does not need to load everything again
+      putBack === undefined,
+    );
+    if (!worked) putBack?.();
+  };
   const moveToStage = (lead: Lead, displayName: string, stage: PipelineStage) => {
     // A lead can only be lost with a reason, so that asks first; every other move goes straight through
     if (stage.kind === 'lost') {
       setPendingLostMove({ lead, displayName, stage });
       return;
     }
-    void performLeadAction(
-      () => apiRequest('POST', `/leads/${lead.id}/move`, { stageId: stage.id }),
-      formatMessage('leads.notice.moved', { name: displayName, stage: stage.name }),
-    );
+    void performMove(lead, displayName, stage);
   };
   const confirmLostMove = async (reason: string) => {
     if (pendingLostMove === null) return;
     const { lead, displayName, stage } = pendingLostMove;
-    await performLeadAction(
-      () => apiRequest('POST', `/leads/${lead.id}/move`, { stageId: stage.id, lostReason: reason }),
-      formatMessage('leads.notice.moved', { name: displayName, stage: stage.name }),
-    );
+    // The question closes at once, and the card moves while the server is asked
     setPendingLostMove(null);
+    await performMove(lead, displayName, stage, reason);
   };
   const assignOwner = (lead: Lead, displayName: string, ownerUserId: string | null) =>
     void performLeadAction(

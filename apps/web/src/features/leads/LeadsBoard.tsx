@@ -189,7 +189,8 @@ export function LeadsBoard({
     <div
       role="list"
       aria-label={t('leads.board.columnsLabel')}
-      className="flex min-h-[420px] flex-1 snap-x gap-4 overflow-x-auto pb-2 md:min-h-0"
+      // `relative` keeps the hidden screen-reader labels inside the board, so they cannot stretch the whole page sideways
+      className="relative flex min-h-[420px] flex-1 snap-x gap-4 overflow-x-auto pb-2 md:min-h-0"
     >
       {columns.map((column) => (
         <section
@@ -242,7 +243,7 @@ export function LeadsBoard({
                 : t('leads.board.empty')}
             </p>
           ) : (
-            <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+            <ul className="scrollbar-hidden flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
               {column.leads.map((lead) => (
                 <LeadCard
                   key={lead.id}

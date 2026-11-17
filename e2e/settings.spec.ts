@@ -12,7 +12,11 @@ test.describe('Settings: AI keys and key mode', () => {
     await expect(
       page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'AI' }),
     ).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('radio', { name: /My own keys first, then the platform's/ })).toBeChecked();
+    // The business is never asked which keys to use: the page only says which are answering (own keys first, then the platform's)
+    await expect(page.getByRole('radio')).toHaveCount(0);
+    await expect(
+      page.getByText(/Your own keys are used first\. If they all fail or run out, the platform's keys step in/),
+    ).toBeVisible();
     await expect(page.getByText('Allowed 1000 AI calls a month. Used 250 this month, 750 left.')).toBeVisible();
     await expect(page.getByText('Allowed until 31 Dec 2026.')).toBeVisible();
     await expect(page.getByRole('progressbar', { name: "Share of this month's allowance used" })).toHaveAttribute(
@@ -23,32 +27,29 @@ test.describe('Settings: AI keys and key mode', () => {
     await expect(usage.getByText('250', { exact: true })).toBeVisible();
   });
 
-  test('changes the key mode and warns when the choice would leave nothing to answer with', async ({
+  test('says in words when the platform’s keys are not switched on, and what that means for the business', async ({
     page,
     pretendApi,
   }) => {
     pretendApi.settings.platformAccess.enabled = false;
     await page.goto('/settings');
-    await expect(page.getByText('Not switched on for your business')).toBeVisible();
-    await page.getByRole('radio', { name: /Only the platform's keys/ }).check();
-    await expect.poll(() => pretendApi.settings.keyModeChanges).toEqual(['platform']);
     await expect(
-      page.getByText(/The platform's keys are not switched on for your business, so the AI cannot answer in this mode/),
+      page.getByText('Not switched on for your business. Ask your platform team, or add your own key.'),
     ).toBeVisible();
-    await expect(page.getByText('Saved.')).toBeVisible();
+    await expect(
+      page.getByText(
+        /The platform's keys are not switched on for your business, so if yours fail the AI cannot answer/,
+      ),
+    ).toBeVisible();
   });
 
-  test('puts the mode back and shows why when the change is refused', async ({ page, pretendApi }) => {
-    pretendApi.settings.refusal = {
-      status: 400,
-      code: 'INVALID_MODE',
-      message: 'That mode is not allowed for your business.',
-    };
+  test('shows a monthly token allowance beside the call allowance, and the nearer one fills the bar', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.settings.platformAccess.monthlyTokenCap = 2000000;
     await page.goto('/settings');
-    // click, not check: the page puts the choice back at once when it is refused, which is what this test is for
-    await page.getByRole('radio', { name: /Only my own keys/ }).click();
-    await expect(page.getByText('That mode is not allowed for your business.')).toBeVisible();
-    await expect(page.getByRole('radio', { name: /My own keys first/ })).toBeChecked();
+    await expect(page.getByText('Allowed 2000000 AI tokens a month. Used 0 this month, 2000000 left.')).toBeVisible();
   });
 
   test('lists the keys by company, showing only the last four characters and how each is doing', async ({ page }) => {

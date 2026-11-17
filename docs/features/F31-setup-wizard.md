@@ -2,11 +2,32 @@
 
 **Requirements:** `5-onboarding-and-launch/03-setup-wizard.md`; `3-ai-agents-and-channels/09-business-questions.md`; `requirements/API.md` (Setup wizard, Knowledge base → prefill); docs/plan/PHASE-1.md (F31); docs/SECURITY.md (SSRF, public fetches); docs/CONVERSATION-TYPES.md (not touched)
 **Depends on:** F01, F03, F06, F16, F17, F18, F19, F20, F37      **Module:** `core.setup` (core). The website reader sits inside it as `websiteReader` (also used later by F18's re-read and F33).
-**Status:** `in_progress`, **paused after slice 4** for the UI catch-up block (R64, 17 Nov 2026) (brief written 17 Nov 2026; waiting for the owner to confirm the open points marked **Confirm**)
+**Status:** `in_progress` (brief written 17 Nov 2026). Slices 1 to 5 and 7 built; the setup page and form screens are C1 and C2; the chat screen is slice 7.
 
 ## Feature guide
 
-*Written at hand-off (CLAUDE.md rule). Outline of what it will say: a guided setup for the owner, a website reader that fills in answers for them to check, a setup chat and a form that save the same answers, a go-live switch, and a checklist on the Today page.*
+**What it does.** After signing up, the owner is walked through getting the business ready for the AI to answer real customers. Toobler One can read the business's website (and, when switched on, its Google listing) and fill in many answers by itself. Those answers wait as **"Please check"** until the owner says Yes or changes them: the AI never uses an answer nobody confirmed. The owner can answer the remaining questions in a **chat** (one question at a time, with buttons for the choices) or in the **form**; both save exactly the same answers. A **Go live** switch turns the AI on for real customers, and it refuses until everything needed is done.
+
+**Why it is useful.** A new business gets from sign-up to a working AI receptionist in minutes instead of filling in a long form. Reading the website does the typing; the owner only checks. Going live is a deliberate step, so the AI never speaks to a customer before the basics are right.
+
+**A day in the life.** Anita signs up, pastes her hotel's website and sees "Reading your website…". While it reads she opens the **Setup chat**. It asks "Do you have a website?" (she taps No... or Yes and pastes a link), "How do customers pay?" (she taps UPI and Card), "What is your business called?" (she types it). When the website answers arrive she taps **Yes** on the right ones and **Change** on one that was old. She tries the **Test the agent** chat, sees it answer from her confirmed facts, and presses **Go live**. The website chat now answers real visitors.
+
+**Who can do what.** Managers only. Staff are told the setup is for managers.
+
+**Settings and limits.** The website reader reads only public websites, a few pages, with time and size limits; at most 10 readings a day per business, one at a time. The setup chat takes at most 60 replies an hour. English only for the chat. Go-live needs: every "needed to go live" question confirmed, the promises step done, and the Test the agent chat tried at least once.
+
+**What it never does.** It never marks a website answer as confirmed by itself and never overwrites an answer you confirmed. It never reads private or internal addresses. It never puts prices from a website into the profile on its own (offerings it finds are only suggested). The chat has no powers except asking a question and saving your answer: it ignores instructions typed into a reply or found on a website. The AI never decides whether you are ready to go live; code checks.
+
+**What is not part of it.** The real test **call** (comes with phone calls, F29): the test is the Test the agent chat for now. Opening hours, lists (like your offerings and FAQs) and prices are easier in the form, so the chat leaves them to it and says how many are left. Reading uploaded documents, and Voice or Upload buttons in the chat, are later.
+
+## For the tech team
+
+- **Module:** `core.setup` (always on). Tables: `setup_steps` (migration 041 or earlier), `prefill_runs` (043); columns `accounts.callback_promise_minutes` (044) and `accounts.live_at` (045).
+- **Routes:** `GET/PATCH /setup`, `POST /knowledge/prefill`, `GET /knowledge/prefill/{id}`, `POST /setup/apply-preset`, `POST /setup/go-live`, `POST /setup/chat` (managers only).
+- **Job:** `setup.run_prefill` (reads the pages, asks the AI what they say, saves answers as "waiting for a check").
+- **Chat:** code picks the question (`setup-chat-questions.ts`), reads the reply by code first (`read-setup-reply.ts`), asks the AI only for an unreadable pick or yes/no reply (`setup_chat` task), and saves through `knowledge.answerQuestion` (the form's own checks). Stateless: the screen sends back the skipped keys.
+- **Screens:** `/setup` (steps, progress, Go live, "Answer by chat"), `/setup/chat`, and the Knowledge base form with "Please check" answers.
+- **Known limits:** the Google listing and the AI reading a real website have only been tested with stand-ins; the 60-an-hour chat limit counts per address, not per person; the chat does not ask list, hours, price or file questions.
 
 ## Owner decisions taken at the start (17 Nov 2026)
 

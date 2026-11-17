@@ -1,11 +1,20 @@
 import { useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
-import type { LeadsResponse, Pipeline, PipelineStage } from '@toobler-one/shared';
+import type {
+  BoardColumn,
+  Lead,
+  LeadsBoardResponse,
+  LeadsResponse,
+  Pipeline,
+  PipelineStage,
+} from '@toobler-one/shared';
 import { Alert, Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
+import { useKeptData } from '../knowledge/use-kept-resource';
+import { moveLeadInColumns } from './board-move';
 import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
 import { LeadsBoard } from './LeadsBoard';
@@ -53,7 +62,27 @@ export function LeadsPage() {
       : { id: '', role: '' };
   const leadsResource = useApiResource<LeadsResponse>(buildLeadsPath(view, signedInUser.id));
   const pipelineResource = useApiResource<Pipeline>('/pipeline');
-  const stages = pipelineResource.state.status === 'ready' ? pipelineResource.state.data.stages : [];
+  // What is on screen while a reload is under way: the last good answer, so the board never blanks out and flashes
+  const leadsData = useKeptData(leadsResource.state);
+  const pipelineData = useKeptData(pipelineResource.state);
+  const stages = pipelineData.data?.stages ?? [];
+  // The board as the person has just changed it, before the server has answered; it is dropped as soon as a newer answer arrives
+  const [boardOverride, setBoardOverride] = useState<{ source: LeadsBoardResponse; columns: BoardColumn[] } | null>(
+    null,
+  );
+  // Shows a move on the board at once, and gives back what puts the card back if the server refuses it
+  const applyMoveLocally = (lead: Lead, stage: PipelineStage) => {
+    const shownAnswer = leadsData.data;
+    if (shownAnswer === null || shownAnswer.view !== 'board') return () => undefined;
+    const originalStageId = lead.stage.id;
+    const changeColumns = (stageId: string) => (previous: typeof boardOverride) => {
+      const startingColumns =
+        previous !== null && previous.source === shownAnswer ? previous.columns : shownAnswer.columns;
+      return { source: shownAnswer, columns: moveLeadInColumns(startingColumns, lead.id, stageId) };
+    };
+    setBoardOverride(changeColumns(stage.id));
+    return () => setBoardOverride(changeColumns(originalStageId));
+  };
   // Moving, assigning and deleting a lead, shared with the board and the lead page
   // A confirmation the lead page left behind ("The lead for Priya was deleted.") shows here first
   const actions = useLeadActions({
@@ -61,6 +90,7 @@ export function LeadsPage() {
     signedInUser,
     onChanged: leadsResource.reload,
     initialNotice: readNoticeFromState(location.state),
+    applyMoveLocally,
   });
 
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
@@ -172,7 +202,7 @@ export function LeadsPage() {
     </>
   );
 
-  if (leadsResource.state.status === 'loading' || pipelineResource.state.status === 'loading') {
+  if (leadsData.isFirstLoad || pipelineData.isFirstLoad) {
     return (
       <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
@@ -183,7 +213,7 @@ export function LeadsPage() {
     );
   }
 
-  if (leadsResource.state.status === 'error' || pipelineResource.state.status === 'error') {
+  if (leadsData.hasFailed || pipelineData.hasFailed || leadsData.data === null) {
     return (
       <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
@@ -198,7 +228,7 @@ export function LeadsPage() {
     );
   }
 
-  const answer = leadsResource.state.data;
+  const answer = leadsData.data;
   const totalLeads =
     answer.view === 'list' ? answer.total : answer.columns.reduce((total, column) => total + column.leadCount, 0);
 
@@ -242,7 +272,7 @@ export function LeadsPage() {
       <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
         <LeadsBoard
-          columns={answer.columns}
+          columns={boardOverride !== null && boardOverride.source === answer ? boardOverride.columns : answer.columns}
           signedInUserId={user.id}
           timeZone={business.timeZone}
           stages={stages}

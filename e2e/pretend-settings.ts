@@ -5,7 +5,12 @@ import type { PretendAnswer } from './pretend-knowledge';
 
 export interface PretendSettings {
   keyMode: string;
-  platformAccess: { enabled: boolean; monthlyCallCap: number | null; expiresAt: string | null };
+  platformAccess: {
+    enabled: boolean;
+    monthlyCallCap: number | null;
+    monthlyTokenCap: number | null;
+    expiresAt: string | null;
+  };
   usage: { calls: number; failures: number; fallbacks: number; used: number };
   keys: Array<Record<string, unknown>>;
   modules: Array<Record<string, unknown>>;
@@ -28,7 +33,7 @@ const NOW = '2026-11-17T10:00:00.000Z';
 export function startingSettings(): PretendSettings {
   return {
     keyMode: 'own_then_platform',
-    platformAccess: { enabled: true, monthlyCallCap: 1000, expiresAt: '2026-12-31' },
+    platformAccess: { enabled: true, monthlyCallCap: 1000, monthlyTokenCap: null, expiresAt: '2026-12-31' },
     usage: { calls: 250, failures: 3, fallbacks: 1, used: 250 },
     keys: [
       {
@@ -149,6 +154,9 @@ export function answerSettingsCall(
         platform: {
           enabled: state.platformAccess.enabled,
           monthlyCallCap: state.platformAccess.monthlyCallCap,
+          monthlyTokenCap: state.platformAccess.monthlyTokenCap,
+          tokensUsedThisMonth: 0,
+          tokensRemainingThisMonth: state.platformAccess.monthlyTokenCap,
           usedThisMonth: state.usage.used,
           remainingThisMonth:
             state.platformAccess.monthlyCallCap === null
