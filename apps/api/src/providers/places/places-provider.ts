@@ -62,10 +62,7 @@ export function readPlaceFromGoogleAnswer(answer: unknown): PlaceDetails | null 
 }
 
 /** The real Google Places client. `fetchFunction` is replaceable so a test can answer without the internet. */
-export function createGooglePlacesProvider(options: {
-  apiKey: string;
-  fetchFunction?: typeof fetch;
-}): PlacesProvider {
+export function createGooglePlacesProvider(options: { apiKey: string; fetchFunction?: typeof fetch }): PlacesProvider {
   const fetchFunction = options.fetchFunction ?? fetch;
   return {
     async findPlace(searchText) {

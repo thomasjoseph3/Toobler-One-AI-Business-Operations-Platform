@@ -19,7 +19,14 @@ export interface ContactsToolbarProps {
  * The row of controls above the contacts, laid out like the Leads toolbar: the search box and Filter on the left, Add contact on
  * the right, all the same compact size. The Filter panel holds the stage filter and a Clear filters button.
  */
-export function ContactsToolbar({ view, typedSearch, onTypedSearchChange, onChangeView, onClearFilters, onAddContact }: ContactsToolbarProps) {
+export function ContactsToolbar({
+  view,
+  typedSearch,
+  onTypedSearchChange,
+  onChangeView,
+  onClearFilters,
+  onAddContact,
+}: ContactsToolbarProps) {
   const activeFilterCount = countActiveContactFilters(view);
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -40,8 +47,15 @@ export function ContactsToolbar({ view, typedSearch, onTypedSearchChange, onChan
           <SelectField
             label={t('contacts.filter.stage')}
             value={view.lifecycleStage}
-            onChange={(event) => onChangeView({ lifecycleStage: readContactsView(new URLSearchParams({ stage: event.target.value })).lifecycleStage })}
-            options={[{ value: 'all', label: t('contacts.filter.allStages') }, ...LIFECYCLE_CHOICES.map((choice) => ({ value: choice.stage, label: t(choice.labelKey) }))]}
+            onChange={(event) =>
+              onChangeView({
+                lifecycleStage: readContactsView(new URLSearchParams({ stage: event.target.value })).lifecycleStage,
+              })
+            }
+            options={[
+              { value: 'all', label: t('contacts.filter.allStages') },
+              ...LIFECYCLE_CHOICES.map((choice) => ({ value: choice.stage, label: t(choice.labelKey) })),
+            ]}
           />
           <Button variant="tertiary" size="compact" disabled={activeFilterCount === 0} onClick={onClearFilters}>
             {t('leads.filter.clear')}

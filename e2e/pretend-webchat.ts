@@ -14,7 +14,8 @@ export interface PretendWebchat {
   fails: boolean;
 }
 
-const SNIPPET = '<script src="https://api.example/widget/loader.js" data-key="wk_abcdefghijklmnopqrstuvwxyz012345" async></script>';
+const SNIPPET =
+  '<script src="https://api.example/widget/loader.js" data-key="wk_abcdefghijklmnopqrstuvwxyz012345" async></script>';
 
 export function startingWebchat(): PretendWebchat {
   return {
@@ -41,10 +42,15 @@ export function startingWebchat(): PretendWebchat {
 
 /** Which buttons really show: chosen, and for Call and WhatsApp with a number. */
 function shownButtons(settings: Record<string, unknown>): string[] {
-  return (settings['buttonOrder'] as string[]).filter((button) => (button === 'call' ? settings['phoneNumber'] : button === 'whatsapp' ? settings['whatsappNumber'] : true));
+  return (settings['buttonOrder'] as string[]).filter((button) =>
+    button === 'call' ? settings['phoneNumber'] : button === 'whatsapp' ? settings['whatsappNumber'] : true,
+  );
 }
 
-export function answerWebchatCall(state: PretendWebchat, call: { method: string; path: string; body: Record<string, unknown> | null; role: 'manager' | 'staff' }): PretendAnswer | undefined {
+export function answerWebchatCall(
+  state: PretendWebchat,
+  call: { method: string; path: string; body: Record<string, unknown> | null; role: 'manager' | 'staff' },
+): PretendAnswer | undefined {
   const { method, path, body, role } = call;
   if (path !== '/channels/webchat') return undefined;
   if (state.isOff) return { status: 404, body: { error: { code: 'NOT_FOUND', message: 'That was not found.' } } };

@@ -59,7 +59,9 @@ const STEPS: Array<{ key: string; part: 1 | 2; checkedBySystem: boolean }> = [
 /** The whole setup picture, worked out the way the API does it. */
 function picture(setup: PretendSetup, knowledge: PretendKnowledge) {
   const missingQuestions = neededMissingKeys(knowledge);
-  const aboutBusinessAnswered = !missingQuestions.some((key) => ['business_name', 'business_summary', 'contact_details', 'opening_hours', 'customer_languages'].includes(key));
+  const aboutBusinessAnswered = !missingQuestions.some((key) =>
+    ['business_name', 'business_summary', 'contact_details', 'opening_hours', 'customer_languages'].includes(key),
+  );
   const offeringsDone = !missingQuestions.includes('offerings');
   const steps = STEPS.map((step) => {
     let status: StepStatus = setup.marked[step.key] ?? 'todo';
@@ -102,7 +104,12 @@ export function answerSetupCall(
     setup.patches.push(body ?? {});
     const step = STEPS.find((candidate) => candidate.key === body?.['step']);
     if (!step || step.checkedBySystem) {
-      return { status: 400, body: { error: { code: 'STEP_CHECKED_BY_SYSTEM', message: 'This step is finished by answering its questions.' } } };
+      return {
+        status: 400,
+        body: {
+          error: { code: 'STEP_CHECKED_BY_SYSTEM', message: 'This step is finished by answering its questions.' },
+        },
+      };
     }
     setup.marked[step.key] = body?.['status'] as StepStatus;
     return { status: 200, body: picture(setup, knowledge) };
@@ -116,7 +123,16 @@ export function answerSetupCall(
     setup.goLiveCalls += 1;
     const current = picture(setup, knowledge);
     if (!current.readyToGoLive) {
-      return { status: 409, body: { error: { code: 'NOT_READY', message: 'Finish the steps below before going live.', details: { blockers: current.blockers } } } };
+      return {
+        status: 409,
+        body: {
+          error: {
+            code: 'NOT_READY',
+            message: 'Finish the steps below before going live.',
+            details: { blockers: current.blockers },
+          },
+        },
+      };
     }
     setup.liveAt = setup.liveAt ?? '2026-11-17T10:30:00.000Z';
     return { status: 200, body: { liveAt: setup.liveAt } };

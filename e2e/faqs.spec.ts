@@ -11,7 +11,9 @@ test.describe('FAQs: questions the AI could not answer', () => {
   test('lists the open questions most asked first, with how often and when', async ({ page }) => {
     await page.goto('/knowledge/faqs');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('FAQs');
-    await expect(page.getByRole('navigation', { name: 'Knowledge base sections' }).getByRole('link', { name: 'FAQs' })).toHaveAttribute('aria-current', 'page');
+    await expect(
+      page.getByRole('navigation', { name: 'Knowledge base sections' }).getByRole('link', { name: 'FAQs' }),
+    ).toHaveAttribute('aria-current', 'page');
     const unanswered = page.getByRole('heading', { name: 'Questions the AI could not answer' }).locator('..');
     const questions = unanswered.getByRole('listitem');
     await expect(questions).toHaveCount(2);
@@ -40,8 +42,13 @@ test.describe('FAQs: questions the AI could not answer', () => {
     await page.getByLabel('Question', { exact: true }).fill('Is there a  swimming pool\nat the property?');
     await page.getByLabel('Answer', { exact: true }).fill('Yes, open 7 to 7.');
     await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.getByRole('heading', { name: 'Is there a swimming pool at the property?', level: 3 })).toBeVisible();
-    expect(pretendApi.faqs.answered[0]).toEqual({ id: POOL_ID, body: { answer: 'Yes, open 7 to 7.', question: 'Is there a swimming pool at the property?' } });
+    await expect(
+      page.getByRole('heading', { name: 'Is there a swimming pool at the property?', level: 3 }),
+    ).toBeVisible();
+    expect(pretendApi.faqs.answered[0]).toEqual({
+      id: POOL_ID,
+      body: { answer: 'Yes, open 7 to 7.', question: 'Is there a swimming pool at the property?' },
+    });
   });
 
   test('checks the form first: an answer is needed', async ({ page, pretendApi }) => {
@@ -95,11 +102,20 @@ test.describe('FAQs: the FAQs the AI uses', () => {
     await page.getByLabel('Answer', { exact: true }).fill('From 2 PM.\nEarlier on request.');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('heading', { name: 'What time is check-in?', level: 3 })).toBeVisible();
-    expect(pretendApi.faqs.createdFaqs).toEqual([{ question: 'What time is check-in?', answer: 'From 2 PM.\nEarlier on request.' }]);
+    expect(pretendApi.faqs.createdFaqs).toEqual([
+      { question: 'What time is check-in?', answer: 'From 2 PM.\nEarlier on request.' },
+    ]);
   });
 
-  test('shows the API’s own words when it refuses (an FAQ that already exists), and keeps what was typed', async ({ page, pretendApi }) => {
-    pretendApi.faqs.refusal = { status: 409, code: 'FAQ_EXISTS', message: 'You already have an FAQ with that question.' };
+  test('shows the API’s own words when it refuses (an FAQ that already exists), and keeps what was typed', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.faqs.refusal = {
+      status: 409,
+      code: 'FAQ_EXISTS',
+      message: 'You already have an FAQ with that question.',
+    };
     await page.goto('/knowledge/faqs');
     await page.getByRole('button', { name: 'Add an FAQ' }).click();
     await page.getByLabel('Question', { exact: true }).fill('Do you have parking?');
@@ -116,7 +132,9 @@ test.describe('FAQs: the FAQs the AI uses', () => {
     await page.getByLabel('Answer', { exact: true }).fill('Yes, free parking and EV charging.');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('Yes, free parking and EV charging.')).toBeVisible();
-    expect(pretendApi.faqs.patchedFaqs).toEqual([{ id: PARKING_ID, body: { answer: 'Yes, free parking and EV charging.' } }]);
+    expect(pretendApi.faqs.patchedFaqs).toEqual([
+      { id: PARKING_ID, body: { answer: 'Yes, free parking and EV charging.' } },
+    ]);
 
     await page.getByRole('button', { name: 'Edit FAQ: Do you allow pets?' }).click();
     await page.getByLabel('Answer', { exact: true }).fill('Small pets are welcome on a lead.');
@@ -150,7 +168,9 @@ test.describe('FAQs: search, staff and problems', () => {
     await page.getByLabel('A customer question').fill('Is there parking available?');
     await page.getByRole('button', { name: 'Search' }).click();
     await expect(page.getByText('The AI would find:')).toBeVisible();
-    await expect(page.getByRole('region').or(page.locator('li')).filter({ hasText: 'Yes, free parking for guests.' }).first()).toBeVisible();
+    await expect(
+      page.getByRole('region').or(page.locator('li')).filter({ hasText: 'Yes, free parking for guests.' }).first(),
+    ).toBeVisible();
     expect(pretendApi.faqs.searches).toEqual(['Is there parking available?']);
     await page.getByLabel('A customer question').fill('Do you arrange helicopter rides?');
     await page.getByRole('button', { name: 'Search' }).click();

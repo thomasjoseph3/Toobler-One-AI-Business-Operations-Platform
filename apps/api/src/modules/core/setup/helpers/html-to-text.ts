@@ -95,7 +95,8 @@ function collectStrings(value: unknown, collected: string[], depth = 0): void {
   if (collected.length > 5000 || depth > 40) return;
   if (typeof value === 'string') collected.push(value);
   else if (Array.isArray(value)) for (const item of value) collectStrings(item, collected, depth + 1);
-  else if (value && typeof value === 'object') for (const item of Object.values(value)) collectStrings(item, collected, depth + 1);
+  else if (value && typeof value === 'object')
+    for (const item of Object.values(value)) collectStrings(item, collected, depth + 1);
 }
 
 /**
@@ -132,7 +133,11 @@ export function readEmbeddedPageText(html: string): string {
     }
   }
   const visibleStrings = collected
-    .map((text) => decodeHtmlCharacters(text.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim())
+    .map((text) =>
+      decodeHtmlCharacters(text.replace(/<[^>]+>/g, ' '))
+        .replace(/\s+/g, ' ')
+        .trim(),
+    )
     .filter(looksLikeVisibleText);
   return [...new Set(visibleStrings)].join('\n').slice(0, MAX_EMBEDDED_TEXT_LENGTH);
 }

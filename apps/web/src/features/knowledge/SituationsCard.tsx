@@ -6,7 +6,15 @@ import { t } from '../../app/i18n';
 import { describeSaveProblem } from './problem-message';
 
 /** How the AI handles the seven common moments (a discount request, being full, a complaint...). Each has a choice already picked; a manager may change it. */
-export function SituationsCard({ situations, canEdit, onChanged }: { situations: readonly Situation[]; canEdit: boolean; onChanged: () => void }) {
+export function SituationsCard({
+  situations,
+  canEdit,
+  onChanged,
+}: {
+  situations: readonly Situation[];
+  canEdit: boolean;
+  onChanged: () => void;
+}) {
   const [problem, setProblem] = useState<string | null>(null);
   // The choice a person just made, shown at once while the save goes through (it is dropped again if the save fails)
   const [justChosen, setJustChosen] = useState<Record<string, string>>({});
@@ -30,7 +38,11 @@ export function SituationsCard({ situations, canEdit, onChanged }: { situations:
     <Card>
       <h2 className="text-heading-sm text-text-primary">{t('knowledge.situations.title')}</h2>
       <p className="text-body-md mb-2 text-text-secondary">{t('knowledge.situations.description')}</p>
-      {problem ? <Alert tone="error" className="mb-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mb-3">
+          {problem}
+        </Alert>
+      ) : null}
       <ul>
         {situations.map((situation) => (
           <li key={situation.key} className="border-b border-border-default py-4 last:border-b-0">
@@ -40,7 +52,10 @@ export function SituationsCard({ situations, canEdit, onChanged }: { situations:
                 {situation.fixed ? <Badge tone="neutral">{t('knowledge.situations.fixed')}</Badge> : null}
               </legend>
               {situation.choices.map((choice) => (
-                <label key={choice.key} className="text-body-md flex min-h-10 cursor-pointer items-center gap-3 text-text-primary">
+                <label
+                  key={choice.key}
+                  className="text-body-md flex min-h-10 cursor-pointer items-center gap-3 text-text-primary"
+                >
                   <input
                     type="radio"
                     name={`situation-${situation.key}`}

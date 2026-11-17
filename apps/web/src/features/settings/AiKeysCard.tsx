@@ -8,7 +8,8 @@ import { AddKeyPanel } from './AddKeyPanel';
 import { describeSettingsProblem } from './problem-message';
 
 /** "17 Nov 2026" for a moment. */
-const formatDay = (isoText: string): string => new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(isoText));
+const formatDay = (isoText: string): string =>
+  new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(isoText));
 
 /**
  * The business's own AI keys, by company: each shows its name, its last four characters, whether it works, and buttons to test it and delete it
@@ -60,9 +61,17 @@ export function AiKeysCard({ keys, onChanged }: { keys: readonly AiKey[]; onChan
         </Button>
       </div>
       <p className="text-label-sm mb-3 text-text-secondary">{t('settings.ai.keys.neverShown')}</p>
-      {problem ? <Alert tone="error" className="mb-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mb-3">
+          {problem}
+        </Alert>
+      ) : null}
       {keys.length === 0 ? (
-        <EmptyState icon={<span aria-hidden>🔑</span>} title={t('settings.ai.keys.empty.title')} description={t('settings.ai.keys.empty.description')} />
+        <EmptyState
+          icon={<span aria-hidden>🔑</span>}
+          title={t('settings.ai.keys.empty.title')}
+          description={t('settings.ai.keys.empty.description')}
+        />
       ) : (
         groupKeysByProvider(keys).map((group) => (
           <section key={group.provider} aria-label={t(PROVIDER_WORDS[group.provider])} className="mb-2">
@@ -76,26 +85,46 @@ export function AiKeysCard({ keys, onChanged }: { keys: readonly AiKey[]; onChan
                   <li key={key.id} className="flex flex-col gap-2 border-b border-border-default py-3 last:border-b-0">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <p className="text-label-md text-text-primary">
-                        {key.label} <span className="text-body-md font-normal text-text-secondary">{key.keyPreview}</span>
+                        {key.label}{' '}
+                        <span className="text-body-md font-normal text-text-secondary">{key.keyPreview}</span>
                       </p>
                       <Badge tone={status.tone}>{t(status.words)}</Badge>
                     </div>
                     {key.statusNote ? <p className="text-label-sm text-text-secondary">{key.statusNote}</p> : null}
-                    {key.statusCheckedAt ? <p className="text-label-sm text-text-secondary">{formatMessage('settings.ai.keys.checked', { date: formatDay(key.statusCheckedAt) })}</p> : null}
+                    {key.statusCheckedAt ? (
+                      <p className="text-label-sm text-text-secondary">
+                        {formatMessage('settings.ai.keys.checked', { date: formatDay(key.statusCheckedAt) })}
+                      </p>
+                    ) : null}
                     <div aria-live="polite">
                       {outcome && result ? (
                         <Alert tone={outcome.isGood ? 'success' : 'error'}>
                           {outcome.isGood && result.modelName !== null && result.latencyMs !== null
-                            ? formatMessage('settings.ai.test.worksWith', { model: result.modelName, latency: Math.round(result.latencyMs) })
+                            ? formatMessage('settings.ai.test.worksWith', {
+                                model: result.modelName,
+                                latency: Math.round(result.latencyMs),
+                              })
                             : t(outcome.words)}
                         </Alert>
                       ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="secondary" size="compact" isLoading={testingId === key.id} onClick={() => test(key)} aria-label={formatMessage('settings.ai.keys.testLabel', { label: key.label })}>
+                      <Button
+                        variant="secondary"
+                        size="compact"
+                        isLoading={testingId === key.id}
+                        onClick={() => test(key)}
+                        aria-label={formatMessage('settings.ai.keys.testLabel', { label: key.label })}
+                      >
                         {t('settings.ai.keys.test')}
                       </Button>
-                      <Button variant="destructive" size="compact" disabled={testingId === key.id} onClick={() => setToDelete(key)} aria-label={formatMessage('settings.ai.keys.deleteLabel', { label: key.label })}>
+                      <Button
+                        variant="destructive"
+                        size="compact"
+                        disabled={testingId === key.id}
+                        onClick={() => setToDelete(key)}
+                        aria-label={formatMessage('settings.ai.keys.deleteLabel', { label: key.label })}
+                      >
                         {t('settings.ai.keys.delete')}
                       </Button>
                     </div>

@@ -140,7 +140,8 @@ export function readExtractionOutput(
     namesGiven.add(name.toLowerCase());
     const description = offering.description?.trim().slice(0, 400) || null;
     const rupees = offering.fromPriceRupees;
-    const hasUsablePrice = typeof rupees === 'number' && Number.isFinite(rupees) && rupees > 0 && rupees <= MAXIMUM_HIGHEST_PRICE_RUPEES;
+    const hasUsablePrice =
+      typeof rupees === 'number' && Number.isFinite(rupees) && rupees > 0 && rupees <= MAXIMUM_HIGHEST_PRICE_RUPEES;
     suggestedOfferings.push({ name, description, fromPricePaise: hasUsablePrice ? Math.round(rupees * 100) : null });
   }
   return { answers, suggestedOfferings: suggestedOfferings.slice(0, MAXIMUM_OFFERING_SUGGESTIONS) };

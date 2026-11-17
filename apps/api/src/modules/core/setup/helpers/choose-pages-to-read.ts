@@ -10,7 +10,8 @@ export const MAX_EXTRA_PAGES = 7;
 export const MAX_SITEMAP_ADDRESSES = 500;
 
 // Where contact details, the description, FAQs, rules and prices most often are
-const MOST_USEFUL_PATTERN = /contact|reach|location|direction|find-us|about|story|faq|question|polic|terms|rules|fees|pricing|price/i;
+const MOST_USEFUL_PATTERN =
+  /contact|reach|location|direction|find-us|about|story|faq|question|polic|terms|rules|fees|pricing|price/i;
 // Pages that often list what the business sells and offers
 const ALSO_USEFUL_PATTERN =
   /service|product|menu|course|class|treatment|doctor|team|package|tour|holiday|trip|room|stay|plan|offer|experience|facilit|amenit/i;
@@ -36,7 +37,11 @@ export function pageKeyOf(address: URL): string {
 }
 
 /** The links most worth reading (from the home page, then the sitemap), best first: one per page, never the home page itself. */
-export function choosePagesWorthReading(homeAddress: string, links: readonly PageLink[], maximumPages = MAX_EXTRA_PAGES): string[] {
+export function choosePagesWorthReading(
+  homeAddress: string,
+  links: readonly PageLink[],
+  maximumPages = MAX_EXTRA_PAGES,
+): string[] {
   const home = new URL(homeAddress);
   const alreadyChosen = new Set([pageKeyOf(home)]);
   const chosen: Array<{ address: string; score: number }> = [];
@@ -79,7 +84,9 @@ export function choosePagesWorthReading(homeAddress: string, links: readonly Pag
 
 /** The addresses a sitemap (or sitemap index) lists. */
 export function readSitemapAddresses(xml: string): string[] {
-  return [...xml.matchAll(/<loc>\s*(?:<!\[CDATA\[)?\s*([^<\s\]]+)/gi)].map((match) => decodeHtmlCharacters(match[1] ?? ''));
+  return [...xml.matchAll(/<loc>\s*(?:<!\[CDATA\[)?\s*([^<\s\]]+)/gi)].map((match) =>
+    decodeHtmlCharacters(match[1] ?? ''),
+  );
 }
 
 /** Whether a sitemap listed inside a sitemap index may hold the business's own pages (not posts, products or archives). */

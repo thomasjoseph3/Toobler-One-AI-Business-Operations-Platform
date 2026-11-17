@@ -75,7 +75,11 @@ export function EditContactPanel({ contact, isOpen, onClose, onSaved }: EditCont
         {formProblem ? <Alert tone="error">{formProblem}</Alert> : null}
         <ContactFormBoxes fields={fields} problems={problems} onChange={changeFields} showLanguage />
         <div>
-          <Checkbox label={t('contactPage.edit.notAFit')} checked={isNotAFit} onChange={() => setIsNotAFit((current) => !current)} />
+          <Checkbox
+            label={t('contactPage.edit.notAFit')}
+            checked={isNotAFit}
+            onChange={() => setIsNotAFit((current) => !current)}
+          />
           <p className="text-body-xs mt-1 text-text-secondary">{t('contactPage.edit.notAFitHint')}</p>
         </div>
       </form>

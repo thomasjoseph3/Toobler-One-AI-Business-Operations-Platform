@@ -2,7 +2,15 @@ import { useState, type FormEvent } from 'react';
 import { Alert, Button, SelectField, SidePanel, TextField } from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { t } from '../../app/i18n';
-import { AI_PROVIDERS, buildAddKeyRequest, checkKeyForm, EMPTY_KEY_FORM, PROVIDER_WORDS, type KeyFormFields, type KeyFormProblems } from './ai-key-state';
+import {
+  AI_PROVIDERS,
+  buildAddKeyRequest,
+  checkKeyForm,
+  EMPTY_KEY_FORM,
+  PROVIDER_WORDS,
+  type KeyFormFields,
+  type KeyFormProblems,
+} from './ai-key-state';
 import { describeSettingsProblem } from './problem-message';
 
 const FORM_ID = 'add-key-form';
@@ -47,9 +55,29 @@ export function AddKeyPanel({ onClose, onSaved }: { onClose: () => void; onSaved
       }
     >
       <form id={FORM_ID} onSubmit={save} className="flex flex-col gap-4" noValidate autoComplete="off">
-        <SelectField label={t('settings.ai.form.provider')} value={fields.provider} options={AI_PROVIDERS.map((provider) => ({ value: provider, label: t(PROVIDER_WORDS[provider]) }))} onChange={(event) => setFields({ ...fields, provider: event.target.value as KeyFormFields['provider'] })} />
-        <TextField label={t('settings.ai.form.label')} helperText={t('settings.ai.form.labelHelper')} value={fields.label} onChange={(event) => setFields({ ...fields, label: event.target.value })} {...(problems.label ? { errorMessage: problems.label } : {})} />
-        <TextField label={t('settings.ai.form.key')} helperText={t('settings.ai.form.keyHelper')} type="password" autoComplete="off" spellCheck={false} value={fields.key} onChange={(event) => setFields({ ...fields, key: event.target.value })} {...(problems.key ? { errorMessage: problems.key } : {})} />
+        <SelectField
+          label={t('settings.ai.form.provider')}
+          value={fields.provider}
+          options={AI_PROVIDERS.map((provider) => ({ value: provider, label: t(PROVIDER_WORDS[provider]) }))}
+          onChange={(event) => setFields({ ...fields, provider: event.target.value as KeyFormFields['provider'] })}
+        />
+        <TextField
+          label={t('settings.ai.form.label')}
+          helperText={t('settings.ai.form.labelHelper')}
+          value={fields.label}
+          onChange={(event) => setFields({ ...fields, label: event.target.value })}
+          {...(problems.label ? { errorMessage: problems.label } : {})}
+        />
+        <TextField
+          label={t('settings.ai.form.key')}
+          helperText={t('settings.ai.form.keyHelper')}
+          type="password"
+          autoComplete="off"
+          spellCheck={false}
+          value={fields.key}
+          onChange={(event) => setFields({ ...fields, key: event.target.value })}
+          {...(problems.key ? { errorMessage: problems.key } : {})}
+        />
         <p className="text-label-sm text-text-secondary">{t('settings.ai.keys.neverShown')}</p>
         {problem ? <Alert tone="error">{problem}</Alert> : null}
       </form>

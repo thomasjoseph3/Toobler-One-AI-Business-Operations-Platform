@@ -30,20 +30,30 @@ describe('todayInTimeZone', () => {
 
 describe('checkOfferForm', () => {
   it('needs words and a last day that is today or later', () => {
-    expect(checkOfferForm(EMPTY_OFFER_FORM, '2026-11-17')).toEqual({ text: 'Say what the offer is.', endsOn: 'Pick the last day of the offer.' });
-    expect(checkOfferForm({ text: 'x', endsOn: '2026-11-16' }, '2026-11-17').endsOn).toBe('The last day cannot be in the past.');
+    expect(checkOfferForm(EMPTY_OFFER_FORM, '2026-11-17')).toEqual({
+      text: 'Say what the offer is.',
+      endsOn: 'Pick the last day of the offer.',
+    });
+    expect(checkOfferForm({ text: 'x', endsOn: '2026-11-16' }, '2026-11-17').endsOn).toBe(
+      'The last day cannot be in the past.',
+    );
     expect(checkOfferForm({ text: 'x', endsOn: '2026-11-17' }, '2026-11-17')).toEqual({}); // today is fine
   });
 });
 
 describe('requests', () => {
   it('builds the create request with trimmed words', () => {
-    expect(buildCreateOfferRequest({ text: ' 10% off ', endsOn: '2026-12-31' })).toEqual({ text: '10% off', endsOn: '2026-12-31' });
+    expect(buildCreateOfferRequest({ text: ' 10% off ', endsOn: '2026-12-31' })).toEqual({
+      text: '10% off',
+      endsOn: '2026-12-31',
+    });
   });
 
   it('sends only what changed', () => {
     expect(buildUpdateOfferRequest(offer, formFromOffer(offer))).toEqual({});
-    expect(buildUpdateOfferRequest(offer, { text: offer.text, endsOn: '2027-01-05' })).toEqual({ endsOn: '2027-01-05' });
+    expect(buildUpdateOfferRequest(offer, { text: offer.text, endsOn: '2027-01-05' })).toEqual({
+      endsOn: '2027-01-05',
+    });
     expect(buildUpdateOfferRequest(offer, { text: 'New words', endsOn: offer.endsOn })).toEqual({ text: 'New words' });
   });
 

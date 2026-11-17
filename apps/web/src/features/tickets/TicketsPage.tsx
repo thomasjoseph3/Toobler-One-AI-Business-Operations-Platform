@@ -64,12 +64,30 @@ export function TicketsPage() {
   const toolbar = (
     <>
       {notice !== null ? (
-        <Alert tone="success" className="mb-4" action={<Button variant="link" onClick={() => setNotice(null)}>{t('contacts.dismiss')}</Button>}>
+        <Alert
+          tone="success"
+          className="mb-4"
+          action={
+            <Button variant="link" onClick={() => setNotice(null)}>
+              {t('contacts.dismiss')}
+            </Button>
+          }
+        >
           {notice}
         </Alert>
       ) : null}
-      <TicketsToolbar view={view} onChangeView={changeView} onClearFilters={clearFilters} onAddTicket={openCreatePanel} />
-      <CreateTicketPanel key={createPanelOpenCount} isOpen={isCreatePanelOpen} onClose={() => setIsCreatePanelOpen(false)} onCreated={handleTicketCreated} />
+      <TicketsToolbar
+        view={view}
+        onChangeView={changeView}
+        onClearFilters={clearFilters}
+        onAddTicket={openCreatePanel}
+      />
+      <CreateTicketPanel
+        key={createPanelOpenCount}
+        isOpen={isCreatePanelOpen}
+        onClose={() => setIsCreatePanelOpen(false)}
+        onCreated={handleTicketCreated}
+      />
     </>
   );
 
@@ -89,7 +107,11 @@ export function TicketsPage() {
       <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
         <Card>
-          <ErrorState title={t('tickets.loadError.title')} description={t('tickets.loadError.description')} action={<Button onClick={ticketsResource.reload}>{t('session.retry')}</Button>} />
+          <ErrorState
+            title={t('tickets.loadError.title')}
+            description={t('tickets.loadError.description')}
+            action={<Button onClick={ticketsResource.reload}>{t('session.retry')}</Button>}
+          />
         </Card>
       </div>
     );
@@ -101,9 +123,23 @@ export function TicketsPage() {
         {toolbar}
         <Card>
           {hasFilters ? (
-            <EmptyState icon={<TicketsIcon size={24} />} title={t('tickets.noMatch.title')} description={t('tickets.noMatch.description')} action={<Button onClick={clearFilters}>{t('tickets.showAll')}</Button>} />
+            <EmptyState
+              icon={<TicketsIcon size={24} />}
+              title={t('tickets.noMatch.title')}
+              description={t('tickets.noMatch.description')}
+              action={<Button onClick={clearFilters}>{t('tickets.showAll')}</Button>}
+            />
           ) : (
-            <EmptyState icon={<TicketsIcon size={24} />} title={t('tickets.empty.title')} description={t('page.tickets.emptyDescription')} action={<Button variant="primary" onClick={openCreatePanel}>{t('tickets.add')}</Button>} />
+            <EmptyState
+              icon={<TicketsIcon size={24} />}
+              title={t('tickets.empty.title')}
+              description={t('page.tickets.emptyDescription')}
+              action={
+                <Button variant="primary" onClick={openCreatePanel}>
+                  {t('tickets.add')}
+                </Button>
+              }
+            />
           )}
         </Card>
       </div>
@@ -144,7 +180,14 @@ export function TicketsPage() {
         <div className="mt-3 overflow-hidden rounded-lg border border-border-default">{footer}</div>
       </div>
       <Card isFlush className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col">
-        <TicketsTable tickets={items} signedInUserId={user.id} timeZone={business.timeZone} selectedTicketIds={selectedTicketIds} onToggleTicket={toggleTicket} onToggleAllTickets={toggleAllTickets} />
+        <TicketsTable
+          tickets={items}
+          signedInUserId={user.id}
+          timeZone={business.timeZone}
+          selectedTicketIds={selectedTicketIds}
+          onToggleTicket={toggleTicket}
+          onToggleAllTickets={toggleAllTickets}
+        />
         {footer}
       </Card>
     </div>

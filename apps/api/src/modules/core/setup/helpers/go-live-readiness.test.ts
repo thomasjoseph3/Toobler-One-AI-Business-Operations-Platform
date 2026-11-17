@@ -4,7 +4,11 @@ import { findGoLiveBlockers } from './go-live-readiness';
 describe('findGoLiveBlockers', () => {
   it('lists the missing questions first, then the steps still to do', () => {
     expect(
-      findGoLiveBlockers({ neededQuestionsStillMissing: ['business_name', 'address'], promisesStepDone: false, hasTriedTheAgent: false }),
+      findGoLiveBlockers({
+        neededQuestionsStillMissing: ['business_name', 'address'],
+        promisesStepDone: false,
+        hasTriedTheAgent: false,
+      }),
     ).toEqual([
       { kind: 'question', key: 'business_name' },
       { kind: 'question', key: 'address' },
@@ -14,12 +18,14 @@ describe('findGoLiveBlockers', () => {
   });
 
   it('says only what is still missing', () => {
-    expect(findGoLiveBlockers({ neededQuestionsStillMissing: [], promisesStepDone: true, hasTriedTheAgent: false })).toEqual([
-      { kind: 'step', key: 'test_agent' },
-    ]);
+    expect(
+      findGoLiveBlockers({ neededQuestionsStillMissing: [], promisesStepDone: true, hasTriedTheAgent: false }),
+    ).toEqual([{ kind: 'step', key: 'test_agent' }]);
   });
 
   it('is empty when the business may go live', () => {
-    expect(findGoLiveBlockers({ neededQuestionsStillMissing: [], promisesStepDone: true, hasTriedTheAgent: true })).toEqual([]);
+    expect(
+      findGoLiveBlockers({ neededQuestionsStillMissing: [], promisesStepDone: true, hasTriedTheAgent: true }),
+    ).toEqual([]);
   });
 });

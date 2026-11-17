@@ -204,7 +204,9 @@ describe('PATCH /api/v1/setup', () => {
     expect((await markStep(person, 'no_such_step', 'done')).statusCode).toBe(400);
     expect((await markStep(person, 'pipeline', 'finished')).statusCode).toBe(400);
     expect((await send(person, 'PATCH', '/setup', { step: 'pipeline' })).statusCode).toBe(400);
-    expect((await send(person, 'PATCH', '/setup', { step: 'pipeline', status: 'done', extra: 1 })).statusCode).toBe(400);
+    expect((await send(person, 'PATCH', '/setup', { step: 'pipeline', status: 'done', extra: 1 })).statusCode).toBe(
+      400,
+    );
   });
 
   it('answers 401 when nobody is signed in, 403 to staff, and refuses a request without the CSRF header', async () => {

@@ -14,7 +14,9 @@ export interface WebchatFormFields {
   buttonOrder: WebchatButton[];
 }
 
-export type WebchatFormProblems = Partial<Record<'colour' | 'greeting' | 'phoneNumber' | 'whatsappNumber' | 'whatsappMessage' | 'buttonOrder', string>>;
+export type WebchatFormProblems = Partial<
+  Record<'colour' | 'greeting' | 'phoneNumber' | 'whatsappNumber' | 'whatsappMessage' | 'buttonOrder', string>
+>;
 
 export const formFromSettings = (settings: WebchatSettings): WebchatFormFields => ({
   colour: settings.colour,
@@ -40,14 +42,17 @@ export function checkWebchatForm(fields: WebchatFormFields): WebchatFormProblems
   const greeting = fields.greeting.trim();
   if (greeting === '') problems.greeting = 'Write a greeting.';
   else if (greeting.length > 200) problems.greeting = 'Keep the greeting under 200 characters.';
-  if (fields.phoneNumber.trim() !== '' && !looksLikePhoneNumber(fields.phoneNumber)) problems.phoneNumber = 'Use a phone number like +91 98470 12345.';
-  if (fields.whatsappNumber.trim() !== '' && !looksLikePhoneNumber(fields.whatsappNumber)) problems.whatsappNumber = 'Use a number like +91 98470 12345.';
+  if (fields.phoneNumber.trim() !== '' && !looksLikePhoneNumber(fields.phoneNumber))
+    problems.phoneNumber = 'Use a phone number like +91 98470 12345.';
+  if (fields.whatsappNumber.trim() !== '' && !looksLikePhoneNumber(fields.whatsappNumber))
+    problems.whatsappNumber = 'Use a number like +91 98470 12345.';
   if (fields.whatsappMessage.trim().length > 300) problems.whatsappMessage = 'Keep the message under 300 characters.';
   if (fields.buttonOrder.length === 0) problems.buttonOrder = 'Keep at least one button.';
   return problems;
 }
 
-const sameList = (first: readonly string[], second: readonly string[]) => JSON.stringify(first) === JSON.stringify(second);
+const sameList = (first: readonly string[], second: readonly string[]) =>
+  JSON.stringify(first) === JSON.stringify(second);
 
 /** What `PATCH /channels/webchat` takes: only what changed from the settings as they were. A number or message the owner emptied is sent as null. */
 export function buildWebchatPatch(original: WebchatSettings, fields: WebchatFormFields): PatchWebchatSettingsRequest {
@@ -57,8 +62,10 @@ export function buildWebchatPatch(original: WebchatSettings, fields: WebchatForm
   if (fields.position !== original.position) request.position = fields.position;
   const asNullable = (text: string) => (text.trim() === '' ? null : text.trim());
   if (asNullable(fields.phoneNumber) !== original.phoneNumber) request.phoneNumber = asNullable(fields.phoneNumber);
-  if (asNullable(fields.whatsappNumber) !== original.whatsappNumber) request.whatsappNumber = asNullable(fields.whatsappNumber);
-  if (asNullable(fields.whatsappMessage) !== original.whatsappMessage) request.whatsappMessage = asNullable(fields.whatsappMessage);
+  if (asNullable(fields.whatsappNumber) !== original.whatsappNumber)
+    request.whatsappNumber = asNullable(fields.whatsappNumber);
+  if (asNullable(fields.whatsappMessage) !== original.whatsappMessage)
+    request.whatsappMessage = asNullable(fields.whatsappMessage);
   if (!sameList(fields.buttonOrder, original.buttonOrder)) request.buttonOrder = fields.buttonOrder;
   return request;
 }
@@ -67,7 +74,11 @@ export function buildWebchatPatch(original: WebchatSettings, fields: WebchatForm
 export const isEmptyPatch = (request: object): boolean => Object.keys(request).length === 0;
 
 /** The button order with one button moved a place; the ends and unknown buttons leave it as it was. */
-export function moveButton(order: readonly WebchatButton[], button: WebchatButton, direction: 'up' | 'down'): WebchatButton[] {
+export function moveButton(
+  order: readonly WebchatButton[],
+  button: WebchatButton,
+  direction: 'up' | 'down',
+): WebchatButton[] {
   const position = order.indexOf(button);
   const target = direction === 'up' ? position - 1 : position + 1;
   if (position === -1 || target < 0 || target >= order.length) return [...order];
@@ -105,28 +116,34 @@ export function tidyWebsite(typed: string): string | null {
   } catch {
     return null;
   }
-  if (!['http:', 'https:'].includes(url.protocol) || !url.hostname.includes('.') && url.hostname !== 'localhost') return null;
+  if (!['http:', 'https:'].includes(url.protocol) || (!url.hostname.includes('.') && url.hostname !== 'localhost'))
+    return null;
   return url.origin;
 }
 
 /** The list with a website added (tidied, no duplicates, within the most allowed), or a message saying why not. */
-export function addWebsite(list: readonly string[], typed: string): { ok: true; list: string[] } | { ok: false; message: string } {
+export function addWebsite(
+  list: readonly string[],
+  typed: string,
+): { ok: true; list: string[] } | { ok: false; message: string } {
   const website = tidyWebsite(typed);
-  if (website === null) return { ok: false, message: 'Use the address of your website, like https://www.nairstays.in.' };
+  if (website === null)
+    return { ok: false, message: 'Use the address of your website, like https://www.nairstays.in.' };
   if (list.includes(website)) return { ok: false, message: 'That website is already on the list.' };
-  if (list.length >= MOST_ALLOWED_WEBSITES) return { ok: false, message: `You can list up to ${MOST_ALLOWED_WEBSITES} websites.` };
+  if (list.length >= MOST_ALLOWED_WEBSITES)
+    return { ok: false, message: `You can list up to ${MOST_ALLOWED_WEBSITES} websites.` };
   return { ok: true, list: [...list, website] };
 }
 
 // ---- Checking the installation ----
 
 export type InstallationState =
-  | { kind: 'no_websites' }
-  | { kind: 'never_seen' }
-  | { kind: 'seen'; website: string; at: string };
+  { kind: 'no_websites' } | { kind: 'never_seen' } | { kind: 'seen'; website: string; at: string };
 
 /** What "Check installation" says: no website listed yet, the bubble never seen, or where and when it was last seen working. */
-export function describeInstallation(settings: Pick<WebchatSettings, 'allowedWebsites' | 'lastSeen'>): InstallationState {
+export function describeInstallation(
+  settings: Pick<WebchatSettings, 'allowedWebsites' | 'lastSeen'>,
+): InstallationState {
   if (settings.allowedWebsites.length === 0) return { kind: 'no_websites' };
   if (settings.lastSeen === null) return { kind: 'never_seen' };
   return { kind: 'seen', website: settings.lastSeen.website, at: settings.lastSeen.at };
@@ -135,7 +152,11 @@ export function describeInstallation(settings: Pick<WebchatSettings, 'allowedWeb
 /** "17 Nov 2026, 15:30" in the business's time zone. */
 export function formatSeenAt(isoText: string, timeZone: string): string {
   const moment = new Date(isoText);
-  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(moment);
-  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }).format(moment);
+  const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(
+    moment,
+  );
+  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }).format(
+    moment,
+  );
   return `${day}, ${time}`;
 }

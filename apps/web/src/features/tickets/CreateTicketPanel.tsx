@@ -56,7 +56,11 @@ export function CreateTicketPanel({ isOpen, onClose, onCreated }: CreateTicketPa
     if (Object.keys(foundProblems).length > 0 || fields.contactId === null) return;
     setIsSaving(true);
     try {
-      const ticket = await apiRequest<TicketDetail>('POST', '/tickets', buildCreateTicketRequest(fields, fields.contactId));
+      const ticket = await apiRequest<TicketDetail>(
+        'POST',
+        '/tickets',
+        buildCreateTicketRequest(fields, fields.contactId),
+      );
       onCreated(ticket.title);
     } catch (error) {
       setFormProblem(describeTicketSaveProblem(error));
@@ -101,13 +105,22 @@ export function CreateTicketPanel({ isOpen, onClose, onCreated }: CreateTicketPa
         <SelectField
           label={t('tickets.form.type')}
           value={fields.type}
-          onChange={(event) => changeFields({ type: TICKET_TYPE_CHOICES.find((choice) => choice.type === event.target.value)?.type ?? 'other' })}
+          onChange={(event) =>
+            changeFields({
+              type: TICKET_TYPE_CHOICES.find((choice) => choice.type === event.target.value)?.type ?? 'other',
+            })
+          }
           options={TICKET_TYPE_CHOICES.map((choice) => ({ value: choice.type, label: t(choice.labelKey) }))}
         />
         <SelectField
           label={t('tickets.form.priority')}
           value={fields.priority}
-          onChange={(event) => changeFields({ priority: TICKET_PRIORITY_CHOICES.find((choice) => choice.priority === event.target.value)?.priority ?? 'normal' })}
+          onChange={(event) =>
+            changeFields({
+              priority:
+                TICKET_PRIORITY_CHOICES.find((choice) => choice.priority === event.target.value)?.priority ?? 'normal',
+            })
+          }
           options={TICKET_PRIORITY_CHOICES.map((choice) => ({ value: choice.priority, label: t(choice.labelKey) }))}
         />
         <TextAreaField

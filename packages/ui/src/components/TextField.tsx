@@ -33,7 +33,10 @@ export function TextField({
     [errorMessage ? errorId : null, helperText ? helperId : null].filter(Boolean).join(' ') || undefined;
   return (
     <div className={joinClassNames('flex flex-col gap-1', className)}>
-      <label htmlFor={inputId} className={joinClassNames("text-label-sm text-text-primary", isLabelHidden ? "sr-only" : undefined)}>
+      <label
+        htmlFor={inputId}
+        className={joinClassNames('text-label-sm text-text-primary', isLabelHidden ? 'sr-only' : undefined)}
+      >
         {label}
         {requirementLabel ? <span className="text-text-secondary"> ({requirementLabel})</span> : null}
       </label>

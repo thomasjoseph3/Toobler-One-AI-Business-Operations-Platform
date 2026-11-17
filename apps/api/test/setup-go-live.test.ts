@@ -15,7 +15,10 @@ const pretendAiCompany = createScriptedLlmProvider(() => ({ answer: 'Hello! How 
 
 beforeAll(async () => {
   database = openTestDatabase();
-  const config = { ...testConfig(), ai: { platformKeys: { gemini: [`golive-${randomUUID()}`], openai: [], anthropic: [] } } };
+  const config = {
+    ...testConfig(),
+    ai: { platformKeys: { gemini: [`golive-${randomUUID()}`], openai: [], anthropic: [] } },
+  };
   app = await buildTestApp(database, [], { config, llmProvider: pretendAiCompany });
 });
 afterAll(async () => {
@@ -42,10 +45,20 @@ async function newBusiness(industry = 'hotel_resort'): Promise<SignedInPerson> {
   const person = await createSignedInPerson(app, database);
   await database.system
     .insertInto('ai_settings')
-    .values({ account_id: person.profile.business.id, key_mode: 'platform', platform_enabled: true, platform_expires_at: null, task_models: {} })
+    .values({
+      account_id: person.profile.business.id,
+      key_mode: 'platform',
+      platform_enabled: true,
+      platform_expires_at: null,
+      task_models: {},
+    })
     .execute();
   if (industry !== 'hotel_resort') {
-    await database.system.updateTable('accounts').set({ industry }).where('id', '=', person.profile.business.id).execute();
+    await database.system
+      .updateTable('accounts')
+      .set({ industry })
+      .where('id', '=', person.profile.business.id)
+      .execute();
   }
   return person;
 }
@@ -99,7 +112,13 @@ describe('POST /api/v1/setup/apply-preset', () => {
       leftAloneStages: [],
     });
     const after = (await send(person, 'GET', '/pipeline')).json();
-    expect(after.stages.map((stage: { name: string }) => stage.name)).toEqual(['New enquiry', 'Called', 'Rate sent', 'Won', 'Lost']);
+    expect(after.stages.map((stage: { name: string }) => stage.name)).toEqual([
+      'New enquiry',
+      'Called',
+      'Rate sent',
+      'Won',
+      'Lost',
+    ]);
     expect(after.stages.map((stage: { id: string }) => stage.id)).toEqual(idsBefore); // renamed, not replaced
     expect(after.stages[0].leadCount).toBe(1); // the lead is still in its stage
     const setup = (await send(person, 'GET', '/setup')).json();
@@ -133,12 +152,19 @@ describe('POST /api/v1/setup/apply-preset', () => {
 
   it('keeps the standard words for a general business, but still counts the step as done', async () => {
     const person = await newBusiness('general');
-    expect((await send(person, 'POST', '/setup/apply-preset')).json()).toEqual({ industry: 'general', renamedStages: [], leftAloneStages: [] });
+    expect((await send(person, 'POST', '/setup/apply-preset')).json()).toEqual({
+      industry: 'general',
+      renamedStages: [],
+      leftAloneStages: [],
+    });
     expect(await stageNames(person)).toEqual(['New', 'Contacted', 'Quoted', 'Won', 'Lost']);
-    expect((await send(person, 'GET', '/setup')).json().steps.find((step: { key: string }) => step.key === 'pipeline').status).toBe('done');
+    expect(
+      (await send(person, 'GET', '/setup')).json().steps.find((step: { key: string }) => step.key === 'pipeline')
+        .status,
+    ).toBe('done');
   });
 
-  it("takes the industry from the business, never from the request, and does not touch another business", async () => {
+  it('takes the industry from the business, never from the request, and does not touch another business', async () => {
     const hotel = await newBusiness('hotel_resort');
     const other = await newBusiness('clinic');
     expect((await send(hotel, 'POST', '/setup/apply-preset', { industry: 'clinic' })).statusCode).toBe(200); // the body is ignored
@@ -240,7 +266,9 @@ describe('POST /api/v1/setup/go-live', () => {
 
   it('cannot be done by anything else: the settings route refuses to set it, and the owner skipping a step does not help', async () => {
     const person = await newBusiness();
-    expect((await send(person, 'PUT', '/knowledge/settings', { liveAt: new Date().toISOString() })).statusCode).toBe(400);
+    expect((await send(person, 'PUT', '/knowledge/settings', { liveAt: new Date().toISOString() })).statusCode).toBe(
+      400,
+    );
     expect((await send(person, 'PATCH', '/setup', { step: 'test_agent', status: 'done' })).statusCode).toBe(400);
     await send(person, 'PATCH', '/setup', { step: 'promises', status: 'skipped' });
     expect((await send(person, 'GET', '/setup')).json().blockers).toContainEqual({ kind: 'step', key: 'promises' }); // skipped is not done

@@ -7,7 +7,9 @@ describe('readListingSearchText', () => {
   });
 
   it('reads the name out of a long Google Maps link, without fetching it', () => {
-    expect(readListingSearchText('https://www.google.com/maps/place/Nair+Stays+Kovalam/@8.4,76.9,17z/data=!3m1')).toBe('Nair Stays Kovalam');
+    expect(readListingSearchText('https://www.google.com/maps/place/Nair+Stays+Kovalam/@8.4,76.9,17z/data=!3m1')).toBe(
+      'Nair Stays Kovalam',
+    );
     expect(readListingSearchText('https://www.google.co.in/maps/place/Caf%C3%A9+Rio/@1,2')).toBe('Café Rio');
   });
 

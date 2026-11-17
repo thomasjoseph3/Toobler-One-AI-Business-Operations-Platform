@@ -13,7 +13,13 @@ export function ListFilterPopover(props: { panelLabel: string; activeFilterCount
     <Popover
       panelLabel={panelLabel}
       renderTrigger={({ isOpen, toggle }) => (
-        <Button size="compact" leadingIcon={<FilterIcon size={15} />} aria-haspopup="dialog" aria-expanded={isOpen} onClick={toggle}>
+        <Button
+          size="compact"
+          leadingIcon={<FilterIcon size={15} />}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          onClick={toggle}
+        >
           {t('leads.toolbar.filter')}
           {activeFilterCount > 0 ? (
             <>

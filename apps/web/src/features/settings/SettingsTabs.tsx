@@ -18,7 +18,10 @@ export function SettingsTabs() {
           to={tab.path}
           end
           className={({ isActive }) =>
-            joinClassNames('text-label-md shrink-0 rounded-md px-3 py-2 hover:bg-hover', isActive ? 'bg-surface text-text-primary shadow-sm' : 'text-text-secondary')
+            joinClassNames(
+              'text-label-md shrink-0 rounded-md px-3 py-2 hover:bg-hover',
+              isActive ? 'bg-surface text-text-primary shadow-sm' : 'text-text-secondary',
+            )
           }
         >
           {t(tab.labelKey)}

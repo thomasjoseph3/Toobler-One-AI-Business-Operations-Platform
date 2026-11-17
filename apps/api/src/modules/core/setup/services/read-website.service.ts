@@ -59,7 +59,9 @@ async function findSitemapPages(homeAddress: string, fetchWebPage: WebPageFetche
   };
 
   const robotsText = await fetchText(`${home.origin}/robots.txt`);
-  const listedInRobots = robotsText ? [...robotsText.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((match) => match[1]!) : [];
+  const listedInRobots = robotsText
+    ? [...robotsText.matchAll(/^\s*sitemap:\s*(\S+)/gim)].map((match) => match[1]!)
+    : [];
   const candidates = [
     ...listedInRobots,
     `${home.origin}/sitemap.xml`,
@@ -96,7 +98,11 @@ export function createWebsiteReader({ fetchWebPage }: { fetchWebPage: WebPageFet
     async readWebsite(typedAddress: string): Promise<WebsiteText> {
       const homePage = await fetchWebPage(typedAddress);
       const readHome = readHtmlPage(homePage.body, homePage.url);
-      const sitemapAddresses = await withinTime(findSitemapPages(homePage.url, fetchWebPage), SITEMAP_TIMEOUT_MILLISECONDS, []);
+      const sitemapAddresses = await withinTime(
+        findSitemapPages(homePage.url, fetchWebPage),
+        SITEMAP_TIMEOUT_MILLISECONDS,
+        [],
+      );
       const candidateLinks: PageLink[] = [
         ...readHome.links,
         ...sitemapAddresses.map((address) => ({ url: address, label: '' })),
@@ -107,11 +113,14 @@ export function createWebsiteReader({ fetchWebPage }: { fetchWebPage: WebPageFet
       const readPages = [
         { url: homePage.url, ...readHome },
         ...otherPages.flatMap((result) =>
-          result.status === 'fulfilled' ? [{ url: result.value.url, ...readHtmlPage(result.value.body, result.value.url) }] : [],
+          result.status === 'fulfilled'
+            ? [{ url: result.value.url, ...readHtmlPage(result.value.body, result.value.url) }]
+            : [],
         ),
       ].filter(
         // A link that redirected to a page already read is read once
-        (page, position, all) => all.findIndex((other) => pageKeyOf(new URL(other.url)) === pageKeyOf(new URL(page.url))) === position,
+        (page, position, all) =>
+          all.findIndex((other) => pageKeyOf(new URL(other.url)) === pageKeyOf(new URL(page.url))) === position,
       );
       return {
         pages: readPages.map((page) => ({ url: page.url, text: page.text })),

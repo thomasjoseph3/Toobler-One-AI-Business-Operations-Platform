@@ -32,8 +32,13 @@ let failQueueing = false;
 
 /** What the pretend AI company says. A test changes it. */
 let script: LlmScript = () => ({ answer: { answers: [], offerings: [] } });
-const pretendAiCompany = createScriptedLlmProvider((tried, request, messagesSoFar) => script(tried, request, messagesSoFar));
-const config = { ...testConfig(), ai: { platformKeys: { gemini: [`prefill-${randomUUID()}`], openai: [], anthropic: [] } } };
+const pretendAiCompany = createScriptedLlmProvider((tried, request, messagesSoFar) =>
+  script(tried, request, messagesSoFar),
+);
+const config = {
+  ...testConfig(),
+  ai: { platformKeys: { gemini: [`prefill-${randomUUID()}`], openai: [], anthropic: [] } },
+};
 
 beforeAll(async () => {
   database = openTestDatabase();
@@ -79,7 +84,10 @@ const send = (
   (options.application ?? app).inject({
     method,
     url: `/api/v1${url}`,
-    headers: { ...(options.withCsrf === false ? {} : unsafeRequestHeaders), ...(person ? { cookie: person.cookieHeader } : {}) },
+    headers: {
+      ...(options.withCsrf === false ? {} : unsafeRequestHeaders),
+      ...(person ? { cookie: person.cookieHeader } : {}),
+    },
     ...(payload === undefined ? {} : { payload: payload as object }),
   });
 
@@ -88,7 +96,13 @@ async function newBusiness(): Promise<SignedInPerson> {
   const person = await createSignedInPerson(app, database);
   await database.system
     .insertInto('ai_settings')
-    .values({ account_id: person.profile.business.id, key_mode: 'platform', platform_enabled: true, platform_expires_at: null, task_models: {} })
+    .values({
+      account_id: person.profile.business.id,
+      key_mode: 'platform',
+      platform_enabled: true,
+      platform_expires_at: null,
+      task_models: {},
+    })
     .execute();
   return person;
 }
@@ -118,9 +132,14 @@ function readingJob(placesProvider: PlacesProvider | null = null) {
   return createRunPrefillService({
     database,
     websiteReader: createWebsiteReader({
-      fetchWebPage: createWebPageFetcher({ isAddressAllowed: (address) => address === '127.0.0.1', allowedPorts: [String(port)] }),
+      fetchWebPage: createWebPageFetcher({
+        isAddressAllowed: (address) => address === '127.0.0.1',
+        allowedPorts: [String(port)],
+      }),
     }),
-    answerExtractor: createWebsiteAnswerExtractor({ aiService: createAiService({ database, config, llm: pretendAiCompany }) }),
+    answerExtractor: createWebsiteAnswerExtractor({
+      aiService: createAiService({ database, config, llm: pretendAiCompany }),
+    }),
     placesProvider,
     logger: app.log,
   });
@@ -130,12 +149,21 @@ const readRun = async (person: SignedInPerson, runId: string) =>
   (await send(person, 'GET', `/knowledge/prefill/${runId}`)).json();
 
 const readAnswers = (person: SignedInPerson) =>
-  database.system.selectFrom('business_answers').selectAll().where('account_id', '=', person.profile.business.id).execute();
+  database.system
+    .selectFrom('business_answers')
+    .selectAll()
+    .where('account_id', '=', person.profile.business.id)
+    .execute();
 
 /** The AI says these answers and offerings. */
-const aiSays = (answers: Array<{ questionKey: string; value: unknown }>, offerings: unknown[] = []): LlmScript => () => ({
-  answer: { answers: answers.map((answer) => ({ questionKey: answer.questionKey, valueJson: JSON.stringify(answer.value) })), offerings },
-});
+const aiSays =
+  (answers: Array<{ questionKey: string; value: unknown }>, offerings: unknown[] = []): LlmScript =>
+  () => ({
+    answer: {
+      answers: answers.map((answer) => ({ questionKey: answer.questionKey, valueJson: JSON.stringify(answer.value) })),
+      offerings,
+    },
+  });
 
 const GOOD_SITE = {
   '/': {
@@ -163,7 +191,9 @@ describe('POST /api/v1/knowledge/prefill', () => {
       suggestedOfferings: [],
       finishedAt: null,
     });
-    expect(queuedJobs).toEqual([{ name: 'setup.run_prefill', data: { accountId: person.profile.business.id, runId: run.id } }]);
+    expect(queuedJobs).toEqual([
+      { name: 'setup.run_prefill', data: { accountId: person.profile.business.id, runId: run.id } },
+    ]);
     expect((await readRun(person, run.id)).id).toBe(run.id);
   });
 
@@ -183,11 +213,23 @@ describe('POST /api/v1/knowledge/prefill', () => {
 
   it('refuses an address that is not a public website with 400, at once, and saves no run', async () => {
     const person = await newBusiness();
-    for (const websiteUrl of ['http://127.0.0.1', 'http://localhost', 'http://169.254.169.254/latest', 'http://10.0.0.1', 'file:///etc/passwd', 'https://user:pass@a.example', 'https://a.example:8080']) {
+    for (const websiteUrl of [
+      'http://127.0.0.1',
+      'http://localhost',
+      'http://169.254.169.254/latest',
+      'http://10.0.0.1',
+      'file:///etc/passwd',
+      'https://user:pass@a.example',
+      'https://a.example:8080',
+    ]) {
       const response = await send(person, 'POST', '/knowledge/prefill', { websiteUrl });
       expect(response.statusCode, websiteUrl).toBe(400);
     }
-    const runs = await database.system.selectFrom('prefill_runs').selectAll().where('account_id', '=', person.profile.business.id).execute();
+    const runs = await database.system
+      .selectFrom('prefill_runs')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .execute();
     expect(runs).toHaveLength(0);
   });
 
@@ -195,7 +237,10 @@ describe('POST /api/v1/knowledge/prefill', () => {
     const person = await newBusiness();
     expect((await send(person, 'POST', '/knowledge/prefill', {})).statusCode).toBe(400);
     expect((await send(person, 'POST', '/knowledge/prefill', { websiteUrl: 'a' })).statusCode).toBe(400);
-    expect((await send(person, 'POST', '/knowledge/prefill', { websiteUrl: 'a.example', accountId: randomUUID() })).statusCode).toBe(400);
+    expect(
+      (await send(person, 'POST', '/knowledge/prefill', { websiteUrl: 'a.example', accountId: randomUUID() }))
+        .statusCode,
+    ).toBe(400);
   });
 
   it('says Google listings are not switched on when there is no key, and refuses a link it cannot read when there is one', async () => {
@@ -204,11 +249,23 @@ describe('POST /api/v1/knowledge/prefill', () => {
     expect(noKey.statusCode).toBe(400);
     expect(noKey.json().error.code).toBe('GOOGLE_LISTING_NOT_SWITCHED_ON');
 
-    const shortLink = await send(person, 'POST', '/knowledge/prefill', { googleListing: 'https://maps.app.goo.gl/abc' }, { application: appWithGoogle });
+    const shortLink = await send(
+      person,
+      'POST',
+      '/knowledge/prefill',
+      { googleListing: 'https://maps.app.goo.gl/abc' },
+      { application: appWithGoogle },
+    );
     expect(shortLink.statusCode).toBe(400);
     expect(shortLink.json().error.code).toBe('LISTING_NOT_SUPPORTED');
 
-    const withKey = await send(person, 'POST', '/knowledge/prefill', { googleListing: 'Nair Stays Kovalam' }, { application: appWithGoogle });
+    const withKey = await send(
+      person,
+      'POST',
+      '/knowledge/prefill',
+      { googleListing: 'Nair Stays Kovalam' },
+      { application: appWithGoogle },
+    );
     expect(withKey.statusCode, withKey.body).toBe(202);
     expect(withKey.json().googleListing).toBe('Nair Stays Kovalam');
   });
@@ -223,8 +280,31 @@ describe('POST /api/v1/knowledge/prefill', () => {
     const busy = await newBusiness();
     for (let counter = 0; counter < MAXIMUM_READINGS_PER_DAY; counter++) {
       await database.runInAccountTransaction(busy.profile.business.id, async (transaction) => {
-        await prefillRunsRepository.insertRun(transaction, { id: uuidv7(), accountId: busy.profile.business.id, websiteUrl: site(), googleListing: null, actor: { kind: 'system', id: 'test' } });
-        await prefillRunsRepository.markFinished(transaction, { accountId: busy.profile.business.id, runId: (await transaction.selectFrom('prefill_runs').select('id').where('account_id', '=', busy.profile.business.id).orderBy('created_at', 'desc').executeTakeFirstOrThrow()).id, status: 'done', errorCode: null, errorMessage: null, pagesRead: 0, answersFound: [], answersSkipped: 0, suggestedOfferings: [] });
+        await prefillRunsRepository.insertRun(transaction, {
+          id: uuidv7(),
+          accountId: busy.profile.business.id,
+          websiteUrl: site(),
+          googleListing: null,
+          actor: { kind: 'system', id: 'test' },
+        });
+        await prefillRunsRepository.markFinished(transaction, {
+          accountId: busy.profile.business.id,
+          runId: (
+            await transaction
+              .selectFrom('prefill_runs')
+              .select('id')
+              .where('account_id', '=', busy.profile.business.id)
+              .orderBy('created_at', 'desc')
+              .executeTakeFirstOrThrow()
+          ).id,
+          status: 'done',
+          errorCode: null,
+          errorMessage: null,
+          pagesRead: 0,
+          answersFound: [],
+          answersSkipped: 0,
+          suggestedOfferings: [],
+        });
       });
     }
     const overTheLimit = await send(busy, 'POST', '/knowledge/prefill', { websiteUrl: 'nairstays.example' });
@@ -241,7 +321,11 @@ describe('POST /api/v1/knowledge/prefill', () => {
     } finally {
       failQueueing = false;
     }
-    const runs = await database.system.selectFrom('prefill_runs').selectAll().where('account_id', '=', person.profile.business.id).execute();
+    const runs = await database.system
+      .selectFrom('prefill_runs')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .execute();
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({ status: 'failed', error_code: 'PREFILL_NOT_STARTED' });
   });
@@ -249,10 +333,14 @@ describe('POST /api/v1/knowledge/prefill', () => {
   it('answers 401 when nobody is signed in, 403 to staff, and 403 without the CSRF header', async () => {
     expect((await send(null, 'POST', '/knowledge/prefill', { websiteUrl: 'a.example' })).statusCode).toBe(401);
     const person = await newBusiness();
-    expect((await send(person, 'POST', '/knowledge/prefill', { websiteUrl: 'a.example' }, { withCsrf: false })).statusCode).toBe(403);
+    expect(
+      (await send(person, 'POST', '/knowledge/prefill', { websiteUrl: 'a.example' }, { withCsrf: false })).statusCode,
+    ).toBe(403);
     for (const role of ['staff', 'staff_own'] as const) {
       await setRole(person, role);
-      expect((await send(person, 'POST', '/knowledge/prefill', { websiteUrl: 'a.example' })).statusCode, role).toBe(403);
+      expect((await send(person, 'POST', '/knowledge/prefill', { websiteUrl: 'a.example' })).statusCode, role).toBe(
+        403,
+      );
     }
   });
 });
@@ -295,15 +383,25 @@ describe('the reading job', () => {
     const run = await readRun(person, runId);
     expect(run).toMatchObject({ status: 'done', errorCode: null, answersSkipped: 0 });
     expect(run.pagesRead).toBe(2);
-    expect(run.answersFound.sort()).toEqual(['address', 'business_name', 'business_summary', 'contact_details', 'opening_hours']);
-    expect(run.suggestedOfferings).toEqual([{ name: 'Sea view room', description: 'Rooms by the beach', fromPricePaise: 250_000 }]);
+    expect(run.answersFound.sort()).toEqual([
+      'address',
+      'business_name',
+      'business_summary',
+      'contact_details',
+      'opening_hours',
+    ]);
+    expect(run.suggestedOfferings).toEqual([
+      { name: 'Sea view room', description: 'Rooms by the beach', fromPricePaise: 250_000 },
+    ]);
 
     const answers = await readAnswers(person);
     expect(answers).toHaveLength(5);
     for (const answer of answers) {
       expect(answer).toMatchObject({ status: 'check', source: 'website', source_ref: site(), confirmed_at: null });
     }
-    expect(answers.find((answer) => answer.question_key === 'contact_details')?.value).toEqual({ rows: [{ kind: 'Phone', value: '+919847012345' }] });
+    expect(answers.find((answer) => answer.question_key === 'contact_details')?.value).toEqual({
+      rows: [{ kind: 'Phone', value: '+919847012345' }],
+    });
   });
 
   it('never lets the AI use an answer that is waiting: the profile shows it as "Please check" and the score ignores it', async () => {
@@ -314,7 +412,9 @@ describe('the reading job', () => {
     await readingJob().runPrefill(person.profile.business.id, runId);
 
     const questions = (await send(person, 'GET', '/knowledge/questions')).json();
-    expect(questions.questions.find((question: { key: string }) => question.key === 'business_name').answer).toMatchObject({ source: 'website', status: 'check' });
+    expect(
+      questions.questions.find((question: { key: string }) => question.key === 'business_name').answer,
+    ).toMatchObject({ source: 'website', status: 'check' });
     expect(questions.progress.waitingForCheck).toBeGreaterThanOrEqual(1);
     expect(questions.progress.neededToGoLiveStillMissing).toContain('business_name');
 
@@ -351,7 +451,7 @@ describe('the reading job', () => {
     expect(name).toMatchObject({ value: 'New Name', status: 'check' });
   });
 
-  it("drops an answer that does not fit its question, a question nobody asked, and one the owner alone answers", async () => {
+  it('drops an answer that does not fit its question, a question nobody asked, and one the owner alone answers', async () => {
     pages = GOOD_SITE;
     script = aiSays([
       { questionKey: 'business_name', value: 'Nair Stays' },
@@ -475,11 +575,20 @@ describe('the reading job with a Google listing', () => {
 
   it("saves Google's answers as from the listing, and they win over the website's for the same question", async () => {
     pages = GOOD_SITE;
-    script = aiSays([{ questionKey: 'address', value: 'Address As The Website Says' }, { questionKey: 'business_summary', value: 'A homestay.' }]);
+    script = aiSays([
+      { questionKey: 'address', value: 'Address As The Website Says' },
+      { questionKey: 'business_summary', value: 'A homestay.' },
+    ]);
     const searches: string[] = [];
     const person = await newBusiness();
-    const runId = await addRun(person, { websiteUrl: site(), googleListing: 'https://www.google.com/maps/place/Nair+Stays+Kovalam/@8,76' });
-    await readingJob(createScriptedPlacesProvider((searchText) => (searches.push(searchText), place))).runPrefill(person.profile.business.id, runId);
+    const runId = await addRun(person, {
+      websiteUrl: site(),
+      googleListing: 'https://www.google.com/maps/place/Nair+Stays+Kovalam/@8,76',
+    });
+    await readingJob(createScriptedPlacesProvider((searchText) => (searches.push(searchText), place))).runPrefill(
+      person.profile.business.id,
+      runId,
+    );
 
     expect(searches).toEqual(['Nair Stays Kovalam']);
     const answers = await readAnswers(person);
@@ -496,7 +605,10 @@ describe('the reading job with a Google listing', () => {
     const person = await newBusiness();
     const listingOnly = await addRun(person, { googleListing: 'Nair Stays Kovalam' });
     await readingJob(null).runPrefill(person.profile.business.id, listingOnly);
-    expect(await readRun(person, listingOnly)).toMatchObject({ status: 'failed', errorCode: 'GOOGLE_LISTING_NOT_SWITCHED_ON' });
+    expect(await readRun(person, listingOnly)).toMatchObject({
+      status: 'failed',
+      errorCode: 'GOOGLE_LISTING_NOT_SWITCHED_ON',
+    });
 
     const both = await addRun(person, { websiteUrl: site(), googleListing: 'Nobody Knows This Place' });
     await readingJob(createScriptedPlacesProvider(() => null)).runPrefill(person.profile.business.id, both);

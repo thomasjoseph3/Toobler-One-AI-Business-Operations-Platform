@@ -17,7 +17,15 @@ const BUTTON_WORDS = {
  * One step of the setup: its name, whether it is done, what it is for, and what to do about it (go to the page, use the industry's words, or
  * wait for the system to notice). A manager can mark a step done or skip it, and reopen it. Staff only read.
  */
-export function SetupStepRow({ step, canEdit, onChanged }: { step: SetupStep; canEdit: boolean; onChanged: () => void }) {
+export function SetupStepRow({
+  step,
+  canEdit,
+  onChanged,
+}: {
+  step: SetupStep;
+  canEdit: boolean;
+  onChanged: () => void;
+}) {
   const description = STEP_DESCRIPTIONS[step.key];
   const [problem, setProblem] = useState<string | null>(null);
   const [presetMessage, setPresetMessage] = useState<string | null>(null);
@@ -44,7 +52,8 @@ export function SetupStepRow({ step, canEdit, onChanged }: { step: SetupStep; ca
       const result = await apiRequest<ApplyPresetResponse>('POST', '/setup/apply-preset');
       const changed = result.renamedStages.length;
       const parts = [changed > 0 ? formatMessage('setup.preset.done', { count: changed }) : t('setup.preset.nothing')];
-      if (result.leftAloneStages.length > 0) parts.push(formatMessage('setup.preset.leftAlone', { names: result.leftAloneStages.join(', ') }));
+      if (result.leftAloneStages.length > 0)
+        parts.push(formatMessage('setup.preset.leftAlone', { names: result.leftAloneStages.join(', ') }));
       setPresetMessage(parts.join(' '));
       onChanged();
     } catch (error) {
@@ -69,18 +78,32 @@ export function SetupStepRow({ step, canEdit, onChanged }: { step: SetupStep; ca
       {canEdit ? (
         <div className="flex flex-wrap items-center gap-3">
           {action.kind === 'open_page' ? (
-            <Link to={action.path} className={buttonClasses('secondary', 'compact')} aria-label={`${t(action.labelKey)}: ${title}`}>
+            <Link
+              to={action.path}
+              className={buttonClasses('secondary', 'compact')}
+              aria-label={`${t(action.labelKey)}: ${title}`}
+            >
               {t(action.labelKey)}
             </Link>
           ) : null}
           {action.kind === 'apply_preset' ? (
-            <Button variant="secondary" size="compact" isLoading={isWorking} onClick={applyPreset} aria-label={`${t('setup.button.applyPreset')}: ${title}`}>
+            <Button
+              variant="secondary"
+              size="compact"
+              isLoading={isWorking}
+              onClick={applyPreset}
+              aria-label={`${t('setup.button.applyPreset')}: ${title}`}
+            >
               {t('setup.button.applyPreset')}
             </Button>
           ) : null}
           {action.kind === 'system_checked' ? (
             action.path ? (
-              <Link to={action.path} className={buttonClasses('secondary', 'compact')} aria-label={`${t(action.labelKey)}: ${title}`}>
+              <Link
+                to={action.path}
+                className={buttonClasses('secondary', 'compact')}
+                aria-label={`${t(action.labelKey)}: ${title}`}
+              >
                 {t(action.labelKey)}
               </Link>
             ) : (

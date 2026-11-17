@@ -3,7 +3,9 @@ import { decodeHtmlCharacters, htmlToText, readEmbeddedPageText, readTagAttribut
 
 describe('decodeHtmlCharacters', () => {
   it('decodes named, decimal and hexadecimal codes, and leaves unknown names alone', () => {
-    expect(decodeHtmlCharacters('Tea &amp; coffee &#8377;500 &#x20B9;600 &unknownname;')).toBe('Tea & coffee ₹500 ₹600 &unknownname;');
+    expect(decodeHtmlCharacters('Tea &amp; coffee &#8377;500 &#x20B9;600 &unknownname;')).toBe(
+      'Tea & coffee ₹500 ₹600 &unknownname;',
+    );
   });
 
   it('drops a code that is not a real character', () => {
@@ -22,12 +24,14 @@ describe('readTagAttribute', () => {
 
 describe('htmlToText', () => {
   it('gives the visible text, one block per line', () => {
-    const html = '<html><head><title>Hidden title</title></head><body><h1>Nair Stays</h1><p>Six rooms<br>by the beach</p></body></html>';
+    const html =
+      '<html><head><title>Hidden title</title></head><body><h1>Nair Stays</h1><p>Six rooms<br>by the beach</p></body></html>';
     expect(htmlToText(html)).toBe('Nair Stays\nSix rooms\nby the beach');
   });
 
   it('drops scripts, styles, comments and an unfinished script cut off by the size limit', () => {
-    const html = '<p>Open daily</p><script>var secret = 1;</script><style>p{color:red}</style><!-- note --><p>9 to 9</p><script>var cutOff = "';
+    const html =
+      '<p>Open daily</p><script>var secret = 1;</script><style>p{color:red}</style><!-- note --><p>9 to 9</p><script>var cutOff = "';
     expect(htmlToText(html)).toBe('Open daily\n9 to 9');
   });
 
@@ -43,7 +47,12 @@ describe('htmlToText', () => {
 describe('readEmbeddedPageText', () => {
   it('reads text from framework data in a JSON script, and not code-like strings', () => {
     const html = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
-      props: { about: 'We are a family run homestay near Kovalam', cssClass: 'flex items-center gap-2', phone: '+91 98470 12345', link: '/rooms' },
+      props: {
+        about: 'We are a family run homestay near Kovalam',
+        cssClass: 'flex items-center gap-2',
+        phone: '+91 98470 12345',
+        link: '/rooms',
+      },
     })}</script>`;
     const text = readEmbeddedPageText(html);
     expect(text).toContain('We are a family run homestay near Kovalam');
@@ -58,7 +67,8 @@ describe('readEmbeddedPageText', () => {
   });
 
   it('skips structured data (read elsewhere) and scripts loaded from an address', () => {
-    const html = '<script type="application/ld+json">{"name":"Skipped Hotel Name"}</script><script src="/a.js" type="application/json"></script>';
+    const html =
+      '<script type="application/ld+json">{"name":"Skipped Hotel Name"}</script><script src="/a.js" type="application/json"></script>';
     expect(readEmbeddedPageText(html)).toBe('');
   });
 

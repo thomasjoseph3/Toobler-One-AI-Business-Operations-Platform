@@ -82,7 +82,12 @@ export function ListEditor({
       ))}
       {canAddRow ? (
         <div>
-          <Button variant="secondary" size="compact" type="button" onClick={() => onChange({ ...draft, rows: [...draft.rows, emptyListRow(fields)] })}>
+          <Button
+            variant="secondary"
+            size="compact"
+            type="button"
+            onClick={() => onChange({ ...draft, rows: [...draft.rows, emptyListRow(fields)] })}
+          >
             {t('knowledge.editor.addRow')}
           </Button>
         </div>

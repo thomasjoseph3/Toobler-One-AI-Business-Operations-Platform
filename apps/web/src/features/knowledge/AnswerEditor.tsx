@@ -47,12 +47,20 @@ function ChoiceList(props: {
 }
 
 /** What fits the question's own type: a text box, a choice list, ticks, Yes or No, the week's hours, or rows. */
-function EditorFields(props: { question: KnowledgeQuestion; draft: AnswerDraft; onChange: (draft: AnswerDraft) => void }) {
+function EditorFields(props: {
+  question: KnowledgeQuestion;
+  draft: AnswerDraft;
+  onChange: (draft: AnswerDraft) => void;
+}) {
   const { question, draft, onChange } = props;
   switch (draft.kind) {
     case 'text':
       return question.type === 'long_text' ? (
-        <TextAreaField label={question.text} value={draft.text} onChange={(event) => onChange({ ...draft, text: event.target.value })} />
+        <TextAreaField
+          label={question.text}
+          value={draft.text}
+          onChange={(event) => onChange({ ...draft, text: event.target.value })}
+        />
       ) : (
         <TextField
           label={question.text}
@@ -77,7 +85,9 @@ function EditorFields(props: { question: KnowledgeQuestion; draft: AnswerDraft; 
               onChange={(event) =>
                 onChange({
                   ...draft,
-                  choices: event.target.checked ? [...draft.choices, option] : draft.choices.filter((choice) => choice !== option),
+                  choices: event.target.checked
+                    ? [...draft.choices, option]
+                    : draft.choices.filter((choice) => choice !== option),
                 })
               }
             />
@@ -141,7 +151,9 @@ export function AnswerEditor(props: { question: KnowledgeQuestion; onSaved: () =
   const [draft, setDraft] = useState<AnswerDraft>(() => {
     const started = startDraft(question, question.answer?.value ?? null);
     // A list starts with one empty row so there is something to type in
-    return started.kind === 'list' && started.rows.length === 0 ? { ...started, rows: [emptyListRow(question.rowFields ?? [])] } : started;
+    return started.kind === 'list' && started.rows.length === 0
+      ? { ...started, rows: [emptyListRow(question.rowFields ?? [])] }
+      : started;
   });
   const [problem, setProblem] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -159,13 +171,21 @@ export function AnswerEditor(props: { question: KnowledgeQuestion; onSaved: () =
       await apiRequest('PUT', `/knowledge/answers/${question.key}`, { value: result.value });
       onSaved();
     } catch (error) {
-      setProblem(error instanceof ApiRequestError || error instanceof Error ? describeSaveProblem(error) : t('knowledge.problem.unknown'));
+      setProblem(
+        error instanceof ApiRequestError || error instanceof Error
+          ? describeSaveProblem(error)
+          : t('knowledge.problem.unknown'),
+      );
       setIsSaving(false);
     }
   };
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-4" aria-label={formatMessage('knowledge.editor.formFor', { question: question.text })}>
+    <form
+      onSubmit={save}
+      className="flex flex-col gap-4"
+      aria-label={formatMessage('knowledge.editor.formFor', { question: question.text })}
+    >
       <EditorFields question={question} draft={draft} onChange={setDraft} />
       {problem ? <Alert tone="error">{problem}</Alert> : null}
       <div className="flex gap-3">

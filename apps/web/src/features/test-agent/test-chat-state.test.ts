@@ -20,18 +20,33 @@ describe('the chat lines', () => {
   });
 
   it('takes back the customer’s last line so it can be typed again, and does nothing when the last line is the agent’s', () => {
-    expect(takeBackLastLine([{ sender: 'agent', body: 'Hello' }, { sender: 'customer', body: 'Price?' }])).toEqual({
+    expect(
+      takeBackLastLine([
+        { sender: 'agent', body: 'Hello' },
+        { sender: 'customer', body: 'Price?' },
+      ]),
+    ).toEqual({
       lines: [{ sender: 'agent', body: 'Hello' }],
       text: 'Price?',
     });
-    expect(takeBackLastLine([{ sender: 'agent', body: 'Hello' }])).toEqual({ lines: [{ sender: 'agent', body: 'Hello' }], text: '' });
+    expect(takeBackLastLine([{ sender: 'agent', body: 'Hello' }])).toEqual({
+      lines: [{ sender: 'agent', body: 'Hello' }],
+      text: '',
+    });
     expect(takeBackLastLine([])).toEqual({ lines: [], text: '' });
   });
 });
 
 describe('words for the tools', () => {
   it('has words for the six tools the agent has, and none for one it does not know', () => {
-    for (const tool of ['get_business_info', 'list_offerings', 'search_knowledge', 'log_unanswered_question', 'save_details', 'request_human_callback']) {
+    for (const tool of [
+      'get_business_info',
+      'list_offerings',
+      'search_knowledge',
+      'log_unanswered_question',
+      'save_details',
+      'request_human_callback',
+    ]) {
       expect(findToolWords(tool), tool).not.toBeNull();
     }
     expect(findToolWords('something_new')).toBeNull();
@@ -46,12 +61,24 @@ describe('the promise', () => {
   });
 
   it('says no time for a promise that has none', () => {
-    expect(describePromise({ kind: 'passed_to_manager', sentence: "I've passed this to the manager.", dueAt: null }, 'Asia/Kolkata')).toEqual({
+    expect(
+      describePromise(
+        { kind: 'passed_to_manager', sentence: "I've passed this to the manager.", dueAt: null },
+        'Asia/Kolkata',
+      ),
+    ).toEqual({
       sentence: "I've passed this to the manager.",
       due: null,
     });
     expect(
-      describePromise({ kind: 'call_back_open', sentence: 'Our team will call you within 15 minutes.', dueAt: '2026-11-17T10:15:00.000Z' }, 'Asia/Kolkata').due,
+      describePromise(
+        {
+          kind: 'call_back_open',
+          sentence: 'Our team will call you within 15 minutes.',
+          dueAt: '2026-11-17T10:15:00.000Z',
+        },
+        'Asia/Kolkata',
+      ).due,
     ).toBe('15:45 on 17 Nov');
   });
 });

@@ -38,7 +38,9 @@ export function takeBackLastLine(lines: readonly ChatLine[]): { lines: ChatLine[
 /** The time a callback falls due, in the business's own time zone, like "10:45 on 17 Nov". */
 export function formatDueTime(isoText: string, timeZone: string): string {
   const due = new Date(isoText);
-  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }).format(due);
+  const time = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }).format(
+    due,
+  );
   const day = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }).format(due);
   return `${time} on ${day}`;
 }

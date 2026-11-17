@@ -1,9 +1,19 @@
-import type { KnowledgeQuestion, PutAnswerRequest, SetupChatQuestion, SetupChatRequest, SetupChatResponse } from '@toobler-one/shared';
+import type {
+  KnowledgeQuestion,
+  PutAnswerRequest,
+  SetupChatQuestion,
+  SetupChatRequest,
+  SetupChatResponse,
+} from '@toobler-one/shared';
 import { ApiError, notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
 import type { createAiService } from '../../ai';
 import type { createKnowledgeService } from '../../knowledge';
-import { buildSetupReplyInstructions, buildSetupReplyMessage, SETUP_REPLY_PROMPT_VERSION } from '../helpers/build-setup-reply-prompt';
+import {
+  buildSetupReplyInstructions,
+  buildSetupReplyMessage,
+  SETUP_REPLY_PROMPT_VERSION,
+} from '../helpers/build-setup-reply-prompt';
 import { readAiReply, readReplyWithoutAi, setupReplyOutputSchema, type ReadReply } from '../helpers/read-setup-reply';
 import { chooseNextChatQuestion, countFormOnlyQuestions, isChatQuestion } from '../helpers/setup-chat-questions';
 
@@ -11,7 +21,8 @@ import { chooseNextChatQuestion, countFormOnlyQuestions, isChatQuestion } from '
 export type SetupChatAiService = Pick<ReturnType<typeof createAiService>, 'generateObject'>;
 
 /** What the owner is told when a reply could not be read, in plain words. */
-const COULD_NOT_READ_REPLY = "I couldn't tell which answer you meant. Please pick one of the options, or say it another way.";
+const COULD_NOT_READ_REPLY =
+  "I couldn't tell which answer you meant. Please pick one of the options, or say it another way.";
 const AI_NOT_AVAILABLE_REPLY =
   "I can't read free-form replies right now. Please pick one of the options exactly, or use the form.";
 
@@ -106,7 +117,9 @@ export function createSetupChatService(dependencies: {
             problem = read.problem;
           } else {
             try {
-              await knowledgeService.answerQuestion(principal, question.key, { value: read.value as PutAnswerRequest['value'] });
+              await knowledgeService.answerQuestion(principal, question.key, {
+                value: read.value as PutAnswerRequest['value'],
+              });
               saved = { questionKey: question.key, questionText: question.text };
             } catch (error) {
               // The question's own checks said no (a bad link, a missing detail): say why, in the checker's words, and ask again

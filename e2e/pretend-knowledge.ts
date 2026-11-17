@@ -73,7 +73,13 @@ export function startingKnowledge(): PretendKnowledge {
         neededToGoLive: true,
         answer: answerOf('Nair Stays', 'check', 'website'),
       }),
-      question({ key: 'business_summary', section: 'B', text: 'What does your business do, in one or two lines?', type: 'long_text', neededToGoLive: true }),
+      question({
+        key: 'business_summary',
+        section: 'B',
+        text: 'What does your business do, in one or two lines?',
+        type: 'long_text',
+        neededToGoLive: true,
+      }),
       question({
         key: 'contact_details',
         section: 'B',
@@ -117,7 +123,13 @@ export function startingKnowledge(): PretendKnowledge {
         type: 'long_text',
         answer: answerOf('Free cancellation up to 48 hours before.', 'confirmed'),
       }),
-      question({ key: 'prices_gst', section: 'C', text: 'Do your prices include GST?', type: 'pick_one', options: ['Included', 'Plus GST', 'No GST'] }),
+      question({
+        key: 'prices_gst',
+        section: 'C',
+        text: 'Do your prices include GST?',
+        type: 'pick_one',
+        options: ['Included', 'Plus GST', 'No GST'],
+      }),
     ],
     situations: [
       {
@@ -163,17 +175,22 @@ export function neededMissingKeys(knowledge: PretendKnowledge): string[] {
 
 /** How complete the profile is, worked out from the questions the way the API does it (confirmed answers count). */
 function progressOf(knowledge: PretendKnowledge) {
-  const counted = knowledge.questions.filter((item) => item['handledElsewhere'] === null || item['elsewhereStatus'] !== 'not_tracked');
+  const counted = knowledge.questions.filter(
+    (item) => item['handledElsewhere'] === null || item['elsewhereStatus'] !== 'not_tracked',
+  );
   const isAnswered = (item: Record<string, unknown>) =>
     item['handledElsewhere'] !== null
       ? item['elsewhereStatus'] === 'done'
       : (item['answer'] as { status?: string } | null)?.status === 'confirmed';
   const answeredQuestions = counted.filter(isAnswered).length;
-  const neededMissing = counted.filter((item) => item['neededToGoLive'] === true && !isAnswered(item)).map((item) => String(item['key']));
+  const neededMissing = counted
+    .filter((item) => item['neededToGoLive'] === true && !isAnswered(item))
+    .map((item) => String(item['key']));
   return {
     totalQuestions: counted.length,
     answeredQuestions,
-    waitingForCheck: counted.filter((item) => (item['answer'] as { status?: string } | null)?.status === 'check').length,
+    waitingForCheck: counted.filter((item) => (item['answer'] as { status?: string } | null)?.status === 'check')
+      .length,
     percentComplete: Math.round((answeredQuestions / counted.length) * 100),
     stillToAnswer: counted.filter((item) => !isAnswered(item)).map((item) => String(item['key'])),
     readyToGoLive: neededMissing.length === 0,
@@ -193,7 +210,10 @@ export function answerKnowledgeCall(
   call: { method: string; path: string; body: Record<string, unknown> | null; role: 'manager' | 'staff' },
 ): PretendAnswer | undefined {
   const { method, path, body, role } = call;
-  const refuseStaff = (): PretendAnswer => ({ status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } });
+  const refuseStaff = (): PretendAnswer => ({
+    status: 403,
+    body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } },
+  });
 
   if (path === '/knowledge/questions' && method === 'GET') {
     if (knowledge.questionsFail) return { status: 500, body: { error: { code: 'BROKEN', message: 'Broken.' } } };
@@ -219,12 +239,14 @@ export function answerKnowledgeCall(
     knowledge.confirmedKeys.push(keys);
     for (const item of knowledge.questions) {
       const answer = item['answer'] as { status?: string; value?: unknown; source?: 'typed' | 'website' } | null;
-      if (keys.includes(String(item['key'])) && answer?.status === 'check') item['answer'] = answerOf(answer.value, 'confirmed', answer.source);
+      if (keys.includes(String(item['key'])) && answer?.status === 'check')
+        item['answer'] = answerOf(answer.value, 'confirmed', answer.source);
     }
     return { status: 200, body: { confirmed: keys, progress: progressOf(knowledge) } };
   }
 
-  if (path === '/knowledge/situations' && method === 'GET') return { status: 200, body: { items: knowledge.situations } };
+  if (path === '/knowledge/situations' && method === 'GET')
+    return { status: 200, body: { items: knowledge.situations } };
   const situationMatch = /^\/knowledge\/situations\/([a-z_]+)$/.exec(path);
   if (situationMatch && method === 'PUT') {
     if (role !== 'manager') return refuseStaff();
@@ -260,7 +282,8 @@ export function answerKnowledgeCall(
     if (knowledge.readingChecks < 2) return { status: 200, body: readingRun(knowledge, 'reading') };
     if (knowledge.readingOutcome === 'done') {
       const summary = knowledge.questions.find((candidate) => candidate['key'] === 'business_summary');
-      if (summary && summary['answer'] === null) summary['answer'] = answerOf('A family homestay by the sea.', 'check', 'website');
+      if (summary && summary['answer'] === null)
+        summary['answer'] = answerOf('A family homestay by the sea.', 'check', 'website');
       return { status: 200, body: readingRun(knowledge, 'done') };
     }
     return { status: 200, body: readingRun(knowledge, 'failed') };
@@ -271,7 +294,9 @@ export function answerKnowledgeCall(
 /** A reading in one of its states, as the API gives it. */
 function readingRun(knowledge: PretendKnowledge, status: 'queued' | 'reading' | 'done' | 'failed') {
   const isDone = status === 'done';
-  const websiteUrl = String(knowledge.startedReadings[knowledge.startedReadings.length - 1]?.['websiteUrl'] ?? 'https://nairstays.example/');
+  const websiteUrl = String(
+    knowledge.startedReadings[knowledge.startedReadings.length - 1]?.['websiteUrl'] ?? 'https://nairstays.example/',
+  );
   return {
     id: PRETEND_RUN_ID,
     status,
@@ -282,7 +307,12 @@ function readingRun(knowledge: PretendKnowledge, status: 'queued' | 'reading' | 
     pagesRead: isDone ? 3 : 0,
     answersFound: isDone ? ['business_summary'] : [],
     answersSkipped: isDone ? 1 : 0,
-    suggestedOfferings: isDone ? [{ name: 'Sea view room', description: 'By the beach', fromPricePaise: 250000 }, { name: 'Yoga class', description: null, fromPricePaise: null }] : [],
+    suggestedOfferings: isDone
+      ? [
+          { name: 'Sea view room', description: 'By the beach', fromPricePaise: 250000 },
+          { name: 'Yoga class', description: null, fromPricePaise: null },
+        ]
+      : [],
     createdAt: PRETEND_NOW,
     finishedAt: isDone || status === 'failed' ? PRETEND_NOW : null,
   };

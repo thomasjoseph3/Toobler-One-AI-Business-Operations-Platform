@@ -2,7 +2,11 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import zlib from 'node:zlib';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createCheckedLookup, createWebPageFetcher, type WebPageFetcher } from '../src/modules/core/setup/services/fetch-web-page.service';
+import {
+  createCheckedLookup,
+  createWebPageFetcher,
+  type WebPageFetcher,
+} from '../src/modules/core/setup/services/fetch-web-page.service';
 import { createWebsiteReader } from '../src/modules/core/setup/services/read-website.service';
 
 // The website reader (F31 slice 2) against a real web server on this machine. The server is the "business website". The
@@ -35,7 +39,10 @@ beforeAll(async () => {
       return;
     }
     const send = () => {
-      response.writeHead(page.status ?? 200, { 'content-type': page.type ?? 'text/html; charset=utf-8', ...page.headers });
+      response.writeHead(page.status ?? 200, {
+        'content-type': page.type ?? 'text/html; charset=utf-8',
+        ...page.headers,
+      });
       response.end(page.body ?? '');
     };
     if (page.delayMilliseconds) setTimeout(send, page.delayMilliseconds);
@@ -53,7 +60,11 @@ const site = (path = '/') => `http://127.0.0.1:${port}${path}`;
 
 /** A fetcher that may reach the fake site only: 127.0.0.1 on the test port, nothing else. */
 const fetcherForTests = (extra: Parameters<typeof createWebPageFetcher>[0] = {}): WebPageFetcher =>
-  createWebPageFetcher({ isAddressAllowed: (address) => address === '127.0.0.1', allowedPorts: [String(port)], ...extra });
+  createWebPageFetcher({
+    isAddressAllowed: (address) => address === '127.0.0.1',
+    allowedPorts: [String(port)],
+    ...extra,
+  });
 
 /** What a refused call threw, as its code. */
 async function codeOf(promise: Promise<unknown>): Promise<string> {
@@ -129,7 +140,14 @@ describe('the safety rules (the real ones, nothing loosened)', () => {
     requestedPaths = [];
     pages = { '/': { body: html('secret') } };
     const realFetcher = createWebPageFetcher();
-    for (const address of [site(), `http://localhost:${port}/`, 'http://127.0.0.1/', 'http://[::1]/', 'http://169.254.169.254/', 'http://10.1.2.3/']) {
+    for (const address of [
+      site(),
+      `http://localhost:${port}/`,
+      'http://127.0.0.1/',
+      'http://[::1]/',
+      'http://169.254.169.254/',
+      'http://10.1.2.3/',
+    ]) {
       expect(await codeOf(realFetcher(address)), address).toBe('WEBSITE_NOT_PUBLIC');
     }
     expect(requestedPaths).toEqual([]); // the fake site was never asked
@@ -157,7 +175,11 @@ describe('reading a whole website', () => {
   it('reads the home page, finds the sitemap through robots.txt and reads the best pages', async () => {
     requestedPaths = [];
     pages = {
-      '/': { body: html('<h1>Nair Stays</h1><a href="/about">About</a><a href="/blog/news">News</a><a href="mailto:hello@nairstays.example">Mail</a>') },
+      '/': {
+        body: html(
+          '<h1>Nair Stays</h1><a href="/about">About</a><a href="/blog/news">News</a><a href="mailto:hello@nairstays.example">Mail</a>',
+        ),
+      },
       '/about': { body: html('<p>Family run since 1998</p>') },
       '/contact': { body: html('<p>Call +91 98470 12345</p><a href="tel:+919847012345">Call</a>') },
       '/blog/news': { body: html('<p>A blog post that must not be read</p>') },
@@ -189,7 +211,11 @@ describe('reading a whole website', () => {
 
   it('never follows a link to another website', async () => {
     requestedPaths = [];
-    pages = { '/': { body: html('<a href="http://10.0.0.9/contact">Contact</a><a href="https://other.example/contact">Contact</a>') } };
+    pages = {
+      '/': {
+        body: html('<a href="http://10.0.0.9/contact">Contact</a><a href="https://other.example/contact">Contact</a>'),
+      },
+    };
     const website = await createWebsiteReader({ fetchWebPage: fetcherForTests() }).readWebsite(site());
     expect(website.pages).toHaveLength(1);
   });
@@ -203,10 +229,14 @@ describe('reading a whole website', () => {
     expect(requestedPaths.filter((path) => path.includes('169'))).toEqual([]);
   });
 
-  it('throws the fetcher\'s refusal when the home page cannot be read', async () => {
+  it("throws the fetcher's refusal when the home page cannot be read", async () => {
     pages = {};
-    expect(await codeOf(createWebsiteReader({ fetchWebPage: fetcherForTests() }).readWebsite(site()))).toBe('WEBSITE_ERROR_STATUS');
-    expect(await codeOf(createWebsiteReader({ fetchWebPage: createWebPageFetcher() }).readWebsite('http://127.0.0.1'))).toBe('WEBSITE_NOT_PUBLIC');
+    expect(await codeOf(createWebsiteReader({ fetchWebPage: fetcherForTests() }).readWebsite(site()))).toBe(
+      'WEBSITE_ERROR_STATUS',
+    );
+    expect(
+      await codeOf(createWebsiteReader({ fetchWebPage: createWebPageFetcher() }).readWebsite('http://127.0.0.1')),
+    ).toBe('WEBSITE_NOT_PUBLIC');
   });
 
   it('reads a page once when two links redirect to the same page', async () => {

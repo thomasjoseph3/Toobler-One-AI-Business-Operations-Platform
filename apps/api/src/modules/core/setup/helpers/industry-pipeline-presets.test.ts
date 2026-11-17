@@ -56,7 +56,9 @@ describe('planStagePreset', () => {
   });
 
   it('copes with a business that has fewer open stages than three', () => {
-    expect(planStagePreset('clinic', [{ id: 'a', name: 'New' }]).rename).toEqual([{ stageId: 'a', from: 'New', to: 'New enquiry' }]);
+    expect(planStagePreset('clinic', [{ id: 'a', name: 'New' }]).rename).toEqual([
+      { stageId: 'a', from: 'New', to: 'New enquiry' },
+    ]);
   });
 });
 

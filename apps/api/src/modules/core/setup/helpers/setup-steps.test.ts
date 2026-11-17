@@ -27,7 +27,11 @@ describe('resolveSetupSteps', () => {
     const before = resolveSetupSteps(marked, NOTHING_FOUND);
     expect(before.find((step) => step.key === 'about_business')?.status).toBe('todo');
 
-    const after = resolveSetupSteps(new Map(), { aboutBusinessAnswered: true, hasOfferingSwitchedOn: true, hasTriedTheAgent: true });
+    const after = resolveSetupSteps(new Map(), {
+      aboutBusinessAnswered: true,
+      hasOfferingSwitchedOn: true,
+      hasTriedTheAgent: true,
+    });
     expect(after.find((step) => step.key === 'about_business')?.status).toBe('done');
     expect(after.find((step) => step.key === 'what_you_sell')?.status).toBe('done');
     expect(after.find((step) => step.key === 'test_agent')?.status).toBe('done');
@@ -57,7 +61,11 @@ describe('computePercentDone', () => {
   it('is 0 with no steps and 100 when every step is done', () => {
     expect(computePercentDone([])).toBe(0);
     const everythingDone = new Map<string, SetupStepStatus>(SETUP_STEPS.map((step) => [step.key, 'done']));
-    const steps = resolveSetupSteps(everythingDone, { aboutBusinessAnswered: true, hasOfferingSwitchedOn: true, hasTriedTheAgent: true });
+    const steps = resolveSetupSteps(everythingDone, {
+      aboutBusinessAnswered: true,
+      hasOfferingSwitchedOn: true,
+      hasTriedTheAgent: true,
+    });
     expect(computePercentDone(steps)).toBe(100);
   });
 });

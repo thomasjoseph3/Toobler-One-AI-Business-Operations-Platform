@@ -154,7 +154,9 @@ describe('decideKeySources', () => {
       platformBlockedBecause: 'cap_reached',
     });
     // no token cap (null) means no limit
-    expect(decideKeySources({ ...base, platformMonthlyTokenCap: null, platformTokensThisMonth: 9e9 }).usePlatform).toBe(true);
+    expect(decideKeySources({ ...base, platformMonthlyTokenCap: null, platformTokensThisMonth: 9e9 }).usePlatform).toBe(
+      true,
+    );
   });
 
   it('stops the platform’s keys when this month’s cap is used up, and not before', () => {

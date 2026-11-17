@@ -64,7 +64,12 @@ function OfferFormPanel(props: { editing: Offer | null; timeZone: string; onClos
       }
     >
       <form id={FORM_ID} onSubmit={save} className="flex flex-col gap-4" noValidate>
-        <TextField label={t('whatYouSell.offers.form.text')} value={fields.text} onChange={(event) => setFields({ ...fields, text: event.target.value })} {...(problems.text ? { errorMessage: problems.text } : {})} />
+        <TextField
+          label={t('whatYouSell.offers.form.text')}
+          value={fields.text}
+          onChange={(event) => setFields({ ...fields, text: event.target.value })}
+          {...(problems.text ? { errorMessage: problems.text } : {})}
+        />
         <TextField
           label={t('whatYouSell.offers.form.endsOn')}
           helperText={t('whatYouSell.offers.form.endsOnHelper')}
@@ -116,30 +121,60 @@ export function OffersCard(props: {
       <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-heading-sm text-text-primary">{t('whatYouSell.offers.title')}</h2>
         {canEdit ? (
-          <Button variant="primary" size="compact" onClick={() => setPanel({ editing: null, openings: (panel?.openings ?? 0) + 1 })}>
+          <Button
+            variant="primary"
+            size="compact"
+            onClick={() => setPanel({ editing: null, openings: (panel?.openings ?? 0) + 1 })}
+          >
             {t('whatYouSell.offers.add')}
           </Button>
         ) : null}
       </div>
-      <Checkbox label={t('whatYouSell.offers.showEnded')} checked={showEnded} onChange={(event) => onShowEndedChange(event.target.checked)} />
-      {problem ? <Alert tone="error" className="mt-3">{problem}</Alert> : null}
+      <Checkbox
+        label={t('whatYouSell.offers.showEnded')}
+        checked={showEnded}
+        onChange={(event) => onShowEndedChange(event.target.checked)}
+      />
+      {problem ? (
+        <Alert tone="error" className="mt-3">
+          {problem}
+        </Alert>
+      ) : null}
       {offers.length === 0 ? (
-        <EmptyState icon={<span aria-hidden>🏷</span>} title={t('whatYouSell.offers.empty.title')} description={t('whatYouSell.offers.empty.description')} />
+        <EmptyState
+          icon={<span aria-hidden>🏷</span>}
+          title={t('whatYouSell.offers.empty.title')}
+          description={t('whatYouSell.offers.empty.description')}
+        />
       ) : (
         <ul className="mt-2">
           {offers.map((offer) => (
             <li key={offer.id} className="flex flex-col gap-2 border-b border-border-default py-4 last:border-b-0">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="text-label-md text-text-primary">{offer.text}</p>
-                <Badge tone={offer.current ? 'success' : 'neutral'}>{t(offer.current ? 'whatYouSell.offers.current' : 'whatYouSell.offers.ended')}</Badge>
+                <Badge tone={offer.current ? 'success' : 'neutral'}>
+                  {t(offer.current ? 'whatYouSell.offers.current' : 'whatYouSell.offers.ended')}
+                </Badge>
               </div>
-              <p className="text-body-md text-text-secondary">{formatMessage('whatYouSell.offers.until', { date: formatOfferDate(offer.endsOn) })}</p>
+              <p className="text-body-md text-text-secondary">
+                {formatMessage('whatYouSell.offers.until', { date: formatOfferDate(offer.endsOn) })}
+              </p>
               {canEdit ? (
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="compact" onClick={() => setPanel({ editing: offer, openings: (panel?.openings ?? 0) + 1 })} aria-label={formatMessage('whatYouSell.offers.edit', { text: offer.text })}>
+                  <Button
+                    variant="secondary"
+                    size="compact"
+                    onClick={() => setPanel({ editing: offer, openings: (panel?.openings ?? 0) + 1 })}
+                    aria-label={formatMessage('whatYouSell.offers.edit', { text: offer.text })}
+                  >
                     {t('whatYouSell.offerings.editButton')}
                   </Button>
-                  <Button variant="destructive" size="compact" onClick={() => setToDelete(offer)} aria-label={formatMessage('whatYouSell.offers.delete', { text: offer.text })}>
+                  <Button
+                    variant="destructive"
+                    size="compact"
+                    onClick={() => setToDelete(offer)}
+                    aria-label={formatMessage('whatYouSell.offers.delete', { text: offer.text })}
+                  >
                     {t('whatYouSell.offerings.deleteButton')}
                   </Button>
                 </div>

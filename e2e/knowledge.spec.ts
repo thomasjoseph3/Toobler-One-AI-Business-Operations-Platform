@@ -9,7 +9,10 @@ test.describe('Business profile', () => {
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Knowledge base');
     // 3 of 9 counted questions are confirmed (the website question, the hours and the policy): 33%
     await expect(page.getByText('33% complete')).toBeVisible();
-    await expect(page.getByRole('progressbar', { name: 'Profile completeness' })).toHaveAttribute('aria-valuenow', '33');
+    await expect(page.getByRole('progressbar', { name: 'Profile completeness' })).toHaveAttribute(
+      'aria-valuenow',
+      '33',
+    );
     await expect(page.getByText('3 of 9 answered')).toBeVisible();
     await expect(page.getByText('Still needed before you can go live:')).toBeVisible();
     await expect(page.getByRole('listitem').filter({ hasText: /^What do you sell\?$/ })).toBeVisible();
@@ -19,7 +22,10 @@ test.describe('Business profile', () => {
     await expect(page.getByText('Mon: 09:00 to 18:00')).toBeVisible();
     await expect(page.getByText('Free cancellation up to 48 hours before.')).toBeVisible();
     await expect(page.getByText('Answer this in What you sell')).toBeVisible(); // answered in another feature
-    await expect(page.getByRole('link', { name: 'Open What you sell' }).first()).toHaveAttribute('href', '/knowledge/what-you-sell');
+    await expect(page.getByRole('link', { name: 'Open What you sell' }).first()).toHaveAttribute(
+      'href',
+      '/knowledge/what-you-sell',
+    );
   });
 
   test('marks an answer from the website "Please check" and says where it came from', async ({ page }) => {
@@ -101,7 +107,12 @@ test.describe('Business profile', () => {
     await expect(page.getByText('Phone · +91 98470 12345')).toBeVisible();
     expect(pretendApi.knowledge.savedAnswers[0]).toEqual({
       key: 'contact_details',
-      value: { rows: [{ kind: 'Phone', value: '+91 98470 12345' }, { kind: 'Email', value: 'hello@nairstays.example' }] },
+      value: {
+        rows: [
+          { kind: 'Phone', value: '+91 98470 12345' },
+          { kind: 'Email', value: 'hello@nairstays.example' },
+        ],
+      },
     });
   });
 
@@ -112,7 +123,10 @@ test.describe('Business profile', () => {
     await page.getByRole('checkbox', { name: 'Hindi' }).check();
     await page.getByRole('button', { name: 'Save answer' }).click();
     await expect(page.getByText('English, Hindi')).toBeVisible();
-    expect(pretendApi.knowledge.savedAnswers[0]).toEqual({ key: 'customer_languages', value: { choices: ['English', 'Hindi'] } });
+    expect(pretendApi.knowledge.savedAnswers[0]).toEqual({
+      key: 'customer_languages',
+      value: { choices: ['English', 'Hindi'] },
+    });
   });
 
   test('only one question is edited at a time', async ({ page }) => {
@@ -120,18 +134,25 @@ test.describe('Business profile', () => {
     await page.getByRole('button', { name: 'Answer: What does your business do, in one or two lines?' }).click();
     await page.getByRole('button', { name: 'Answer: Which languages do your customers speak?' }).click();
     await expect(page.getByRole('form')).toHaveCount(1);
-    await expect(page.getByRole('form', { name: 'Answer for: Which languages do your customers speak?' })).toBeVisible();
+    await expect(
+      page.getByRole('form', { name: 'Answer for: Which languages do your customers speak?' }),
+    ).toBeVisible();
   });
 });
 
 test.describe('Read my website', () => {
-  test('starts a reading, says it is working, then shows what it found and the suggestions', async ({ page, pretendApi }) => {
+  test('starts a reading, says it is working, then shows what it found and the suggestions', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/knowledge');
     await page.getByLabel('Your website address').fill('nairstays.example');
     await page.getByRole('button', { name: 'Read my website' }).click();
     await expect(page.getByText(/Reading your website/)).toBeVisible();
     expect(pretendApi.knowledge.startedReadings).toEqual([{ websiteUrl: 'nairstays.example' }]);
-    await expect(page.getByText('Done. We read 3 pages and found 1 answers to check.')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Done. We read 3 pages and found 1 answers to check.')).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByText('1 answers you already confirmed were left as they are.')).toBeVisible();
     // The answer it found now waits for the owner's Yes
     const row = page.getByRole('listitem').filter({ hasText: 'What does your business do, in one or two lines?' });
@@ -147,16 +168,25 @@ test.describe('Read my website', () => {
     await page.goto('/knowledge');
     await page.getByLabel('Your website address').fill('slow.example');
     await page.getByRole('button', { name: 'Read my website' }).click();
-    await expect(page.getByText(/We could not read that website. The website took too long to answer./)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/We could not read that website. The website took too long to answer./)).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page.getByRole('button', { name: 'Read my website' })).toBeEnabled();
   });
 
-  test('shows the API’s refusal (a private address) and asks for an address when the box is empty', async ({ page, pretendApi }) => {
+  test('shows the API’s refusal (a private address) and asks for an address when the box is empty', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/knowledge');
     await page.getByRole('button', { name: 'Read my website' }).click();
     await expect(page.getByText('Enter your website address.')).toBeVisible();
     expect(pretendApi.knowledge.startedReadings).toEqual([]);
-    pretendApi.knowledge.readingRefusal = { status: 400, code: 'WEBSITE_NOT_PUBLIC', message: "That address can't be read: it isn't a public website." };
+    pretendApi.knowledge.readingRefusal = {
+      status: 400,
+      code: 'WEBSITE_NOT_PUBLIC',
+      message: "That address can't be read: it isn't a public website.",
+    };
     await page.getByLabel('Your website address').fill('http://localhost');
     await page.getByRole('button', { name: 'Read my website' }).click();
     await expect(page.getByText("That address can't be read: it isn't a public website.")).toBeVisible();
@@ -182,7 +212,9 @@ test.describe('Settings and situations', () => {
     await page.goto('/knowledge');
     await expect(page.getByText('(Ready-picked)')).toBeVisible();
     await page.getByRole('radio', { name: 'Prices are fixed' }).check();
-    await expect.poll(() => pretendApi.knowledge.chosenSituations).toEqual([{ key: 'discount_request', choice: 'prices_are_fixed' }]);
+    await expect
+      .poll(() => pretendApi.knowledge.chosenSituations)
+      .toEqual([{ key: 'discount_request', choice: 'prices_are_fixed' }]);
     await expect(page.getByText('The same for every business')).toBeVisible();
     await expect(page.getByRole('radio', { name: 'Apologise, pass to the manager and raise a ticket' })).toBeDisabled();
   });

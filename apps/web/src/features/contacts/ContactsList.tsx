@@ -1,6 +1,16 @@
 import type { ReactNode } from 'react';
 import type { Contact } from '@toobler-one/shared';
-import { Card, Checkbox, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, Tag } from '@toobler-one/ui';
+import {
+  Card,
+  Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  Tag,
+} from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import { findLeadDisplayName } from '../leads/lead-display';
 import { ContactNameLink } from './ContactNameLink';
@@ -17,18 +27,31 @@ export interface ContactsTableProps {
 
 /** The contact's stage as a tag: the word always shows, the colour is only a hint. */
 function StageTag({ contact }: { contact: Contact }) {
-  return <Tag tone={findLifecycleTagTone(contact.lifecycleStage)}>{t(findLifecycleLabelKey(contact.lifecycleStage))}</Tag>;
+  return (
+    <Tag tone={findLifecycleTagTone(contact.lifecycleStage)}>{t(findLifecycleLabelKey(contact.lifecycleStage))}</Tag>
+  );
 }
 
 /** The contacts as a table for tablets and desktops, laid out like the leads table: select box, name, email, phone, stage and the "…" menu. */
-export function ContactsTable({ contacts, selectedContactIds, onToggleContact, onToggleAllContacts, renderRowMenu }: ContactsTableProps) {
+export function ContactsTable({
+  contacts,
+  selectedContactIds,
+  onToggleContact,
+  onToggleAllContacts,
+  renderRowMenu,
+}: ContactsTableProps) {
   const areAllSelected = contacts.length > 0 && contacts.every((contact) => selectedContactIds.has(contact.id));
   return (
     <Table className="min-w-[720px]" containerClassName="min-h-0 flex-1 overflow-auto">
       <TableHead>
         <tr>
           <TableHeaderCell className="w-12">
-            <Checkbox label={t('contacts.selectAll')} isLabelHidden checked={areAllSelected} onChange={onToggleAllContacts} />
+            <Checkbox
+              label={t('contacts.selectAll')}
+              isLabelHidden
+              checked={areAllSelected}
+              onChange={onToggleAllContacts}
+            />
           </TableHeaderCell>
           <TableHeaderCell>{t('contacts.column.name')}</TableHeaderCell>
           <TableHeaderCell>{t('contacts.column.email')}</TableHeaderCell>
@@ -46,7 +69,12 @@ export function ContactsTable({ contacts, selectedContactIds, onToggleContact, o
             <TableRow key={contact.id} isSelected={selectedContactIds.has(contact.id)}>
               <TableCell className="w-12">
                 <div className="flex items-center">
-                  <Checkbox label={formatMessage('contacts.selectOne', { name: displayName })} isLabelHidden checked={selectedContactIds.has(contact.id)} onChange={() => onToggleContact(contact.id)} />
+                  <Checkbox
+                    label={formatMessage('contacts.selectOne', { name: displayName })}
+                    isLabelHidden
+                    checked={selectedContactIds.has(contact.id)}
+                    onChange={() => onToggleContact(contact.id)}
+                  />
                 </div>
               </TableCell>
               <TableCell className="text-text-primary">

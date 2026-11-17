@@ -25,7 +25,15 @@ function question(overrides: Partial<KnowledgeQuestion>): KnowledgeQuestion {
 
 const pickOne = question({ type: 'pick_one', options: ['Plus GST', 'Including GST', 'No GST'] });
 const pickSeveral = question({ type: 'pick_several', options: ['Cash', 'UPI', 'Card'] });
-const output = (changes: Partial<SetupReplyOutput>): SetupReplyOutput => ({ understood: true, choice: null, choices: [], otherText: null, yes: null, detail: null, ...changes });
+const output = (changes: Partial<SetupReplyOutput>): SetupReplyOutput => ({
+  understood: true,
+  choice: null,
+  choices: [],
+  otherText: null,
+  yes: null,
+  detail: null,
+  ...changes,
+});
 
 describe('readReplyWithoutAi', () => {
   it('takes plain text and links as typed (trimmed)', () => {
@@ -67,14 +75,20 @@ describe('readAiReply', () => {
 
   it('builds a yes or no, with the detail only for a yes', () => {
     const yesNo = question({ type: 'yes_no' });
-    expect(readAiReply(yesNo, output({ yes: true, detail: 'https://x.com' }))).toEqual({ yes: true, detail: 'https://x.com' });
+    expect(readAiReply(yesNo, output({ yes: true, detail: 'https://x.com' }))).toEqual({
+      yes: true,
+      detail: 'https://x.com',
+    });
     expect(readAiReply(yesNo, output({ yes: false, detail: 'ignored' }))).toEqual({ yes: false });
     expect(readAiReply(yesNo, output({ yes: null }))).toBeNull();
   });
 
   it('builds a pick one and a pick several, with the owner’s own words for "Other"', () => {
     expect(readAiReply(pickOne, output({ choice: 'Plus GST' }))).toEqual({ choice: 'Plus GST' });
-    expect(readAiReply(pickOne, output({ choice: 'Other', otherText: 'Depends' }))).toEqual({ choice: 'Other', otherText: 'Depends' });
+    expect(readAiReply(pickOne, output({ choice: 'Other', otherText: 'Depends' }))).toEqual({
+      choice: 'Other',
+      otherText: 'Depends',
+    });
     expect(readAiReply(pickSeveral, output({ choices: ['Cash', 'UPI'] }))).toEqual({ choices: ['Cash', 'UPI'] });
     expect(readAiReply(pickSeveral, output({ choices: [] }))).toBeNull();
   });

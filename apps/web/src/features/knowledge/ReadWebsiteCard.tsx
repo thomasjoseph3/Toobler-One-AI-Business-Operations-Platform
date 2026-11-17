@@ -96,7 +96,9 @@ export function ReadWebsiteCard({ businessId, onFinished }: { businessId: string
 
       <div aria-live="polite" className="mt-4 flex flex-col gap-3">
         {problem ? <Alert tone="error">{problem}</Alert> : null}
-        {reading?.kind === 'working' ? <p className="text-body-md text-text-secondary">{t('knowledge.reading.working')}</p> : null}
+        {reading?.kind === 'working' ? (
+          <p className="text-body-md text-text-secondary">{t('knowledge.reading.working')}</p>
+        ) : null}
         {reading?.kind === 'failed' ? (
           <Alert tone="error">{formatMessage('knowledge.reading.failed', { message: reading.message })}</Alert>
         ) : null}
@@ -110,9 +112,13 @@ export function ReadWebsiteCard({ businessId, onFinished }: { businessId: string
                   : formatMessage('knowledge.reading.done', { pages: reading.pagesRead, found: reading.answersFound })}
             </Alert>
             {reading.answersSkipped > 0 ? (
-              <p className="text-body-md text-text-secondary">{formatMessage('knowledge.reading.skipped', { count: reading.answersSkipped })}</p>
+              <p className="text-body-md text-text-secondary">
+                {formatMessage('knowledge.reading.skipped', { count: reading.answersSkipped })}
+              </p>
             ) : null}
-            {reading.warning ? <Alert tone="error">{formatMessage('knowledge.reading.warning', { message: reading.warning })}</Alert> : null}
+            {reading.warning ? (
+              <Alert tone="error">{formatMessage('knowledge.reading.warning', { message: reading.warning })}</Alert>
+            ) : null}
           </div>
         ) : null}
         {run && run.suggestedOfferings.length > 0 ? (
@@ -130,7 +136,10 @@ export function ReadWebsiteCard({ businessId, onFinished }: { businessId: string
             </ul>
             <p className="text-label-sm mt-1 text-text-secondary">
               {t('knowledge.reading.suggestionsHelp')}{' '}
-              <Link to="/knowledge/what-you-sell" className="text-link underline underline-offset-2 hover:text-link-hover">
+              <Link
+                to="/knowledge/what-you-sell"
+                className="text-link underline underline-offset-2 hover:text-link-hover"
+              >
                 {t('knowledge.reading.suggestionsLink')}
               </Link>
             </p>

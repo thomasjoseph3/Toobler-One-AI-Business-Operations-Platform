@@ -14,7 +14,11 @@ const NO_WORDS = new Set(['no', 'n', 'nope', 'nah', 'not', 'false']);
 
 /** Lower-case, no surrounding spaces or full stops, single spaces: so "  Yes. " and "yes" read the same. */
 function normalise(text: string): string {
-  return text.trim().toLowerCase().replace(/[.!]+$/u, '').replace(/\s+/gu, ' ');
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[.!]+$/u, '')
+    .replace(/\s+/gu, ' ');
 }
 
 /** The option a typed piece means: its number in the list ("2" is the second option) or its exact words, ignoring capitals. Null when it is neither. */

@@ -33,7 +33,8 @@ export function canBeAnsweredHere(question: KnowledgeQuestion): boolean {
 
 const emptyWeek = (): Record<DayOfWeek, DayDraft> => {
   const week = {} as Record<DayOfWeek, DayDraft>;
-  for (const day of DAYS_OF_THE_WEEK) week[day] = { isOpen: false, from: DEFAULT_OPENING_TIME, to: DEFAULT_CLOSING_TIME };
+  for (const day of DAYS_OF_THE_WEEK)
+    week[day] = { isOpen: false, from: DEFAULT_OPENING_TIME, to: DEFAULT_CLOSING_TIME };
   return week;
 };
 
@@ -101,7 +102,8 @@ export function startDraft(question: KnowledgeQuestion, currentValue: unknown): 
           const textRow: Record<string, string> = {};
           for (const field of question.rowFields ?? []) {
             const cell = row[field.key];
-            textRow[field.key] = field.kind === 'price' && typeof cell === 'number' ? paiseToRupeesText(cell) : String(cell ?? '');
+            textRow[field.key] =
+              field.kind === 'price' && typeof cell === 'number' ? paiseToRupeesText(cell) : String(cell ?? '');
           }
           return textRow;
         }),
@@ -136,14 +138,17 @@ export function draftToValue(question: KnowledgeQuestion, draft: AnswerDraft): D
     case 'text': {
       const text = draft.text.trim();
       if (text === '') return { ok: false, message: 'Please type an answer.' };
-      if (question.type === 'link' && !isWebLink(text)) return { ok: false, message: 'Use a full link like https://example.com' };
+      if (question.type === 'link' && !isWebLink(text))
+        return { ok: false, message: 'Use a full link like https://example.com' };
       return { ok: true, value: text };
     }
     case 'pick_one': {
       if (draft.choice === '') return { ok: false, message: 'Pick one.' };
       if (draft.choice === OTHER_CHOICE) {
         const otherText = draft.otherText.trim();
-        return otherText === '' ? { ok: false, message: 'Say what "Other" is.' } : { ok: true, value: { choice: OTHER_CHOICE, otherText } };
+        return otherText === ''
+          ? { ok: false, message: 'Say what "Other" is.' }
+          : { ok: true, value: { choice: OTHER_CHOICE, otherText } };
       }
       return { ok: true, value: { choice: draft.choice } };
     }
@@ -168,7 +173,8 @@ export function draftToValue(question: KnowledgeQuestion, draft: AnswerDraft): D
           ? { ok: false, message: `${question.yesDetail.label} is needed for "Yes".` }
           : { ok: true, value: { yes: true } };
       }
-      if (question.yesDetail?.kind === 'link' && !isWebLink(detail)) return { ok: false, message: 'Use a full link like https://example.com' };
+      if (question.yesDetail?.kind === 'link' && !isWebLink(detail))
+        return { ok: false, message: 'Use a full link like https://example.com' };
       return { ok: true, value: { yes: true, detail } };
     }
     case 'weekly_hours': {
@@ -183,7 +189,8 @@ export function draftToValue(question: KnowledgeQuestion, draft: AnswerDraft): D
         if (hours.to <= hours.from) return { ok: false, message: 'Closing time must be after opening time.' };
         days[day] = { open: hours.from, close: hours.to };
       }
-      if (Object.keys(days).length === 0) return { ok: false, message: 'Open on at least one day, or choose "Open all day".' };
+      if (Object.keys(days).length === 0)
+        return { ok: false, message: 'Open on at least one day, or choose "Open all day".' };
       return { ok: true, value: { days } };
     }
     case 'list': {
@@ -210,7 +217,8 @@ export function draftToValue(question: KnowledgeQuestion, draft: AnswerDraft): D
         if (Object.keys(row).length > 0) rows.push(row);
       }
       if (rows.length === 0) return { ok: false, message: 'Add at least one row.' };
-      if (question.maxRows !== null && rows.length > question.maxRows) return { ok: false, message: `At most ${question.maxRows} rows.` };
+      if (question.maxRows !== null && rows.length > question.maxRows)
+        return { ok: false, message: `At most ${question.maxRows} rows.` };
       return { ok: true, value: { rows } };
     }
     case 'price': {
@@ -241,10 +249,18 @@ export function formatAnswer(question: KnowledgeQuestion, value: unknown): strin
     case 'link':
       return typeof value === 'string' ? [value] : [];
     case 'pick_one':
-      return [stored['choice'] === OTHER_CHOICE ? String(stored['otherText'] ?? OTHER_CHOICE) : String(stored['choice'] ?? '')];
+      return [
+        stored['choice'] === OTHER_CHOICE
+          ? String(stored['otherText'] ?? OTHER_CHOICE)
+          : String(stored['choice'] ?? ''),
+      ];
     case 'pick_several': {
       const choices = Array.isArray(stored['choices']) ? (stored['choices'] as string[]) : [];
-      return [choices.map((choice) => (choice === OTHER_CHOICE ? String(stored['otherText'] ?? OTHER_CHOICE) : choice)).join(', ')];
+      return [
+        choices
+          .map((choice) => (choice === OTHER_CHOICE ? String(stored['otherText'] ?? OTHER_CHOICE) : choice))
+          .join(', '),
+      ];
     }
     case 'yes_no':
       return stored['yes'] === true ? [stored['detail'] ? `Yes: ${String(stored['detail'])}` : 'Yes'] : ['No'];
@@ -253,7 +269,9 @@ export function formatAnswer(question: KnowledgeQuestion, value: unknown): strin
       const days = valueAsRecord(stored['days']);
       return DAYS_OF_THE_WEEK.map((day) => {
         const hours = valueAsRecord(days[day]);
-        return hours['open'] ? `${DAY_NAMES[day]}: ${String(hours['open'])} to ${String(hours['close'])}` : `${DAY_NAMES[day]}: closed`;
+        return hours['open']
+          ? `${DAY_NAMES[day]}: ${String(hours['open'])} to ${String(hours['close'])}`
+          : `${DAY_NAMES[day]}: closed`;
       });
     }
     case 'list': {

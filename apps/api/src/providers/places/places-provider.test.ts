@@ -68,7 +68,8 @@ describe('createGooglePlacesProvider', () => {
     for (const status of [401, 403, 500]) {
       const provider = createGooglePlacesProvider({
         apiKey: 'secret-key-value',
-        fetchFunction: (async () => new Response('{"error":"secret-key-value is bad"}', { status })) as unknown as typeof fetch,
+        fetchFunction: (async () =>
+          new Response('{"error":"secret-key-value is bad"}', { status })) as unknown as typeof fetch,
       });
       const error = await provider.findPlace('x').catch((caught: Error) => caught);
       expect(error).toMatchObject({ code: 'GOOGLE_LISTING_UNAVAILABLE' });

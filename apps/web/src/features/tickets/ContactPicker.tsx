@@ -46,17 +46,33 @@ export function ContactPicker(props: {
         helperText={t('tickets.form.personHint')}
         {...(errorMessage ? { errorMessage } : {})}
       />
-      {search.status === 'searching' ? <p role="status" className="text-body-sm text-text-secondary">{t('tickets.form.searching')}</p> : null}
-      {search.status === 'error' ? <p role="alert" className="text-body-sm text-error">{t('tickets.form.searchFailed')}</p> : null}
-      {search.status === 'found' && search.people.length === 0 ? <p className="text-body-sm text-text-secondary">{t('tickets.form.noPerson')}</p> : null}
+      {search.status === 'searching' ? (
+        <p role="status" className="text-body-sm text-text-secondary">
+          {t('tickets.form.searching')}
+        </p>
+      ) : null}
+      {search.status === 'error' ? (
+        <p role="alert" className="text-body-sm text-error">
+          {t('tickets.form.searchFailed')}
+        </p>
+      ) : null}
+      {search.status === 'found' && search.people.length === 0 ? (
+        <p className="text-body-sm text-text-secondary">{t('tickets.form.noPerson')}</p>
+      ) : null}
       {search.status === 'found' && search.people.length > 0 ? (
         <ul className="flex flex-col overflow-hidden rounded-md border border-border-default">
           {search.people.map((person) => (
             <li key={person.id} className="border-t border-border-subtle first:border-t-0">
-              <button type="button" onClick={() => onChoose(person)} className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-hover">
+              <button
+                type="button"
+                onClick={() => onChoose(person)}
+                className="flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-hover"
+              >
                 <span className="text-body-md text-text-primary">{findLeadDisplayName(person)}</span>
                 <span className="text-body-xs text-text-secondary">
-                  {[person.phone, person.email].filter((value) => value && value !== findLeadDisplayName(person)).join(' · ')}
+                  {[person.phone, person.email]
+                    .filter((value) => value && value !== findLeadDisplayName(person))
+                    .join(' · ')}
                 </span>
               </button>
             </li>

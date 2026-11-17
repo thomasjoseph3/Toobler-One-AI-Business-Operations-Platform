@@ -10,7 +10,10 @@ test.describe('Test the agent', () => {
     await expect(page.getByText(/Say hello, or ask something a customer would ask/)).toBeVisible();
     await expect(page.getByText('Send a message and what the agent did will show here.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
-    await expect(page.getByRole('link', { name: 'Back to the business profile' })).toHaveAttribute('href', '/knowledge');
+    await expect(page.getByRole('link', { name: 'Back to the business profile' })).toHaveAttribute(
+      'href',
+      '/knowledge',
+    );
   });
 
   test('sends a message, shows the reply, and shows what the agent did', async ({ page, pretendApi }) => {
@@ -29,14 +32,19 @@ test.describe('Test the agent', () => {
     await expect(page.getByText('No promise yet. It makes one once it can reach the customer.')).toBeVisible();
   });
 
-  test('carries on the same chat, and shows what the customer told it and the one promise with its due time', async ({ page, pretendApi }) => {
+  test('carries on the same chat, and shows what the customer told it and the one promise with its due time', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/knowledge/test-agent');
     await page.getByLabel('Your message as the customer').fill('Hello');
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByText('Hello! How can I help you today?')).toBeVisible();
     await page.getByLabel('Your message as the customer').fill('I am Ravi, 98470 12345');
     await page.getByRole('button', { name: 'Send' }).click();
-    await expect(page.getByText('Thank you, Ravi. Our team will call you within 15 minutes.', { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText('Thank you, Ravi. Our team will call you within 15 minutes.', { exact: true }).first(),
+    ).toBeVisible();
     // The second message carries the chat's id, so it is the same chat
     expect(pretendApi.agent.sent[1]?.conversationId).toBeTruthy();
     await expect(page.getByText('Ravi', { exact: true })).toBeVisible(); // what it learned
@@ -68,8 +76,15 @@ test.describe('Test the agent', () => {
     expect(pretendApi.agent.sent[0]?.message).toBe('first line\nsecond line');
   });
 
-  test('puts the message back in the box when the agent cannot answer, and shows its plain words', async ({ page, pretendApi }) => {
-    pretendApi.agent.refusal = { status: 503, code: 'AI_NOT_AVAILABLE', message: 'No AI key is set up for this job yet.' };
+  test('puts the message back in the box when the agent cannot answer, and shows its plain words', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.agent.refusal = {
+      status: 503,
+      code: 'AI_NOT_AVAILABLE',
+      message: 'No AI key is set up for this job yet.',
+    };
     await page.goto('/knowledge/test-agent');
     await page.getByLabel('Your message as the customer').fill('Do you have parking?');
     await page.getByRole('button', { name: 'Send' }).click();
@@ -111,7 +126,9 @@ test.describe('Test the agent', () => {
     await page.getByRole('button', { name: 'Send' }).click();
     await expect(page.getByText('Hello! How can I help you today?')).toBeVisible();
     await page.getByRole('button', { name: 'Show the summary the inbox would keep' }).click();
-    await expect(page.getByText('Ravi asked about a deluxe room and was promised a call within 15 minutes.')).toBeVisible();
+    await expect(
+      page.getByText('Ravi asked about a deluxe room and was promised a call within 15 minutes.'),
+    ).toBeVisible();
     expect(pretendApi.agent.summariesAskedFor).toHaveLength(1);
   });
 

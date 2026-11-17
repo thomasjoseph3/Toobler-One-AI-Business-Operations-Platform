@@ -1,12 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import type { Ticket } from '@toobler-one/shared';
-import { buildCreateTicketRequest, buildUpdateTicketRequest, checkNote, checkTicketEditForm, checkTicketForm, EMPTY_TICKET_FORM, ticketToEditFields } from './ticket-form';
-import { buildTicketsPath, countActiveTicketFilters, DEFAULT_TICKETS_VIEW, describeTicketOwner, isTicketsViewFiltered, readTicketsView, writeTicketsView } from './tickets-view';
+import {
+  buildCreateTicketRequest,
+  buildUpdateTicketRequest,
+  checkNote,
+  checkTicketEditForm,
+  checkTicketForm,
+  EMPTY_TICKET_FORM,
+  ticketToEditFields,
+} from './ticket-form';
+import {
+  buildTicketsPath,
+  countActiveTicketFilters,
+  DEFAULT_TICKETS_VIEW,
+  describeTicketOwner,
+  isTicketsViewFiltered,
+  readTicketsView,
+  writeTicketsView,
+} from './tickets-view';
 
 describe('the tickets view in the web address', () => {
   it('starts with open tickets, and falls back to that for anything not understood', () => {
     expect(readTicketsView(new URLSearchParams(''))).toEqual(DEFAULT_TICKETS_VIEW);
-    expect(readTicketsView(new URLSearchParams('status=nonsense&owner=x&type=y&priority=z&page=0'))).toEqual(DEFAULT_TICKETS_VIEW);
+    expect(readTicketsView(new URLSearchParams('status=nonsense&owner=x&type=y&priority=z&page=0'))).toEqual(
+      DEFAULT_TICKETS_VIEW,
+    );
   });
 
   it('reads and writes every filter, leaving out the defaults', () => {
@@ -37,8 +55,13 @@ describe('the tickets view in the web address', () => {
 
 describe('the Add ticket form', () => {
   it('needs a person and a title', () => {
-    expect(checkTicketForm(EMPTY_TICKET_FORM)).toEqual({ contact: 'tickets.form.needContact', title: 'tickets.form.needTitle' });
-    expect(checkTicketForm({ ...EMPTY_TICKET_FORM, contactId: 'c1', title: '   ' }).title).toBe('tickets.form.needTitle');
+    expect(checkTicketForm(EMPTY_TICKET_FORM)).toEqual({
+      contact: 'tickets.form.needContact',
+      title: 'tickets.form.needTitle',
+    });
+    expect(checkTicketForm({ ...EMPTY_TICKET_FORM, contactId: 'c1', title: '   ' }).title).toBe(
+      'tickets.form.needTitle',
+    );
     expect(checkTicketForm({ ...EMPTY_TICKET_FORM, contactId: 'c1', title: 'Wrong bill' })).toEqual({});
   });
 
@@ -49,33 +72,68 @@ describe('the Add ticket form', () => {
   });
 
   it('builds the request, trimming and leaving out empty details', () => {
-    expect(buildCreateTicketRequest({ ...EMPTY_TICKET_FORM, title: ' Wrong bill ', type: 'complaint', priority: 'high' }, 'c1')).toEqual({
+    expect(
+      buildCreateTicketRequest(
+        { ...EMPTY_TICKET_FORM, title: ' Wrong bill ', type: 'complaint', priority: 'high' },
+        'c1',
+      ),
+    ).toEqual({
       contactId: 'c1',
       title: 'Wrong bill',
       type: 'complaint',
       priority: 'high',
     });
-    expect(buildCreateTicketRequest({ ...EMPTY_TICKET_FORM, title: 'a', details: ' more ' }, 'c1').details).toBe('more');
+    expect(buildCreateTicketRequest({ ...EMPTY_TICKET_FORM, title: 'a', details: ' more ' }, 'c1').details).toBe(
+      'more',
+    );
   });
 });
 
 describe('the Edit ticket form', () => {
-  const ticket: Ticket = { id: 't1', contactId: 'c1', contact: null, title: 'Wrong bill', details: null, type: 'complaint', priority: 'high', status: 'open', ownerUserId: null, conversationTypeKey: null, closedAt: null, closedByUserId: null, createdAt: '', updatedAt: '' };
+  const ticket: Ticket = {
+    id: 't1',
+    contactId: 'c1',
+    contact: null,
+    title: 'Wrong bill',
+    details: null,
+    type: 'complaint',
+    priority: 'high',
+    status: 'open',
+    ownerUserId: null,
+    conversationTypeKey: null,
+    closedAt: null,
+    closedByUserId: null,
+    createdAt: '',
+    updatedAt: '',
+  };
 
   it('sends nothing when nothing changed', () => {
     expect(buildUpdateTicketRequest(ticketToEditFields(ticket), ticket)).toEqual({});
   });
 
   it('sends only what changed, and null for emptied details', () => {
-    expect(buildUpdateTicketRequest({ ...ticketToEditFields(ticket), title: ' Wrong bill again ', priority: 'urgent' }, ticket)).toEqual({ title: 'Wrong bill again', priority: 'urgent' });
-    expect(buildUpdateTicketRequest({ ...ticketToEditFields(ticket), details: ' call back ' }, ticket)).toEqual({ details: 'call back' });
-    expect(buildUpdateTicketRequest(ticketToEditFields({ ...ticket, details: 'x' }), { ...ticket, details: 'x' })).toEqual({});
-    expect(buildUpdateTicketRequest({ ...ticketToEditFields(ticket), details: '' }, { ...ticket, details: 'old' })).toEqual({ details: null });
+    expect(
+      buildUpdateTicketRequest(
+        { ...ticketToEditFields(ticket), title: ' Wrong bill again ', priority: 'urgent' },
+        ticket,
+      ),
+    ).toEqual({ title: 'Wrong bill again', priority: 'urgent' });
+    expect(buildUpdateTicketRequest({ ...ticketToEditFields(ticket), details: ' call back ' }, ticket)).toEqual({
+      details: 'call back',
+    });
+    expect(
+      buildUpdateTicketRequest(ticketToEditFields({ ...ticket, details: 'x' }), { ...ticket, details: 'x' }),
+    ).toEqual({});
+    expect(
+      buildUpdateTicketRequest({ ...ticketToEditFields(ticket), details: '' }, { ...ticket, details: 'old' }),
+    ).toEqual({ details: null });
   });
 
   it('needs a title, and refuses texts that are too long', () => {
     expect(checkTicketEditForm({ ...ticketToEditFields(ticket), title: ' ' }).title).toBe('tickets.form.needTitle');
-    expect(checkTicketEditForm({ ...ticketToEditFields(ticket), details: 'x'.repeat(2001) }).details).toBe('tickets.form.detailsTooLong');
+    expect(checkTicketEditForm({ ...ticketToEditFields(ticket), details: 'x'.repeat(2001) }).details).toBe(
+      'tickets.form.detailsTooLong',
+    );
     expect(checkTicketEditForm(ticketToEditFields(ticket))).toEqual({});
   });
 

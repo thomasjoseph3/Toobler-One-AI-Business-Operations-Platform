@@ -75,7 +75,9 @@ export function OfferingFormPanel(props: {
     <SidePanel
       isOpen={isOpen}
       onClose={onClose}
-      title={editing ? formatMessage('whatYouSell.form.editTitle', { name: editing.name }) : t('whatYouSell.form.addTitle')}
+      title={
+        editing ? formatMessage('whatYouSell.form.editTitle', { name: editing.name }) : t('whatYouSell.form.addTitle')
+      }
       closeLabel={t('whatYouSell.form.close')}
       footer={
         <>
@@ -87,9 +89,23 @@ export function OfferingFormPanel(props: {
       }
     >
       <form id={FORM_ID} onSubmit={save} className="flex flex-col gap-4" noValidate>
-        <TextField label={t('whatYouSell.form.name')} value={fields.name} onChange={(event) => change({ name: event.target.value })} autoComplete="off" {...(problems.name ? { errorMessage: problems.name } : {})} />
-        <TextAreaField label={t('whatYouSell.form.description')} value={fields.description} onChange={(event) => change({ description: event.target.value })} />
-        <Checkbox label={t('whatYouSell.form.sharesPrice')} checked={fields.sharesPrice} onChange={(event) => change({ sharesPrice: event.target.checked })} />
+        <TextField
+          label={t('whatYouSell.form.name')}
+          value={fields.name}
+          onChange={(event) => change({ name: event.target.value })}
+          autoComplete="off"
+          {...(problems.name ? { errorMessage: problems.name } : {})}
+        />
+        <TextAreaField
+          label={t('whatYouSell.form.description')}
+          value={fields.description}
+          onChange={(event) => change({ description: event.target.value })}
+        />
+        <Checkbox
+          label={t('whatYouSell.form.sharesPrice')}
+          checked={fields.sharesPrice}
+          onChange={(event) => change({ sharesPrice: event.target.checked })}
+        />
         {fields.sharesPrice ? (
           <div className="flex flex-col gap-4 rounded-md border border-border-default p-3">
             <TextField
@@ -110,7 +126,11 @@ export function OfferingFormPanel(props: {
               }}
             />
             {unitChoice === OTHER_UNIT ? (
-              <TextField label={t('whatYouSell.form.unitCustom')} value={fields.priceUnit} onChange={(event) => change({ priceUnit: event.target.value })} />
+              <TextField
+                label={t('whatYouSell.form.unitCustom')}
+                value={fields.priceUnit}
+                onChange={(event) => change({ priceUnit: event.target.value })}
+              />
             ) : null}
             {problems.priceUnit ? <p className="text-label-sm text-error">{problems.priceUnit}</p> : null}
             <SelectField
@@ -127,8 +147,17 @@ export function OfferingFormPanel(props: {
             {problems.gstMode ? <p className="text-label-sm text-error">{problems.gstMode}</p> : null}
           </div>
         ) : null}
-        <TextField label={t('whatYouSell.form.season')} helperText={t('whatYouSell.form.seasonHelper')} value={fields.seasonNote} onChange={(event) => change({ seasonNote: event.target.value })} />
-        <TextField label={t('whatYouSell.form.includes')} value={fields.includes} onChange={(event) => change({ includes: event.target.value })} />
+        <TextField
+          label={t('whatYouSell.form.season')}
+          helperText={t('whatYouSell.form.seasonHelper')}
+          value={fields.seasonNote}
+          onChange={(event) => change({ seasonNote: event.target.value })}
+        />
+        <TextField
+          label={t('whatYouSell.form.includes')}
+          value={fields.includes}
+          onChange={(event) => change({ includes: event.target.value })}
+        />
         <fieldset className="flex flex-col gap-3">
           <legend className="text-label-md text-text-primary">{t('whatYouSell.form.details')}</legend>
           {fields.details.map((detail, position) => (
@@ -136,14 +165,34 @@ export function OfferingFormPanel(props: {
               <TextField
                 label={formatMessage('whatYouSell.form.detailLabel', { number: position + 1 })}
                 value={detail.label}
-                onChange={(event) => change({ details: fields.details.map((row, rowPosition) => (rowPosition === position ? { ...row, label: event.target.value } : row)) })}
+                onChange={(event) =>
+                  change({
+                    details: fields.details.map((row, rowPosition) =>
+                      rowPosition === position ? { ...row, label: event.target.value } : row,
+                    ),
+                  })
+                }
               />
               <TextField
                 label={formatMessage('whatYouSell.form.detailValue', { number: position + 1 })}
                 value={detail.value}
-                onChange={(event) => change({ details: fields.details.map((row, rowPosition) => (rowPosition === position ? { ...row, value: event.target.value } : row)) })}
+                onChange={(event) =>
+                  change({
+                    details: fields.details.map((row, rowPosition) =>
+                      rowPosition === position ? { ...row, value: event.target.value } : row,
+                    ),
+                  })
+                }
               />
-              <Button type="button" variant="tertiary" size="compact" aria-label={formatMessage('whatYouSell.form.removeDetail', { number: position + 1 })} onClick={() => change({ details: fields.details.filter((_row, rowPosition) => rowPosition !== position) })}>
+              <Button
+                type="button"
+                variant="tertiary"
+                size="compact"
+                aria-label={formatMessage('whatYouSell.form.removeDetail', { number: position + 1 })}
+                onClick={() =>
+                  change({ details: fields.details.filter((_row, rowPosition) => rowPosition !== position) })
+                }
+              >
                 ✕
               </Button>
             </div>
@@ -151,13 +200,22 @@ export function OfferingFormPanel(props: {
           {problems.details ? <p className="text-label-sm text-error">{problems.details}</p> : null}
           {fields.details.length < MAXIMUM_DETAILS ? (
             <div>
-              <Button type="button" variant="secondary" size="compact" onClick={() => change({ details: [...fields.details, { label: '', value: '' }] })}>
+              <Button
+                type="button"
+                variant="secondary"
+                size="compact"
+                onClick={() => change({ details: [...fields.details, { label: '', value: '' }] })}
+              >
                 {t('whatYouSell.form.addDetail')}
               </Button>
             </div>
           ) : null}
         </fieldset>
-        <Checkbox label={t('whatYouSell.form.active')} checked={fields.active} onChange={(event) => change({ active: event.target.checked })} />
+        <Checkbox
+          label={t('whatYouSell.form.active')}
+          checked={fields.active}
+          onChange={(event) => change({ active: event.target.checked })}
+        />
         {problem ? <Alert tone="error">{problem}</Alert> : null}
       </form>
     </SidePanel>

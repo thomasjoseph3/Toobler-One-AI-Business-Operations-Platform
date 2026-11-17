@@ -40,7 +40,13 @@ describe('readHtmlPage', () => {
       name: 'Nair Stays',
       telephone: '+91 98470 12345',
       email: 'mailto:hello@nairstays.example',
-      address: { streetAddress: 'Beach Road', addressLocality: 'Kovalam', addressRegion: 'Kerala', postalCode: '695527', addressCountry: '107' },
+      address: {
+        streetAddress: 'Beach Road',
+        addressLocality: 'Kovalam',
+        addressRegion: 'Kerala',
+        postalCode: '695527',
+        addressCountry: '107',
+      },
       openingHours: ['Mo-Su 09:00-21:00'],
       hasMap: 'https://www.google.com/maps/place/Nair+Stays',
     })}</script><p>Hello</p>`;
@@ -85,12 +91,17 @@ describe('readStructuredBusinessFacts', () => {
   });
 
   it('skips a block that is not valid JSON and a map link that is not a map', () => {
-    const facts = readStructuredBusinessFacts(['{ "@type": "Store", broken', JSON.stringify({ '@type': 'Store', hasMap: 'https://evil.example' })]);
+    const facts = readStructuredBusinessFacts([
+      '{ "@type": "Store", broken',
+      JSON.stringify({ '@type': 'Store', hasMap: 'https://evil.example' }),
+    ]);
     expect(facts).toEqual({});
   });
 
   it('accepts an address written as one line', () => {
-    expect(readStructuredBusinessFacts([JSON.stringify({ '@type': 'Store', address: ' 12 Main Road, Kochi ' })]).address).toEqual({
+    expect(
+      readStructuredBusinessFacts([JSON.stringify({ '@type': 'Store', address: ' 12 Main Road, Kochi ' })]).address,
+    ).toEqual({
       line1: '12 Main Road, Kochi',
     });
   });

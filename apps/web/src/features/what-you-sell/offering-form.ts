@@ -78,7 +78,9 @@ export function checkOfferingForm(fields: OfferingFormFields): OfferingFormProbl
     if (fields.priceUnit.trim() === '') problems.priceUnit = 'Say what the price is for, like per night.';
     if (fields.gstMode === '') problems.gstMode = 'Say whether the price includes GST.';
   }
-  const incompleteDetail = fields.details.some((detail) => (detail.label.trim() === '') !== (detail.value.trim() === ''));
+  const incompleteDetail = fields.details.some(
+    (detail) => (detail.label.trim() === '') !== (detail.value.trim() === ''),
+  );
   if (incompleteDetail) problems.details = 'Give each detail a name and a value, or remove it.';
   return problems;
 }
@@ -113,9 +115,12 @@ export function buildCreateRequest(fields: OfferingFormFields): CreateOfferingRe
 export function buildUpdateRequest(original: Offering, fields: OfferingFormFields): UpdateOfferingRequest {
   const request: UpdateOfferingRequest = {};
   if (fields.name.trim() !== original.name) request.name = fields.name.trim();
-  if (fields.description.trim() !== (original.description ?? '')) request.description = fields.description.trim() === '' ? null : fields.description.trim();
-  if (fields.seasonNote.trim() !== (original.seasonNote ?? '')) request.seasonNote = fields.seasonNote.trim() === '' ? null : fields.seasonNote.trim();
-  if (fields.includes.trim() !== (original.includes ?? '')) request.includes = fields.includes.trim() === '' ? null : fields.includes.trim();
+  if (fields.description.trim() !== (original.description ?? ''))
+    request.description = fields.description.trim() === '' ? null : fields.description.trim();
+  if (fields.seasonNote.trim() !== (original.seasonNote ?? ''))
+    request.seasonNote = fields.seasonNote.trim() === '' ? null : fields.seasonNote.trim();
+  if (fields.includes.trim() !== (original.includes ?? ''))
+    request.includes = fields.includes.trim() === '' ? null : fields.includes.trim();
   if (fields.active !== original.active) request.active = fields.active;
 
   if (!fields.sharesPrice) {
@@ -123,7 +128,9 @@ export function buildUpdateRequest(original: Offering, fields: OfferingFormField
   } else {
     const paise = rupeesTextToPaise(fields.priceRupees);
     const priceChanged =
-      paise !== original.fromPricePaise || fields.priceUnit.trim() !== (original.priceUnit ?? '') || fields.gstMode !== (original.gstMode ?? '');
+      paise !== original.fromPricePaise ||
+      fields.priceUnit.trim() !== (original.priceUnit ?? '') ||
+      fields.gstMode !== (original.gstMode ?? '');
     if (priceChanged) {
       request.fromPricePaise = paise ?? 0;
       request.priceUnit = fields.priceUnit.trim();
@@ -132,7 +139,10 @@ export function buildUpdateRequest(original: Offering, fields: OfferingFormField
   }
 
   const details = cleanDetails(fields.details);
-  if (JSON.stringify(details) !== JSON.stringify(original.details.map((detail) => ({ label: detail.label, value: detail.value })))) {
+  if (
+    JSON.stringify(details) !==
+    JSON.stringify(original.details.map((detail) => ({ label: detail.label, value: detail.value })))
+  ) {
     request.details = details;
   }
   return request;

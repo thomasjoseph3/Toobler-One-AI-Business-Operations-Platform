@@ -209,7 +209,11 @@ describe('OPTIONS /api/v1/public/widget/{key}/… (the browser asks permission f
 describe('POST /api/v1/public/widget/{key}/messages', () => {
   it('does not answer a business that has not gone live: 503 NOT_OPEN_YET, nothing saved, the agent never asked; it answers once the business is live', async () => {
     const { accountId, key } = await newBusinessWithChat();
-    await database.system.updateTable('accounts').set({ live_at: null, live_by: null }).where('id', '=', accountId).execute();
+    await database.system
+      .updateTable('accounts')
+      .set({ live_at: null, live_by: null })
+      .where('id', '=', accountId)
+      .execute();
     let timesTheAgentWasAsked = 0;
     script = () => {
       timesTheAgentWasAsked += 1;

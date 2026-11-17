@@ -4,7 +4,11 @@ import { factsToAnswers } from './facts-to-answers';
 describe('factsToAnswers', () => {
   it('gives the name, the address in one line, and every phone and email once', () => {
     const answers = factsToAnswers({
-      facts: { name: 'Nair Stays', phone: '+91 98470 12345', address: { line1: 'Beach Road', city: 'Kovalam', state: 'Kerala', postalCode: '695527' } },
+      facts: {
+        name: 'Nair Stays',
+        phone: '+91 98470 12345',
+        address: { line1: 'Beach Road', city: 'Kovalam', state: 'Kerala', postalCode: '695527' },
+      },
       phones: ['+91 98470 12345', '+919847099999'],
       emails: ['hello@nairstays.example'],
     });

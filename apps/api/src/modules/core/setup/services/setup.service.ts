@@ -128,7 +128,12 @@ export function createSetupService({ database }: { database: Database }) {
       await database.runInAccountTransaction(accountId, async (transaction) => {
         const currentStatus = (await setupStepsRepository.lockMarkedStep(transaction, accountId, 'pipeline')) ?? 'todo';
         if (currentStatus !== 'done') {
-          await setupStepsRepository.saveMarkedStep(transaction, { accountId, stepKey: 'pipeline', status: 'done', actor });
+          await setupStepsRepository.saveMarkedStep(transaction, {
+            accountId,
+            stepKey: 'pipeline',
+            status: 'done',
+            actor,
+          });
         }
         if (plan.rename.length > 0) {
           await writeActivityLog(transaction, {
@@ -163,7 +168,12 @@ export function createSetupService({ database }: { database: Database }) {
       const liveAt = await database.runInAccountTransaction(accountId, async (transaction) => {
         const wentLiveAt = await markBusinessLive(transaction, accountId, actor);
         if (wentLiveAt === null) return (await findBusinessLiveAt(transaction, accountId))!; // two managers pressed it together
-        await writeActivityLog(transaction, { accountId, actor, kind: 'setup.went_live', details: { recordType: 'business', recordId: accountId } });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'setup.went_live',
+          details: { recordType: 'business', recordId: accountId },
+        });
         await publishEvent(transaction, { accountId, eventName: 'business.went_live', payload: {} });
         return wentLiveAt;
       });

@@ -376,7 +376,10 @@ describe('GET /api/v1/ai/usage', () => {
       .set({ platform_monthly_token_cap: 500 })
       .where('account_id', '=', accountId)
       .execute();
-    const service = serviceWith(() => ({ answer: 'ok', usage: { inputTokens: 200, outputTokens: 50, cachedTokens: 0 } }));
+    const service = serviceWith(() => ({
+      answer: 'ok',
+      usage: { inputTokens: 200, outputTokens: 50, cachedTokens: 0 },
+    }));
     // 250 tokens a call: two calls leave exactly 0 of the 500, so the third is refused
     await service.generateText({ accountId, tag, prompt });
     await service.generateText({ accountId, tag, prompt });

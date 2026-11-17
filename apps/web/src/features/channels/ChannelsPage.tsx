@@ -35,15 +35,41 @@ export function ChannelsPage() {
   } else if (webchatData.hasFailed || webchatData.data === null) {
     webchat = (
       <Card>
-        <ErrorState title={t('channels.error.title')} description={t('knowledge.error.description')} action={<Button variant="secondary" onClick={webchatResource.reload}>{t('knowledge.retry')}</Button>} />
+        <ErrorState
+          title={t('channels.error.title')}
+          description={t('knowledge.error.description')}
+          action={
+            <Button variant="secondary" onClick={webchatResource.reload}>
+              {t('knowledge.retry')}
+            </Button>
+          }
+        />
       </Card>
     );
   } else {
     // The look card holds what is typed, so it starts again only when the saved settings really change
     webchat = (
       <>
-        <WebchatInstallCard settings={webchatData.data} canEdit={canEdit} timeZone={timeZone} onChanged={webchatResource.reload} />
-        <WebchatLookCard key={JSON.stringify([webchatData.data.colour, webchatData.data.greeting, webchatData.data.position, webchatData.data.phoneNumber, webchatData.data.whatsappNumber, webchatData.data.whatsappMessage, webchatData.data.buttonOrder])} settings={webchatData.data} canEdit={canEdit} onSaved={webchatResource.reload} />
+        <WebchatInstallCard
+          settings={webchatData.data}
+          canEdit={canEdit}
+          timeZone={timeZone}
+          onChanged={webchatResource.reload}
+        />
+        <WebchatLookCard
+          key={JSON.stringify([
+            webchatData.data.colour,
+            webchatData.data.greeting,
+            webchatData.data.position,
+            webchatData.data.phoneNumber,
+            webchatData.data.whatsappNumber,
+            webchatData.data.whatsappMessage,
+            webchatData.data.buttonOrder,
+          ])}
+          settings={webchatData.data}
+          canEdit={canEdit}
+          onSaved={webchatResource.reload}
+        />
       </>
     );
   }

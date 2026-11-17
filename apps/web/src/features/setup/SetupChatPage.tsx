@@ -6,7 +6,14 @@ import { Alert, Button, Card, TextAreaField, TextField } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
-import { addQuestionLine, buildReplyText, canSendReply, isPickQuestion, toggleOption, type SetupChatLine } from './setup-chat-state';
+import {
+  addQuestionLine,
+  buildReplyText,
+  canSendReply,
+  isPickQuestion,
+  toggleOption,
+  type SetupChatLine,
+} from './setup-chat-state';
 
 /** One plain sentence for a failed message. Never a code or a status number. */
 function describeChatProblem(error: unknown): string {
@@ -41,7 +48,8 @@ export function SetupChatPage() {
   // Shows what the chat answered: the reply line, the problem in words, the next question, the progress. Uses only setters, so it never changes.
   const applyResponse = useCallback((response: SetupChatResponse, replyLineText: string | null) => {
     setLines((current) => {
-      let nextLines = replyLineText === null ? [...current] : [...current, { kind: 'reply', text: replyLineText } as SetupChatLine];
+      let nextLines =
+        replyLineText === null ? [...current] : [...current, { kind: 'reply', text: replyLineText } as SetupChatLine];
       if (response.problem !== null) nextLines = [...nextLines, { kind: 'problem', text: response.problem }];
       return response.next === null ? nextLines : addQuestionLine(nextLines, response.next);
     });
@@ -123,7 +131,10 @@ export function SetupChatPage() {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4">
-      <Link to="/setup" className="text-body-md-semibold inline-flex items-center gap-1 text-link hover:text-link-hover">
+      <Link
+        to="/setup"
+        className="text-body-md-semibold inline-flex items-center gap-1 text-link hover:text-link-hover"
+      >
         <ArrowLeft aria-hidden className="size-4" />
         {t('setupChat.back')}
       </Link>
@@ -134,13 +145,32 @@ export function SetupChatPage() {
             {t('setupChat.switchToForm')}
           </Link>
         </div>
-        <div role="progressbar" aria-label={t('setup.progress.bar')} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentComplete} className="my-3 h-2 w-full overflow-hidden rounded-full bg-surface-subtle">
+        <div
+          role="progressbar"
+          aria-label={t('setup.progress.bar')}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percentComplete}
+          className="my-3 h-2 w-full overflow-hidden rounded-full bg-surface-subtle"
+        >
           <div className="h-full rounded-full bg-action" style={{ width: `${percentComplete}%` }} />
         </div>
-        {progress ? <p className="text-label-sm text-text-secondary">{formatMessage('setupChat.progress', { answered: progress.answeredQuestions, total: progress.totalQuestions })}</p> : null}
+        {progress ? (
+          <p className="text-label-sm text-text-secondary">
+            {formatMessage('setupChat.progress', {
+              answered: progress.answeredQuestions,
+              total: progress.totalQuestions,
+            })}
+          </p>
+        ) : null}
       </Card>
       <Card>
-        <div role="log" aria-live="polite" aria-label={t('setupChat.logLabel')} className="mb-4 flex max-h-[50vh] min-h-[120px] flex-col gap-3 overflow-y-auto">
+        <div
+          role="log"
+          aria-live="polite"
+          aria-label={t('setupChat.logLabel')}
+          className="mb-4 flex max-h-[50vh] min-h-[120px] flex-col gap-3 overflow-y-auto"
+        >
           {isStarting ? <p className="text-body-md text-text-secondary">{t('setupChat.loading')}</p> : null}
           {lines.map((line, index) => (
             <div
@@ -158,20 +188,32 @@ export function SetupChatPage() {
           ))}
           {question === null && !isStarting && progress !== null ? (
             <div className="text-body-md max-w-[85%] rounded-lg bg-surface-subtle px-3 py-2 text-text-primary">
-              {formOnlyRemaining > 0 ? formatMessage('setupChat.done.formLeft', { count: formOnlyRemaining }) : t('setupChat.done.allAsked')}
+              {formOnlyRemaining > 0
+                ? formatMessage('setupChat.done.formLeft', { count: formOnlyRemaining })
+                : t('setupChat.done.allAsked')}
             </div>
           ) : null}
           <div ref={logEndRef} />
         </div>
 
-        {problem ? <Alert tone="error" className="mb-3">{problem}</Alert> : null}
+        {problem ? (
+          <Alert tone="error" className="mb-3">
+            {problem}
+          </Alert>
+        ) : null}
 
         {question !== null ? (
           <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
-            {question.neededToGoLive ? <p className="text-label-sm text-text-secondary">{t('setupChat.needed')}</p> : null}
+            {question.neededToGoLive ? (
+              <p className="text-label-sm text-text-secondary">{t('setupChat.needed')}</p>
+            ) : null}
             {isYesNo ? (
               <div className="flex gap-2">
-                <Button variant="primary" disabled={isSending} onClick={() => sendReply(typedText.trim() !== '' ? `Yes, ${typedText.trim()}` : 'Yes')}>
+                <Button
+                  variant="primary"
+                  disabled={isSending}
+                  onClick={() => sendReply(typedText.trim() !== '' ? `Yes, ${typedText.trim()}` : 'Yes')}
+                >
                   {t('setupChat.yes')}
                 </Button>
                 <Button disabled={isSending} onClick={() => sendReply('No')}>
@@ -199,10 +241,20 @@ export function SetupChatPage() {
               </fieldset>
             ) : null}
             {question.type === 'long_text' ? (
-              <TextAreaField label={t('setupChat.yourAnswer')} value={typedText} onChange={(event) => setTypedText(event.target.value)} />
+              <TextAreaField
+                label={t('setupChat.yourAnswer')}
+                value={typedText}
+                onChange={(event) => setTypedText(event.target.value)}
+              />
             ) : (
               <TextField
-                label={isPick ? t('setupChat.orOwnWords') : isYesNo ? (question.yesDetailLabel ?? t('setupChat.yesDetail')) : t('setupChat.yourAnswer')}
+                label={
+                  isPick
+                    ? t('setupChat.orOwnWords')
+                    : isYesNo
+                      ? (question.yesDetailLabel ?? t('setupChat.yesDetail'))
+                      : t('setupChat.yourAnswer')
+                }
                 value={typedText}
                 onChange={(event) => setTypedText(event.target.value)}
                 autoComplete="off"
@@ -210,7 +262,12 @@ export function SetupChatPage() {
             )}
             <div className="flex flex-wrap items-center gap-2">
               {isYesNo ? null : (
-                <Button type="submit" variant="primary" isLoading={isSending} disabled={!canSendReply(typedText, selectedOptions)}>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  isLoading={isSending}
+                  disabled={!canSendReply(typedText, selectedOptions)}
+                >
                   {t('setupChat.send')}
                 </Button>
               )}
@@ -223,10 +280,16 @@ export function SetupChatPage() {
 
         {question === null && !isStarting ? (
           <div className="flex flex-wrap gap-2">
-            <Link to="/knowledge" className="text-body-md-semibold inline-flex h-10 items-center rounded-md bg-action px-4 text-action-text hover:bg-action-hover">
+            <Link
+              to="/knowledge"
+              className="text-body-md-semibold inline-flex h-10 items-center rounded-md bg-action px-4 text-action-text hover:bg-action-hover"
+            >
               {t('setupChat.openForm')}
             </Link>
-            <Link to="/setup" className="text-body-md-semibold inline-flex h-10 items-center rounded-md border border-border-default px-4 text-text-primary hover:bg-hover">
+            <Link
+              to="/setup"
+              className="text-body-md-semibold inline-flex h-10 items-center rounded-md border border-border-default px-4 text-text-primary hover:bg-hover"
+            >
               {t('setupChat.backToSetup')}
             </Link>
           </div>

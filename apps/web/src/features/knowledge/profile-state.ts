@@ -28,7 +28,8 @@ export function groupQuestionsBySection(questions: readonly KnowledgeQuestion[])
 export type QuestionState = 'waiting' | 'answered' | 'elsewhere_done' | 'elsewhere_open' | 'unanswered';
 
 export function describeQuestionState(question: KnowledgeQuestion): QuestionState {
-  if (question.handledElsewhere !== null) return question.elsewhereStatus === 'done' ? 'elsewhere_done' : 'elsewhere_open';
+  if (question.handledElsewhere !== null)
+    return question.elsewhereStatus === 'done' ? 'elsewhere_done' : 'elsewhere_open';
   if (question.answer === null) return 'unanswered';
   return question.answer.status === 'check' ? 'waiting' : 'answered';
 }
@@ -46,7 +47,14 @@ export function describeAnswerSource(question: KnowledgeQuestion): 'website' | '
 /** How a reading of the website is going, for the page to show. */
 export type ReadingState =
   | { kind: 'working' }
-  | { kind: 'done'; answersFound: number; answersSkipped: number; pagesRead: number; suggestionCount: number; warning: string | null }
+  | {
+      kind: 'done';
+      answersFound: number;
+      answersSkipped: number;
+      pagesRead: number;
+      suggestionCount: number;
+      warning: string | null;
+    }
   | { kind: 'failed'; message: string };
 
 /** Turns a reading (from the API) into what the page says. A finished reading that found nothing and had a problem is a failure. */

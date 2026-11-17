@@ -56,11 +56,7 @@ export function App() {
             <Route element={<RequireSignIn />}>
               <Route element={<Shell />}>
                 {NAVIGATION_ITEMS.map((item) => (
-                  <Route
-                    key={item.id}
-                    path={item.path}
-                    element={pageFor(item)}
-                  />
+                  <Route key={item.id} path={item.path} element={pageFor(item)} />
                 ))}
                 <Route path="/leads/:leadId" element={<LeadPage />} />
                 <Route path="/contacts/:contactId" element={<ContactPage />} />

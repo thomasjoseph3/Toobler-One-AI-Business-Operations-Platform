@@ -7,10 +7,14 @@ const DELUXE_ID = '0191f0a0-0000-7000-8000-0000000000e1';
 const YOGA_ID = '0191f0a0-0000-7000-8000-0000000000e2';
 
 test.describe('What you sell: the offerings', () => {
-  test('shows each offering with its price in words, its state and its details, and marks the page in the tabs', async ({ page }) => {
+  test('shows each offering with its price in words, its state and its details, and marks the page in the tabs', async ({
+    page,
+  }) => {
     await page.goto('/knowledge/what-you-sell');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('What you sell');
-    await expect(page.getByRole('navigation', { name: 'Knowledge base sections' }).getByRole('link', { name: 'What you sell' })).toHaveAttribute('aria-current', 'page');
+    await expect(
+      page.getByRole('navigation', { name: 'Knowledge base sections' }).getByRole('link', { name: 'What you sell' }),
+    ).toHaveAttribute('aria-current', 'page');
     const deluxe = page.getByRole('listitem').filter({ hasText: 'Deluxe room' });
     await expect(deluxe.getByText('from ₹4,500 per night plus GST')).toBeVisible();
     await expect(deluxe.getByText('Sea view')).toBeVisible();
@@ -28,10 +32,15 @@ test.describe('What you sell: the offerings', () => {
     await expect(page.getByRole('listitem').filter({ hasText: 'Deluxe room' }).getByText('Switched off')).toBeVisible();
     expect(pretendApi.sales.patchedOfferings).toEqual([{ id: DELUXE_ID, body: { active: false } }]);
     await page.getByRole('button', { name: 'Switch on: Deluxe room' }).click();
-    await expect(page.getByRole('listitem').filter({ hasText: 'Deluxe room' }).getByText('On', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('listitem').filter({ hasText: 'Deluxe room' }).getByText('On', { exact: true }),
+    ).toBeVisible();
   });
 
-  test('moves an offering up or down by sending the whole new order; the ends cannot move further', async ({ page, pretendApi }) => {
+  test('moves an offering up or down by sending the whole new order; the ends cannot move further', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/knowledge/what-you-sell');
     await expect(page.getByRole('button', { name: 'Move Deluxe room up' })).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Move Yoga class down' })).toBeDisabled();
@@ -57,7 +66,10 @@ test.describe('What you sell: the offerings', () => {
     await expect(page.getByText('from ₹6,000 per person including GST')).toBeVisible();
   });
 
-  test('checks the form on the device first: a shared price needs its number, unit and GST note', async ({ page, pretendApi }) => {
+  test('checks the form on the device first: a shared price needs its number, unit and GST note', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/knowledge/what-you-sell');
     await page.getByRole('button', { name: 'Add something you sell' }).first().click();
     await page.getByRole('button', { name: 'Save' }).click();
@@ -87,8 +99,15 @@ test.describe('What you sell: the offerings', () => {
     expect(pretendApi.sales.patchedOfferings[1]).toEqual({ id: DELUXE_ID, body: { fromPricePaise: null } });
   });
 
-  test('shows the API’s own words when it refuses (a name already used), and keeps what was typed', async ({ page, pretendApi }) => {
-    pretendApi.sales.refusal = { status: 409, code: 'OFFERING_EXISTS', message: 'You already have something with that name.' };
+  test('shows the API’s own words when it refuses (a name already used), and keeps what was typed', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.sales.refusal = {
+      status: 409,
+      code: 'OFFERING_EXISTS',
+      message: 'You already have something with that name.',
+    };
     await page.goto('/knowledge/what-you-sell');
     await page.getByRole('button', { name: 'Add something you sell' }).first().click();
     await page.getByLabel('Name', { exact: true }).fill('Deluxe room');
@@ -118,13 +137,19 @@ test.describe('What you sell: the offerings', () => {
 });
 
 test.describe('What you sell: suggestions from the website', () => {
-  test('offers what the reading found, fills the form for the owner to check, and adds it', async ({ page, pretendApi }) => {
+  test('offers what the reading found, fills the form for the owner to check, and adds it', async ({
+    page,
+    pretendApi,
+  }) => {
     // A reading on the profile page (this browser remembers it)
     await page.goto('/knowledge');
     await page.getByLabel('Your website address').fill('nairstays.example');
     await page.getByRole('button', { name: 'Read my website' }).click();
     await expect(page.getByText(/Done. We read 3 pages/)).toBeVisible({ timeout: 10_000 });
-    await page.getByRole('navigation', { name: 'Knowledge base sections' }).getByRole('link', { name: 'What you sell' }).click();
+    await page
+      .getByRole('navigation', { name: 'Knowledge base sections' })
+      .getByRole('link', { name: 'What you sell' })
+      .click();
 
     await expect(page.getByText('Your website seems to sell these')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add Sea view room' })).toBeVisible();
@@ -142,7 +167,12 @@ test.describe('What you sell: suggestions from the website', () => {
     await page.getByLabel('GST', { exact: true }).selectOption('plus');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByRole('heading', { name: 'Sea view room' })).toBeVisible();
-    expect(pretendApi.sales.createdOfferings[0]).toMatchObject({ name: 'Sea view room', fromPricePaise: 250000, priceUnit: 'per night', gstMode: 'plus' });
+    expect(pretendApi.sales.createdOfferings[0]).toMatchObject({
+      name: 'Sea view room',
+      fromPricePaise: 250000,
+      priceUnit: 'per night',
+      gstMode: 'plus',
+    });
     await expect(page.getByText('Your website seems to sell these')).toHaveCount(0); // nothing left to suggest
   });
 
@@ -175,7 +205,10 @@ test.describe('What you sell: the offers', () => {
     expect(pretendApi.sales.offerQueries.some((query) => query.includes('include=expired'))).toBe(true);
   });
 
-  test('adds an offer, refuses a last day in the past, and sends the date as a plain date', async ({ page, pretendApi }) => {
+  test('adds an offer, refuses a last day in the past, and sends the date as a plain date', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/knowledge/what-you-sell');
     await page.getByRole('button', { name: 'Add an offer' }).click();
     await page.getByLabel('What is the offer?').fill('Monsoon: free breakfast');
@@ -189,13 +222,18 @@ test.describe('What you sell: the offers', () => {
     expect(pretendApi.sales.createdOffers).toEqual([{ text: 'Monsoon: free breakfast', endsOn: '2099-09-30' }]);
   });
 
-  test('changes the last day of an offer, sending only that, and deletes after "Are you sure?"', async ({ page, pretendApi }) => {
+  test('changes the last day of an offer, sending only that, and deletes after "Are you sure?"', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/knowledge/what-you-sell');
     await page.getByRole('button', { name: 'Edit offer: December: 10% off' }).click();
     await page.getByLabel('Last day').fill('2100-01-15');
     await page.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('Until 15 Jan 2100')).toBeVisible();
-    expect(pretendApi.sales.patchedOffers).toEqual([{ id: '0191f0a0-0000-7000-8000-0000000000f1', body: { endsOn: '2100-01-15' } }]);
+    expect(pretendApi.sales.patchedOffers).toEqual([
+      { id: '0191f0a0-0000-7000-8000-0000000000f1', body: { endsOn: '2100-01-15' } },
+    ]);
 
     await page.getByRole('button', { name: 'Delete offer: December: 10% off' }).click();
     await expect(page.getByRole('dialog').getByText('Delete this offer?')).toBeVisible();

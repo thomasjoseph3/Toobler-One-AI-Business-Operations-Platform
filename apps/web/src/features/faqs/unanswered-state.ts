@@ -28,5 +28,7 @@ export function sortOpenQuestions(questions: readonly UnansweredQuestion[]): Una
 
 /** A date like "17 Nov 2026" from an ISO moment, in the business's time zone. */
 export function formatAskedDate(isoText: string, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(new Date(isoText));
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(
+    new Date(isoText),
+  );
 }

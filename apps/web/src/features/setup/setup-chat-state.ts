@@ -4,9 +4,7 @@ import type { SetupChatQuestion } from '@toobler-one/shared';
 
 /** One line of the conversation on screen: the chat asking, the owner replying, or a note about a reply that could not be used. */
 export type SetupChatLine =
-  | { kind: 'question'; text: string }
-  | { kind: 'reply'; text: string }
-  | { kind: 'problem'; text: string };
+  { kind: 'question'; text: string } | { kind: 'reply'; text: string } | { kind: 'problem'; text: string };
 
 /** Which kinds of question are answered by picking ready options (shown as buttons). */
 export function isPickQuestion(question: SetupChatQuestion): boolean {
@@ -22,7 +20,11 @@ export function canSendReply(typedText: string, selectedOptions: readonly string
  * The words sent to the chat for what the owner chose and typed: the chosen options in the order the question lists them (joined with
  * commas, which the chat reads as several options), then anything typed. A single typed answer is sent as typed.
  */
-export function buildReplyText(question: SetupChatQuestion, selectedOptions: readonly string[], typedText: string): string {
+export function buildReplyText(
+  question: SetupChatQuestion,
+  selectedOptions: readonly string[],
+  typedText: string,
+): string {
   const orderedChoices = question.options.filter((option) => selectedOptions.includes(option));
   const typed = typedText.trim();
   if (orderedChoices.length === 0) return typed;

@@ -28,7 +28,10 @@ function ManagerChecklist() {
       <p className="text-body-md mb-4 text-text-secondary">
         {setup.blockers.length === 0
           ? formatMessage('setup.checklist.descriptionNone', { percent: setup.percentDone })
-          : formatMessage('setup.checklist.description', { percent: setup.percentDone, blockers: setup.blockers.length })}
+          : formatMessage('setup.checklist.description', {
+              percent: setup.percentDone,
+              blockers: setup.blockers.length,
+            })}
       </p>
       <Link to="/setup" className={buttonClasses('primary', 'standard')}>
         {t('setup.checklist.open')}

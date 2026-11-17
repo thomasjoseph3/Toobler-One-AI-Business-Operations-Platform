@@ -10,7 +10,12 @@ import { addWebsite, describeInstallation, formatSeenAt } from './webchat-form';
  * Putting the chat on the website: the one line to copy, the websites that may show it (add and remove; each change is saved at once, and
  * removing asks "Are you sure?"), and "Check the installation" (where and when the bubble was last seen working). Managers change the list; staff read.
  */
-export function WebchatInstallCard(props: { settings: WebchatSettings; canEdit: boolean; timeZone: string; onChanged: () => void }) {
+export function WebchatInstallCard(props: {
+  settings: WebchatSettings;
+  canEdit: boolean;
+  timeZone: string;
+  onChanged: () => void;
+}) {
   const { settings, canEdit, timeZone, onChanged } = props;
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [typedWebsite, setTypedWebsite] = useState('');
@@ -68,7 +73,9 @@ export function WebchatInstallCard(props: { settings: WebchatSettings; canEdit: 
         <li>{t('channels.webchat.install.step3')}</li>
       </ol>
       <div className="mt-3 flex flex-col gap-2">
-        <label htmlFor="webchat-snippet" className="text-label-sm text-text-primary">{t('channels.webchat.install.lineLabel')}</label>
+        <label htmlFor="webchat-snippet" className="text-label-sm text-text-primary">
+          {t('channels.webchat.install.lineLabel')}
+        </label>
         <textarea
           id="webchat-snippet"
           readOnly
@@ -81,7 +88,9 @@ export function WebchatInstallCard(props: { settings: WebchatSettings; canEdit: 
           <Button variant="secondary" size="compact" onClick={copy}>
             {t('channels.webchat.install.copy')}
           </Button>
-          <span role="status" className="text-label-sm text-text-secondary">{copyMessage}</span>
+          <span role="status" className="text-label-sm text-text-secondary">
+            {copyMessage}
+          </span>
         </div>
       </div>
 
@@ -91,10 +100,19 @@ export function WebchatInstallCard(props: { settings: WebchatSettings; canEdit: 
       ) : (
         <ul className="flex flex-col gap-2">
           {settings.allowedWebsites.map((website) => (
-            <li key={website} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-subtle px-3 py-2">
+            <li
+              key={website}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-subtle px-3 py-2"
+            >
               <span className="text-body-md text-text-primary">{website}</span>
               {canEdit ? (
-                <Button variant="tertiary" size="compact" disabled={isSaving} onClick={() => setToRemove(website)} aria-label={formatMessage('channels.webchat.websites.remove', { website })}>
+                <Button
+                  variant="tertiary"
+                  size="compact"
+                  disabled={isSaving}
+                  onClick={() => setToRemove(website)}
+                  aria-label={formatMessage('channels.webchat.websites.remove', { website })}
+                >
                   {t('channels.webchat.websites.removeButton')}
                 </Button>
               ) : null}
@@ -104,20 +122,42 @@ export function WebchatInstallCard(props: { settings: WebchatSettings; canEdit: 
       )}
       {canEdit ? (
         <form onSubmit={add} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <TextField label={t('channels.webchat.websites.addLabel')} helperText={t('channels.webchat.websites.addHelper')} value={typedWebsite} onChange={(event) => setTypedWebsite(event.target.value)} inputMode="url" className="sm:flex-1" />
+          <TextField
+            label={t('channels.webchat.websites.addLabel')}
+            helperText={t('channels.webchat.websites.addHelper')}
+            value={typedWebsite}
+            onChange={(event) => setTypedWebsite(event.target.value)}
+            inputMode="url"
+            className="sm:flex-1"
+          />
           <Button type="submit" variant="primary" isLoading={isSaving}>
             {t('channels.webchat.websites.add')}
           </Button>
         </form>
       ) : null}
-      {problem ? <Alert tone="error" className="mt-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mt-3">
+          {problem}
+        </Alert>
+      ) : null}
 
       <h3 className="text-label-md mb-2 mt-6 text-text-primary">{t('channels.webchat.check.title')}</h3>
       <div aria-live="polite" className="flex flex-col gap-3">
         {installation.kind === 'seen' ? (
-          <Alert tone="success">{formatMessage('channels.webchat.check.seen', { website: installation.website, when: formatSeenAt(installation.at, timeZone) })}</Alert>
+          <Alert tone="success">
+            {formatMessage('channels.webchat.check.seen', {
+              website: installation.website,
+              when: formatSeenAt(installation.at, timeZone),
+            })}
+          </Alert>
         ) : (
-          <p className="text-body-md text-text-secondary">{t(installation.kind === 'no_websites' ? 'channels.webchat.check.noWebsites' : 'channels.webchat.check.never')}</p>
+          <p className="text-body-md text-text-secondary">
+            {t(
+              installation.kind === 'no_websites'
+                ? 'channels.webchat.check.noWebsites'
+                : 'channels.webchat.check.never',
+            )}
+          </p>
         )}
         <div>
           <Button variant="secondary" size="compact" onClick={onChanged}>

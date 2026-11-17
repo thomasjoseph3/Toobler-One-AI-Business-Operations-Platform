@@ -3,7 +3,15 @@ import type { Faq } from '@toobler-one/shared';
 import { Alert, Button, SidePanel, TextAreaField } from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { t } from '../../app/i18n';
-import { buildCreateFaqRequest, buildUpdateFaqRequest, checkFaqForm, EMPTY_FAQ_FORM, formFromFaq, type FaqFormFields, type FaqFormProblems } from './faq-form';
+import {
+  buildCreateFaqRequest,
+  buildUpdateFaqRequest,
+  checkFaqForm,
+  EMPTY_FAQ_FORM,
+  formFromFaq,
+  type FaqFormFields,
+  type FaqFormProblems,
+} from './faq-form';
 import { describeFaqProblem } from './problem-message';
 
 const FORM_ID = 'faq-form';
@@ -75,7 +83,13 @@ export function FaqFormPanel(props: {
           onChange={(event) => setFields({ ...fields, question: event.target.value })}
           {...(problems.question ? { errorMessage: problems.question } : {})}
         />
-        <TextAreaField label={t('faqs.form.answer')} rows={5} value={fields.answer} onChange={(event) => setFields({ ...fields, answer: event.target.value })} {...(problems.answer ? { errorMessage: problems.answer } : {})} />
+        <TextAreaField
+          label={t('faqs.form.answer')}
+          rows={5}
+          value={fields.answer}
+          onChange={(event) => setFields({ ...fields, answer: event.target.value })}
+          {...(problems.answer ? { errorMessage: problems.answer } : {})}
+        />
         {problem ? <Alert tone="error">{problem}</Alert> : null}
       </form>
     </SidePanel>

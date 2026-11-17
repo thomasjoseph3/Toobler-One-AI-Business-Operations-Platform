@@ -3,7 +3,8 @@ import { expect, test } from './support';
 
 // Channels → Website chat in a real browser, at phone and desktop size, against a pretend API (e2e/pretend-webchat.ts).
 
-const SNIPPET = '<script src="https://api.example/widget/loader.js" data-key="wk_abcdefghijklmnopqrstuvwxyz012345" async></script>';
+const SNIPPET =
+  '<script src="https://api.example/widget/loader.js" data-key="wk_abcdefghijklmnopqrstuvwxyz012345" async></script>';
 
 test.describe('Website chat: putting it on your website', () => {
   test('shows the line to paste, the listed websites and the state of the installation', async ({ page }) => {
@@ -28,11 +29,16 @@ test.describe('Website chat: putting it on your website', () => {
     await page.getByLabel('Website address').fill('www.nairstays.in/rooms');
     await page.getByRole('button', { name: 'Add a website' }).click();
     await expect(page.getByText('https://www.nairstays.in', { exact: true })).toBeVisible();
-    expect(pretendApi.webchat.patches).toEqual([{ allowedWebsites: ['https://nairstays.example', 'https://www.nairstays.in'] }]);
+    expect(pretendApi.webchat.patches).toEqual([
+      { allowedWebsites: ['https://nairstays.example', 'https://www.nairstays.in'] },
+    ]);
     await expect(page.getByLabel('Website address')).toHaveValue('');
   });
 
-  test('refuses something that is not a website, and one already listed, without asking the server', async ({ page, pretendApi }) => {
+  test('refuses something that is not a website, and one already listed, without asking the server', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/channels');
     await page.getByLabel('Website address').fill('not a website');
     await page.getByRole('button', { name: 'Add a website' }).click();
@@ -53,10 +59,15 @@ test.describe('Website chat: putting it on your website', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Remove', exact: true }).click();
     await expect(page.getByText('No website listed yet, so the chat shows nowhere.')).toBeVisible();
     expect(pretendApi.webchat.patches).toEqual([{ allowedWebsites: [] }]);
-    await expect(page.getByText('Add your website first, then open your website in another tab and check again.')).toBeVisible();
+    await expect(
+      page.getByText('Add your website first, then open your website in another tab and check again.'),
+    ).toBeVisible();
   });
 
-  test('"Check again" shows where and when the chat was last seen working, in the business’s time zone', async ({ page, pretendApi }) => {
+  test('"Check again" shows where and when the chat was last seen working, in the business’s time zone', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/channels');
     await expect(page.getByText(/We have not seen the chat working yet/)).toBeVisible();
     pretendApi.webchat.settings['lastSeen'] = { website: 'https://nairstays.example', at: '2026-11-17T10:00:00.000Z' };
@@ -97,7 +108,10 @@ test.describe('Website chat: how it looks and its buttons', () => {
     expect(pretendApi.webchat.patches).toEqual([]);
   });
 
-  test('a button needs its number: WhatsApp is hidden until one is added, and then shows in the preview', async ({ page, pretendApi }) => {
+  test('a button needs its number: WhatsApp is hidden until one is added, and then shows in the preview', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/channels');
     const preview = page.getByRole('figure', { name: 'How the chat bubble will look' });
     await expect(preview.getByText('WhatsApp')).toHaveCount(0);
@@ -129,7 +143,11 @@ test.describe('Website chat: how it looks and its buttons', () => {
   });
 
   test('shows the API’s own words when it refuses, and keeps what was typed', async ({ page, pretendApi }) => {
-    pretendApi.webchat.refusal = { status: 400, code: 'INVALID_PHONE', message: 'That phone number does not look right.' };
+    pretendApi.webchat.refusal = {
+      status: 400,
+      code: 'INVALID_PHONE',
+      message: 'That phone number does not look right.',
+    };
     await page.goto('/channels');
     await page.getByLabel('Phone number for the Call button').fill('+91 12345 67890');
     await page.getByRole('button', { name: 'Save changes' }).click();
@@ -152,7 +170,8 @@ test.describe('Website chat: off, staff and problems', () => {
     await expect(page.getByText(/Only managers can change these settings/)).toBeVisible();
     await expect(page.getByLabel('The line to paste')).toHaveValue(SNIPPET);
     await expect(page.getByLabel('Greeting')).toBeDisabled();
-    for (const name of [/Save changes/, /Add a website/, /^Remove/]) await expect(page.getByRole('button', { name })).toHaveCount(0);
+    for (const name of [/Save changes/, /Add a website/, /^Remove/])
+      await expect(page.getByRole('button', { name })).toHaveCount(0);
   });
 
   test('shows an error with a retry when it cannot be loaded', async ({ page, pretendApi }) => {

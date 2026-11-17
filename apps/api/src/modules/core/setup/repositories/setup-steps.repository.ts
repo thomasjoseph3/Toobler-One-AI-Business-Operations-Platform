@@ -19,11 +19,7 @@ export async function listMarkedSteps(db: Db, accountId: string): Promise<Map<st
  * Locks the owner's mark on one step until the end of the transaction, and returns its status. Two managers marking the same
  * step at the same moment take turns. Undefined when the step has never been marked.
  */
-export async function lockMarkedStep(
-  db: Db,
-  accountId: string,
-  stepKey: string,
-): Promise<SetupStepStatus | undefined> {
+export async function lockMarkedStep(db: Db, accountId: string, stepKey: string): Promise<SetupStepStatus | undefined> {
   const row = await db
     .selectFrom('setup_steps')
     .select('status')

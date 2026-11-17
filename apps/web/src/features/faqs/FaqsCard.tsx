@@ -7,7 +7,12 @@ import { describeFaqProblem } from './problem-message';
 import { FAQ_SOURCE_WORDS, isWaitingForCheck } from './unanswered-state';
 
 /** Every FAQ, newest first. Anyone on the team can add, change and delete one (delete asks "Are you sure?" naming it). A drafted FAQ is marked "Please check". */
-export function FaqsCard(props: { faqs: readonly Faq[]; onAdd: () => void; onEdit: (faq: Faq) => void; onChanged: () => void }) {
+export function FaqsCard(props: {
+  faqs: readonly Faq[];
+  onAdd: () => void;
+  onEdit: (faq: Faq) => void;
+  onChanged: () => void;
+}) {
   const { faqs, onAdd, onEdit, onChanged } = props;
   const [toDelete, setToDelete] = useState<Faq | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -36,9 +41,17 @@ export function FaqsCard(props: { faqs: readonly Faq[]; onAdd: () => void; onEdi
           {t('faqs.list.add')}
         </Button>
       </div>
-      {problem ? <Alert tone="error" className="mb-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mb-3">
+          {problem}
+        </Alert>
+      ) : null}
       {faqs.length === 0 ? (
-        <EmptyState icon={<span aria-hidden>💬</span>} title={t('faqs.list.empty.title')} description={t('faqs.list.empty.description')} />
+        <EmptyState
+          icon={<span aria-hidden>💬</span>}
+          title={t('faqs.list.empty.title')}
+          description={t('faqs.list.empty.description')}
+        />
       ) : (
         <ul>
           {faqs.map((faq) => (
@@ -49,12 +62,24 @@ export function FaqsCard(props: { faqs: readonly Faq[]; onAdd: () => void; onEdi
               </div>
               <p className="text-body-md whitespace-pre-line text-text-primary">{faq.answer}</p>
               <p className="text-label-sm text-text-secondary">{t(FAQ_SOURCE_WORDS[faq.source])}</p>
-              {isWaitingForCheck(faq) ? <p className="text-label-sm text-text-secondary">{t('faqs.list.checkHelp')}</p> : null}
+              {isWaitingForCheck(faq) ? (
+                <p className="text-label-sm text-text-secondary">{t('faqs.list.checkHelp')}</p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" size="compact" onClick={() => onEdit(faq)} aria-label={formatMessage('faqs.list.edit', { question: faq.question })}>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  onClick={() => onEdit(faq)}
+                  aria-label={formatMessage('faqs.list.edit', { question: faq.question })}
+                >
                   {t('faqs.list.editButton')}
                 </Button>
-                <Button variant="destructive" size="compact" onClick={() => setToDelete(faq)} aria-label={formatMessage('faqs.list.delete', { question: faq.question })}>
+                <Button
+                  variant="destructive"
+                  size="compact"
+                  onClick={() => setToDelete(faq)}
+                  aria-label={formatMessage('faqs.list.delete', { question: faq.question })}
+                >
                   {t('faqs.list.deleteButton')}
                 </Button>
               </div>

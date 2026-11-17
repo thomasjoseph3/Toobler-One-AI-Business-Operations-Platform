@@ -80,9 +80,14 @@ export function createPrefillService(dependencies: {
           new Date(startedAt.getTime() - STUCK_AFTER_MILLISECONDS),
         );
         if (activeRunId) {
-          throw new ApiError(409, 'PREFILL_ALREADY_RUNNING', 'We are already reading for you. Please wait for it to finish.', {
-            runId: activeRunId,
-          });
+          throw new ApiError(
+            409,
+            'PREFILL_ALREADY_RUNNING',
+            'We are already reading for you. Please wait for it to finish.',
+            {
+              runId: activeRunId,
+            },
+          );
         }
         const startedToday = await prefillRunsRepository.countRunsSince(
           transaction,
@@ -102,7 +107,10 @@ export function createPrefillService(dependencies: {
           actor,
           kind: 'setup.prefill_started',
           // What kind of reading, never the address or the name
-          details: { recordType: 'prefill_run', fields: [websiteUrl ? 'website' : '', googleListing ? 'google_listing' : ''].filter(Boolean) },
+          details: {
+            recordType: 'prefill_run',
+            fields: [websiteUrl ? 'website' : '', googleListing ? 'google_listing' : ''].filter(Boolean),
+          },
         });
       });
 

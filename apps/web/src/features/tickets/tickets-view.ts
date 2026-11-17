@@ -35,7 +35,13 @@ export interface TicketsView {
 }
 
 /** The first thing staff want: what still needs doing. */
-export const DEFAULT_TICKETS_VIEW: TicketsView = { status: 'open', owner: 'all', type: 'all', priority: 'all', page: 1 };
+export const DEFAULT_TICKETS_VIEW: TicketsView = {
+  status: 'open',
+  owner: 'all',
+  type: 'all',
+  priority: 'all',
+  page: 1,
+};
 
 /** The words for a ticket type. */
 export function findTypeLabelKey(type: TicketType): MessageKey {
@@ -95,11 +101,19 @@ export function buildTicketsPath(view: TicketsView): string {
 
 /** Whether any filter differs from the first view (so an empty list means "nothing matches", not "no tickets yet"). */
 export function isTicketsViewFiltered(view: TicketsView): boolean {
-  return view.status !== DEFAULT_TICKETS_VIEW.status || view.owner !== 'all' || view.type !== 'all' || view.priority !== 'all';
+  return (
+    view.status !== DEFAULT_TICKETS_VIEW.status ||
+    view.owner !== 'all' ||
+    view.type !== 'all' ||
+    view.priority !== 'all'
+  );
 }
 
 /** Who owns a ticket, from the signed-in person's point of view: nobody, you, or someone else (the team list arrives with F02). */
-export function describeTicketOwner(ticket: Pick<Ticket, 'ownerUserId'>, signedInUserId: string): 'nobody' | 'you' | 'teamMember' {
+export function describeTicketOwner(
+  ticket: Pick<Ticket, 'ownerUserId'>,
+  signedInUserId: string,
+): 'nobody' | 'you' | 'teamMember' {
   if (ticket.ownerUserId === null) return 'nobody';
   return ticket.ownerUserId === signedInUserId ? 'you' : 'teamMember';
 }

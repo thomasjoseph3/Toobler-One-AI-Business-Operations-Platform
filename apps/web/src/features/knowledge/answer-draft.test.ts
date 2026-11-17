@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowledgeQuestion } from '@toobler-one/shared';
-import { draftToValue, emptyListRow, formatAnswer, paiseToRupeesText, rupeesTextToPaise, startDraft } from './answer-draft';
+import {
+  draftToValue,
+  emptyListRow,
+  formatAnswer,
+  paiseToRupeesText,
+  rupeesTextToPaise,
+  startDraft,
+} from './answer-draft';
 
 /** A question with sensible defaults; a test changes what it needs. */
 const question = (changes: Partial<KnowledgeQuestion>): KnowledgeQuestion => ({
@@ -40,7 +47,10 @@ describe('rupees and paise', () => {
 describe('text and link questions', () => {
   it('saves trimmed text and refuses an empty answer', () => {
     const textQuestion = question({});
-    expect(draftToValue(textQuestion, { kind: 'text', text: '  Nair Stays ' })).toEqual({ ok: true, value: 'Nair Stays' });
+    expect(draftToValue(textQuestion, { kind: 'text', text: '  Nair Stays ' })).toEqual({
+      ok: true,
+      value: 'Nair Stays',
+    });
     expect(draftToValue(textQuestion, { kind: 'text', text: '   ' }).ok).toBe(false);
   });
 
@@ -61,7 +71,10 @@ describe('pick questions', () => {
   const pickOne = question({ type: 'pick_one', options: ['Included', 'Plus GST', 'Other'], allowOther: true });
 
   it('stores the choice, and the words for Other', () => {
-    expect(draftToValue(pickOne, { kind: 'pick_one', choice: 'Included', otherText: '' })).toEqual({ ok: true, value: { choice: 'Included' } });
+    expect(draftToValue(pickOne, { kind: 'pick_one', choice: 'Included', otherText: '' })).toEqual({
+      ok: true,
+      value: { choice: 'Included' },
+    });
     expect(draftToValue(pickOne, { kind: 'pick_one', choice: 'Other', otherText: ' Depends ' })).toEqual({
       ok: true,
       value: { choice: 'Other', otherText: 'Depends' },
@@ -72,13 +85,20 @@ describe('pick questions', () => {
 
   it('keeps several choices within the most allowed', () => {
     const several = question({ type: 'pick_several', options: ['A', 'B', 'C'], maxChoices: 2 });
-    expect(draftToValue(several, { kind: 'pick_several', choices: ['A', 'B'], otherText: '' })).toEqual({ ok: true, value: { choices: ['A', 'B'] } });
+    expect(draftToValue(several, { kind: 'pick_several', choices: ['A', 'B'], otherText: '' })).toEqual({
+      ok: true,
+      value: { choices: ['A', 'B'] },
+    });
     expect(draftToValue(several, { kind: 'pick_several', choices: ['A', 'B', 'C'], otherText: '' }).ok).toBe(false);
     expect(draftToValue(several, { kind: 'pick_several', choices: [], otherText: '' }).ok).toBe(false);
   });
 
   it('reads the stored shapes back into a draft', () => {
-    expect(startDraft(pickOne, { choice: 'Plus GST' })).toEqual({ kind: 'pick_one', choice: 'Plus GST', otherText: '' });
+    expect(startDraft(pickOne, { choice: 'Plus GST' })).toEqual({
+      kind: 'pick_one',
+      choice: 'Plus GST',
+      otherText: '',
+    });
     expect(startDraft(question({ type: 'pick_several' }), { choices: ['A'], otherText: 'x' })).toEqual({
       kind: 'pick_several',
       choices: ['A'],
@@ -97,7 +117,10 @@ describe('yes or no questions', () => {
       ok: true,
       value: { yes: true, detail: 'https://a.example' },
     });
-    expect(draftToValue(withLink, { kind: 'yes_no', yes: false, detail: 'ignored' })).toEqual({ ok: true, value: { yes: false } });
+    expect(draftToValue(withLink, { kind: 'yes_no', yes: false, detail: 'ignored' })).toEqual({
+      ok: true,
+      value: { yes: false },
+    });
     expect(draftToValue(withLink, { kind: 'yes_no', yes: null, detail: '' }).ok).toBe(false);
   });
 });
@@ -109,7 +132,10 @@ describe('opening hours', () => {
     const draft = startDraft(hours, null);
     if (draft.kind !== 'weekly_hours') throw new Error('expected hours');
     draft.days.mon = { isOpen: true, from: '09:00', to: '18:30' };
-    expect(draftToValue(hours, draft)).toEqual({ ok: true, value: { days: { mon: { open: '09:00', close: '18:30' } } } });
+    expect(draftToValue(hours, draft)).toEqual({
+      ok: true,
+      value: { days: { mon: { open: '09:00', close: '18:30' } } },
+    });
     draft.days.tue = { isOpen: true, from: '10:00', to: '10:00' };
     expect(draftToValue(hours, draft).ok).toBe(false);
   });
@@ -152,7 +178,10 @@ describe('list questions', () => {
     expect(
       draftToValue(contacts, {
         kind: 'list',
-        rows: [{ kind: 'Phone', value: ' +91 98470 12345 ' }, { kind: 'Phone', value: '' }],
+        rows: [
+          { kind: 'Phone', value: ' +91 98470 12345 ' },
+          { kind: 'Phone', value: '' },
+        ],
       }).ok,
     ).toBe(false); // a half-filled row: the value is needed
     expect(draftToValue(contacts, { kind: 'list', rows: [{ kind: 'Phone', value: '+91 98470 12345' }] })).toEqual({
@@ -169,7 +198,9 @@ describe('list questions', () => {
 
   it('starts a new row on the first option of a pick column, and shows rows on one line each', () => {
     expect(emptyListRow(contacts.rowFields!)).toEqual({ kind: 'Phone', value: '' });
-    expect(formatAnswer(contacts, { rows: [{ kind: 'Phone', value: '+91 98470 12345' }] })).toEqual(['Phone · +91 98470 12345']);
+    expect(formatAnswer(contacts, { rows: [{ kind: 'Phone', value: '+91 98470 12345' }] })).toEqual([
+      'Phone · +91 98470 12345',
+    ]);
   });
 
   it('writes a price column as whole paise and shows it as rupees', () => {
@@ -186,7 +217,10 @@ describe('list questions', () => {
     });
     expect(draftToValue(offerings, { kind: 'list', rows: [{ name: 'Room', from: 'cheap' }] }).ok).toBe(false);
     expect(formatAnswer(offerings, { rows: [{ name: 'Room', from: 250000 }] })).toEqual(['Room · ₹2500']);
-    expect(startDraft(offerings, { rows: [{ name: 'Room', from: 250000 }] })).toEqual({ kind: 'list', rows: [{ name: 'Room', from: '2500' }] });
+    expect(startDraft(offerings, { rows: [{ name: 'Room', from: 250000 }] })).toEqual({
+      kind: 'list',
+      rows: [{ name: 'Room', from: '2500' }],
+    });
   });
 });
 

@@ -6,12 +6,19 @@ import type { MessageKey } from '../../app/i18n';
 const KIND_ORDER: ReadonlyArray<ModuleView['kind']> = ['engine', 'channel', 'feature'];
 
 /** The modules grouped by kind in a fixed order (engines, channels, features), leaving out empty groups. */
-export function groupModulesByKind(modules: readonly ModuleView[]): Array<{ kind: ModuleView['kind']; modules: ModuleView[] }> {
-  return KIND_ORDER.map((kind) => ({ kind, modules: modules.filter((module) => module.kind === kind) })).filter((group) => group.modules.length > 0);
+export function groupModulesByKind(
+  modules: readonly ModuleView[],
+): Array<{ kind: ModuleView['kind']; modules: ModuleView[] }> {
+  return KIND_ORDER.map((kind) => ({ kind, modules: modules.filter((module) => module.kind === kind) })).filter(
+    (group) => group.modules.length > 0,
+  );
 }
 
 /** What a module's state is called and how it is drawn. */
-export function describeModuleState(state: ModuleState): { words: MessageKey; tone: 'success' | 'neutral' | 'warning' | 'info' } {
+export function describeModuleState(state: ModuleState): {
+  words: MessageKey;
+  tone: 'success' | 'neutral' | 'warning' | 'info';
+} {
   switch (state) {
     case 'active':
       return { words: 'settings.modules.state.active', tone: 'success' };

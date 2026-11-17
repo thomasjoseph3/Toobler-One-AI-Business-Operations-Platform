@@ -143,7 +143,12 @@ export function useLeadActions({
 
   /** The "Change status" button for a lead's page (shown on a phone): pick the new status from a list. */
   const renderChangeStatusMenu = (lead: Lead, displayName: string): ReactNode => (
-    <ChangeStatusMenu lead={lead} displayName={displayName} stages={stages} onMoveToStage={(stage) => moveToStage(lead, displayName, stage)} />
+    <ChangeStatusMenu
+      lead={lead}
+      displayName={displayName}
+      stages={stages}
+      onMoveToStage={(stage) => moveToStage(lead, displayName, stage)}
+    />
   );
 
   const dialogs = (

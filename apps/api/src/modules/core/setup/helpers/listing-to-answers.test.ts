@@ -34,11 +34,18 @@ describe('listingToAnswers', () => {
       websiteUrl: null,
       openingPeriods: [period(1, 9, 18)],
     });
-    expect(answers.map((answer) => answer.questionKey)).toEqual(['business_name', 'address', 'contact_details', 'opening_hours']);
+    expect(answers.map((answer) => answer.questionKey)).toEqual([
+      'business_name',
+      'address',
+      'contact_details',
+      'opening_hours',
+    ]);
     expect(answers[2]!.value).toEqual({ rows: [{ kind: 'Phone', value: '+91 98470 12345' }] });
   });
 
   it('gives nothing for what Google does not have', () => {
-    expect(listingToAnswers({ name: null, address: null, phone: null, websiteUrl: null, openingPeriods: [] })).toEqual([]);
+    expect(listingToAnswers({ name: null, address: null, phone: null, websiteUrl: null, openingPeriods: [] })).toEqual(
+      [],
+    );
   });
 });

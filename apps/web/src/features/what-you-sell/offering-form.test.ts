@@ -36,20 +36,42 @@ describe('checkOfferingForm', () => {
   });
 
   it('needs a price, a unit and a GST note together when a price is shared', () => {
-    const problems = checkOfferingForm({ ...EMPTY_OFFERING_FORM, name: 'Room', sharesPrice: true, priceRupees: 'cheap', priceUnit: '', gstMode: '' });
+    const problems = checkOfferingForm({
+      ...EMPTY_OFFERING_FORM,
+      name: 'Room',
+      sharesPrice: true,
+      priceRupees: 'cheap',
+      priceUnit: '',
+      gstMode: '',
+    });
     expect(Object.keys(problems).sort()).toEqual(['gstMode', 'price', 'priceUnit']);
-    expect(checkOfferingForm({ ...EMPTY_OFFERING_FORM, name: 'Room', sharesPrice: true, priceRupees: '4,500', gstMode: 'plus' })).toEqual({});
+    expect(
+      checkOfferingForm({
+        ...EMPTY_OFFERING_FORM,
+        name: 'Room',
+        sharesPrice: true,
+        priceRupees: '4,500',
+        gstMode: 'plus',
+      }),
+    ).toEqual({});
   });
 
   it('wants each detail to have a name and a value, or to be left empty', () => {
-    expect(checkOfferingForm({ ...EMPTY_OFFERING_FORM, name: 'Room', details: [{ label: 'Check-in', value: '' }] }).details).toBeTruthy();
-    expect(checkOfferingForm({ ...EMPTY_OFFERING_FORM, name: 'Room', details: [{ label: '', value: '' }] })).toEqual({});
+    expect(
+      checkOfferingForm({ ...EMPTY_OFFERING_FORM, name: 'Room', details: [{ label: 'Check-in', value: '' }] }).details,
+    ).toBeTruthy();
+    expect(checkOfferingForm({ ...EMPTY_OFFERING_FORM, name: 'Room', details: [{ label: '', value: '' }] })).toEqual(
+      {},
+    );
   });
 });
 
 describe('buildCreateRequest', () => {
   it('sends only what was filled in, with the price as whole paise', () => {
-    expect(buildCreateRequest({ ...EMPTY_OFFERING_FORM, name: ' Yoga class ' })).toEqual({ name: 'Yoga class', active: true });
+    expect(buildCreateRequest({ ...EMPTY_OFFERING_FORM, name: ' Yoga class ' })).toEqual({
+      name: 'Yoga class',
+      active: true,
+    });
     expect(
       buildCreateRequest({
         ...EMPTY_OFFERING_FORM,
@@ -60,7 +82,10 @@ describe('buildCreateRequest', () => {
         priceUnit: 'per night',
         gstMode: 'plus',
         includes: 'Breakfast',
-        details: [{ label: 'Check-in', value: '2 PM' }, { label: '', value: '' }],
+        details: [
+          { label: 'Check-in', value: '2 PM' },
+          { label: '', value: '' },
+        ],
       }),
     ).toEqual({
       name: 'Deluxe room',
@@ -83,7 +108,13 @@ describe('forms from existing things', () => {
 
   it('fills the form from a website suggestion and leaves the unit and GST note for the owner', () => {
     const form = formFromSuggestion({ name: 'Sea view room', description: 'By the beach', fromPricePaise: 250000 });
-    expect(form).toMatchObject({ name: 'Sea view room', sharesPrice: true, priceRupees: '2500', priceUnit: '', gstMode: '' });
+    expect(form).toMatchObject({
+      name: 'Sea view room',
+      sharesPrice: true,
+      priceRupees: '2500',
+      priceUnit: '',
+      gstMode: '',
+    });
     expect(Object.keys(checkOfferingForm(form)).sort()).toEqual(['gstMode', 'priceUnit']); // the owner must choose them
     expect(formFromSuggestion({ name: 'Yoga', description: null, fromPricePaise: null }).sharesPrice).toBe(false);
   });
@@ -98,7 +129,9 @@ describe('buildUpdateRequest', () => {
 
   it('takes the price away completely when the owner stops sharing it', () => {
     const original = offering();
-    expect(buildUpdateRequest(original, { ...formFromOffering(original), sharesPrice: false })).toEqual({ fromPricePaise: null });
+    expect(buildUpdateRequest(original, { ...formFromOffering(original), sharesPrice: false })).toEqual({
+      fromPricePaise: null,
+    });
   });
 
   it('sends all three together when the price changes, and nothing for a price that stays the same', () => {
@@ -109,7 +142,15 @@ describe('buildUpdateRequest', () => {
       gstMode: 'plus',
     });
     const noPrice = offering({ fromPricePaise: null, priceUnit: null, gstMode: null, priceInWords: null });
-    expect(buildUpdateRequest(noPrice, { ...formFromOffering(noPrice), sharesPrice: true, priceRupees: '900', priceUnit: 'per person', gstMode: 'none' })).toEqual({
+    expect(
+      buildUpdateRequest(noPrice, {
+        ...formFromOffering(noPrice),
+        sharesPrice: true,
+        priceRupees: '900',
+        priceUnit: 'per person',
+        gstMode: 'none',
+      }),
+    ).toEqual({
       fromPricePaise: 90000,
       priceUnit: 'per person',
       gstMode: 'none',
@@ -118,7 +159,9 @@ describe('buildUpdateRequest', () => {
 
   it('replaces the whole details list when it changed', () => {
     const original = offering();
-    expect(buildUpdateRequest(original, { ...formFromOffering(original), details: [{ label: 'Check-in', value: '3 PM' }] })).toEqual({
+    expect(
+      buildUpdateRequest(original, { ...formFromOffering(original), details: [{ label: 'Check-in', value: '3 PM' }] }),
+    ).toEqual({
       details: [{ label: 'Check-in', value: '3 PM' }],
     });
   });

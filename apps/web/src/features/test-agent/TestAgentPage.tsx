@@ -1,10 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import {
-  AGENT_TEST_MESSAGE_MAX,
-  type AgentTestChatResponse,
-  type AgentTestChatSummary,
-} from '@toobler-one/shared';
+import { AGENT_TEST_MESSAGE_MAX, type AgentTestChatResponse, type AgentTestChatSummary } from '@toobler-one/shared';
 import { Alert, Badge, Button, Card, Tag, TextAreaField } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { formatMessage, t, type MessageKey } from '../../app/i18n';
@@ -41,7 +37,9 @@ function Insights({ turn, timeZone }: { turn: AgentTestChatResponse | null; time
   return (
     <div className="flex flex-col gap-5">
       <section aria-labelledby="insight-sources">
-        <h3 id="insight-sources" className="text-label-md mb-1 text-text-primary">{t('testAgent.insights.answeredFrom')}</h3>
+        <h3 id="insight-sources" className="text-label-md mb-1 text-text-primary">
+          {t('testAgent.insights.answeredFrom')}
+        </h3>
         {sources.length > 0 ? (
           <ul className="flex flex-wrap gap-2">
             {sources.map((source) => (
@@ -55,7 +53,9 @@ function Insights({ turn, timeZone }: { turn: AgentTestChatResponse | null; time
         )}
       </section>
       <section aria-labelledby="insight-learned">
-        <h3 id="insight-learned" className="text-label-md mb-1 text-text-primary">{t('testAgent.insights.learned')}</h3>
+        <h3 id="insight-learned" className="text-label-md mb-1 text-text-primary">
+          {t('testAgent.insights.learned')}
+        </h3>
         {details.length > 0 ? (
           <dl className="text-body-md grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             {details.map((detail) => (
@@ -70,29 +70,40 @@ function Insights({ turn, timeZone }: { turn: AgentTestChatResponse | null; time
         )}
       </section>
       <section aria-labelledby="insight-promise">
-        <h3 id="insight-promise" className="text-label-md mb-1 text-text-primary">{t('testAgent.insights.promise')}</h3>
+        <h3 id="insight-promise" className="text-label-md mb-1 text-text-primary">
+          {t('testAgent.insights.promise')}
+        </h3>
         {promise ? (
           <div className="flex flex-col gap-1">
             <p className="text-body-md text-text-primary">“{promise.sentence}”</p>
-            {promise.due ? <p className="text-label-sm text-text-secondary">{formatMessage('testAgent.insights.due', { time: promise.due })}</p> : null}
+            {promise.due ? (
+              <p className="text-label-sm text-text-secondary">
+                {formatMessage('testAgent.insights.due', { time: promise.due })}
+              </p>
+            ) : null}
           </div>
         ) : (
           <p className="text-body-md text-text-secondary">{t('testAgent.insights.noPromise')}</p>
         )}
       </section>
       <section aria-labelledby="insight-situation">
-        <h3 id="insight-situation" className="text-label-md mb-1 text-text-primary">{t('testAgent.insights.situation')}</h3>
+        <h3 id="insight-situation" className="text-label-md mb-1 text-text-primary">
+          {t('testAgent.insights.situation')}
+        </h3>
         <p className="text-body-md text-text-primary">{t(`testAgent.situation.${turn.situation}` as MessageKey)}</p>
       </section>
       {turn.toolsCalled.length > 0 ? (
         <section aria-labelledby="insight-steps">
-          <h3 id="insight-steps" className="text-label-md mb-1 text-text-primary">{t('testAgent.insights.steps')}</h3>
+          <h3 id="insight-steps" className="text-label-md mb-1 text-text-primary">
+            {t('testAgent.insights.steps')}
+          </h3>
           <ul className="text-body-md flex flex-col gap-1 text-text-primary">
             {turn.toolsCalled.map((tool, position) => {
               const words = findToolWords(tool.name);
               return (
                 <li key={position}>
-                  {words ? t(words) : tool.name} {tool.ok ? '' : <span className="text-error">{t('testAgent.insights.stepFailed')}</span>}
+                  {words ? t(words) : tool.name}{' '}
+                  {tool.ok ? '' : <span className="text-error">{t('testAgent.insights.stepFailed')}</span>}
                 </li>
               );
             })}
@@ -100,7 +111,11 @@ function Insights({ turn, timeZone }: { turn: AgentTestChatResponse | null; time
         </section>
       ) : null}
       {hasHeldBackAmounts(turn) ? (
-        <Alert tone="error">{formatMessage('testAgent.insights.heldBack', { amounts: turn.heldBackAmounts.map((amount) => `₹${amount}`).join(', ') })}</Alert>
+        <Alert tone="error">
+          {formatMessage('testAgent.insights.heldBack', {
+            amounts: turn.heldBackAmounts.map((amount) => `₹${amount}`).join(', '),
+          })}
+        </Alert>
       ) : null}
     </div>
   );
@@ -195,11 +210,21 @@ export function TestAgentPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Card aria-label={t('testAgent.chatLabel')}>
           <div className="flex flex-col gap-4">
-            <div className="flex max-h-[28rem] min-h-48 flex-col gap-3 overflow-y-auto" role="log" aria-live="polite" aria-label={t('testAgent.chatLabel')}>
+            <div
+              className="flex max-h-[28rem] min-h-48 flex-col gap-3 overflow-y-auto"
+              role="log"
+              aria-live="polite"
+              aria-label={t('testAgent.chatLabel')}
+            >
               {lines.length === 0 ? <p className="text-body-md text-text-secondary">{t('testAgent.empty')}</p> : null}
               {lines.map((line, position) => (
-                <div key={position} className={line.sender === 'customer' ? 'flex flex-col items-end' : 'flex flex-col items-start'}>
-                  <span className="text-label-xs mb-0.5 text-text-secondary">{t(line.sender === 'customer' ? 'testAgent.you' : 'testAgent.agent')}</span>
+                <div
+                  key={position}
+                  className={line.sender === 'customer' ? 'flex flex-col items-end' : 'flex flex-col items-start'}
+                >
+                  <span className="text-label-xs mb-0.5 text-text-secondary">
+                    {t(line.sender === 'customer' ? 'testAgent.you' : 'testAgent.agent')}
+                  </span>
                   <p
                     className={`text-body-md max-w-[85%] whitespace-pre-line rounded-lg px-3 py-2 ${
                       line.sender === 'customer' ? 'bg-action text-action-text' : 'bg-surface-subtle text-text-primary'
@@ -230,10 +255,20 @@ export function TestAgentPage() {
                 }}
               />
               <div className="flex flex-wrap gap-3">
-                <Button type="submit" variant="primary" isLoading={isSending} disabled={!canSendMessage(draftText, AGENT_TEST_MESSAGE_MAX)}>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  isLoading={isSending}
+                  disabled={!canSendMessage(draftText, AGENT_TEST_MESSAGE_MAX)}
+                >
                   {t('testAgent.send')}
                 </Button>
-                <Button type="button" variant="secondary" onClick={startNewChat} disabled={isSending || lines.length === 0}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={startNewChat}
+                  disabled={isSending || lines.length === 0}
+                >
                   {t('testAgent.newChat')}
                 </Button>
               </div>
@@ -254,7 +289,11 @@ export function TestAgentPage() {
                 <div>
                   <h3 className="text-label-md mb-1 text-text-primary">{t('testAgent.summary.title')}</h3>
                   <p className="text-body-md text-text-primary">{summary.summary}</p>
-                  {summary.writtenByAi ? null : <Badge tone="neutral" className="mt-2">{t('testAgent.summary.byCode')}</Badge>}
+                  {summary.writtenByAi ? null : (
+                    <Badge tone="neutral" className="mt-2">
+                      {t('testAgent.summary.byCode')}
+                    </Badge>
+                  )}
                 </div>
               ) : null}
             </div>

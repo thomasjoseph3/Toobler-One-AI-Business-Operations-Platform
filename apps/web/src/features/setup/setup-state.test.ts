@@ -10,11 +10,28 @@ import {
   STEP_DESCRIPTIONS,
 } from './setup-state';
 
-const step = (changes: Partial<SetupStep>): SetupStep => ({ key: 'website', part: 1, checkedBySystem: false, status: 'todo', ...changes });
+const step = (changes: Partial<SetupStep>): SetupStep => ({
+  key: 'website',
+  part: 1,
+  checkedBySystem: false,
+  status: 'todo',
+  ...changes,
+});
 
 describe('every step has words and a way to finish', () => {
   it('covers each step the API can send', () => {
-    for (const key of ['website', 'about_business', 'what_you_sell', 'situations', 'goals', 'promises', 'pipeline', 'team', 'channels', 'test_agent'] as const) {
+    for (const key of [
+      'website',
+      'about_business',
+      'what_you_sell',
+      'situations',
+      'goals',
+      'promises',
+      'pipeline',
+      'team',
+      'channels',
+      'test_agent',
+    ] as const) {
       expect(STEP_DESCRIPTIONS[key].titleKey, key).toBeTruthy();
       expect(STEP_DESCRIPTIONS[key].helpKey, key).toBeTruthy();
     }
@@ -54,20 +71,28 @@ describe('small helpers', () => {
   });
 
   it('splits the steps by part and counts the finished ones (skipped counts as finished here)', () => {
-    const steps = [step({ key: 'website', part: 1, status: 'done' }), step({ key: 'promises', part: 2, status: 'skipped' }), step({ key: 'team', part: 2 })];
+    const steps = [
+      step({ key: 'website', part: 1, status: 'done' }),
+      step({ key: 'promises', part: 2, status: 'skipped' }),
+      step({ key: 'team', part: 2 }),
+    ];
     expect(stepsOfPart(steps, 2).map((item) => item.key)).toEqual(['promises', 'team']);
     expect(countFinishedSteps(stepsOfPart(steps, 2))).toEqual({ finished: 1, total: 2 });
   });
 
   it('points at the first step still to do', () => {
-    expect(findNextStep([step({ key: 'website', status: 'done' }), step({ key: 'goals' }), step({ key: 'team' })])?.key).toBe('goals');
+    expect(
+      findNextStep([step({ key: 'website', status: 'done' }), step({ key: 'goals' }), step({ key: 'team' })])?.key,
+    ).toBe('goals');
     expect(findNextStep([step({ status: 'skipped' })])).toBeUndefined();
   });
 
   it('says a blocker in words: the question text, or the step name', () => {
     const texts = new Map([['business_name', 'What do customers call your business?']]);
     const title = (key: string) => `Step ${key}`;
-    expect(describeBlocker({ kind: 'question', key: 'business_name' }, texts, title)).toBe('What do customers call your business?');
+    expect(describeBlocker({ kind: 'question', key: 'business_name' }, texts, title)).toBe(
+      'What do customers call your business?',
+    );
     expect(describeBlocker({ kind: 'question', key: 'unknown_key' }, texts, title)).toBe('unknown_key');
     expect(describeBlocker({ kind: 'step', key: 'promises' }, texts, title)).toBe('Step promises');
   });

@@ -94,7 +94,11 @@ export function parseWebsiteAddress(typedAddress: unknown, rules: WebsiteAddress
   if (url.port && !allowedPorts.includes(url.port)) throw notAPublicWebsite();
   const hostname = url.hostname.replace(/^\[|\]$/g, '');
   const isIpAddress = net.isIP(hostname) !== 0;
-  if (isIpAddress ? !isAddressAllowed(hostname) : !hostname.includes('.') || /\.(local|localhost|internal|lan|home)$/i.test(hostname)) {
+  if (
+    isIpAddress
+      ? !isAddressAllowed(hostname)
+      : !hostname.includes('.') || /\.(local|localhost|internal|lan|home)$/i.test(hostname)
+  ) {
     throw notAPublicWebsite();
   }
   url.hash = '';

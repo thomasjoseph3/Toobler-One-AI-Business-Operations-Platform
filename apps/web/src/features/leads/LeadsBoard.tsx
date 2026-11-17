@@ -1,6 +1,16 @@
 import { useState, type ReactNode } from 'react';
 import type { BoardColumn, Lead, PipelineStage } from '@toobler-one/shared';
-import { ActionMenu, type ActionMenuItem, ActivityIcon, Button, CalendarIcon, IconButton, PhoneIcon, PlusIcon, Tag } from '@toobler-one/ui';
+import {
+  ActionMenu,
+  type ActionMenuItem,
+  ActivityIcon,
+  Button,
+  CalendarIcon,
+  IconButton,
+  PhoneIcon,
+  PlusIcon,
+  Tag,
+} from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import { listOpenStageIdsInOrder, moveStageInOrder, type ColumnDirection } from './stage-order';
 import { LeadNameLink } from './LeadNameLink';
@@ -44,7 +54,10 @@ function LeadCard({
   renderRowMenu,
   onDragStart,
   onDragEnd,
-}: { lead: Lead; onDragStart: (lead: Lead) => void; onDragEnd: () => void } & Pick<LeadsBoardProps, 'signedInUserId' | 'timeZone' | 'renderRowMenu'>) {
+}: { lead: Lead; onDragStart: (lead: Lead) => void; onDragEnd: () => void } & Pick<
+  LeadsBoardProps,
+  'signedInUserId' | 'timeZone' | 'renderRowMenu'
+>) {
   const displayName = findLeadDisplayName(lead.contact);
   const callbackDate = formatCallbackDate(lead.callbackAt, timeZone);
   return (
@@ -114,7 +127,9 @@ function buildColumnMenuItems(
 ): ActionMenuItem[] {
   const stage = stages.find((candidate) => candidate.id === columnStage.id);
   if (stage === undefined) return [];
-  const items: ActionMenuItem[] = [{ id: 'rename', label: t('pipeline.rename.title'), onSelect: () => actions.onRenameColumn(stage) }];
+  const items: ActionMenuItem[] = [
+    { id: 'rename', label: t('pipeline.rename.title'), onSelect: () => actions.onRenameColumn(stage) },
+  ];
   if (stage.kind !== 'open') return items;
   if (moveStageInOrder(openStageIdsInOrder, stage.id, 'left') !== null) {
     items.push({ id: 'left', label: t('pipeline.moveLeft'), onSelect: () => actions.onMoveColumn(stage, 'left') });
@@ -124,7 +139,13 @@ function buildColumnMenuItems(
   }
   // The last open column cannot be deleted: a pipeline needs at least one
   if (openStageIdsInOrder.length > 1) {
-    items.push({ id: 'delete', label: t('pipeline.delete.menu'), group: 'delete', tone: 'danger', onSelect: () => actions.onDeleteColumn(stage) });
+    items.push({
+      id: 'delete',
+      label: t('pipeline.delete.menu'),
+      group: 'delete',
+      tone: 'danger',
+      onSelect: () => actions.onDeleteColumn(stage),
+    });
   }
   return items;
 }
@@ -134,7 +155,19 @@ function buildColumnMenuItems(
  * with how many leads it holds, and its newest leads as cards (up to 50: if there are more, it says so). The board scrolls
  * sideways when the stages do not fit, and each column scrolls up and down on its own, so the toolbar above stays in view.
  */
-export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRowMenu, onMoveLead, canEditColumns, onRenameColumn, onAddColumn, onMoveColumn, onDeleteColumn }: LeadsBoardProps) {
+export function LeadsBoard({
+  columns,
+  signedInUserId,
+  timeZone,
+  stages,
+  renderRowMenu,
+  onMoveLead,
+  canEditColumns,
+  onRenameColumn,
+  onAddColumn,
+  onMoveColumn,
+  onDeleteColumn,
+}: LeadsBoardProps) {
   const openStageIdsInOrderForMoves = listOpenStageIdsInOrder(stages);
   // The card being dragged and the column it is over, so the column can show where it would land
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
@@ -194,13 +227,19 @@ export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRo
               <ActionMenu
                 triggerLabel={formatMessage('leads.board.columnMore', { stage: column.stage.name })}
                 panelLabel={formatMessage('leads.board.columnMenu', { stage: column.stage.name })}
-                items={buildColumnMenuItems(column.stage, stages, openStageIdsInOrderForMoves, { onRenameColumn, onMoveColumn, onDeleteColumn })}
+                items={buildColumnMenuItems(column.stage, stages, openStageIdsInOrderForMoves, {
+                  onRenameColumn,
+                  onMoveColumn,
+                  onDeleteColumn,
+                })}
               />
             ) : null}
           </header>
           {column.leads.length === 0 ? (
             <p className="text-body-sm px-1 text-text-tertiary">
-              {columnUnderCard === column.stage.id && draggedLead !== null ? t('leads.board.dropHere') : t('leads.board.empty')}
+              {columnUnderCard === column.stage.id && draggedLead !== null
+                ? t('leads.board.dropHere')
+                : t('leads.board.empty')}
             </p>
           ) : (
             <ul className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">

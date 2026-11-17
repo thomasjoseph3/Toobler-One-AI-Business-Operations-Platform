@@ -60,8 +60,22 @@ export function startingSales(): PretendSales {
       offering({ id: '0191f0a0-0000-7000-8000-0000000000e2', name: 'Yoga class', active: false, sort: 1 }),
     ],
     offers: [
-      { id: '0191f0a0-0000-7000-8000-0000000000f1', text: 'December: 10% off', endsOn: '2099-12-31', current: true, createdAt: NOW, updatedAt: NOW },
-      { id: '0191f0a0-0000-7000-8000-0000000000f2', text: 'Old promotion', endsOn: '2000-01-01', current: false, createdAt: NOW, updatedAt: NOW },
+      {
+        id: '0191f0a0-0000-7000-8000-0000000000f1',
+        text: 'December: 10% off',
+        endsOn: '2099-12-31',
+        current: true,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+      {
+        id: '0191f0a0-0000-7000-8000-0000000000f2',
+        text: 'Old promotion',
+        endsOn: '2000-01-01',
+        current: false,
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
     ],
     createdOfferings: [],
     patchedOfferings: [],
@@ -87,10 +101,19 @@ function priceWords(body: Record<string, unknown>): string | null {
 /** Answers an `/offerings...` or `/offers...` call, or says nothing (undefined) when the call is not about them. */
 export function answerSalesCall(
   sales: PretendSales,
-  call: { method: string; path: string; search: string; body: Record<string, unknown> | null; role: 'manager' | 'staff' },
+  call: {
+    method: string;
+    path: string;
+    search: string;
+    body: Record<string, unknown> | null;
+    role: 'manager' | 'staff';
+  },
 ): PretendAnswer | undefined {
   const { method, path, search, body, role } = call;
-  const refuseStaff = (): PretendAnswer => ({ status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } });
+  const refuseStaff = (): PretendAnswer => ({
+    status: 403,
+    body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } },
+  });
   const refused = (): PretendAnswer | undefined => {
     if (!sales.refusal) return undefined;
     const { status, code, message } = sales.refusal;
@@ -139,7 +162,7 @@ export function answerSalesCall(
     if (refusal) return refusal;
     sales.patchedOfferings.push({ id, body: body ?? {} });
     Object.assign(target, body ?? {});
-    if (body && ('fromPricePaise' in body)) {
+    if (body && 'fromPricePaise' in body) {
       target['priceInWords'] = body['fromPricePaise'] === null ? null : priceWords(body);
       if (body['fromPricePaise'] === null) Object.assign(target, { priceUnit: null, gstMode: null });
     }
@@ -156,7 +179,13 @@ export function answerSalesCall(
     const refusal = refused();
     if (refusal) return refusal;
     sales.createdOffers.push(body ?? {});
-    const created = { id: `0191f0a0-0000-7000-8000-0000000000${(0xf3 + sales.createdOffers.length - 1).toString(16)}`, ...(body ?? {}), current: true, createdAt: NOW, updatedAt: NOW };
+    const created = {
+      id: `0191f0a0-0000-7000-8000-0000000000${(0xf3 + sales.createdOffers.length - 1).toString(16)}`,
+      ...(body ?? {}),
+      current: true,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
     sales.offers.push(created);
     return { status: 201, body: created };
   }

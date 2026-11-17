@@ -45,7 +45,15 @@ export function ModulesPage() {
   if (data.hasFailed || data.data === null) {
     return (
       <Card>
-        <ErrorState title={t('settings.error.title')} description={t('knowledge.error.description')} action={<Button variant="secondary" onClick={resource.reload}>{t('knowledge.retry')}</Button>} />
+        <ErrorState
+          title={t('settings.error.title')}
+          description={t('knowledge.error.description')}
+          action={
+            <Button variant="secondary" onClick={resource.reload}>
+              {t('knowledge.retry')}
+            </Button>
+          }
+        />
       </Card>
     );
   }
@@ -60,7 +68,9 @@ export function ModulesPage() {
       {modules.length === 0 ? <p className="text-body-md text-text-secondary">{t('settings.modules.empty')}</p> : null}
       {groupModulesByKind(modules).map((group) => (
         <Card key={group.kind} aria-labelledby={`modules-${group.kind}`}>
-          <h2 id={`modules-${group.kind}`} className="text-heading-sm mb-1 text-text-primary">{t(`settings.modules.kind.${group.kind}` as MessageKey)}</h2>
+          <h2 id={`modules-${group.kind}`} className="text-heading-sm mb-1 text-text-primary">
+            {t(`settings.modules.kind.${group.kind}` as MessageKey)}
+          </h2>
           <ul>
             {group.modules.map((module) => {
               const state = describeModuleState(module.state);
@@ -73,8 +83,14 @@ export function ModulesPage() {
                     <Badge tone={state.tone}>{t(state.words)}</Badge>
                   </div>
                   <p className="text-body-md text-text-secondary">{module.description}</p>
-                  {needs.length > 0 ? <p className="text-label-sm text-text-secondary">{formatMessage('settings.modules.needs', { names: needs.join(', ') })}</p> : null}
-                  {module.state === 'not_in_plan' ? <p className="text-label-sm text-text-secondary">{t('settings.modules.notInPlanHelp')}</p> : null}
+                  {needs.length > 0 ? (
+                    <p className="text-label-sm text-text-secondary">
+                      {formatMessage('settings.modules.needs', { names: needs.join(', ') })}
+                    </p>
+                  ) : null}
+                  {module.state === 'not_in_plan' ? (
+                    <p className="text-label-sm text-text-secondary">{t('settings.modules.notInPlanHelp')}</p>
+                  ) : null}
                   {canEdit && action ? (
                     <div>
                       <Button
@@ -82,7 +98,10 @@ export function ModulesPage() {
                         size="compact"
                         isLoading={busyId === module.id}
                         onClick={() => (action === 'switch_on' ? void change(module, true) : setToSwitchOff(module))}
-                        aria-label={formatMessage(action === 'switch_on' ? 'settings.modules.switchOnLabel' : 'settings.modules.switchOffLabel', { name: module.name })}
+                        aria-label={formatMessage(
+                          action === 'switch_on' ? 'settings.modules.switchOnLabel' : 'settings.modules.switchOffLabel',
+                          { name: module.name },
+                        )}
                       >
                         {t(action === 'switch_on' ? 'settings.modules.switchOn' : 'settings.modules.switchOff')}
                       </Button>

@@ -51,7 +51,10 @@ export const buildAddKeyRequest = (fields: KeyFormFields): AddAiKeyRequest => ({
 });
 
 /** What a key's state is called, and how it is drawn. */
-export function describeKeyStatus(status: AiKeyStatus): { words: MessageKey; tone: 'neutral' | 'success' | 'warning' | 'error' } {
+export function describeKeyStatus(status: AiKeyStatus): {
+  words: MessageKey;
+  tone: 'neutral' | 'success' | 'warning' | 'error';
+} {
   switch (status) {
     case 'working':
       return { words: 'settings.ai.status.working', tone: 'success' };
@@ -82,7 +85,9 @@ export function describeTestOutcome(outcome: AiKeyTestOutcome): { words: Message
 
 /** The keys grouped by AI company, in a fixed order, leaving out companies with none. */
 export function groupKeysByProvider(keys: readonly AiKey[]): Array<{ provider: AiProvider; keys: AiKey[] }> {
-  return AI_PROVIDERS.map((provider) => ({ provider, keys: keys.filter((key) => key.provider === provider) })).filter((group) => group.keys.length > 0);
+  return AI_PROVIDERS.map((provider) => ({ provider, keys: keys.filter((key) => key.provider === provider) })).filter(
+    (group) => group.keys.length > 0,
+  );
 }
 
 /**
@@ -97,14 +102,26 @@ export function describeWhichKeysAnswer(access: AiPlatformAccess, ownKeyCount: n
 }
 
 /** The platform's part for the manager: whether it is allowed, the call and token allowances, what was used this month and when it ends. */
-export function describePlatformUsage(usage: AiPlatformUsage): Array<{ key: MessageKey; values: Record<string, string | number> }> {
+export function describePlatformUsage(
+  usage: AiPlatformUsage,
+): Array<{ key: MessageKey; values: Record<string, string | number> }> {
   if (!usage.enabled) return [{ key: 'settings.ai.platform.off', values: {} }];
   const lines: Array<{ key: MessageKey; values: Record<string, string | number> }> = [];
   if (usage.monthlyCallCap !== null) {
-    lines.push({ key: 'settings.ai.platform.cap', values: { used: usage.usedThisMonth, cap: usage.monthlyCallCap, left: usage.remainingThisMonth ?? 0 } });
+    lines.push({
+      key: 'settings.ai.platform.cap',
+      values: { used: usage.usedThisMonth, cap: usage.monthlyCallCap, left: usage.remainingThisMonth ?? 0 },
+    });
   }
   if (usage.monthlyTokenCap !== null) {
-    lines.push({ key: 'settings.ai.platform.tokenCap', values: { used: usage.tokensUsedThisMonth, cap: usage.monthlyTokenCap, left: usage.tokensRemainingThisMonth ?? 0 } });
+    lines.push({
+      key: 'settings.ai.platform.tokenCap',
+      values: {
+        used: usage.tokensUsedThisMonth,
+        cap: usage.monthlyTokenCap,
+        left: usage.tokensRemainingThisMonth ?? 0,
+      },
+    });
   }
   // With no limit of either kind, say so
   if (usage.monthlyCallCap === null && usage.monthlyTokenCap === null) {
@@ -120,5 +137,8 @@ export function percentOfCapUsed(
 ): number {
   const percentOf = (used: number, cap: number | null): number =>
     cap === null || cap === 0 ? 0 : Math.min(100, Math.round((used / cap) * 100));
-  return Math.max(percentOf(usage.usedThisMonth, usage.monthlyCallCap), percentOf(usage.tokensUsedThisMonth, usage.monthlyTokenCap));
+  return Math.max(
+    percentOf(usage.usedThisMonth, usage.monthlyCallCap),
+    percentOf(usage.tokensUsedThisMonth, usage.monthlyTokenCap),
+  );
 }

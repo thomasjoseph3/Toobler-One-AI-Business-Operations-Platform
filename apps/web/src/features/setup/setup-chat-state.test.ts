@@ -1,9 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import type { SetupChatQuestion } from '@toobler-one/shared';
-import { addQuestionLine, buildReplyText, canSendReply, isPickQuestion, toggleOption, type SetupChatLine } from './setup-chat-state';
+import {
+  addQuestionLine,
+  buildReplyText,
+  canSendReply,
+  isPickQuestion,
+  toggleOption,
+  type SetupChatLine,
+} from './setup-chat-state';
 
 const question = (overrides: Partial<SetupChatQuestion>): SetupChatQuestion => ({
-  key: 'q', text: 'How do customers pay?', type: 'pick_several', options: ['UPI', 'Card', 'Cash'], allowOther: false, maxChoices: null, yesDetailLabel: null, neededToGoLive: false, ...overrides,
+  key: 'q',
+  text: 'How do customers pay?',
+  type: 'pick_several',
+  options: ['UPI', 'Card', 'Cash'],
+  allowOther: false,
+  maxChoices: null,
+  yesDetailLabel: null,
+  neededToGoLive: false,
+  ...overrides,
 });
 
 describe('setup chat replies', () => {
@@ -44,7 +59,11 @@ describe('addQuestionLine', () => {
   });
 
   it('does not repeat the question that is already last when a reply could not be used', () => {
-    const withProblem: SetupChatLine[] = [...asked, { kind: 'reply', text: 'x' }, { kind: 'problem', text: 'Could not read that' }];
+    const withProblem: SetupChatLine[] = [
+      ...asked,
+      { kind: 'reply', text: 'x' },
+      { kind: 'problem', text: 'Could not read that' },
+    ];
     expect(addQuestionLine(withProblem, question({}))).toEqual(withProblem);
   });
 

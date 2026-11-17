@@ -16,7 +16,12 @@ export const formFromOffer = (offer: Offer): OfferFormFields => ({ text: offer.t
 
 /** Today's date in the business's own time zone, as 2026-11-17. (The API counts an offer through the end of its last day in that zone.) */
 export function todayInTimeZone(timeZone: string, now: Date): string {
-  const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(now);
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone,
+  }).formatToParts(now);
   const part = (type: string) => parts.find((candidate) => candidate.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
@@ -30,7 +35,10 @@ export function checkOfferForm(fields: OfferFormFields, today: string): OfferFor
   return problems;
 }
 
-export const buildCreateOfferRequest = (fields: OfferFormFields): CreateOfferRequest => ({ text: fields.text.trim(), endsOn: fields.endsOn });
+export const buildCreateOfferRequest = (fields: OfferFormFields): CreateOfferRequest => ({
+  text: fields.text.trim(),
+  endsOn: fields.endsOn,
+});
 
 /** What `PATCH /offers/{id}` takes: only what changed. */
 export function buildUpdateOfferRequest(original: Offer, fields: OfferFormFields): UpdateOfferRequest {

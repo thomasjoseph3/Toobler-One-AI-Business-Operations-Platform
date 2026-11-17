@@ -54,9 +54,15 @@ describe('describeQuestionState', () => {
     expect(describeQuestionState(question({}))).toBe('unanswered');
     expect(describeQuestionState(question({ answer: answer('check') }))).toBe('waiting');
     expect(describeQuestionState(question({ answer: answer('confirmed') }))).toBe('answered');
-    expect(describeQuestionState(question({ handledElsewhere: 'offerings', elsewhereStatus: 'done' }))).toBe('elsewhere_done');
-    expect(describeQuestionState(question({ handledElsewhere: 'offerings', elsewhereStatus: 'not_done' }))).toBe('elsewhere_open');
-    expect(describeQuestionState(question({ handledElsewhere: 'faqs', elsewhereStatus: 'not_tracked' }))).toBe('elsewhere_open');
+    expect(describeQuestionState(question({ handledElsewhere: 'offerings', elsewhereStatus: 'done' }))).toBe(
+      'elsewhere_done',
+    );
+    expect(describeQuestionState(question({ handledElsewhere: 'offerings', elsewhereStatus: 'not_done' }))).toBe(
+      'elsewhere_open',
+    );
+    expect(describeQuestionState(question({ handledElsewhere: 'faqs', elsewhereStatus: 'not_tracked' }))).toBe(
+      'elsewhere_open',
+    );
   });
 
   it('finds the answers waiting for a Yes', () => {
@@ -95,9 +101,22 @@ describe('describeReading', () => {
   it('says what was found, with a warning when part of it failed', () => {
     expect(
       describeReading(
-        run({ status: 'done', pagesRead: 3, answersFound: ['a', 'b'], answersSkipped: 1, errorMessage: 'The AI could not answer just now.' }),
+        run({
+          status: 'done',
+          pagesRead: 3,
+          answersFound: ['a', 'b'],
+          answersSkipped: 1,
+          errorMessage: 'The AI could not answer just now.',
+        }),
       ),
-    ).toEqual({ kind: 'done', answersFound: 2, answersSkipped: 1, pagesRead: 3, suggestionCount: 0, warning: 'The AI could not answer just now.' });
+    ).toEqual({
+      kind: 'done',
+      answersFound: 2,
+      answersSkipped: 1,
+      pagesRead: 3,
+      suggestionCount: 0,
+      warning: 'The AI could not answer just now.',
+    });
   });
 
   it('says why a reading failed, in the words the API gave', () => {

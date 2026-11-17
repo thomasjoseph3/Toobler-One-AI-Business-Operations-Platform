@@ -27,19 +27,25 @@ const key = (changes: Partial<AiKey> = {}): AiKey => ({
 
 describe('checkKeyForm', () => {
   it('accepts a label and a long single-word key', () => {
-    expect(checkKeyForm({ provider: 'gemini', label: 'Main key', key: 'AIzaSyExampleKeyExample1234567890' })).toEqual({});
+    expect(checkKeyForm({ provider: 'gemini', label: 'Main key', key: 'AIzaSyExampleKeyExample1234567890' })).toEqual(
+      {},
+    );
   });
 
   it('asks for what is missing and says what is wrong in plain words', () => {
     expect(Object.keys(checkKeyForm(EMPTY_KEY_FORM)).sort()).toEqual(['key', 'label']);
-    expect(checkKeyForm({ ...EMPTY_KEY_FORM, label: 'x', key: 'two words here that are long enough' }).key).toContain('no spaces');
+    expect(checkKeyForm({ ...EMPTY_KEY_FORM, label: 'x', key: 'two words here that are long enough' }).key).toContain(
+      'no spaces',
+    );
     expect(checkKeyForm({ ...EMPTY_KEY_FORM, label: 'x', key: 'short' }).key).toContain('too short');
     expect(checkKeyForm({ ...EMPTY_KEY_FORM, label: 'x', key: 'k'.repeat(401) }).key).toContain('too long');
     expect(checkKeyForm({ ...EMPTY_KEY_FORM, label: 'n'.repeat(81), key: 'k'.repeat(20) }).label).toContain('80');
   });
 
   it('tidies the label and trims the key when building the request', () => {
-    expect(buildAddKeyRequest({ provider: 'openai', label: '  Main   key ', key: '  sk-abcdefghijklmnop1234  ' })).toEqual({
+    expect(
+      buildAddKeyRequest({ provider: 'openai', label: '  Main   key ', key: '  sk-abcdefghijklmnop1234  ' }),
+    ).toEqual({
       provider: 'openai',
       label: 'Main key',
       key: 'sk-abcdefghijklmnop1234',
@@ -54,11 +60,16 @@ describe('keys and tests', () => {
     expect(describeKeyStatus('failed').tone).toBe('error');
     expect(describeKeyStatus('unchecked').tone).toBe('neutral');
     expect(describeTestOutcome('works').isGood).toBe(true);
-    for (const outcome of ['rejected', 'quota', 'no_model', 'unreachable'] as const) expect(describeTestOutcome(outcome).isGood, outcome).toBe(false);
+    for (const outcome of ['rejected', 'quota', 'no_model', 'unreachable'] as const)
+      expect(describeTestOutcome(outcome).isGood, outcome).toBe(false);
   });
 
   it('groups keys by company in a fixed order and leaves out companies with none', () => {
-    const groups = groupKeysByProvider([key({ provider: 'anthropic' }), key({ id: 'b', provider: 'gemini' }), key({ id: 'c', provider: 'gemini' })]);
+    const groups = groupKeysByProvider([
+      key({ provider: 'anthropic' }),
+      key({ id: 'b', provider: 'gemini' }),
+      key({ id: 'c', provider: 'gemini' }),
+    ]);
     expect(groups.map((group) => group.provider)).toEqual(['gemini', 'anthropic']);
     expect(groups[0]!.keys).toHaveLength(2);
   });
@@ -75,28 +86,95 @@ describe('the key mode and the platform’s part', () => {
   });
 
   it('describes the platform allowance and how much is used', () => {
-    expect(describePlatformUsage({ enabled: false, monthlyCallCap: null, monthlyTokenCap: null, tokensUsedThisMonth: 0, tokensRemainingThisMonth: null, usedThisMonth: 0, remainingThisMonth: null, expiresAt: null })).toEqual([{ key: 'settings.ai.platform.off', values: {} }]);
-    expect(describePlatformUsage({ enabled: true, monthlyCallCap: 1000, monthlyTokenCap: null, tokensUsedThisMonth: 0, tokensRemainingThisMonth: null, usedThisMonth: 250, remainingThisMonth: 750, expiresAt: '2026-12-31' })).toEqual([
+    expect(
+      describePlatformUsage({
+        enabled: false,
+        monthlyCallCap: null,
+        monthlyTokenCap: null,
+        tokensUsedThisMonth: 0,
+        tokensRemainingThisMonth: null,
+        usedThisMonth: 0,
+        remainingThisMonth: null,
+        expiresAt: null,
+      }),
+    ).toEqual([{ key: 'settings.ai.platform.off', values: {} }]);
+    expect(
+      describePlatformUsage({
+        enabled: true,
+        monthlyCallCap: 1000,
+        monthlyTokenCap: null,
+        tokensUsedThisMonth: 0,
+        tokensRemainingThisMonth: null,
+        usedThisMonth: 250,
+        remainingThisMonth: 750,
+        expiresAt: '2026-12-31',
+      }),
+    ).toEqual([
       { key: 'settings.ai.platform.cap', values: { used: 250, cap: 1000, left: 750 } },
       { key: 'settings.ai.platform.expires', values: { date: '2026-12-31' } },
     ]);
-    expect(describePlatformUsage({ enabled: true, monthlyCallCap: null, monthlyTokenCap: null, tokensUsedThisMonth: 0, tokensRemainingThisMonth: null, usedThisMonth: 40, remainingThisMonth: null, expiresAt: null })[0]!.key).toBe('settings.ai.platform.noCap');
-    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 250, monthlyTokenCap: null, tokensUsedThisMonth: 0 })).toBe(25);
-    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 5000, monthlyTokenCap: null, tokensUsedThisMonth: 0 })).toBe(100);
-    expect(percentOfCapUsed({ monthlyCallCap: null, usedThisMonth: 5, monthlyTokenCap: null, tokensUsedThisMonth: 0 })).toBe(0);
+    expect(
+      describePlatformUsage({
+        enabled: true,
+        monthlyCallCap: null,
+        monthlyTokenCap: null,
+        tokensUsedThisMonth: 0,
+        tokensRemainingThisMonth: null,
+        usedThisMonth: 40,
+        remainingThisMonth: null,
+        expiresAt: null,
+      })[0]!.key,
+    ).toBe('settings.ai.platform.noCap');
+    expect(
+      percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 250, monthlyTokenCap: null, tokensUsedThisMonth: 0 }),
+    ).toBe(25);
+    expect(
+      percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 5000, monthlyTokenCap: null, tokensUsedThisMonth: 0 }),
+    ).toBe(100);
+    expect(
+      percentOfCapUsed({ monthlyCallCap: null, usedThisMonth: 5, monthlyTokenCap: null, tokensUsedThisMonth: 0 }),
+    ).toBe(0);
     // the nearer of the two allowances counts: 10% of the calls but 80% of the tokens is 80%
-    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 100, monthlyTokenCap: 1_000_000, tokensUsedThisMonth: 800_000 })).toBe(80);
-    expect(describePlatformUsage({ enabled: true, monthlyCallCap: null, monthlyTokenCap: 1000, tokensUsedThisMonth: 400, tokensRemainingThisMonth: 600, usedThisMonth: 3, remainingThisMonth: null, expiresAt: null })).toEqual([
-      { key: 'settings.ai.platform.tokenCap', values: { used: 400, cap: 1000, left: 600 } },
-    ]);
+    expect(
+      percentOfCapUsed({
+        monthlyCallCap: 1000,
+        usedThisMonth: 100,
+        monthlyTokenCap: 1_000_000,
+        tokensUsedThisMonth: 800_000,
+      }),
+    ).toBe(80);
+    expect(
+      describePlatformUsage({
+        enabled: true,
+        monthlyCallCap: null,
+        monthlyTokenCap: 1000,
+        tokensUsedThisMonth: 400,
+        tokensRemainingThisMonth: 600,
+        usedThisMonth: 3,
+        remainingThisMonth: null,
+        expiresAt: null,
+      }),
+    ).toEqual([{ key: 'settings.ai.platform.tokenCap', values: { used: 400, cap: 1000, left: 600 } }]);
   });
 });
 
 describe('modules', () => {
-  const module = (changes: Partial<ModuleView>): ModuleView => ({ id: 'feature.x', kind: 'feature', name: 'X', description: '', requires: [], state: 'active', ...changes });
+  const module = (changes: Partial<ModuleView>): ModuleView => ({
+    id: 'feature.x',
+    kind: 'feature',
+    name: 'X',
+    description: '',
+    requires: [],
+    state: 'active',
+    ...changes,
+  });
 
   it('groups by kind in a fixed order', () => {
-    const groups = groupModulesByKind([module({ id: 'a', kind: 'feature' }), module({ id: 'b', kind: 'engine' }), module({ id: 'c', kind: 'feature' })]);
+    const groups = groupModulesByKind([
+      module({ id: 'a', kind: 'feature' }),
+      module({ id: 'b', kind: 'engine' }),
+      module({ id: 'c', kind: 'feature' }),
+    ]);
     expect(groups.map((group) => group.kind)).toEqual(['engine', 'feature']);
   });
 
@@ -111,6 +189,9 @@ describe('modules', () => {
 
   it('writes the names of the modules a module needs', () => {
     const leads = module({ id: 'engine.leads', name: 'Lead engine' });
-    expect(namesOfRequirements(module({ requires: ['engine.leads', 'unknown.thing'] }), [leads])).toEqual(['Lead engine', 'unknown.thing']);
+    expect(namesOfRequirements(module({ requires: ['engine.leads', 'unknown.thing'] }), [leads])).toEqual([
+      'Lead engine',
+      'unknown.thing',
+    ]);
   });
 });

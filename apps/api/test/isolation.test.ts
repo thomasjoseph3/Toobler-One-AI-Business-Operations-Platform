@@ -124,7 +124,13 @@ beforeAll(async () => {
     `Does it work ${secretWords}?`,
   );
   // A starts a reading of its website (the job is not run here: the isolation test only needs A's reading to exist)
-  const prefillRun = await sendOk(businessA, 'POST', '/knowledge/prefill', { websiteUrl: `https://${secretWords}.example` }, 202);
+  const prefillRun = await sendOk(
+    businessA,
+    'POST',
+    '/knowledge/prefill',
+    { websiteUrl: `https://${secretWords}.example` },
+    202,
+  );
   // A saves an AI key of its own; B must never see it, its label, or be able to touch it
   const aiKey = await sendOk(
     businessA,
@@ -615,7 +621,11 @@ const attempts: Attempt[] = [
   {
     route: 'POST /api/v1/setup/chat',
     what: "answer a question in the setup chat as B (B's own answer is saved; A's answers must stay as they were)",
-    request: () => ({ method: 'POST', url: '/setup/chat', payload: { questionKey: 'business_name', reply: 'B Stays' } }),
+    request: () => ({
+      method: 'POST',
+      url: '/setup/chat',
+      payload: { questionKey: 'business_name', reply: 'B Stays' },
+    }),
     expectedStatus: 200,
   },
   {
@@ -632,8 +642,12 @@ const attempts: Attempt[] = [
   },
   {
     route: 'POST /api/v1/knowledge/prefill',
-    what: 'start a reading as B (B gets its own; A\'s reading and answers must stay as they were)',
-    request: () => ({ method: 'POST', url: '/knowledge/prefill', payload: { websiteUrl: 'https://bobs-business.example' } }),
+    what: "start a reading as B (B gets its own; A's reading and answers must stay as they were)",
+    request: () => ({
+      method: 'POST',
+      url: '/knowledge/prefill',
+      payload: { websiteUrl: 'https://bobs-business.example' },
+    }),
     expectedStatus: 202,
   },
   {

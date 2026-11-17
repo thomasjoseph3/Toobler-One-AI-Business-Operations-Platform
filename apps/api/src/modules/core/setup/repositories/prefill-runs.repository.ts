@@ -130,7 +130,12 @@ export async function lockRun(db: Db, accountId: string, runId: string): Promise
 
 /** Marks a run as being read. */
 export async function markReading(db: Db, accountId: string, runId: string): Promise<void> {
-  await db.updateTable('prefill_runs').set({ status: 'reading' }).where('account_id', '=', accountId).where('id', '=', runId).execute();
+  await db
+    .updateTable('prefill_runs')
+    .set({ status: 'reading' })
+    .where('account_id', '=', accountId)
+    .where('id', '=', runId)
+    .execute();
 }
 
 /** Marks a run finished (`done`, with what was found) or `failed` (with a code and a plain message, never page text). */

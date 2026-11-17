@@ -58,7 +58,12 @@ export function DeleteStageDialog({ stage, otherOpenStages, onClose, onDeleted }
       footer={
         <>
           <Button onClick={onClose}>{t('leadForm.cancel')}</Button>
-          <Button variant="destructive" isLoading={isDeleting} disabled={hasLeads && moveToStageId === ''} onClick={() => void confirmDelete()}>
+          <Button
+            variant="destructive"
+            isLoading={isDeleting}
+            disabled={hasLeads && moveToStageId === ''}
+            onClick={() => void confirmDelete()}
+          >
             {t('pipeline.delete.confirm')}
           </Button>
         </>
@@ -67,7 +72,9 @@ export function DeleteStageDialog({ stage, otherOpenStages, onClose, onDeleted }
       <div className="flex flex-col gap-3">
         {problem ? <Alert tone="error">{problem}</Alert> : null}
         <p className="text-body-md text-text-secondary">
-          {hasLeads ? formatMessage('pipeline.delete.hasLeads', { count: stage.leadCount }) : t('pipeline.delete.empty')}
+          {hasLeads
+            ? formatMessage('pipeline.delete.hasLeads', { count: stage.leadCount })
+            : t('pipeline.delete.empty')}
         </p>
         {hasLeads ? (
           <SelectField

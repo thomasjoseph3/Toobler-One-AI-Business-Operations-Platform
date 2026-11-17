@@ -32,7 +32,8 @@ export function checkContactForm(fields: ContactFormFields): ContactFormProblems
   const hasEmail = fields.email.trim() !== '';
   if (!hasPhone && !hasEmail) problems.contact = 'contacts.form.needPhoneOrEmail';
   if (hasEmail && !EMAIL_SHAPE.test(fields.email.trim())) problems.email = 'contacts.form.emailInvalid';
-  if (fields.language.trim() !== '' && !/^[a-zA-Z]{2}$/.test(fields.language.trim())) problems.language = 'contacts.form.languageInvalid';
+  if (fields.language.trim() !== '' && !/^[a-zA-Z]{2}$/.test(fields.language.trim()))
+    problems.language = 'contacts.form.languageInvalid';
   return problems;
 }
 

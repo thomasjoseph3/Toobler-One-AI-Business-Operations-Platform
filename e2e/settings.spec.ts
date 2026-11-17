@@ -9,27 +9,41 @@ test.describe('Settings: AI keys and key mode', () => {
   test('shows the key mode, what the platform allows and this month’s use', async ({ page }) => {
     await page.goto('/settings');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings');
-    await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'AI' })).toHaveAttribute('aria-current', 'page');
+    await expect(
+      page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'AI' }),
+    ).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('radio', { name: /My own keys first, then the platform's/ })).toBeChecked();
     await expect(page.getByText('Allowed 1000 AI calls a month. Used 250 this month, 750 left.')).toBeVisible();
     await expect(page.getByText('Allowed until 31 Dec 2026.')).toBeVisible();
-    await expect(page.getByRole('progressbar', { name: "Share of this month's allowance used" })).toHaveAttribute('aria-valuenow', '25');
+    await expect(page.getByRole('progressbar', { name: "Share of this month's allowance used" })).toHaveAttribute(
+      'aria-valuenow',
+      '25',
+    );
     const usage = page.getByRole('heading', { name: 'AI use this month' }).locator('..');
     await expect(usage.getByText('250', { exact: true })).toBeVisible();
   });
 
-  test('changes the key mode and warns when the choice would leave nothing to answer with', async ({ page, pretendApi }) => {
+  test('changes the key mode and warns when the choice would leave nothing to answer with', async ({
+    page,
+    pretendApi,
+  }) => {
     pretendApi.settings.platformAccess.enabled = false;
     await page.goto('/settings');
     await expect(page.getByText('Not switched on for your business')).toBeVisible();
     await page.getByRole('radio', { name: /Only the platform's keys/ }).check();
     await expect.poll(() => pretendApi.settings.keyModeChanges).toEqual(['platform']);
-    await expect(page.getByText(/The platform's keys are not switched on for your business, so the AI cannot answer in this mode/)).toBeVisible();
+    await expect(
+      page.getByText(/The platform's keys are not switched on for your business, so the AI cannot answer in this mode/),
+    ).toBeVisible();
     await expect(page.getByText('Saved.')).toBeVisible();
   });
 
   test('puts the mode back and shows why when the change is refused', async ({ page, pretendApi }) => {
-    pretendApi.settings.refusal = { status: 400, code: 'INVALID_MODE', message: 'That mode is not allowed for your business.' };
+    pretendApi.settings.refusal = {
+      status: 400,
+      code: 'INVALID_MODE',
+      message: 'That mode is not allowed for your business.',
+    };
     await page.goto('/settings');
     // click, not check: the page puts the choice back at once when it is refused, which is what this test is for
     await page.getByRole('radio', { name: /Only my own keys/ }).click();
@@ -56,7 +70,9 @@ test.describe('Settings: AI keys and key mode', () => {
     pretendApi.settings.nextTestOutcome = 'rejected';
     await page.getByRole('button', { name: 'Test the key Main Gemini key' }).click();
     await expect(page.getByText(/The AI company rejected this key/)).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Google Gemini' }).getByText('Rejected', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('region', { name: 'Google Gemini' }).getByText('Rejected', { exact: true }),
+    ).toBeVisible();
   });
 
   test('adds a key: checks it first, sends it once, and never shows it again', async ({ page, pretendApi }) => {
@@ -140,8 +156,11 @@ test.describe('Settings: modules', () => {
   test('lists every module by kind with its state, what it needs, and the right button', async ({ page }) => {
     await page.goto('/settings/modules');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Settings');
-    await expect(page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Modules' })).toHaveAttribute('aria-current', 'page');
-    for (const heading of ['Engines', 'Channels', 'Features']) await expect(page.getByRole('heading', { name: heading, level: 2 })).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Modules' }),
+    ).toHaveAttribute('aria-current', 'page');
+    for (const heading of ['Engines', 'Channels', 'Features'])
+      await expect(page.getByRole('heading', { name: heading, level: 2 })).toBeVisible();
     const chat = page.getByRole('listitem').filter({ hasText: 'Website chat' });
     await expect(chat.getByText('On', { exact: true })).toBeVisible();
     await expect(chat.getByText('Needs: Lead engine')).toBeVisible();
@@ -149,13 +168,23 @@ test.describe('Settings: modules', () => {
     const whatsapp = page.getByRole('listitem').filter({ hasText: 'WhatsApp' });
     await expect(whatsapp.getByText('Not in your plan')).toBeVisible();
     await expect(whatsapp.getByRole('button')).toHaveCount(0);
-    await expect(page.getByRole('listitem').filter({ hasText: 'Follow-ups' }).getByRole('button', { name: 'Switch on Follow-ups' })).toBeVisible();
+    await expect(
+      page
+        .getByRole('listitem')
+        .filter({ hasText: 'Follow-ups' })
+        .getByRole('button', { name: 'Switch on Follow-ups' }),
+    ).toBeVisible();
   });
 
-  test('switches a module on at once, and off only after a question that says the data is kept', async ({ page, pretendApi }) => {
+  test('switches a module on at once, and off only after a question that says the data is kept', async ({
+    page,
+    pretendApi,
+  }) => {
     await page.goto('/settings/modules');
     await page.getByRole('button', { name: 'Switch on Follow-ups' }).click();
-    await expect(page.getByRole('listitem').filter({ hasText: 'Follow-ups' }).getByText('On', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('listitem').filter({ hasText: 'Follow-ups' }).getByText('On', { exact: true }),
+    ).toBeVisible();
     expect(pretendApi.settings.moduleChanges).toEqual([{ id: 'feature.followups', enabled: true }]);
 
     await page.getByRole('button', { name: 'Switch off Website chat' }).click();
@@ -165,12 +194,18 @@ test.describe('Settings: modules', () => {
     expect(pretendApi.settings.moduleChanges).toHaveLength(1);
     await page.getByRole('button', { name: 'Switch off Website chat' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Switch off', exact: true }).click();
-    await expect(page.getByRole('listitem').filter({ hasText: 'Website chat' }).getByText('Switched off')).toBeVisible();
+    await expect(
+      page.getByRole('listitem').filter({ hasText: 'Website chat' }).getByText('Switched off'),
+    ).toBeVisible();
     expect(pretendApi.settings.moduleChanges[1]).toEqual({ id: 'channel.webchat', enabled: false });
   });
 
   test('shows the API’s own words when it refuses a switch', async ({ page, pretendApi }) => {
-    pretendApi.settings.refusal = { status: 409, code: 'MODULE_NEEDED', message: 'Another module needs this one switched on.' };
+    pretendApi.settings.refusal = {
+      status: 409,
+      code: 'MODULE_NEEDED',
+      message: 'Another module needs this one switched on.',
+    };
     await page.goto('/settings/modules');
     await page.getByRole('button', { name: 'Switch on Follow-ups' }).click();
     await expect(page.getByText('Another module needs this one switched on.')).toBeVisible();
@@ -196,9 +231,17 @@ test.describe('Settings: modules', () => {
   test('has no accessibility problems on either page', async ({ page }) => {
     await page.goto('/settings');
     await expect(page.getByText('Main Gemini key')).toBeVisible();
-    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations.map((violation) => `${violation.id}: ${violation.nodes.length}`)).toEqual([]);
+    expect(
+      (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations.map(
+        (violation) => `${violation.id}: ${violation.nodes.length}`,
+      ),
+    ).toEqual([]);
     await page.goto('/settings/modules');
     await expect(page.getByRole('heading', { name: 'Website chat', level: 3 })).toBeVisible();
-    expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations.map((violation) => `${violation.id}: ${violation.nodes.length}`)).toEqual([]);
+    expect(
+      (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze()).violations.map(
+        (violation) => `${violation.id}: ${violation.nodes.length}`,
+      ),
+    ).toEqual([]);
   });
 });

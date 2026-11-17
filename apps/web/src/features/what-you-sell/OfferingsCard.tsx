@@ -38,7 +38,15 @@ export function OfferingsCard(props: {
   const switchActive = (offering: Offering) =>
     run(offering.id, () => apiRequest('PATCH', `/offerings/${offering.id}`, { active: !offering.active }));
   const move = (offering: Offering, direction: 'up' | 'down') =>
-    run(offering.id, () => apiRequest('POST', '/offerings/reorder', { offeringIds: moveId(offerings.map((item) => item.id), offering.id, direction) }));
+    run(offering.id, () =>
+      apiRequest('POST', '/offerings/reorder', {
+        offeringIds: moveId(
+          offerings.map((item) => item.id),
+          offering.id,
+          direction,
+        ),
+      }),
+    );
   const confirmDelete = async () => {
     if (!toDelete) return;
     const target = toDelete;
@@ -56,21 +64,43 @@ export function OfferingsCard(props: {
           </Button>
         ) : null}
       </div>
-      {problem ? <Alert tone="error" className="mb-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mb-3">
+          {problem}
+        </Alert>
+      ) : null}
       {offerings.length === 0 ? (
-        <EmptyState icon={<span aria-hidden>🛍</span>} title={t('whatYouSell.offerings.empty.title')} description={t('whatYouSell.offerings.empty.description')} />
+        <EmptyState
+          icon={<span aria-hidden>🛍</span>}
+          title={t('whatYouSell.offerings.empty.title')}
+          description={t('whatYouSell.offerings.empty.description')}
+        />
       ) : (
         <ul>
           {offerings.map((offering, position) => (
             <li key={offering.id} className="flex flex-col gap-2 border-b border-border-default py-4 last:border-b-0">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <h3 className={`text-label-md ${offering.active ? 'text-text-primary' : 'text-text-secondary'}`}>{offering.name}</h3>
-                <Badge tone={offering.active ? 'success' : 'neutral'}>{t(offering.active ? 'whatYouSell.offerings.on' : 'whatYouSell.offerings.off')}</Badge>
+                <h3 className={`text-label-md ${offering.active ? 'text-text-primary' : 'text-text-secondary'}`}>
+                  {offering.name}
+                </h3>
+                <Badge tone={offering.active ? 'success' : 'neutral'}>
+                  {t(offering.active ? 'whatYouSell.offerings.on' : 'whatYouSell.offerings.off')}
+                </Badge>
               </div>
-              <p className="text-body-md text-text-primary">{offering.priceInWords ?? t('whatYouSell.offerings.noPrice')}</p>
+              <p className="text-body-md text-text-primary">
+                {offering.priceInWords ?? t('whatYouSell.offerings.noPrice')}
+              </p>
               {offering.description ? <p className="text-body-md text-text-secondary">{offering.description}</p> : null}
-              {offering.includes ? <p className="text-body-md text-text-secondary">{formatMessage('whatYouSell.offerings.includes', { text: offering.includes })}</p> : null}
-              {offering.seasonNote ? <p className="text-body-md text-text-secondary">{formatMessage('whatYouSell.offerings.season', { text: offering.seasonNote })}</p> : null}
+              {offering.includes ? (
+                <p className="text-body-md text-text-secondary">
+                  {formatMessage('whatYouSell.offerings.includes', { text: offering.includes })}
+                </p>
+              ) : null}
+              {offering.seasonNote ? (
+                <p className="text-body-md text-text-secondary">
+                  {formatMessage('whatYouSell.offerings.season', { text: offering.seasonNote })}
+                </p>
+              ) : null}
               {offering.details.length > 0 ? (
                 <dl className="text-body-md grid grid-cols-[auto_1fr] gap-x-3 text-text-secondary">
                   {offering.details.map((detail) => (
@@ -83,7 +113,13 @@ export function OfferingsCard(props: {
               ) : null}
               {canEdit ? (
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="compact" disabled={busyId === offering.id} onClick={() => onEdit(offering)} aria-label={formatMessage('whatYouSell.offerings.edit', { name: offering.name })}>
+                  <Button
+                    variant="secondary"
+                    size="compact"
+                    disabled={busyId === offering.id}
+                    onClick={() => onEdit(offering)}
+                    aria-label={formatMessage('whatYouSell.offerings.edit', { name: offering.name })}
+                  >
                     {t('whatYouSell.offerings.editButton')}
                   </Button>
                   <Button
@@ -91,17 +127,42 @@ export function OfferingsCard(props: {
                     size="compact"
                     disabled={busyId === offering.id}
                     onClick={() => switchActive(offering)}
-                    aria-label={formatMessage(offering.active ? 'whatYouSell.offerings.switchOff' : 'whatYouSell.offerings.switchOn', { name: offering.name })}
+                    aria-label={formatMessage(
+                      offering.active ? 'whatYouSell.offerings.switchOff' : 'whatYouSell.offerings.switchOn',
+                      { name: offering.name },
+                    )}
                   >
-                    {t(offering.active ? 'whatYouSell.offerings.switchOffButton' : 'whatYouSell.offerings.switchOnButton')}
+                    {t(
+                      offering.active
+                        ? 'whatYouSell.offerings.switchOffButton'
+                        : 'whatYouSell.offerings.switchOnButton',
+                    )}
                   </Button>
-                  <Button variant="tertiary" size="compact" disabled={busyId === offering.id || position === 0} onClick={() => move(offering, 'up')} aria-label={formatMessage('whatYouSell.offerings.moveUp', { name: offering.name })}>
+                  <Button
+                    variant="tertiary"
+                    size="compact"
+                    disabled={busyId === offering.id || position === 0}
+                    onClick={() => move(offering, 'up')}
+                    aria-label={formatMessage('whatYouSell.offerings.moveUp', { name: offering.name })}
+                  >
                     ↑
                   </Button>
-                  <Button variant="tertiary" size="compact" disabled={busyId === offering.id || position === offerings.length - 1} onClick={() => move(offering, 'down')} aria-label={formatMessage('whatYouSell.offerings.moveDown', { name: offering.name })}>
+                  <Button
+                    variant="tertiary"
+                    size="compact"
+                    disabled={busyId === offering.id || position === offerings.length - 1}
+                    onClick={() => move(offering, 'down')}
+                    aria-label={formatMessage('whatYouSell.offerings.moveDown', { name: offering.name })}
+                  >
                     ↓
                   </Button>
-                  <Button variant="destructive" size="compact" disabled={busyId === offering.id} onClick={() => setToDelete(offering)} aria-label={formatMessage('whatYouSell.offerings.delete', { name: offering.name })}>
+                  <Button
+                    variant="destructive"
+                    size="compact"
+                    disabled={busyId === offering.id}
+                    onClick={() => setToDelete(offering)}
+                    aria-label={formatMessage('whatYouSell.offerings.delete', { name: offering.name })}
+                  >
                     {t('whatYouSell.offerings.deleteButton')}
                   </Button>
                 </div>

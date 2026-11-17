@@ -12,7 +12,12 @@ export function ContactFormBoxes(props: {
   const { fields, problems, onChange, showLanguage = false } = props;
   return (
     <>
-      <TextField label={t('contacts.form.name')} value={fields.name} onChange={(event) => onChange({ name: event.target.value })} autoComplete="off" />
+      <TextField
+        label={t('contacts.form.name')}
+        value={fields.name}
+        onChange={(event) => onChange({ name: event.target.value })}
+        autoComplete="off"
+      />
       <TextField
         label={t('contacts.form.phone')}
         type="tel"

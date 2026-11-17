@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Faq, UnansweredQuestion } from '@toobler-one/shared';
-import { buildCreateFaqRequest, buildUpdateFaqRequest, checkFaqForm, EMPTY_FAQ_FORM, formFromFaq, tidyQuestion } from './faq-form';
+import {
+  buildCreateFaqRequest,
+  buildUpdateFaqRequest,
+  checkFaqForm,
+  EMPTY_FAQ_FORM,
+  formFromFaq,
+  tidyQuestion,
+} from './faq-form';
 import { describeAskedTimes, formatAskedDate, isWaitingForCheck, sortOpenQuestions } from './unanswered-state';
 
 const faq = (changes: Partial<Faq> = {}): Faq => ({
@@ -16,7 +23,10 @@ const faq = (changes: Partial<Faq> = {}): Faq => ({
 
 describe('checkFaqForm', () => {
   it('needs a question and an answer, and keeps them within the limits', () => {
-    expect(checkFaqForm(EMPTY_FAQ_FORM)).toEqual({ question: 'Type the question a customer would ask.', answer: 'Type the answer.' });
+    expect(checkFaqForm(EMPTY_FAQ_FORM)).toEqual({
+      question: 'Type the question a customer would ask.',
+      answer: 'Type the answer.',
+    });
     expect(checkFaqForm({ question: 'Pets?', answer: 'Yes' })).toEqual({});
     expect(checkFaqForm({ question: 'x'.repeat(301), answer: 'y' }).question).toContain('300');
     expect(checkFaqForm({ question: 'q', answer: 'y'.repeat(2001) }).answer).toContain('2000');
@@ -30,14 +40,21 @@ describe('checkFaqForm', () => {
 describe('requests', () => {
   it('tidies the question and trims the answer but keeps the answer’s line breaks', () => {
     expect(tidyQuestion('  Do   you\nhave   parking?  ')).toBe('Do you have parking?');
-    expect(buildCreateFaqRequest({ question: '  Pets   allowed? ', answer: ' Yes.\nOn a lead. ' })).toEqual({ question: 'Pets allowed?', answer: 'Yes.\nOn a lead.' });
+    expect(buildCreateFaqRequest({ question: '  Pets   allowed? ', answer: ' Yes.\nOn a lead. ' })).toEqual({
+      question: 'Pets allowed?',
+      answer: 'Yes.\nOn a lead.',
+    });
   });
 
   it('sends only what changed, and nothing when the form is unchanged', () => {
     const original = faq();
     expect(buildUpdateFaqRequest(original, formFromFaq(original))).toEqual({});
-    expect(buildUpdateFaqRequest(original, { ...formFromFaq(original), answer: 'Yes, and EV charging.' })).toEqual({ answer: 'Yes, and EV charging.' });
-    expect(buildUpdateFaqRequest(original, { question: 'Is there parking?', answer: original.answer })).toEqual({ question: 'Is there parking?' });
+    expect(buildUpdateFaqRequest(original, { ...formFromFaq(original), answer: 'Yes, and EV charging.' })).toEqual({
+      answer: 'Yes, and EV charging.',
+    });
+    expect(buildUpdateFaqRequest(original, { question: 'Is there parking?', answer: original.answer })).toEqual({
+      question: 'Is there parking?',
+    });
   });
 });
 
@@ -53,8 +70,20 @@ describe('unanswered questions and FAQs', () => {
   });
 
   it('puts the most asked first and keeps the order of ties', () => {
-    const question = (id: string, count: number): UnansweredQuestion => ({ id, question: id, count, lastAskedAt: '2026-11-17T10:00:00.000Z', status: 'open', faqId: null, createdAt: '2026-11-17T10:00:00.000Z' });
-    expect(sortOpenQuestions([question('a', 1), question('b', 3), question('c', 3), question('d', 2)]).map((item) => item.id)).toEqual(['b', 'c', 'd', 'a']);
+    const question = (id: string, count: number): UnansweredQuestion => ({
+      id,
+      question: id,
+      count,
+      lastAskedAt: '2026-11-17T10:00:00.000Z',
+      status: 'open',
+      faqId: null,
+      createdAt: '2026-11-17T10:00:00.000Z',
+    });
+    expect(
+      sortOpenQuestions([question('a', 1), question('b', 3), question('c', 3), question('d', 2)]).map(
+        (item) => item.id,
+      ),
+    ).toEqual(['b', 'c', 'd', 'a']);
   });
 
   it('shows the date in the business’s time zone', () => {

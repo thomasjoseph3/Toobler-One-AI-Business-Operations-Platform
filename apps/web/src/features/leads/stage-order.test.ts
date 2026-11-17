@@ -2,11 +2,24 @@ import { describe, expect, it } from 'vitest';
 import type { PipelineStage } from '@toobler-one/shared';
 import { listOpenStageIdsInOrder, moveStageInOrder } from './stage-order';
 
-const stage = (id: string, kind: PipelineStage['kind'], sort: number): PipelineStage => ({ id, name: id, kind, sort, leadCount: 0 });
+const stage = (id: string, kind: PipelineStage['kind'], sort: number): PipelineStage => ({
+  id,
+  name: id,
+  kind,
+  sort,
+  leadCount: 0,
+});
 
 describe('listOpenStageIdsInOrder', () => {
   it('lists only the open stages, in board order', () => {
-    expect(listOpenStageIdsInOrder([stage('b', 'open', 1), stage('won', 'won', 3), stage('a', 'open', 0), stage('lost', 'lost', 4)])).toEqual(['a', 'b']);
+    expect(
+      listOpenStageIdsInOrder([
+        stage('b', 'open', 1),
+        stage('won', 'won', 3),
+        stage('a', 'open', 0),
+        stage('lost', 'lost', 4),
+      ]),
+    ).toEqual(['a', 'b']);
   });
 });
 

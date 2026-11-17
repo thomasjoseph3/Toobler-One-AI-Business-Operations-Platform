@@ -62,7 +62,11 @@ export function createRunPrefillService(dependencies: {
       let answersSkipped = 0;
 
       /** Saves one source's answers and adds up what was saved and what was left alone. */
-      const saveAnswers = async (source: 'website' | 'listing', sourceReference: string, answers: PrefilledAnswer[]) => {
+      const saveAnswers = async (
+        source: 'website' | 'listing',
+        sourceReference: string,
+        answers: PrefilledAnswer[],
+      ) => {
         if (answers.length === 0) return;
         const saved = await prefilledAnswers.saveWaitingAnswers({
           accountId,
@@ -90,7 +94,11 @@ export function createRunPrefillService(dependencies: {
             }
             const place = await placesProvider.findPlace(readListingSearchText(run.googleListing));
             if (!place) {
-              throw new ApiError(400, 'GOOGLE_LISTING_NOT_FOUND', "We couldn't find that business on Google. Check the name and town.");
+              throw new ApiError(
+                400,
+                'GOOGLE_LISTING_NOT_FOUND',
+                "We couldn't find that business on Google. Check the name and town.",
+              );
             }
             listingAnswers = firstAnswerPerQuestion(listingToAnswers(place));
             await saveAnswers('listing', place.name ?? run.googleListing, listingAnswers);
@@ -106,7 +114,11 @@ export function createRunPrefillService(dependencies: {
             const website = await websiteReader.readWebsite(run.websiteUrl);
             pagesRead = website.pages.length;
             // Answers the page's own data states come first, then the AI's reading; the listing's answers are not repeated
-            const answersFromData = factsToAnswers({ facts: website.facts, phones: website.phones, emails: website.emails });
+            const answersFromData = factsToAnswers({
+              facts: website.facts,
+              phones: website.phones,
+              emails: website.emails,
+            });
             let answersFromAi: PrefilledAnswer[] = [];
             try {
               const extracted = await answerExtractor.extractAnswers({

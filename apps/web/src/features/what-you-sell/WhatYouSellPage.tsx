@@ -70,17 +70,26 @@ export function WhatYouSellPage() {
         <ErrorState
           title={t('whatYouSell.error.title')}
           description={t('knowledge.error.description')}
-          action={<Button variant="secondary" onClick={offeringsResource.reload}>{t('knowledge.retry')}</Button>}
+          action={
+            <Button variant="secondary" onClick={offeringsResource.reload}>
+              {t('knowledge.retry')}
+            </Button>
+          }
         />
       </Card>
     );
   }
 
   const offerings = offeringsData.data.items;
-  const suggestions = pickSuggestionsToShow(lastReading?.suggestedOfferings ?? [], offerings.map((offering) => offering.name), dismissedNames);
+  const suggestions = pickSuggestionsToShow(
+    lastReading?.suggestedOfferings ?? [],
+    offerings.map((offering) => offering.name),
+    dismissedNames,
+  );
   const openPanel = (editing: Offering | null, fields: OfferingFormFields) =>
     setPanel({ editing, fields, openings: (panel?.openings ?? 0) + 1 });
-  const dismiss = (suggestion: SuggestedOffering) => setDismissedNames((earlier) => new Set([...earlier, suggestionKey(suggestion)]));
+  const dismiss = (suggestion: SuggestedOffering) =>
+    setDismissedNames((earlier) => new Set([...earlier, suggestionKey(suggestion)]));
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -88,7 +97,11 @@ export function WhatYouSellPage() {
       <p className="text-body-md text-text-secondary">{t('whatYouSell.intro')}</p>
       {canEdit ? null : <p className="text-body-md text-text-secondary">{t('whatYouSell.managersOnly')}</p>}
       {canEdit ? (
-        <SuggestionsCard suggestions={suggestions} onAdd={(suggestion) => openPanel(null, formFromSuggestion(suggestion))} onDismiss={dismiss} />
+        <SuggestionsCard
+          suggestions={suggestions}
+          onAdd={(suggestion) => openPanel(null, formFromSuggestion(suggestion))}
+          onDismiss={dismiss}
+        />
       ) : null}
       <OfferingsCard
         offerings={offerings}

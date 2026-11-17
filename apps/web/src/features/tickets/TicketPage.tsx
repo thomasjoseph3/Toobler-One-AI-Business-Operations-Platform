@@ -2,7 +2,17 @@ import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 import type { TicketDetail } from '@toobler-one/shared';
-import { Alert, Button, Card, EmptyState, ErrorState, LoadingState, TextAreaField, Tag, TicketsIcon } from '@toobler-one/ui';
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  TextAreaField,
+  Tag,
+  TicketsIcon,
+} from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { t } from '../../app/i18n';
@@ -44,7 +54,10 @@ export function TicketPage() {
   const listSearch = (location.state as { listSearch?: string } | null)?.listSearch ?? '';
 
   const backLink = (
-    <Link to={{ pathname: '/tickets', search: listSearch }} className="text-body-md-semibold mb-4 inline-flex items-center gap-1 text-link hover:text-link-hover">
+    <Link
+      to={{ pathname: '/tickets', search: listSearch }}
+      className="text-body-md-semibold mb-4 inline-flex items-center gap-1 text-link hover:text-link-hover"
+    >
       <ArrowLeft aria-hidden className="size-4" />
       {t('ticketPage.back')}
     </Link>
@@ -72,9 +85,17 @@ export function TicketPage() {
         {backLink}
         <Card>
           {isMissing ? (
-            <EmptyState icon={<TicketsIcon size={24} />} title={t('ticketPage.notFound.title')} description={t('ticketPage.notFound.description')} />
+            <EmptyState
+              icon={<TicketsIcon size={24} />}
+              title={t('ticketPage.notFound.title')}
+              description={t('ticketPage.notFound.description')}
+            />
           ) : (
-            <ErrorState title={t('ticketPage.loadError.title')} description={t('ticketPage.loadError.description')} action={<Button onClick={ticketResource.reload}>{t('session.retry')}</Button>} />
+            <ErrorState
+              title={t('ticketPage.loadError.title')}
+              description={t('ticketPage.loadError.description')}
+              action={<Button onClick={ticketResource.reload}>{t('session.retry')}</Button>}
+            />
           )}
         </Card>
       </>
@@ -84,7 +105,11 @@ export function TicketPage() {
   const ticket = ticketResource.state.data;
   const isClosed = ticket.status === 'done';
   const writerLabel = (writtenByUserId: string | null) =>
-    writtenByUserId === null ? t('ticketPage.notes.system') : writtenByUserId === signedInUserId ? t('leads.owner.you') : t('leads.owner.teamMember');
+    writtenByUserId === null
+      ? t('ticketPage.notes.system')
+      : writtenByUserId === signedInUserId
+        ? t('leads.owner.you')
+        : t('leads.owner.teamMember');
 
   // Sends one change (take it, free it, close, reopen, a note) and shows the result in words; the page loads again after it worked.
   const sendChange = async (request: Record<string, unknown>, successText: string): Promise<boolean> => {
@@ -118,7 +143,15 @@ export function TicketPage() {
     <>
       {backLink}
       {actionNotice !== null ? (
-        <Alert tone={actionNotice.tone} className="mb-4" action={<Button variant="link" onClick={() => setActionNotice(null)}>{t('contacts.dismiss')}</Button>}>
+        <Alert
+          tone={actionNotice.tone}
+          className="mb-4"
+          action={
+            <Button variant="link" onClick={() => setActionNotice(null)}>
+              {t('contacts.dismiss')}
+            </Button>
+          }
+        >
           {actionNotice.text}
         </Alert>
       ) : null}
@@ -128,31 +161,51 @@ export function TicketPage() {
             <h2 className="text-heading-xl break-words text-text-primary">{ticket.title}</h2>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <Tag tone={findPriorityTagTone(ticket.priority)}>{t(findPriorityLabelKey(ticket.priority))}</Tag>
-              <Tag tone={isClosed ? 'won' : 'new'}>{isClosed ? t('tickets.status.done') : t('tickets.status.open')}</Tag>
+              <Tag tone={isClosed ? 'won' : 'new'}>
+                {isClosed ? t('tickets.status.done') : t('tickets.status.open')}
+              </Tag>
               <span className="text-body-sm text-text-secondary">{t(findTypeLabelKey(ticket.type))}</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isClosed ? (
-              <Button size="compact" variant="primary" isLoading={isActing} onClick={() => void sendChange({ status: 'open' }, t('ticketPage.reopened'))}>
+              <Button
+                size="compact"
+                variant="primary"
+                isLoading={isActing}
+                onClick={() => void sendChange({ status: 'open' }, t('ticketPage.reopened'))}
+              >
                 {t('ticketPage.reopen')}
               </Button>
             ) : (
               <>
                 {ticket.ownerUserId !== signedInUserId ? (
-                  <Button size="compact" disabled={isActing} onClick={() => void sendChange({ ownerUserId: signedInUserId }, t('ticketPage.assigned'))}>
+                  <Button
+                    size="compact"
+                    disabled={isActing}
+                    onClick={() => void sendChange({ ownerUserId: signedInUserId }, t('ticketPage.assigned'))}
+                  >
                     {t('ticketPage.assignToMe')}
                   </Button>
                 ) : null}
                 {ticket.ownerUserId !== null ? (
-                  <Button size="compact" disabled={isActing} onClick={() => void sendChange({ ownerUserId: null }, t('ticketPage.unassigned'))}>
+                  <Button
+                    size="compact"
+                    disabled={isActing}
+                    onClick={() => void sendChange({ ownerUserId: null }, t('ticketPage.unassigned'))}
+                  >
                     {t('ticketPage.removeOwner')}
                   </Button>
                 ) : null}
                 <Button size="compact" disabled={isActing} onClick={openEditPanel}>
                   {t('ticketPage.edit.button')}
                 </Button>
-                <Button size="compact" variant="primary" isLoading={isActing} onClick={() => void sendChange({ status: 'done' }, t('ticketPage.closed'))}>
+                <Button
+                  size="compact"
+                  variant="primary"
+                  isLoading={isActing}
+                  onClick={() => void sendChange({ status: 'done' }, t('ticketPage.closed'))}
+                >
                   {t('ticketPage.close')}
                 </Button>
               </>
@@ -175,10 +228,14 @@ export function TicketPage() {
             </Row>
             <Row label={t('tickets.column.owner')}>{findOwnerLabel(ticket.ownerUserId, signedInUserId)}</Row>
             <Row label={t('tickets.column.opened')}>{formatMoment(ticket.createdAt, timeZone)}</Row>
-            {isClosed ? <Row label={t('ticketPage.details.closedAt')}>{formatMoment(ticket.closedAt, timeZone)}</Row> : null}
+            {isClosed ? (
+              <Row label={t('ticketPage.details.closedAt')}>{formatMoment(ticket.closedAt, timeZone)}</Row>
+            ) : null}
           </dl>
           <h4 className="text-label-md mt-4 mb-1 text-text-primary">{t('tickets.form.details')}</h4>
-          <p className="text-body-md break-words whitespace-pre-wrap text-text-secondary">{ticket.details ?? t('ticketPage.details.none')}</p>
+          <p className="text-body-md break-words whitespace-pre-wrap text-text-secondary">
+            {ticket.details ?? t('ticketPage.details.none')}
+          </p>
         </Card>
         <Card>
           <h3 className="text-heading-sm mb-3 text-text-primary">{t('ticketPage.notes.title')}</h3>
@@ -210,7 +267,17 @@ export function TicketPage() {
           </div>
         </Card>
       </div>
-      <EditTicketPanel key={editOpenCount} ticket={ticket} isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} onSaved={() => { setIsEditOpen(false); setActionNotice({ tone: 'success', text: t('ticketPage.saved') }); ticketResource.reload(); }} />
+      <EditTicketPanel
+        key={editOpenCount}
+        ticket={ticket}
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onSaved={() => {
+          setIsEditOpen(false);
+          setActionNotice({ tone: 'success', text: t('ticketPage.saved') });
+          ticketResource.reload();
+        }}
+      />
     </>
   );
 }

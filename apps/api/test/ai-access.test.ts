@@ -103,7 +103,12 @@ describe('PUT /api/v1/platform/businesses/{id}/ai-access', () => {
       url: '/api/v1/ai/settings',
       headers: { ...unsafeRequestHeaders, cookie: business.cookieHeader },
     });
-    expect(seenByBusiness.json().platformAccess).toEqual({ enabled: true, monthlyCallCap: 300, monthlyTokenCap: null, expiresAt: endsAt });
+    expect(seenByBusiness.json().platformAccess).toEqual({
+      enabled: true,
+      monthlyCallCap: 300,
+      monthlyTokenCap: null,
+      expiresAt: endsAt,
+    });
   });
 
   it('sets and clears a monthly token cap, which the business sees', async () => {
@@ -112,7 +117,11 @@ describe('PUT /api/v1/platform/businesses/{id}/ai-access', () => {
     const set = await putAccess(platformAdmin, id, { enabled: true, monthlyTokenCap: 2_000_000 });
     expect(set.statusCode, set.body).toBe(200);
     expect(set.json()).toMatchObject({ monthlyTokenCap: 2_000_000, monthlyCallCap: null });
-    const seenByBusiness = await app.inject({ method: 'GET', url: '/api/v1/ai/settings', headers: { ...unsafeRequestHeaders, cookie: business.cookieHeader } });
+    const seenByBusiness = await app.inject({
+      method: 'GET',
+      url: '/api/v1/ai/settings',
+      headers: { ...unsafeRequestHeaders, cookie: business.cookieHeader },
+    });
     expect(seenByBusiness.json().platformAccess.monthlyTokenCap).toBe(2_000_000);
     const cleared = await putAccess(platformAdmin, id, { monthlyTokenCap: null });
     expect(cleared.json().monthlyTokenCap).toBeNull();

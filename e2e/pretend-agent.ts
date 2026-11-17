@@ -79,7 +79,11 @@ export function answerAgentCall(
           ],
           detailsSaved: details,
           situation: 'sale_enquiry',
-          promise: { kind: 'call_back_open', sentence: 'Our team will call you within 15 minutes.', dueAt: '2026-11-17T10:15:00.000Z' },
+          promise: {
+            kind: 'call_back_open',
+            sentence: 'Our team will call you within 15 minutes.',
+            dueAt: '2026-11-17T10:15:00.000Z',
+          },
           heldBackAmounts: [],
         },
       };
@@ -119,7 +123,12 @@ export function answerAgentCall(
     agent.summariesAskedFor.push(summaryMatch[1]!);
     return {
       status: 200,
-      body: { conversationId: summaryMatch[1], summary: 'Ravi asked about a deluxe room and was promised a call within 15 minutes.', summarisedAt: '2026-11-17T10:05:00.000Z', writtenByAi: true },
+      body: {
+        conversationId: summaryMatch[1],
+        summary: 'Ravi asked about a deluxe room and was promised a call within 15 minutes.',
+        summarisedAt: '2026-11-17T10:05:00.000Z',
+        writtenByAi: true,
+      },
     };
   }
   return undefined;

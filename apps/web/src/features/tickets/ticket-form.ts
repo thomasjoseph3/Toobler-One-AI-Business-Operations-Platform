@@ -13,7 +13,13 @@ export interface TicketFormFields {
   priority: TicketPriority;
 }
 
-export const EMPTY_TICKET_FORM: TicketFormFields = { contactId: null, title: '', details: '', type: 'other', priority: 'normal' };
+export const EMPTY_TICKET_FORM: TicketFormFields = {
+  contactId: null,
+  title: '',
+  details: '',
+  type: 'other',
+  priority: 'normal',
+};
 
 /** The longest title and details the API accepts. */
 export const MAX_TITLE_LENGTH = 200;
@@ -38,7 +44,12 @@ export function checkTicketForm(fields: TicketFormFields): TicketFormProblems {
 
 /** Turns the checked form into the request body; empty details are left out. Call it only after `checkTicketForm` found nothing. */
 export function buildCreateTicketRequest(fields: TicketFormFields, contactId: string): CreateTicketRequest {
-  const request: CreateTicketRequest = { contactId, title: fields.title.trim(), type: fields.type, priority: fields.priority };
+  const request: CreateTicketRequest = {
+    contactId,
+    title: fields.title.trim(),
+    type: fields.type,
+    priority: fields.priority,
+  };
   if (fields.details.trim() !== '') request.details = fields.details.trim();
   return request;
 }
@@ -69,7 +80,8 @@ export function checkTicketEditForm(fields: TicketEditFields): TicketFormProblem
 export function buildUpdateTicketRequest(fields: TicketEditFields, ticket: Ticket): UpdateTicketRequest {
   const request: UpdateTicketRequest = {};
   if (fields.title.trim() !== ticket.title) request.title = fields.title.trim();
-  if (fields.details.trim() !== (ticket.details ?? '')) request.details = fields.details.trim() === '' ? null : fields.details.trim();
+  if (fields.details.trim() !== (ticket.details ?? ''))
+    request.details = fields.details.trim() === '' ? null : fields.details.trim();
   if (fields.type !== ticket.type) request.type = fields.type;
   if (fields.priority !== ticket.priority) request.priority = fields.priority;
   return request;

@@ -25,10 +25,12 @@ export function checkFaqForm(fields: FaqFormFields): FaqFormProblems {
   const problems: FaqFormProblems = {};
   const question = tidyQuestion(fields.question);
   if (question === '') problems.question = 'Type the question a customer would ask.';
-  else if (question.length > MAX_FAQ_QUESTION_LENGTH) problems.question = `Keep the question under ${MAX_FAQ_QUESTION_LENGTH} characters.`;
+  else if (question.length > MAX_FAQ_QUESTION_LENGTH)
+    problems.question = `Keep the question under ${MAX_FAQ_QUESTION_LENGTH} characters.`;
   const answer = fields.answer.trim();
   if (answer === '') problems.answer = 'Type the answer.';
-  else if (answer.length > MAX_FAQ_ANSWER_LENGTH) problems.answer = `Keep the answer under ${MAX_FAQ_ANSWER_LENGTH} characters.`;
+  else if (answer.length > MAX_FAQ_ANSWER_LENGTH)
+    problems.answer = `Keep the answer under ${MAX_FAQ_ANSWER_LENGTH} characters.`;
   return problems;
 }
 

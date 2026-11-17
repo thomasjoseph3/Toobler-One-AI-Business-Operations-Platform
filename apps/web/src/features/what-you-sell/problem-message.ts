@@ -2,7 +2,13 @@ import { ApiRequestError } from '../../api/client';
 import { t } from '../../app/i18n';
 
 /** Codes whose own words are plain enough to show (the API wrote them for the person). */
-const PLAIN_WORD_CODES: ReadonlySet<string> = new Set(['VALIDATION_ERROR', 'OFFERING_EXISTS', 'OFFERS_LIMIT', 'OFFERINGS_LIMIT', 'INVALID_DATE']);
+const PLAIN_WORD_CODES: ReadonlySet<string> = new Set([
+  'VALIDATION_ERROR',
+  'OFFERING_EXISTS',
+  'OFFERS_LIMIT',
+  'OFFERINGS_LIMIT',
+  'INVALID_DATE',
+]);
 
 /** One plain sentence for a failed change. Never a code or a status number. */
 export function describeChangeProblem(error: unknown): string {

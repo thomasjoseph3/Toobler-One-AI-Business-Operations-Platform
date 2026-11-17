@@ -91,7 +91,13 @@ export function LeadsPage() {
       await apiRequest('POST', '/pipeline/stages/reorder', { stageIds: newOrder });
       actions.showNotice({ tone: 'success', text: formatMessage('pipeline.notice.moved', { name: stage.name }) });
     } catch (error) {
-      actions.showNotice({ tone: 'error', text: error instanceof ApiRequestError && error.status === 403 ? t('leads.error.forbidden') : t('leads.error.unknown') });
+      actions.showNotice({
+        tone: 'error',
+        text:
+          error instanceof ApiRequestError && error.status === 403
+            ? t('leads.error.forbidden')
+            : t('leads.error.unknown'),
+      });
     }
     reloadAll();
   };
@@ -139,7 +145,10 @@ export function LeadsPage() {
           onClose={() => setStageToDelete(null)}
           onDeleted={(stageName) => {
             setStageToDelete(null);
-            actions.showNotice({ tone: 'success', text: formatMessage('pipeline.notice.deleted', { name: stageName }) });
+            actions.showNotice({
+              tone: 'success',
+              text: formatMessage('pipeline.notice.deleted', { name: stageName }),
+            });
             reloadAll();
           }}
         />
@@ -150,7 +159,12 @@ export function LeadsPage() {
           onClose={() => setStageDialog(null)}
           onSaved={(stageName) => {
             setStageDialog(null);
-            actions.showNotice({ tone: 'success', text: formatMessage(stageDialog.stageToRename ? 'pipeline.notice.renamed' : 'pipeline.notice.added', { name: stageName }) });
+            actions.showNotice({
+              tone: 'success',
+              text: formatMessage(stageDialog.stageToRename ? 'pipeline.notice.renamed' : 'pipeline.notice.added', {
+                name: stageName,
+              }),
+            });
             reloadAll();
           }}
         />

@@ -2,7 +2,20 @@ import { useState } from 'react';
 import { ArrowLeft, Mail } from 'lucide-react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import type { Contact } from '@toobler-one/shared';
-import { Alert, Button, ButtonLink, Card, ConfirmDialog, ContactsIcon, EmptyState, ErrorState, LoadingState, PhoneIcon, Tag, WhatsappIcon } from '@toobler-one/ui';
+import {
+  Alert,
+  Button,
+  ButtonLink,
+  Card,
+  ConfirmDialog,
+  ContactsIcon,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PhoneIcon,
+  Tag,
+  WhatsappIcon,
+} from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
@@ -42,7 +55,10 @@ export function ContactPage() {
   const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
   const listSearch = (location.state as { listSearch?: string } | null)?.listSearch ?? '';
   const backLink = (
-    <Link to={{ pathname: '/contacts', search: listSearch }} className="text-body-md-semibold mb-4 inline-flex items-center gap-1 text-link hover:text-link-hover">
+    <Link
+      to={{ pathname: '/contacts', search: listSearch }}
+      className="text-body-md-semibold mb-4 inline-flex items-center gap-1 text-link hover:text-link-hover"
+    >
       <ArrowLeft aria-hidden className="size-4" />
       {t('contactPage.back')}
     </Link>
@@ -65,9 +81,17 @@ export function ContactPage() {
         {backLink}
         <Card>
           {isMissing ? (
-            <EmptyState icon={<ContactsIcon size={24} />} title={t('contactPage.notFound.title')} description={t('contactPage.notFound.description')} />
+            <EmptyState
+              icon={<ContactsIcon size={24} />}
+              title={t('contactPage.notFound.title')}
+              description={t('contactPage.notFound.description')}
+            />
           ) : (
-            <ErrorState title={t('contactPage.loadError.title')} description={t('contactPage.loadError.description')} action={<Button onClick={contactResource.reload}>{t('session.retry')}</Button>} />
+            <ErrorState
+              title={t('contactPage.loadError.title')}
+              description={t('contactPage.loadError.description')}
+              action={<Button onClick={contactResource.reload}>{t('session.retry')}</Button>}
+            />
           )}
         </Card>
       </>
@@ -94,7 +118,9 @@ export function ContactPage() {
       await apiRequest('DELETE', `/contacts/${contact.id}`);
       navigate(
         { pathname: '/contacts', search: listSearch },
-        { state: { notice: { tone: 'success', text: formatMessage('contactPage.delete.done', { name: displayName }) } } },
+        {
+          state: { notice: { tone: 'success', text: formatMessage('contactPage.delete.done', { name: displayName }) } },
+        },
       );
     } catch (error) {
       setDeleteProblem(describeContactSaveProblem(error));
@@ -117,7 +143,15 @@ export function ContactPage() {
         </Alert>
       ) : null}
       {isSavedNoticeShown ? (
-        <Alert tone="success" className="mb-4" action={<Button variant="link" onClick={() => setIsSavedNoticeShown(false)}>{t('contacts.dismiss')}</Button>}>
+        <Alert
+          tone="success"
+          className="mb-4"
+          action={
+            <Button variant="link" onClick={() => setIsSavedNoticeShown(false)}>
+              {t('contacts.dismiss')}
+            </Button>
+          }
+        >
           {t('contactPage.saved')}
         </Alert>
       ) : null}
@@ -126,7 +160,9 @@ export function ContactPage() {
           <div className="min-w-0">
             <h2 className="text-heading-xl break-words text-text-primary">{displayName}</h2>
             <div className="mt-2">
-              <Tag tone={findLifecycleTagTone(contact.lifecycleStage)}>{t(findLifecycleLabelKey(contact.lifecycleStage))}</Tag>
+              <Tag tone={findLifecycleTagTone(contact.lifecycleStage)}>
+                {t(findLifecycleLabelKey(contact.lifecycleStage))}
+              </Tag>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -136,12 +172,22 @@ export function ContactPage() {
               </ButtonLink>
             ) : null}
             {contact.phone ? (
-              <ButtonLink size="compact" href={`https://wa.me/${toWhatsappDigits(contact.phone)}`} target="_blank" rel="noopener noreferrer" leadingIcon={<WhatsappIcon size={16} />}>
+              <ButtonLink
+                size="compact"
+                href={`https://wa.me/${toWhatsappDigits(contact.phone)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                leadingIcon={<WhatsappIcon size={16} />}
+              >
                 {t('leadPage.whatsapp')}
               </ButtonLink>
             ) : null}
             {contact.email ? (
-              <ButtonLink size="compact" href={`mailto:${contact.email}`} leadingIcon={<Mail aria-hidden className="size-4" />}>
+              <ButtonLink
+                size="compact"
+                href={`mailto:${contact.email}`}
+                leadingIcon={<Mail aria-hidden className="size-4" />}
+              >
                 {t('leadPage.emailPerson')}
               </ButtonLink>
             ) : null}
@@ -184,7 +230,13 @@ export function ContactPage() {
         onConfirm={() => void confirmDelete()}
         onCancel={() => setIsDeleteAsked(false)}
       />
-      <EditContactPanel key={editOpenCount} contact={contact} isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} onSaved={handleSaved} />
+      <EditContactPanel
+        key={editOpenCount}
+        contact={contact}
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onSaved={handleSaved}
+      />
     </>
   );
 }

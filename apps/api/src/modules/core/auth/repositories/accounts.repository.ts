@@ -44,7 +44,11 @@ export async function findLiveAt(db: Db, accountId: string): Promise<Date | null
 /**
  * Marks the business live, once. Returns the moment, or null when it was already live (nothing changes then: the first moment is kept).
  */
-export async function markLive(db: Db, accountId: string, actor: { kind: string; id: string | null }): Promise<Date | null> {
+export async function markLive(
+  db: Db,
+  accountId: string,
+  actor: { kind: string; id: string | null },
+): Promise<Date | null> {
   const row = await db
     .updateTable('accounts')
     .set({ live_at: new Date(), live_by: { kind: actor.kind, id: actor.id } })

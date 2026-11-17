@@ -35,7 +35,9 @@ export function ProfileProgressCard(props: {
     <Card>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-heading-sm text-text-primary">{t('knowledge.progress.title')}</h2>
-        <p className="text-label-md text-text-secondary">{formatMessage('knowledge.progress.percent', { percent: progress.percentComplete })}</p>
+        <p className="text-label-md text-text-secondary">
+          {formatMessage('knowledge.progress.percent', { percent: progress.percentComplete })}
+        </p>
       </div>
       <div
         role="progressbar"
@@ -48,7 +50,10 @@ export function ProfileProgressCard(props: {
         <div className="h-full rounded-full bg-action" style={{ width: `${progress.percentComplete}%` }} />
       </div>
       <p className="text-body-md text-text-secondary">
-        {formatMessage('knowledge.progress.summary', { answered: progress.answeredQuestions, total: progress.totalQuestions })}
+        {formatMessage('knowledge.progress.summary', {
+          answered: progress.answeredQuestions,
+          total: progress.totalQuestions,
+        })}
       </p>
       {stillNeeded.length > 0 ? (
         <div className="mt-2">
@@ -65,7 +70,9 @@ export function ProfileProgressCard(props: {
       {waitingKeys.length > 0 ? (
         <div className="mt-4 flex flex-col gap-3 rounded-md bg-warning-bg p-3">
           <p className="text-body-md text-text-primary">
-            {waitingKeys.length === 1 ? t('knowledge.progress.waitingOne') : formatMessage('knowledge.progress.waiting', { count: waitingKeys.length })}
+            {waitingKeys.length === 1
+              ? t('knowledge.progress.waitingOne')
+              : formatMessage('knowledge.progress.waiting', { count: waitingKeys.length })}
           </p>
           {canEdit ? (
             <div>
@@ -76,7 +83,11 @@ export function ProfileProgressCard(props: {
           ) : null}
         </div>
       ) : null}
-      {problem ? <Alert tone="error" className="mt-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mt-3">
+          {problem}
+        </Alert>
+      ) : null}
     </Card>
   );
 }

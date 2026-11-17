@@ -27,7 +27,9 @@ export function FaqsPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [panel, setPanel] = useState<PanelState | null>(null);
   const faqsResource = useApiResource<FaqsResponse>('/knowledge/faqs');
-  const unansweredResource = useApiResource<UnansweredQuestionsResponse>(showHistory ? '/knowledge/unanswered?include=history' : '/knowledge/unanswered');
+  const unansweredResource = useApiResource<UnansweredQuestionsResponse>(
+    showHistory ? '/knowledge/unanswered?include=history' : '/knowledge/unanswered',
+  );
   const faqsData = useKeptData(faqsResource.state);
   const unansweredData = useKeptData(unansweredResource.state);
 
@@ -42,7 +44,11 @@ export function FaqsPage() {
         <ErrorState
           title={t('faqs.error.title')}
           description={t('knowledge.error.description')}
-          action={<Button variant="secondary" onClick={faqsResource.reload}>{t('knowledge.retry')}</Button>}
+          action={
+            <Button variant="secondary" onClick={faqsResource.reload}>
+              {t('knowledge.retry')}
+            </Button>
+          }
         />
       </Card>
     );
@@ -55,7 +61,11 @@ export function FaqsPage() {
   };
 
   const panelFields = (state: PanelState): FaqFormFields =>
-    state.kind === 'edit' ? formFromFaq(state.faq) : state.kind === 'answer' ? { question: state.question.question, answer: '' } : EMPTY_FAQ_FORM;
+    state.kind === 'edit'
+      ? formFromFaq(state.faq)
+      : state.kind === 'answer'
+        ? { question: state.question.question, answer: '' }
+        : EMPTY_FAQ_FORM;
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -69,12 +79,23 @@ export function FaqsPage() {
         onAnswer={(question) => open({ kind: 'answer', question })}
         onChanged={reloadAll}
       />
-      <FaqsCard faqs={faqsData.data.items} onAdd={() => open({ kind: 'new' })} onEdit={(faq) => open({ kind: 'edit', faq })} onChanged={reloadAll} />
+      <FaqsCard
+        faqs={faqsData.data.items}
+        onAdd={() => open({ kind: 'new' })}
+        onEdit={(faq) => open({ kind: 'edit', faq })}
+        onChanged={reloadAll}
+      />
       <SearchCard />
       {panel ? (
         <FaqFormPanel
           key={panel.openings}
-          title={t(panel.kind === 'edit' ? 'faqs.form.editTitle' : panel.kind === 'answer' ? 'faqs.unanswered.panelTitle' : 'faqs.form.addTitle')}
+          title={t(
+            panel.kind === 'edit'
+              ? 'faqs.form.editTitle'
+              : panel.kind === 'answer'
+                ? 'faqs.unanswered.panelTitle'
+                : 'faqs.form.addTitle',
+          )}
           editing={panel.kind === 'edit' ? panel.faq : null}
           startingFields={panelFields(panel)}
           {...(panel.kind === 'answer'

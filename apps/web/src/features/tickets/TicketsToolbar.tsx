@@ -1,7 +1,12 @@
 import { Button, PlusIcon, SelectField } from '@toobler-one/ui';
 import { t } from '../../app/i18n';
 import { ListFilterPopover } from '../shared/ListFilterPopover';
-import { countActiveTicketFilters, TICKET_PRIORITY_CHOICES, TICKET_TYPE_CHOICES, type TicketsView } from './tickets-view';
+import {
+  countActiveTicketFilters,
+  TICKET_PRIORITY_CHOICES,
+  TICKET_TYPE_CHOICES,
+  type TicketsView,
+} from './tickets-view';
 
 export interface TicketsToolbarProps {
   view: TicketsView;
@@ -25,7 +30,11 @@ export function TicketsToolbar({ view, onChangeView, onClearFilters, onAddTicket
           <SelectField
             label={t('tickets.filter.status')}
             value={view.status}
-            onChange={(event) => onChangeView({ status: event.target.value === 'all' ? 'all' : event.target.value === 'done' ? 'done' : 'open' })}
+            onChange={(event) =>
+              onChangeView({
+                status: event.target.value === 'all' ? 'all' : event.target.value === 'done' ? 'done' : 'open',
+              })
+            }
             options={[
               { value: 'open', label: t('tickets.status.open') },
               { value: 'done', label: t('tickets.status.done') },
@@ -35,7 +44,11 @@ export function TicketsToolbar({ view, onChangeView, onClearFilters, onAddTicket
           <SelectField
             label={t('tickets.filter.owner')}
             value={view.owner}
-            onChange={(event) => onChangeView({ owner: event.target.value === 'me' || event.target.value === 'unassigned' ? event.target.value : 'all' })}
+            onChange={(event) =>
+              onChangeView({
+                owner: event.target.value === 'me' || event.target.value === 'unassigned' ? event.target.value : 'all',
+              })
+            }
             options={[
               { value: 'all', label: t('tickets.filter.everyone') },
               { value: 'me', label: t('tickets.filter.mine') },
@@ -45,14 +58,29 @@ export function TicketsToolbar({ view, onChangeView, onClearFilters, onAddTicket
           <SelectField
             label={t('tickets.filter.type')}
             value={view.type}
-            onChange={(event) => onChangeView({ type: TICKET_TYPE_CHOICES.find((choice) => choice.type === event.target.value)?.type ?? 'all' })}
-            options={[{ value: 'all', label: t('tickets.filter.all') }, ...TICKET_TYPE_CHOICES.map((choice) => ({ value: choice.type, label: t(choice.labelKey) }))]}
+            onChange={(event) =>
+              onChangeView({
+                type: TICKET_TYPE_CHOICES.find((choice) => choice.type === event.target.value)?.type ?? 'all',
+              })
+            }
+            options={[
+              { value: 'all', label: t('tickets.filter.all') },
+              ...TICKET_TYPE_CHOICES.map((choice) => ({ value: choice.type, label: t(choice.labelKey) })),
+            ]}
           />
           <SelectField
             label={t('tickets.filter.priority')}
             value={view.priority}
-            onChange={(event) => onChangeView({ priority: TICKET_PRIORITY_CHOICES.find((choice) => choice.priority === event.target.value)?.priority ?? 'all' })}
-            options={[{ value: 'all', label: t('tickets.filter.all') }, ...TICKET_PRIORITY_CHOICES.map((choice) => ({ value: choice.priority, label: t(choice.labelKey) }))]}
+            onChange={(event) =>
+              onChangeView({
+                priority:
+                  TICKET_PRIORITY_CHOICES.find((choice) => choice.priority === event.target.value)?.priority ?? 'all',
+              })
+            }
+            options={[
+              { value: 'all', label: t('tickets.filter.all') },
+              ...TICKET_PRIORITY_CHOICES.map((choice) => ({ value: choice.priority, label: t(choice.labelKey) })),
+            ]}
           />
           <Button variant="tertiary" size="compact" disabled={activeFilterCount === 0} onClick={onClearFilters}>
             {t('leads.filter.clear')}

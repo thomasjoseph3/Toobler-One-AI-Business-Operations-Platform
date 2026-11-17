@@ -12,11 +12,16 @@ import { openTestDatabase } from './support/harness';
 let database: Database;
 let app: FastifyInstance;
 let script: LlmScript = () => ({ answer: 'Hello!' });
-const pretendAiCompany = createScriptedLlmProvider((tried, request, messagesSoFar) => script(tried, request, messagesSoFar));
+const pretendAiCompany = createScriptedLlmProvider((tried, request, messagesSoFar) =>
+  script(tried, request, messagesSoFar),
+);
 
 beforeAll(async () => {
   database = openTestDatabase();
-  const config = { ...testConfig(), ai: { platformKeys: { gemini: [`promise-${randomUUID()}`], openai: [], anthropic: [] } } };
+  const config = {
+    ...testConfig(),
+    ai: { platformKeys: { gemini: [`promise-${randomUUID()}`], openai: [], anthropic: [] } },
+  };
   app = await buildTestApp(database, [], { config, llmProvider: pretendAiCompany });
 });
 afterAll(async () => {
@@ -37,7 +42,13 @@ async function newBusiness(callbackPromiseMinutes?: number): Promise<SignedInPer
   const person = await createSignedInPerson(app, database);
   await database.system
     .insertInto('ai_settings')
-    .values({ account_id: person.profile.business.id, key_mode: 'platform', platform_enabled: true, platform_expires_at: null, task_models: {} })
+    .values({
+      account_id: person.profile.business.id,
+      key_mode: 'platform',
+      platform_enabled: true,
+      platform_expires_at: null,
+      task_models: {},
+    })
     .execute();
   await send(person, 'PUT', '/knowledge/answers/opening_hours', { value: { allDay: true } });
   if (callbackPromiseMinutes !== undefined) {

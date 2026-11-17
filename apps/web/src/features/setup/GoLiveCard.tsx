@@ -26,14 +26,19 @@ export function GoLiveCard(props: {
       setJustWentLive(true);
       onChanged();
     } catch (error) {
-      setProblem(error instanceof ApiRequestError && error.code === 'NOT_READY' ? t('setup.problem.notReady') : describeSaveProblem(error));
+      setProblem(
+        error instanceof ApiRequestError && error.code === 'NOT_READY'
+          ? t('setup.problem.notReady')
+          : describeSaveProblem(error),
+      );
       if (error instanceof ApiRequestError && error.code === 'NOT_READY') onChanged(); // the list may have changed: show what is left
     } finally {
       setIsWorking(false);
     }
   };
 
-  const stepTitle = (step: string) => t(STEP_DESCRIPTIONS[step as keyof typeof STEP_DESCRIPTIONS].titleKey as MessageKey);
+  const stepTitle = (step: string) =>
+    t(STEP_DESCRIPTIONS[step as keyof typeof STEP_DESCRIPTIONS].titleKey as MessageKey);
   return (
     <Card>
       <h2 className="text-heading-sm text-text-primary">{t('setup.goLive.title')}</h2>
@@ -68,7 +73,11 @@ export function GoLiveCard(props: {
           ) : null}
         </div>
       )}
-      {problem ? <Alert tone="error" className="mt-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mt-3">
+          {problem}
+        </Alert>
+      ) : null}
     </Card>
   );
 }

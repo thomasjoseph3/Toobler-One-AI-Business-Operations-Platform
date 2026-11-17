@@ -30,7 +30,10 @@ export function KnowledgePage() {
   const situationsData = useKeptData(situationsResource.state);
   const settingsData = useKeptData(settingsResource.state);
   const questions = questionsData.data?.questions ?? null;
-  const questionTexts = useMemo(() => new Map((questions ?? []).map((question) => [question.key, question.text])), [questions]);
+  const questionTexts = useMemo(
+    () => new Map((questions ?? []).map((question) => [question.key, question.text])),
+    [questions],
+  );
   const groups = useMemo(() => groupQuestionsBySection(questions ?? []), [questions]);
 
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
@@ -50,7 +53,11 @@ export function KnowledgePage() {
         <ErrorState
           title={t('knowledge.error.title')}
           description={t('knowledge.error.description')}
-          action={<Button variant="secondary" onClick={reloadAll}>{t('knowledge.retry')}</Button>}
+          action={
+            <Button variant="secondary" onClick={reloadAll}>
+              {t('knowledge.retry')}
+            </Button>
+          }
         />
       </Card>
     );
@@ -76,7 +83,9 @@ export function KnowledgePage() {
         canEdit={canEdit}
         onChanged={questionsResource.reload}
       />
-      {canEdit ? <ReadWebsiteCard businessId={sessionState.profile.business.id} onFinished={questionsResource.reload} /> : null}
+      {canEdit ? (
+        <ReadWebsiteCard businessId={sessionState.profile.business.id} onFinished={questionsResource.reload} />
+      ) : null}
       {settingsData.data ? (
         <BusinessSettingsCard settings={settingsData.data} canEdit={canEdit} onSaved={settingsResource.reload} />
       ) : null}
@@ -91,7 +100,12 @@ export function KnowledgePage() {
         />
       ))}
       {situationsData.data ? (
-        <SituationsCard key={JSON.stringify(situationsData.data)} situations={situationsData.data.items} canEdit={canEdit} onChanged={situationsResource.reload} />
+        <SituationsCard
+          key={JSON.stringify(situationsData.data)}
+          situations={situationsData.data.items}
+          canEdit={canEdit}
+          onChanged={situationsResource.reload}
+        />
       ) : null}
     </div>
   );

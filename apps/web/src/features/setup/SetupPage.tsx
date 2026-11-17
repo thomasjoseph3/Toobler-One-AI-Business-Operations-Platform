@@ -41,7 +41,11 @@ export function SetupPage() {
         <ErrorState
           title={t('setup.error.title')}
           description={t('setup.error.description')}
-          action={<Button variant="secondary" onClick={setupResource.reload}>{t('knowledge.retry')}</Button>}
+          action={
+            <Button variant="secondary" onClick={setupResource.reload}>
+              {t('knowledge.retry')}
+            </Button>
+          }
         />
       </Card>
     );
@@ -61,8 +65,12 @@ export function SetupPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-heading-sm text-text-primary">{t('setup.progress.title')}</h2>
           <div className="flex items-center gap-3">
-            <Badge tone={setup.isLive ? 'success' : 'neutral'}>{setup.isLive ? t('setup.live.badge') : t('setup.live.notYet')}</Badge>
-            <p className="text-label-md text-text-secondary">{formatMessage('setup.progress.percent', { percent: setup.percentDone })}</p>
+            <Badge tone={setup.isLive ? 'success' : 'neutral'}>
+              {setup.isLive ? t('setup.live.badge') : t('setup.live.notYet')}
+            </Badge>
+            <p className="text-label-md text-text-secondary">
+              {formatMessage('setup.progress.percent', { percent: setup.percentDone })}
+            </p>
           </div>
         </div>
         <div
@@ -76,7 +84,9 @@ export function SetupPage() {
           <div className="h-full rounded-full bg-action" style={{ width: `${setup.percentDone}%` }} />
         </div>
         {setup.isLive && setup.liveAt ? (
-          <p className="text-body-md text-text-secondary">{formatMessage('setup.live.since', { date: formatDate(setup.liveAt) })}</p>
+          <p className="text-body-md text-text-secondary">
+            {formatMessage('setup.live.since', { date: formatDate(setup.liveAt) })}
+          </p>
         ) : null}
         <p className="text-body-md text-text-primary">
           {nextStep
@@ -84,7 +94,10 @@ export function SetupPage() {
             : t('setup.progress.allDone')}
         </p>
         <div className="mt-3">
-          <Link to="/setup/chat" className="text-body-md-semibold inline-flex h-10 items-center rounded-md bg-action px-4 text-action-text hover:bg-action-hover">
+          <Link
+            to="/setup/chat"
+            className="text-body-md-semibold inline-flex h-10 items-center rounded-md bg-action px-4 text-action-text hover:bg-action-hover"
+          >
             {t('setup.chat.open')}
           </Link>
         </div>
@@ -104,7 +117,9 @@ export function SetupPage() {
               <h2 id={`setup-part-${part}`} className="text-heading-sm text-text-primary">
                 {t(`setup.part.${part}` as MessageKey)}
               </h2>
-              <p className="text-label-sm text-text-secondary">{formatMessage('setup.part.count', { finished, total })}</p>
+              <p className="text-label-sm text-text-secondary">
+                {formatMessage('setup.part.count', { finished, total })}
+              </p>
             </div>
             <ul>
               {steps.map((step) => (

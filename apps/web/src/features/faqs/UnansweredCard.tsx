@@ -43,17 +43,34 @@ export function UnansweredCard(props: {
       <li key={question.id} className="flex flex-col gap-2 border-b border-border-default py-4 last:border-b-0">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <p className="text-label-md text-text-primary">{question.question}</p>
-          {isOpen ? null : <Badge tone={question.status === 'answered' ? 'success' : 'neutral'}>{t(`faqs.unanswered.status.${question.status}` as MessageKey)}</Badge>}
+          {isOpen ? null : (
+            <Badge tone={question.status === 'answered' ? 'success' : 'neutral'}>
+              {t(`faqs.unanswered.status.${question.status}` as MessageKey)}
+            </Badge>
+          )}
         </div>
         <p className="text-label-sm text-text-secondary">
-          {formatMessage(asked.key, { count: asked.count })} · {formatMessage('faqs.unanswered.lastAsked', { date: formatAskedDate(question.lastAskedAt, timeZone) })}
+          {formatMessage(asked.key, { count: asked.count })} ·{' '}
+          {formatMessage('faqs.unanswered.lastAsked', { date: formatAskedDate(question.lastAskedAt, timeZone) })}
         </p>
         {isOpen ? (
           <div className="flex flex-wrap gap-2">
-            <Button variant="primary" size="compact" disabled={busyId === question.id} onClick={() => onAnswer(question)} aria-label={formatMessage('faqs.unanswered.answerLabel', { question: question.question })}>
+            <Button
+              variant="primary"
+              size="compact"
+              disabled={busyId === question.id}
+              onClick={() => onAnswer(question)}
+              aria-label={formatMessage('faqs.unanswered.answerLabel', { question: question.question })}
+            >
               {t('faqs.unanswered.answer')}
             </Button>
-            <Button variant="tertiary" size="compact" isLoading={busyId === question.id} onClick={() => ignore(question)} aria-label={formatMessage('faqs.unanswered.ignoreLabel', { question: question.question })}>
+            <Button
+              variant="tertiary"
+              size="compact"
+              isLoading={busyId === question.id}
+              onClick={() => ignore(question)}
+              aria-label={formatMessage('faqs.unanswered.ignoreLabel', { question: question.question })}
+            >
               {t('faqs.unanswered.ignore')}
             </Button>
           </div>
@@ -66,16 +83,30 @@ export function UnansweredCard(props: {
     <Card>
       <h2 className="text-heading-sm text-text-primary">{t('faqs.unanswered.title')}</h2>
       <p className="text-body-md mb-3 text-text-secondary">{t('faqs.unanswered.description')}</p>
-      {problem ? <Alert tone="error" className="mb-3">{problem}</Alert> : null}
+      {problem ? (
+        <Alert tone="error" className="mb-3">
+          {problem}
+        </Alert>
+      ) : null}
       {ordered.length === 0 ? (
-        <EmptyState icon={<span aria-hidden>✅</span>} title={t('faqs.unanswered.empty.title')} description={t('faqs.unanswered.empty.description')} />
+        <EmptyState
+          icon={<span aria-hidden>✅</span>}
+          title={t('faqs.unanswered.empty.title')}
+          description={t('faqs.unanswered.empty.description')}
+        />
       ) : (
         <ul>{ordered.map((question) => row(question, true))}</ul>
       )}
       <div className="mt-3">
-        <Checkbox label={t('faqs.unanswered.showHistory')} checked={showHistory} onChange={(event) => onShowHistoryChange(event.target.checked)} />
+        <Checkbox
+          label={t('faqs.unanswered.showHistory')}
+          checked={showHistory}
+          onChange={(event) => onShowHistoryChange(event.target.checked)}
+        />
       </div>
-      {showHistory && history.length > 0 ? <ul className="mt-2">{history.map((question) => row(question, false))}</ul> : null}
+      {showHistory && history.length > 0 ? (
+        <ul className="mt-2">{history.map((question) => row(question, false))}</ul>
+      ) : null}
     </Card>
   );
 }

@@ -20,7 +20,11 @@ export function SettingsAiPage() {
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <SettingsTabs />
       <p className="text-body-md text-text-secondary">{t('settings.ai.intro')}</p>
-      {isManager ? <ManagerAiSettings /> : <p className="text-body-md text-text-secondary">{t('settings.managersOnly')}</p>}
+      {isManager ? (
+        <ManagerAiSettings />
+      ) : (
+        <p className="text-body-md text-text-secondary">{t('settings.managersOnly')}</p>
+      )}
     </div>
   );
 }
@@ -43,24 +47,42 @@ function ManagerAiSettings() {
   if (settings.hasFailed || keys.hasFailed || settings.data === null || keys.data === null) {
     return (
       <Card>
-        <ErrorState title={t('settings.error.title')} description={t('knowledge.error.description')} action={<Button variant="secondary" onClick={reloadAll}>{t('knowledge.retry')}</Button>} />
+        <ErrorState
+          title={t('settings.error.title')}
+          description={t('knowledge.error.description')}
+          action={
+            <Button variant="secondary" onClick={reloadAll}>
+              {t('knowledge.retry')}
+            </Button>
+          }
+        />
       </Card>
     );
   }
   return (
     <>
-      <KeyStatusCard access={settings.data.platformAccess} usage={usage.data?.platform ?? null} ownKeyCount={keys.data.items.length} />
+      <KeyStatusCard
+        access={settings.data.platformAccess}
+        usage={usage.data?.platform ?? null}
+        ownKeyCount={keys.data.items.length}
+      />
       <AiKeysCard keys={keys.data.items} onChanged={reloadAll} />
       {usage.data ? (
         <Card>
           <h2 className="text-heading-sm mb-2 text-text-primary">{t('settings.ai.usage.title')}</h2>
           <dl className="text-body-md grid grid-cols-[auto_1fr] gap-x-6 gap-y-1">
             <dt className="text-text-secondary">{t('settings.ai.usage.calls')}</dt>
-            <dd className="text-text-primary">{formatMessage('settings.ai.usage.number', { number: usage.data.totals.calls })}</dd>
+            <dd className="text-text-primary">
+              {formatMessage('settings.ai.usage.number', { number: usage.data.totals.calls })}
+            </dd>
             <dt className="text-text-secondary">{t('settings.ai.usage.failures')}</dt>
-            <dd className="text-text-primary">{formatMessage('settings.ai.usage.number', { number: usage.data.totals.failures })}</dd>
+            <dd className="text-text-primary">
+              {formatMessage('settings.ai.usage.number', { number: usage.data.totals.failures })}
+            </dd>
             <dt className="text-text-secondary">{t('settings.ai.usage.fallbacks')}</dt>
-            <dd className="text-text-primary">{formatMessage('settings.ai.usage.number', { number: usage.data.totals.fallbacks })}</dd>
+            <dd className="text-text-primary">
+              {formatMessage('settings.ai.usage.number', { number: usage.data.totals.fallbacks })}
+            </dd>
           </dl>
         </Card>
       ) : null}

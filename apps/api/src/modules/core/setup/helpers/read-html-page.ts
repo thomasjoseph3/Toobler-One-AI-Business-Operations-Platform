@@ -62,7 +62,9 @@ function readOpeningHours(business: Record<string, unknown>): string | undefined
   if (plain.length) return plain.join(', ');
   const specifications = [business['openingHoursSpecification']]
     .flat()
-    .filter((specification): specification is Record<string, unknown> => !!specification && typeof specification === 'object')
+    .filter(
+      (specification): specification is Record<string, unknown> => !!specification && typeof specification === 'object',
+    )
     .map((specification) => {
       const days = [specification['dayOfWeek']]
         .flat()
@@ -71,7 +73,9 @@ function readOpeningHours(business: Record<string, unknown>): string | undefined
         .join(', ');
       const opens = specification['opens'];
       const closes = specification['closes'];
-      return days && opens && closes ? `${days} ${toHoursAndMinutes(opens) ?? asText(opens)}–${toHoursAndMinutes(closes) ?? asText(closes)}` : '';
+      return days && opens && closes
+        ? `${days} ${toHoursAndMinutes(opens) ?? asText(opens)}–${toHoursAndMinutes(closes) ?? asText(closes)}`
+        : '';
     })
     .filter(Boolean);
   return specifications.length ? specifications.join('; ') : undefined;
@@ -107,9 +111,9 @@ export function readStructuredBusinessFacts(jsonBlocks: readonly string[]): Stru
     facts.phone ??= firstText(business['telephone']);
     facts.email ??= firstText(business['email'])?.replace(/^mailto:/i, '');
     if (!facts.address) {
-      const addressObject = [business['address']].flat().find((candidate) => candidate && typeof candidate === 'object') as
-        | Record<string, unknown>
-        | undefined;
+      const addressObject = [business['address']]
+        .flat()
+        .find((candidate) => candidate && typeof candidate === 'object') as Record<string, unknown> | undefined;
       const readPart = (value: unknown) =>
         firstText(typeof value === 'object' && value ? (value as Record<string, unknown>)['name'] : value);
       if (addressObject) {
@@ -180,9 +184,11 @@ export function readHtmlPage(html: string, baseAddress: string): ReadPage {
       }
       const whatsAppNumber = readWhatsAppNumber(url);
       if (whatsAppNumber) whatsAppNumbers.add(whatsAppNumber);
-      else if (/^(www\.)?google\.[a-z.]+$/i.test(url.hostname) && url.pathname.startsWith('/maps')) mapLinks.add(url.href);
+      else if (/^(www\.)?google\.[a-z.]+$/i.test(url.hostname) && url.pathname.startsWith('/maps'))
+        mapLinks.add(url.href);
       else if (/^maps\.(app\.)?goo\.gl$/i.test(url.hostname)) mapLinks.add(url.href);
-      else if (/^https?:$/.test(url.protocol)) links.push({ url: url.href, label: htmlToText(anchor[1] ?? '').slice(0, 80) });
+      else if (/^https?:$/.test(url.protocol))
+        links.push({ url: url.href, label: htmlToText(anchor[1] ?? '').slice(0, 80) });
     }
   }
 

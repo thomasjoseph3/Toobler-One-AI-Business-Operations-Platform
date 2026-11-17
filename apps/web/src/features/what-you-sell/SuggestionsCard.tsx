@@ -22,16 +22,30 @@ export function SuggestionsCard(props: {
               {suggestion.name}
               {suggestion.fromPricePaise !== null ? (
                 <span className="text-body-md ml-2 font-normal text-text-secondary">
-                  {formatMessage('whatYouSell.suggestions.priceFrom', { price: paiseToRupeesText(suggestion.fromPricePaise) })}
+                  {formatMessage('whatYouSell.suggestions.priceFrom', {
+                    price: paiseToRupeesText(suggestion.fromPricePaise),
+                  })}
                 </span>
               ) : null}
             </p>
-            {suggestion.description ? <p className="text-body-md text-text-secondary">{suggestion.description}</p> : null}
+            {suggestion.description ? (
+              <p className="text-body-md text-text-secondary">{suggestion.description}</p>
+            ) : null}
             <div className="flex flex-wrap gap-2">
-              <Button variant="primary" size="compact" onClick={() => onAdd(suggestion)} aria-label={formatMessage('whatYouSell.suggestions.add', { name: suggestion.name })}>
+              <Button
+                variant="primary"
+                size="compact"
+                onClick={() => onAdd(suggestion)}
+                aria-label={formatMessage('whatYouSell.suggestions.add', { name: suggestion.name })}
+              >
                 {t('whatYouSell.suggestions.addButton')}
               </Button>
-              <Button variant="tertiary" size="compact" onClick={() => onDismiss(suggestion)} aria-label={formatMessage('whatYouSell.suggestions.dismiss', { name: suggestion.name })}>
+              <Button
+                variant="tertiary"
+                size="compact"
+                onClick={() => onDismiss(suggestion)}
+                aria-label={formatMessage('whatYouSell.suggestions.dismiss', { name: suggestion.name })}
+              >
                 {formatMessage('whatYouSell.suggestions.dismiss', { name: suggestion.name })}
               </Button>
             </div>

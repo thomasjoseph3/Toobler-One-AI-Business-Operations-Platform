@@ -47,7 +47,9 @@ export interface WebPageFetcherRules {
  * The lookup the connection itself uses (so there is no second lookup an attacker could change): it refuses a name that
  * resolves to any address that is not allowed.
  */
-export function createCheckedLookup(isAddressAllowed: (address: string) => boolean = isPublicAddress): net.LookupFunction {
+export function createCheckedLookup(
+  isAddressAllowed: (address: string) => boolean = isPublicAddress,
+): net.LookupFunction {
   return (hostname, lookupOptions, callback) => {
     dns.lookup(hostname, { ...lookupOptions, all: true }, (error, addresses) => {
       if (error) return callback(error, '', 4);
@@ -157,7 +159,11 @@ export function createWebPageFetcher(rules: WebPageFetcherRules = {}): WebPageFe
         if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') {
           throw new ApiError(400, 'WEBSITE_NOT_FOUND', `No website was found at ${url.hostname}.`);
         }
-        throw new ApiError(400, 'WEBSITE_UNREADABLE', `The website could not be read (${code || 'connection failed'}).`);
+        throw new ApiError(
+          400,
+          'WEBSITE_UNREADABLE',
+          `The website could not be read (${code || 'connection failed'}).`,
+        );
       }
       if (response.redirectTo) {
         // Each hop is checked like the first address, so a redirect to a private address is refused

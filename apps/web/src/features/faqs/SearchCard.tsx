@@ -31,14 +31,21 @@ export function SearchCard() {
       <h2 className="text-heading-sm text-text-primary">{t('faqs.search.title')}</h2>
       <p className="text-body-md mb-3 text-text-secondary">{t('faqs.search.description')}</p>
       <form onSubmit={search} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <TextField label={t('faqs.search.label')} value={text} onChange={(event) => setText(event.target.value)} className="sm:flex-1" />
+        <TextField
+          label={t('faqs.search.label')}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          className="sm:flex-1"
+        />
         <Button type="submit" variant="secondary" isLoading={isSearching} disabled={text.trim() === ''}>
           {t('faqs.search.button')}
         </Button>
       </form>
       <div aria-live="polite" className="mt-3 flex flex-col gap-2">
         {problem ? <Alert tone="error">{problem}</Alert> : null}
-        {result && result.items.length === 0 ? <p className="text-body-md text-text-secondary">{t('faqs.search.none')}</p> : null}
+        {result && result.items.length === 0 ? (
+          <p className="text-body-md text-text-secondary">{t('faqs.search.none')}</p>
+        ) : null}
         {result && result.items.length > 0 ? (
           <>
             <p className="text-label-md text-text-primary">{t('faqs.search.found')}</p>

@@ -37,7 +37,8 @@ export function listingToAnswers(place: PlaceDetails): PrefilledAnswer[] {
   const answers: PrefilledAnswer[] = [];
   if (place.name) answers.push({ questionKey: 'business_name', value: place.name });
   if (place.address) answers.push({ questionKey: 'address', value: place.address });
-  if (place.phone) answers.push({ questionKey: 'contact_details', value: { rows: [{ kind: 'Phone', value: place.phone }] } });
+  if (place.phone)
+    answers.push({ questionKey: 'contact_details', value: { rows: [{ kind: 'Phone', value: place.phone }] } });
   const hours = openingPeriodsToHours(place.openingPeriods);
   if (hours) answers.push({ questionKey: 'opening_hours', value: hours });
   return answers;

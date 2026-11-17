@@ -226,11 +226,18 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           const settingsAnswer = answerSettingsCall(pretendApi.settings, {
             method: request.method(),
             path,
-            body: request.method() === 'GET' || request.method() === 'DELETE' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            body:
+              request.method() === 'GET' || request.method() === 'DELETE'
+                ? null
+                : (request.postDataJSON() as Record<string, unknown> | null),
             role: pretendApi.role,
           });
           if (settingsAnswer) {
-            return route.fulfill(settingsAnswer.body === undefined ? { status: settingsAnswer.status } : json(settingsAnswer.status, settingsAnswer.body));
+            return route.fulfill(
+              settingsAnswer.body === undefined
+                ? { status: settingsAnswer.status }
+                : json(settingsAnswer.status, settingsAnswer.body),
+            );
           }
         }
         if (path === '/channels/webchat') {
@@ -247,11 +254,18 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             method: request.method(),
             path,
             search: new URL(request.url()).search,
-            body: request.method() === 'GET' || request.method() === 'DELETE' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            body:
+              request.method() === 'GET' || request.method() === 'DELETE'
+                ? null
+                : (request.postDataJSON() as Record<string, unknown> | null),
             role: pretendApi.role,
           });
           if (salesAnswer) {
-            return route.fulfill(salesAnswer.body === undefined ? { status: salesAnswer.status } : json(salesAnswer.status, salesAnswer.body));
+            return route.fulfill(
+              salesAnswer.body === undefined
+                ? { status: salesAnswer.status }
+                : json(salesAnswer.status, salesAnswer.body),
+            );
           }
         }
         if (path.startsWith('/agent/')) {
@@ -261,7 +275,11 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
           });
           if (agentAnswer) {
-            return route.fulfill(agentAnswer.body === undefined ? { status: agentAnswer.status } : json(agentAnswer.status, agentAnswer.body));
+            return route.fulfill(
+              agentAnswer.body === undefined
+                ? { status: agentAnswer.status }
+                : json(agentAnswer.status, agentAnswer.body),
+            );
           }
         }
         if (path.startsWith('/setup')) {
@@ -273,7 +291,9 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           });
           if (setupAnswer) {
             return route.fulfill(
-              setupAnswer.body === undefined ? { status: setupAnswer.status } : json(setupAnswer.status, setupAnswer.body),
+              setupAnswer.body === undefined
+                ? { status: setupAnswer.status }
+                : json(setupAnswer.status, setupAnswer.body),
             );
           }
         }
@@ -282,10 +302,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             method: request.method(),
             path,
             search: new URL(request.url()).search,
-            body: request.method() === 'GET' || request.method() === 'DELETE' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            body:
+              request.method() === 'GET' || request.method() === 'DELETE'
+                ? null
+                : (request.postDataJSON() as Record<string, unknown> | null),
           });
           if (faqsAnswer) {
-            return route.fulfill(faqsAnswer.body === undefined ? { status: faqsAnswer.status } : json(faqsAnswer.status, faqsAnswer.body));
+            return route.fulfill(
+              faqsAnswer.body === undefined ? { status: faqsAnswer.status } : json(faqsAnswer.status, faqsAnswer.body),
+            );
           }
         }
         if (path.startsWith('/knowledge/')) {
@@ -297,7 +322,9 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           });
           if (knowledgeAnswer) {
             return route.fulfill(
-              knowledgeAnswer.body === undefined ? { status: knowledgeAnswer.status } : json(knowledgeAnswer.status, knowledgeAnswer.body),
+              knowledgeAnswer.body === undefined
+                ? { status: knowledgeAnswer.status }
+                : json(knowledgeAnswer.status, knowledgeAnswer.body),
             );
           }
         }

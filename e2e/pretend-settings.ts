@@ -31,14 +31,60 @@ export function startingSettings(): PretendSettings {
     platformAccess: { enabled: true, monthlyCallCap: 1000, expiresAt: '2026-12-31' },
     usage: { calls: 250, failures: 3, fallbacks: 1, used: 250 },
     keys: [
-      { id: '0191f0a0-0000-7000-8000-0000000000a1', provider: 'gemini', label: 'Main Gemini key', keyPreview: '••••3f9a', status: 'working', statusNote: 'Answered a real request.', statusCheckedAt: NOW, createdAt: NOW },
-      { id: '0191f0a0-0000-7000-8000-0000000000a2', provider: 'openai', label: 'Spare OpenAI key', keyPreview: '••••77bc', status: 'unchecked', statusNote: null, statusCheckedAt: null, createdAt: NOW },
+      {
+        id: '0191f0a0-0000-7000-8000-0000000000a1',
+        provider: 'gemini',
+        label: 'Main Gemini key',
+        keyPreview: '••••3f9a',
+        status: 'working',
+        statusNote: 'Answered a real request.',
+        statusCheckedAt: NOW,
+        createdAt: NOW,
+      },
+      {
+        id: '0191f0a0-0000-7000-8000-0000000000a2',
+        provider: 'openai',
+        label: 'Spare OpenAI key',
+        keyPreview: '••••77bc',
+        status: 'unchecked',
+        statusNote: null,
+        statusCheckedAt: null,
+        createdAt: NOW,
+      },
     ],
     modules: [
-      { id: 'engine.leads', kind: 'engine', name: 'Lead engine', description: 'Leads, contacts and the pipeline.', requires: [], state: 'active' },
-      { id: 'channel.webchat', kind: 'channel', name: 'Website chat', description: 'The chat bubble on your website.', requires: ['engine.leads'], state: 'active' },
-      { id: 'channel.whatsapp', kind: 'channel', name: 'WhatsApp', description: 'The AI answers on WhatsApp.', requires: ['engine.leads'], state: 'not_in_plan' },
-      { id: 'feature.followups', kind: 'feature', name: 'Follow-ups', description: 'Automatic follow-up messages.', requires: ['engine.leads'], state: 'off' },
+      {
+        id: 'engine.leads',
+        kind: 'engine',
+        name: 'Lead engine',
+        description: 'Leads, contacts and the pipeline.',
+        requires: [],
+        state: 'active',
+      },
+      {
+        id: 'channel.webchat',
+        kind: 'channel',
+        name: 'Website chat',
+        description: 'The chat bubble on your website.',
+        requires: ['engine.leads'],
+        state: 'active',
+      },
+      {
+        id: 'channel.whatsapp',
+        kind: 'channel',
+        name: 'WhatsApp',
+        description: 'The AI answers on WhatsApp.',
+        requires: ['engine.leads'],
+        state: 'not_in_plan',
+      },
+      {
+        id: 'feature.followups',
+        kind: 'feature',
+        name: 'Follow-ups',
+        description: 'Automatic follow-up messages.',
+        requires: ['engine.leads'],
+        state: 'off',
+      },
     ],
     addedKeys: [],
     keyModeChanges: [],
@@ -60,7 +106,10 @@ export function answerSettingsCall(
   const isAi = path.startsWith('/ai/');
   const isModules = path.startsWith('/modules');
   if (!isAi && !isModules) return undefined;
-  const refuseStaff = (): PretendAnswer => ({ status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } });
+  const refuseStaff = (): PretendAnswer => ({
+    status: 403,
+    body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } },
+  });
   const refused = (): PretendAnswer | undefined => {
     if (!state.refusal) return undefined;
     const { status, code, message } = state.refusal;
@@ -87,13 +136,24 @@ export function answerSettingsCall(
         from: '2026-11-01',
         to: '2026-11-17',
         groupBy: null,
-        totals: { calls: state.usage.calls, failures: state.usage.failures, fallbacks: state.usage.fallbacks, inputTokens: 0, outputTokens: 0, cachedTokens: 0, cacheHitRate: 0 },
+        totals: {
+          calls: state.usage.calls,
+          failures: state.usage.failures,
+          fallbacks: state.usage.fallbacks,
+          inputTokens: 0,
+          outputTokens: 0,
+          cachedTokens: 0,
+          cacheHitRate: 0,
+        },
         groups: [],
         platform: {
           enabled: state.platformAccess.enabled,
           monthlyCallCap: state.platformAccess.monthlyCallCap,
           usedThisMonth: state.usage.used,
-          remainingThisMonth: state.platformAccess.monthlyCallCap === null ? null : state.platformAccess.monthlyCallCap - state.usage.used,
+          remainingThisMonth:
+            state.platformAccess.monthlyCallCap === null
+              ? null
+              : state.platformAccess.monthlyCallCap - state.usage.used,
           expiresAt: state.platformAccess.expiresAt,
         },
       },
@@ -104,8 +164,21 @@ export function answerSettingsCall(
     const refusal = refused();
     if (refusal) return refusal;
     const key = String(body?.['key'] ?? '');
-    state.addedKeys.push({ provider: String(body?.['provider']), label: String(body?.['label']), keyLength: key.length });
-    const created = { id: `0191f0a0-0000-7000-8000-0000000000${(0xa3 + state.addedKeys.length - 1).toString(16)}`, provider: body?.['provider'], label: body?.['label'], keyPreview: `••••${key.slice(-4)}`, status: 'unchecked', statusNote: null, statusCheckedAt: null, createdAt: NOW };
+    state.addedKeys.push({
+      provider: String(body?.['provider']),
+      label: String(body?.['label']),
+      keyLength: key.length,
+    });
+    const created = {
+      id: `0191f0a0-0000-7000-8000-0000000000${(0xa3 + state.addedKeys.length - 1).toString(16)}`,
+      provider: body?.['provider'],
+      label: body?.['label'],
+      keyPreview: `••••${key.slice(-4)}`,
+      status: 'unchecked',
+      statusNote: null,
+      statusCheckedAt: null,
+      createdAt: NOW,
+    };
     state.keys.push(created);
     return { status: 201, body: created };
   }
@@ -121,8 +194,19 @@ export function answerSettingsCall(
     if (method === 'POST' && keyMatch[2]) {
       state.testedKeyIds.push(String(target['id']));
       const works = state.nextTestOutcome === 'works';
-      Object.assign(target, { status: works ? 'working' : state.nextTestOutcome === 'quota' ? 'limited' : 'failed', statusCheckedAt: NOW });
-      return { status: 200, body: { key: target, outcome: state.nextTestOutcome, modelName: works ? 'gemini-2.5-flash' : null, latencyMs: works ? 412.6 : null } };
+      Object.assign(target, {
+        status: works ? 'working' : state.nextTestOutcome === 'quota' ? 'limited' : 'failed',
+        statusCheckedAt: NOW,
+      });
+      return {
+        status: 200,
+        body: {
+          key: target,
+          outcome: state.nextTestOutcome,
+          modelName: works ? 'gemini-2.5-flash' : null,
+          latencyMs: works ? 412.6 : null,
+        },
+      };
     }
   }
 

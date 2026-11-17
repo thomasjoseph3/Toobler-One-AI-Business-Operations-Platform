@@ -1,7 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import type { Contact, ContactsListResponse } from '@toobler-one/shared';
-import { Alert, Button, Card, ConfirmDialog, ContactsIcon, EmptyState, ErrorState, LoadingState, Pagination } from '@toobler-one/ui';
+import {
+  Alert,
+  Button,
+  Card,
+  ConfirmDialog,
+  ContactsIcon,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Pagination,
+} from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
@@ -12,7 +22,15 @@ import { ContactRowMenu } from './ContactRowMenu';
 import { ContactsToolbar } from './ContactsToolbar';
 import { CreateContactPanel } from './CreateContactPanel';
 import { describeContactSaveProblem } from './contact-problem';
-import { CONTACTS_PAGE_SIZE, DEFAULT_CONTACTS_VIEW, buildContactsPath, countActiveContactFilters, readContactsView, writeContactsView, type ContactsView } from './contacts-view';
+import {
+  CONTACTS_PAGE_SIZE,
+  DEFAULT_CONTACTS_VIEW,
+  buildContactsPath,
+  countActiveContactFilters,
+  readContactsView,
+  writeContactsView,
+  type ContactsView,
+} from './contacts-view';
 
 /** The Contacts page fills the main area from 768 px, so the toolbar stays on top, the contacts scroll and the footer stays at the bottom (as on Leads). */
 const PAGE_FRAME_CLASSES = 'md:flex md:h-full md:min-h-0 md:flex-col';
@@ -46,14 +64,19 @@ export function ContactsPage() {
   // A counter so each opening of the panel starts with an empty form
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
   // A confirmation the contact page left behind ("Priya was deleted.") shows first
-  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(readNoticeFromState(location.state));
+  const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(
+    readNoticeFromState(location.state),
+  );
   const [contactToDelete, setContactToDelete] = useState<{ id: string; displayName: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Applies the typed search a moment after the typing stops
   useEffect(() => {
     if (typedSearch.trim() === view.searchText.trim()) return;
-    const timer = setTimeout(() => setSearchParams(writeContactsView({ ...view, page: 1, searchText: typedSearch })), SEARCH_DELAY_MILLISECONDS);
+    const timer = setTimeout(
+      () => setSearchParams(writeContactsView({ ...view, page: 1, searchText: typedSearch })),
+      SEARCH_DELAY_MILLISECONDS,
+    );
     return () => clearTimeout(timer);
   }, [typedSearch, view, setSearchParams]);
 
@@ -87,7 +110,10 @@ export function ContactsPage() {
     setIsDeleting(true);
     try {
       await apiRequest('DELETE', `/contacts/${contactToDelete.id}`);
-      setNotice({ tone: 'success', text: formatMessage('contactPage.delete.done', { name: contactToDelete.displayName }) });
+      setNotice({
+        tone: 'success',
+        text: formatMessage('contactPage.delete.done', { name: contactToDelete.displayName }),
+      });
     } catch (error) {
       setNotice({ tone: 'error', text: describeContactSaveProblem(error) });
     }
@@ -108,12 +134,32 @@ export function ContactsPage() {
   const toolbar = (
     <>
       {notice !== null ? (
-        <Alert tone={notice.tone} className="mb-4" action={<Button variant="link" onClick={() => setNotice(null)}>{t('contacts.dismiss')}</Button>}>
+        <Alert
+          tone={notice.tone}
+          className="mb-4"
+          action={
+            <Button variant="link" onClick={() => setNotice(null)}>
+              {t('contacts.dismiss')}
+            </Button>
+          }
+        >
           {notice.text}
         </Alert>
       ) : null}
-      <ContactsToolbar view={view} typedSearch={typedSearch} onTypedSearchChange={setTypedSearch} onChangeView={changeView} onClearFilters={clearFilters} onAddContact={openCreatePanel} />
-      <CreateContactPanel key={createPanelOpenCount} isOpen={isCreatePanelOpen} onClose={() => setIsCreatePanelOpen(false)} onCreated={handleContactCreated} />
+      <ContactsToolbar
+        view={view}
+        typedSearch={typedSearch}
+        onTypedSearchChange={setTypedSearch}
+        onChangeView={changeView}
+        onClearFilters={clearFilters}
+        onAddContact={openCreatePanel}
+      />
+      <CreateContactPanel
+        key={createPanelOpenCount}
+        isOpen={isCreatePanelOpen}
+        onClose={() => setIsCreatePanelOpen(false)}
+        onCreated={handleContactCreated}
+      />
       <ConfirmDialog
         isOpen={contactToDelete !== null}
         tone="danger"
@@ -145,7 +191,11 @@ export function ContactsPage() {
       <div className={PAGE_FRAME_CLASSES}>
         {toolbar}
         <Card>
-          <ErrorState title={t('contacts.loadError.title')} description={t('contacts.loadError.description')} action={<Button onClick={contactsResource.reload}>{t('session.retry')}</Button>} />
+          <ErrorState
+            title={t('contacts.loadError.title')}
+            description={t('contacts.loadError.description')}
+            action={<Button onClick={contactsResource.reload}>{t('session.retry')}</Button>}
+          />
         </Card>
       </div>
     );
@@ -157,9 +207,23 @@ export function ContactsPage() {
         {toolbar}
         <Card>
           {hasFilters ? (
-            <EmptyState icon={<ContactsIcon size={24} />} title={t('contacts.noMatch.title')} description={t('contacts.noMatch.description')} action={<Button onClick={clearFilters}>{t('leads.filter.clear')}</Button>} />
+            <EmptyState
+              icon={<ContactsIcon size={24} />}
+              title={t('contacts.noMatch.title')}
+              description={t('contacts.noMatch.description')}
+              action={<Button onClick={clearFilters}>{t('leads.filter.clear')}</Button>}
+            />
           ) : (
-            <EmptyState icon={<ContactsIcon size={24} />} title={t('page.contacts.emptyTitle')} description={t('page.contacts.emptyDescription')} action={<Button variant="primary" onClick={openCreatePanel}>{t('contacts.add')}</Button>} />
+            <EmptyState
+              icon={<ContactsIcon size={24} />}
+              title={t('page.contacts.emptyTitle')}
+              description={t('page.contacts.emptyDescription')}
+              action={
+                <Button variant="primary" onClick={openCreatePanel}>
+                  {t('contacts.add')}
+                </Button>
+              }
+            />
           )}
         </Card>
       </div>
@@ -200,7 +264,13 @@ export function ContactsPage() {
         <div className="mt-3 overflow-hidden rounded-lg border border-border-default">{footer}</div>
       </div>
       <Card isFlush className="hidden md:flex md:min-h-0 md:flex-1 md:flex-col">
-        <ContactsTable contacts={items} selectedContactIds={selectedContactIds} onToggleContact={toggleContact} onToggleAllContacts={toggleAllContacts} renderRowMenu={renderRowMenu} />
+        <ContactsTable
+          contacts={items}
+          selectedContactIds={selectedContactIds}
+          onToggleContact={toggleContact}
+          onToggleAllContacts={toggleAllContacts}
+          renderRowMenu={renderRowMenu}
+        />
         {footer}
       </Card>
     </div>

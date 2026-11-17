@@ -72,13 +72,18 @@ export function QuestionRow(props: {
           {state === 'elsewhere_done' || state === 'elsewhere_open' ? (
             <p className="text-body-md text-text-secondary">
               {t(state === 'elsewhere_done' ? 'knowledge.question.elsewhereDone' : 'knowledge.question.elsewhereOpen')}{' '}
-              <Link to="/knowledge/what-you-sell" className="text-link underline underline-offset-2 hover:text-link-hover">
+              <Link
+                to="/knowledge/what-you-sell"
+                className="text-link underline underline-offset-2 hover:text-link-hover"
+              >
                 {t('knowledge.question.elsewhereLink')}
               </Link>
             </p>
           ) : lines.length > 0 ? (
             <div className="flex flex-col gap-1">
-              {state === 'waiting' && sourceWords ? <p className="text-label-sm text-text-secondary">{t(sourceWords)}</p> : null}
+              {state === 'waiting' && sourceWords ? (
+                <p className="text-label-sm text-text-secondary">{t(sourceWords)}</p>
+              ) : null}
               <ul className="text-body-md flex flex-col text-text-primary">
                 {lines.map((line, position) => (
                   <li key={position} className="whitespace-pre-line">
@@ -95,15 +100,31 @@ export function QuestionRow(props: {
             <div className="flex flex-wrap gap-3">
               {state === 'waiting' ? (
                 <>
-                  <Button variant="primary" size="compact" isLoading={isConfirming} onClick={sayYes} aria-label={`${t('knowledge.question.yes')}: ${question.text}`}>
+                  <Button
+                    variant="primary"
+                    size="compact"
+                    isLoading={isConfirming}
+                    onClick={sayYes}
+                    aria-label={`${t('knowledge.question.yes')}: ${question.text}`}
+                  >
                     {t('knowledge.question.yes')}
                   </Button>
-                  <Button variant="secondary" size="compact" onClick={onStartEditing} aria-label={`${t('knowledge.question.change')}: ${question.text}`}>
+                  <Button
+                    variant="secondary"
+                    size="compact"
+                    onClick={onStartEditing}
+                    aria-label={`${t('knowledge.question.change')}: ${question.text}`}
+                  >
                     {t('knowledge.question.change')}
                   </Button>
                 </>
               ) : (
-                <Button variant="secondary" size="compact" onClick={onStartEditing} aria-label={`${t(state === 'unanswered' ? 'knowledge.question.answer' : 'knowledge.question.change')}: ${question.text}`}>
+                <Button
+                  variant="secondary"
+                  size="compact"
+                  onClick={onStartEditing}
+                  aria-label={`${t(state === 'unanswered' ? 'knowledge.question.answer' : 'knowledge.question.change')}: ${question.text}`}
+                >
                   {t(state === 'unanswered' ? 'knowledge.question.answer' : 'knowledge.question.change')}
                 </Button>
               )}

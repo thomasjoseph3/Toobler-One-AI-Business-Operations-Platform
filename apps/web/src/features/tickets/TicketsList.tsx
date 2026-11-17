@@ -1,5 +1,15 @@
 import type { Ticket } from '@toobler-one/shared';
-import { Card, Checkbox, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, Tag } from '@toobler-one/ui';
+import {
+  Card,
+  Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  Tag,
+} from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import { findLeadDisplayName, findOwnerLabel, formatMoment } from '../leads/lead-display';
 import { TicketNameLink } from './TicketNameLink';
@@ -22,18 +32,34 @@ function PriorityTag({ ticket }: { ticket: Ticket }) {
 
 /** The status as a tag: Open or Closed, in words. */
 function StatusTag({ ticket }: { ticket: Ticket }) {
-  return <Tag tone={ticket.status === 'open' ? 'new' : 'won'}>{ticket.status === 'open' ? t('tickets.status.open') : t('tickets.status.done')}</Tag>;
+  return (
+    <Tag tone={ticket.status === 'open' ? 'new' : 'won'}>
+      {ticket.status === 'open' ? t('tickets.status.open') : t('tickets.status.done')}
+    </Tag>
+  );
 }
 
 /** The tickets as a table for tablets and desktops, laid out like the leads table: select box, title, person, type, priority, status, owner and opened. */
-export function TicketsTable({ tickets, signedInUserId, timeZone, selectedTicketIds, onToggleTicket, onToggleAllTickets }: TicketsTableProps) {
+export function TicketsTable({
+  tickets,
+  signedInUserId,
+  timeZone,
+  selectedTicketIds,
+  onToggleTicket,
+  onToggleAllTickets,
+}: TicketsTableProps) {
   const areAllSelected = tickets.length > 0 && tickets.every((ticket) => selectedTicketIds.has(ticket.id));
   return (
     <Table className="min-w-[900px]" containerClassName="min-h-0 flex-1 overflow-auto">
       <TableHead>
         <tr>
           <TableHeaderCell className="w-12">
-            <Checkbox label={t('tickets.selectAll')} isLabelHidden checked={areAllSelected} onChange={onToggleAllTickets} />
+            <Checkbox
+              label={t('tickets.selectAll')}
+              isLabelHidden
+              checked={areAllSelected}
+              onChange={onToggleAllTickets}
+            />
           </TableHeaderCell>
           <TableHeaderCell>{t('tickets.column.title')}</TableHeaderCell>
           <TableHeaderCell>{t('tickets.column.person')}</TableHeaderCell>
@@ -49,7 +75,12 @@ export function TicketsTable({ tickets, signedInUserId, timeZone, selectedTicket
           <TableRow key={ticket.id} isSelected={selectedTicketIds.has(ticket.id)}>
             <TableCell className="w-12">
               <div className="flex items-center">
-                <Checkbox label={formatMessage('tickets.selectOne', { title: ticket.title })} isLabelHidden checked={selectedTicketIds.has(ticket.id)} onChange={() => onToggleTicket(ticket.id)} />
+                <Checkbox
+                  label={formatMessage('tickets.selectOne', { title: ticket.title })}
+                  isLabelHidden
+                  checked={selectedTicketIds.has(ticket.id)}
+                  onChange={() => onToggleTicket(ticket.id)}
+                />
               </div>
             </TableCell>
             <TableCell className="max-w-[260px] break-words text-text-primary">

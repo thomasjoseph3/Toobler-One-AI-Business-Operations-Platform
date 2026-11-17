@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { isPublicAddress, parseWebsiteAddress } from './public-address';
 
 describe('isPublicAddress', () => {
-  it.each(['8.8.8.8', '1.1.1.1', '142.250.183.46', '2606:4700:4700::1111'])('accepts the public address %s', (address) => {
-    expect(isPublicAddress(address)).toBe(true);
-  });
+  it.each(['8.8.8.8', '1.1.1.1', '142.250.183.46', '2606:4700:4700::1111'])(
+    'accepts the public address %s',
+    (address) => {
+      expect(isPublicAddress(address)).toBe(true);
+    },
+  );
 
   it.each([
     '127.0.0.1',
@@ -80,8 +83,12 @@ describe('parseWebsiteAddress', () => {
   });
 
   it('refuses with a code the screen can use', () => {
-    expect(() => parseWebsiteAddress('http://127.0.0.1')).toThrowError(expect.objectContaining({ code: 'WEBSITE_NOT_PUBLIC' }));
-    expect(() => parseWebsiteAddress('ftp://x.in')).toThrowError(expect.objectContaining({ code: 'WEBSITE_ADDRESS_INVALID' }));
+    expect(() => parseWebsiteAddress('http://127.0.0.1')).toThrowError(
+      expect.objectContaining({ code: 'WEBSITE_NOT_PUBLIC' }),
+    );
+    expect(() => parseWebsiteAddress('ftp://x.in')).toThrowError(
+      expect.objectContaining({ code: 'WEBSITE_ADDRESS_INVALID' }),
+    );
   });
 
   it('accepts an extra port only when the caller allows it (tests only)', () => {
