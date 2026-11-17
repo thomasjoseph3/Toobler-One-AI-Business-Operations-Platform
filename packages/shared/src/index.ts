@@ -24,3 +24,4 @@ export * from './ai-models-admin';
 export * from './agent-test-chat';
 export * from './webchat';
 export * from './setup';
+export * from './setup-chat';

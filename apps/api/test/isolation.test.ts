@@ -613,6 +613,12 @@ const attempts: Attempt[] = [
     expectedStatus: 200,
   },
   {
+    route: 'POST /api/v1/setup/chat',
+    what: "answer a question in the setup chat as B (B's own answer is saved; A's answers must stay as they were)",
+    request: () => ({ method: 'POST', url: '/setup/chat', payload: { questionKey: 'business_name', reply: 'B Stays' } }),
+    expectedStatus: 200,
+  },
+  {
     route: 'POST /api/v1/setup/go-live',
     what: 'go live as B (B is not ready, so 409; A must not be made live)',
     request: () => ({ method: 'POST', url: '/setup/go-live' }),
@@ -645,7 +651,7 @@ const attempts: Attempt[] = [
   {
     route: 'PUT /api/v1/ai/settings',
     what: "change the AI settings (B's own business only), and A's must stay as they were",
-    request: () => ({ method: 'PUT', url: '/ai/settings', payload: { keyMode: 'own_then_platform' } }),
+    request: () => ({ method: 'PUT', url: '/ai/settings', payload: { keyMode: 'platform' } }),
     expectedStatus: 200,
   },
   {
@@ -950,7 +956,7 @@ describe('isolation: business B tries to reach business A', () => {
     const offersOfA = await sendOk(businessA, 'GET', '/offers');
     expect(offersOfA.items).toHaveLength(1);
     expect(offersOfA.items[0].text).toBe(`Offer ${dataOfA.secretWords}`);
-    expect((await sendOk(businessA, 'GET', '/ai/settings')).keyMode).toBe('own'); // B's change did not reach A
+    expect((await sendOk(businessA, 'GET', '/ai/settings')).keyMode).toBe('own_then_platform'); // B's change did not reach A
     const keysOfA = await sendOk(businessA, 'GET', '/ai/keys');
     expect(keysOfA.items).toHaveLength(1);
     expect(keysOfA.items[0].label).toBe(`Key ${dataOfA.secretWords}`);

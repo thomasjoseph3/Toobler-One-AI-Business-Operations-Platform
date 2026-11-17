@@ -4,9 +4,15 @@ import {
   applyPresetResponseSchema,
   goLiveResponseSchema,
   patchSetupRequestSchema,
+  setupChatRequestSchema,
+  setupChatResponseSchema,
   setupResponseSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
+import { routeLimit } from '../../../../kernel/http/route-limits';
+import { createAiService } from '../../ai';
+import { createKnowledgeService } from '../../knowledge';
+import { createSetupChatService } from '../services/setup-chat.service';
 import { createSetupService } from '../services/setup.service';
 
 /**
@@ -16,6 +22,10 @@ import { createSetupService } from '../services/setup.service';
 export function setupRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const setupService = createSetupService({ database: app.kernel.database });
+  const setupChatService = createSetupChatService({
+    knowledgeService: createKnowledgeService({ database: app.kernel.database }),
+    aiService: createAiService({ database: app.kernel.database, config: app.kernel.config, llm: app.kernel.llm }),
+  });
 
   // For managers only (the guard answers 403 to staff). The business comes from the session, never from the request.
   typedApp.get(
@@ -47,6 +57,19 @@ export function setupRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return setupService.applyPreset(request.principal);
+    },
+  );
+
+  // For managers only. One owner message in, the next question out. The AI may read a pick or yes/no reply, so it is rate limited.
+  typedApp.post(
+    '/setup/chat',
+    {
+      config: { access: 'manager', ...routeLimit(app, 'setupChat') },
+      schema: { body: setupChatRequestSchema, response: { 200: setupChatResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return setupChatService.reply(request.principal, request.body);
     },
   );
 
