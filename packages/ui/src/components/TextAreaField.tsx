@@ -9,6 +9,8 @@ export interface TextAreaFieldProps extends Omit<TextareaHTMLAttributes<HTMLText
   helperText?: string;
   /** When set the field is in its error state and the message shows below it. */
   errorMessage?: string;
+  /** Hides the label from sight but keeps it for screen readers: for a box whose placeholder says what it is for (a note box). */
+  isLabelHidden?: boolean;
 }
 
 /** A labelled box for longer text, with helper text and an error message, wired up for screen readers (the multi-line twin of TextField). */
@@ -17,6 +19,7 @@ export function TextAreaField({
   requirementLabel,
   helperText,
   errorMessage,
+  isLabelHidden = false,
   className,
   rows = 3,
   ...rest
@@ -28,7 +31,10 @@ export function TextAreaField({
     [errorMessage ? errorId : null, helperText ? helperId : null].filter(Boolean).join(' ') || undefined;
   return (
     <div className={joinClassNames('flex flex-col gap-1', className)}>
-      <label htmlFor={fieldId} className="text-label-sm text-text-primary">
+      <label
+        htmlFor={fieldId}
+        className={joinClassNames('text-label-sm text-text-primary', isLabelHidden ? 'sr-only' : undefined)}
+      >
         {label}
         {requirementLabel ? <span className="text-text-secondary"> ({requirementLabel})</span> : null}
       </label>

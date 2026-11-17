@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { answerFaqsCall, startingFaqs, type PretendFaqs } from './pretend-faqs';
 import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
+import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
 import { answerSettingsCall, startingSettings, type PretendSettings } from './pretend-settings';
 import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
 import { answerSalesCall, startingSales, type PretendSales } from './pretend-sales';
@@ -82,6 +83,8 @@ export interface PretendApi {
   webchat: PretendWebchat;
   /** Settings: the AI key mode, own keys, usage and the modules. */
   settings: PretendSettings;
+  /** Notes on a lead (the Notes panel and the lead page). */
+  notes: PretendNotes;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -210,6 +213,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         faqs: startingFaqs(),
         webchat: startingWebchat(),
         settings: startingSettings(),
+        notes: startingNotes(),
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -221,6 +225,16 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path === '/activities' || path === '/notes') {
+          const notesAnswer = answerNotesCall(pretendApi.notes, {
+            method: request.method(),
+            path,
+            search: new URL(request.url()).search,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            userName: profileFor(pretendApi).user.name,
+          });
+          if (notesAnswer) return route.fulfill(json(notesAnswer.status, notesAnswer.body));
         }
         if (path.startsWith('/ai/') || path.startsWith('/modules')) {
           const settingsAnswer = answerSettingsCall(pretendApi.settings, {

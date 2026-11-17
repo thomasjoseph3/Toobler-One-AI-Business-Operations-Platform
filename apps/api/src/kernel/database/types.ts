@@ -554,6 +554,24 @@ export interface TicketNotesTable {
   created_at: Generated<Date>;
 }
 
+/** One thing that happened with a person and, usually, one of their leads (today: a note). Fenced by account_id. */
+export interface ActivitiesTable {
+  id: string;
+  account_id: string;
+  contact_id: string;
+  lead_id: string | null;
+  kind: 'note';
+  body: string | null;
+  by_user_id: string | null;
+  by_agent: string | null;
+  edited_at: Date | null;
+  deleted_at: Date | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** One answer to one business question. Fenced by account_id; the primary key is (account_id, question_key). */
 export interface BusinessAnswersTable {
   account_id: string;
@@ -713,6 +731,7 @@ export interface DB {
   leads: LeadsTable;
   tickets: TicketsTable;
   ticket_notes: TicketNotesTable;
+  activities: ActivitiesTable;
   conversation_types: ConversationTypesTable;
   block_list: BlockListTable;
   conversations: ConversationsTable;

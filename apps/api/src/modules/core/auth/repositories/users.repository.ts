@@ -208,3 +208,18 @@ export async function listStaffContactPoints(
     emails: rows.map((row) => row.email),
   };
 }
+
+/** The name and role of some people of the business (unknown ids, and people of other businesses, are simply missing). Run it inside the business's own transaction. */
+export async function listPeopleByIds(
+  db: Db,
+  accountId: string,
+  userIds: string[],
+): Promise<Array<{ id: string; name: string; role: 'manager' | 'staff' | 'staff_own' }>> {
+  if (userIds.length === 0) return [];
+  return db
+    .selectFrom('users')
+    .select(['id', 'name', 'role'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', userIds)
+    .execute();
+}

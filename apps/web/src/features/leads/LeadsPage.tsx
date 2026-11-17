@@ -17,6 +17,7 @@ import { useKeptData } from '../knowledge/use-kept-resource';
 import { moveLeadInColumns } from './board-move';
 import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
+import { NotesPanel } from '../notes/NotesPanel';
 import { LeadsBoard } from './LeadsBoard';
 import { DeleteStageDialog } from './DeleteStageDialog';
 import { StageNameDialog } from './StageNameDialog';
@@ -53,6 +54,8 @@ export function LeadsPage() {
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
   // The box for naming a column: closed, adding a new one, or renaming one
+  // The lead whose Notes panel is open (the add-note icon of its row), or none
+  const [notesLead, setNotesLead] = useState<{ id: string; displayName: string } | null>(null);
   const [stageToDelete, setStageToDelete] = useState<PipelineStage | null>(null);
   const [stageDialog, setStageDialog] = useState<{ stageToRename: PipelineStage | null } | null>(null);
   const view = readLeadsView(searchParams);
@@ -168,6 +171,14 @@ export function LeadsPage() {
         onCreated={handleLeadCreated}
       />
       {actions.dialogs}
+      {notesLead !== null ? (
+        <NotesPanel
+          key={notesLead.id}
+          leadId={notesLead.id}
+          leadName={notesLead.displayName}
+          onClose={() => setNotesLead(null)}
+        />
+      ) : null}
       {stageToDelete !== null ? (
         <DeleteStageDialog
           stage={stageToDelete}
@@ -342,6 +353,7 @@ export function LeadsPage() {
           onToggleLead={toggleLead}
           onToggleAllLeads={toggleAllLeads}
           renderRowMenu={actions.renderRowMenu}
+          onOpenNotes={(lead, displayName) => setNotesLead({ id: lead.id, displayName })}
         />
         {footer}
       </Card>

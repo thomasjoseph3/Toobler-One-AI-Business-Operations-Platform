@@ -9,3 +9,6 @@ export { createPipelineService } from './services/pipeline.service';
 // A staff correction ("this was not a sale") takes the lead off the board without deleting it.
 export { closeLeadAsReclassified } from './services/lead-reclassify.service';
 export { DEFAULT_STAGES } from './helpers/default-pipeline';
+// The notes module (F07) checks a lead exists, and is the person's to see, before it saves a note on it.
+export { findLeadReference } from './services/lead-reference.service';
+export type { LeadReference } from './services/lead-reference.service';

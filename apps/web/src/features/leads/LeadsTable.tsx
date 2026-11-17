@@ -37,6 +37,8 @@ export interface LeadsTableProps {
   onToggleAllLeads: () => void;
   /** Draws the "…" menu of one lead (the page knows the stages, the signed-in person and what each action does). */
   renderRowMenu: (lead: Lead, displayName: string) => ReactNode;
+  /** Opens the Notes panel of one lead (the add-note icon of its row). */
+  onOpenNotes: (lead: Lead, displayName: string) => void;
 }
 
 /** The small green chip with the callback date (Figma "Next activity"); the calendar icon and the date both show. */
@@ -59,14 +61,18 @@ export function LeadsTable({
   onToggleLead,
   onToggleAllLeads,
   renderRowMenu,
+  onOpenNotes,
 }: LeadsTableProps) {
   const areAllSelected = leads.length > 0 && leads.every((lead) => selectedLeadIds.has(lead.id));
   return (
     <Table className="min-w-[940px]" containerClassName="min-h-0 flex-1 overflow-auto">
       <TableHead>
         <tr>
-          <TableHeaderCell className="w-12">
+          <TableHeaderCell className="w-10 !pr-0">
             <Checkbox label={t('leads.selectAll')} isLabelHidden checked={areAllSelected} onChange={onToggleAllLeads} />
+          </TableHeaderCell>
+          <TableHeaderCell className="w-28 !px-1">
+            <span className="sr-only">{t('leads.column.nextActivity')}</span>
           </TableHeaderCell>
           <TableHeaderCell>{t('leads.column.name')}</TableHeaderCell>
           <TableHeaderCell>{t('leads.column.email')}</TableHeaderCell>
@@ -74,7 +80,6 @@ export function LeadsTable({
           <TableHeaderCell>{t('leads.column.status')}</TableHeaderCell>
           <TableHeaderCell>{t('leads.column.source')}</TableHeaderCell>
           <TableHeaderCell>{t('leads.column.owner')}</TableHeaderCell>
-          <TableHeaderCell>{t('leads.column.nextActivity')}</TableHeaderCell>
           <TableHeaderCell className="w-12">
             {/* Choosing columns is drawn as designed and does nothing yet */}
             <IconButton
@@ -93,7 +98,7 @@ export function LeadsTable({
           const callbackDate = formatCallbackDate(lead.callbackAt, timeZone);
           return (
             <TableRow key={lead.id} isSelected={selectedLeadIds.has(lead.id)}>
-              <TableCell className="w-12">
+              <TableCell className="w-10 !pr-0">
                 <div className="flex items-center">
                   <Checkbox
                     label={formatMessage('leads.selectOne', { name: displayName })}
@@ -103,39 +108,39 @@ export function LeadsTable({
                   />
                 </div>
               </TableCell>
-              <TableCell className="text-text-primary">
+              <TableCell className="w-28 !px-1 whitespace-nowrap">
+                {/* Next activity (Figma: right after the select box): the callback date, and the quick actions when the row is hovered or focused */}
+                <div className="flex items-center gap-1">
+                  {callbackDate ? <CallbackChip date={callbackDate} /> : null}
+                  <div className="invisible flex items-center gap-1 group-focus-within:visible group-hover:visible">
+                    {callbackDate ? null : (
+                      <IconButton
+                        label={t('leads.row.logActivity')}
+                        size="compact"
+                        icon={<ActivityIcon size={20} />}
+                        aria-disabled
+                        title={t('leads.notYet')}
+                      />
+                    )}
+                    <IconButton
+                      label={formatMessage('leads.row.addNoteFor', { name: displayName })}
+                      size="compact"
+                      icon={<AddNoteIcon size={18} />}
+                      onClick={() => onOpenNotes(lead, displayName)}
+                    />
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-text-primary [overflow-wrap:anywhere]">
                 <LeadNameLink lead={lead}>{displayName}</LeadNameLink>
               </TableCell>
-              <TableCell>{lead.contact?.email}</TableCell>
+              <TableCell className="[overflow-wrap:anywhere]">{lead.contact?.email}</TableCell>
               <TableCell className="whitespace-nowrap">{lead.contact?.phone}</TableCell>
               <TableCell>
                 <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
               </TableCell>
               <TableCell>{findChannelLabel(lead.firstChannel)}</TableCell>
               <TableCell>{findOwnerLabel(lead.ownerUserId, signedInUserId)}</TableCell>
-              <TableCell>
-                {callbackDate ? (
-                  <CallbackChip date={callbackDate} />
-                ) : (
-                  // With no callback booked, the quick actions show when the row is hovered or focused (as in the Figma row)
-                  <div className="invisible flex items-center gap-1 group-focus-within:visible group-hover:visible">
-                    <IconButton
-                      label={t('leads.row.logActivity')}
-                      size="compact"
-                      icon={<ActivityIcon size={20} />}
-                      aria-disabled
-                      title={t('leads.notYet')}
-                    />
-                    <IconButton
-                      label={t('leads.row.addNote')}
-                      size="compact"
-                      icon={<AddNoteIcon size={18} />}
-                      aria-disabled
-                      title={t('leads.notYet')}
-                    />
-                  </div>
-                )}
-              </TableCell>
               <TableCell className="w-12">{renderRowMenu(lead, displayName)}</TableCell>
             </TableRow>
           );

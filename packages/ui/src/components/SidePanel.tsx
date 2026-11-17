@@ -7,6 +7,8 @@ export interface SidePanelProps {
   /** Called when the person closes the panel: the close button, the Escape key, or a press on the dimmed page. */
   onClose: () => void;
   title: string;
+  /** Something small shown right after the title, such as a count badge ("Notes 2"). */
+  titleExtra?: ReactNode;
   /** The words for the close button. */
   closeLabel: string;
   /** The panel's buttons (Cancel, Save), kept in view at the bottom while the form scrolls. */
@@ -19,7 +21,7 @@ export interface SidePanelProps {
  * focus trap, Escape closes, focus returns to the button that opened it). On a phone it fills the screen. It is a native
  * `<dialog>`, so the browser does the focus trap and the Escape key.
  */
-export function SidePanel({ isOpen, onClose, title, closeLabel, footer, children }: SidePanelProps) {
+export function SidePanel({ isOpen, onClose, title, titleExtra, closeLabel, footer, children }: SidePanelProps) {
   const panelRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -44,9 +46,12 @@ export function SidePanel({ isOpen, onClose, title, closeLabel, footer, children
     >
       <div className="ml-auto flex h-full max-h-full min-h-0 w-full flex-col bg-surface text-text-primary shadow-lg md:w-[480px] md:rounded-l-xl md:border-l md:border-border-default">
         <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border-subtle px-4 md:px-6">
-          <h2 id={titleId} className="text-heading-lg">
-            {title}
-          </h2>
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 id={titleId} className="text-heading-lg">
+              {title}
+            </h2>
+            {titleExtra}
+          </div>
           <IconButton label={closeLabel} icon={<X aria-hidden className="size-5" />} onClick={onClose} />
         </div>
         {/* min-h-0 lets this area shrink and scroll inside the panel in every browser; overscroll-contain keeps the page behind from taking the scroll */}

@@ -25,6 +25,7 @@ import {
   formatMoment,
   toWhatsappDigits,
 } from './lead-display';
+import { LeadNotesCard } from '../notes/LeadNotesCard';
 import { LeadDetailsCard } from './LeadDetailsCard';
 import { readNoticeFromState, useLeadActions } from './useLeadActions';
 
@@ -215,10 +216,7 @@ export function LeadPage() {
               leadResource.reload();
             }}
           />
-          <Card>
-            <h3 className="text-heading-md mb-3 text-text-primary">{t('leadPage.timeline.heading')}</h3>
-            <p className="text-body-md text-text-secondary">{t('leadPage.timeline.empty')}</p>
-          </Card>
+          <LeadNotesCard leadId={lead.id} />
         </div>
         <div className="flex flex-col gap-6">
           <Card>

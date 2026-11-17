@@ -7,3 +7,6 @@ export { findBusinessIdentity, findBusinessIndustry, findStaffContactPoints } fr
 export { findBusinessLiveAt, markBusinessLive } from './services/business-facts.service';
 export type { BusinessIdentity } from './services/business-facts.service';
 // The AI agent (F19) uses `findBusinessIdentity` to say who it speaks for and to read the business's hours in its own time zone.
+// The notes module (F07) shows who wrote a note: their name and role.
+export { findPeopleSummaries } from './services/people-summaries.service';
+export type { PersonSummary } from './services/people-summaries.service';
