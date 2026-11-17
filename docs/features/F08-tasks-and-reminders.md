@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/05-tasks-and-reminders.md`; `requirements/API.md` (Tasks and reminders); the designer's activity menu (Create Task, Create Meeting, Create Call) in the Leads list frame `docs/design/screens/leads-list-with-activity-menu.png`.
 **Depends on:** F04 contacts, F06 leads, F07 timeline.      **Module:** `core.tasks` (core).
-**Status:** `in_progress`: slices 1 to 4 built (17 Nov 2026); the AI agent's promises becoming tasks is the one open item (see the end).
+**Status:** `approved` under the standing instruction (17 Nov 2026): slices 1 to 4 built; the AI agent's promises becoming tasks is the one open item (see the end).
 
 ## Feature guide
 

@@ -150,14 +150,14 @@ test.describe("a lead's own page", () => {
     pretendApi,
   }) => {
     await page.goto('/leads/lead-0');
-    await page.getByRole('button', { name: 'Actions' }).click();
+    await page.getByRole('button', { name: 'Actions', exact: true }).click();
     await page
       .getByRole('group', { name: 'Actions for Priya Menon 0' })
       .getByRole('button', { name: 'Quoted' })
       .click();
     await expect(page.getByRole('status').filter({ hasText: 'Priya Menon 0 moved to Quoted.' })).toBeVisible();
     expect(pretendApi.movedLeads).toEqual([{ leadId: 'lead-0', body: { stageId: PRETEND_STAGE_IDS.quoted } }]);
-    await page.getByRole('button', { name: 'Actions' }).click();
+    await page.getByRole('button', { name: 'Actions', exact: true }).click();
     await page
       .getByRole('group', { name: 'Actions for Priya Menon 0' })
       .getByRole('button', { name: 'Delete lead' })
@@ -174,7 +174,7 @@ test.describe("a lead's own page", () => {
   test('staff never see Delete on the page', async ({ page, pretendApi }) => {
     pretendApi.role = 'staff';
     await page.goto('/leads/lead-0');
-    await page.getByRole('button', { name: 'Actions' }).click();
+    await page.getByRole('button', { name: 'Actions', exact: true }).click();
     const menu = page.getByRole('group', { name: 'Actions for Priya Menon 0' });
     await expect(menu.getByRole('button', { name: 'Quoted' })).toBeVisible();
     await expect(menu.getByRole('button', { name: 'Delete lead' })).toHaveCount(0);

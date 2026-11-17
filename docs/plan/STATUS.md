@@ -29,7 +29,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F20 | Website chat | approved | [brief](../features/F20-website-chat.md) | 2026-11-16 |
 | F31 | Setup wizard and fill from website | approved | [brief](../features/F31-setup-wizard.md) | 2026-11-17 |
 | F07 | Timeline and notes | approved | [brief](../features/F07-timeline-and-notes.md) | 2026-11-17 |
-| F08 | Tasks and reminders | in_progress | [brief](../features/F08-tasks-and-reminders.md) | |
+| F08 | Tasks and reminders | approved | [brief](../features/F08-tasks-and-reminders.md) | 2026-11-17 |
 | F02 | Team, roles, teams and the activity log | planned | | |
 | F05 | Companies | planned | | |
 | F09 | Custom fields | planned | | |

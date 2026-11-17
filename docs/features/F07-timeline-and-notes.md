@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/04-activity-timeline-and-notes.md`; `requirements/API.md` (Activity timeline and notes); the designer's frames `docs/design/screens/leads-note-panel.png` ("Leads - Note", Figma node 2024:3774) and `docs/design/screens/leads-list-with-activity-menu.png` (Figma node 2024:2730).
 **Depends on:** F04 contacts, F06 leads.      **Module:** `core.activities` (core).
-**Status:** `in_progress`: slices 1 to 4 built (17 Nov 2026). Pulled ahead of F02 because the designer delivered the screen and the owner asked for it (R69, 17 Nov 2026).
+**Status:** `approved` under the standing instruction (17 Nov 2026): slices 1 to 4 built. Pulled ahead of F02 because the designer delivered the screen and the owner asked for it (R69, 17 Nov 2026).
 
 ## Feature guide
 
