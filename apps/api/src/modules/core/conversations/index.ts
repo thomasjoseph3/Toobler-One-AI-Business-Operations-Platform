@@ -7,3 +7,5 @@ export type { FinaliseOptions, FinaliseResult } from './services/conversation-fi
 export { createConversationClassifier } from './services/conversation-classifier.service';
 // "Test the agent" (F19) saves its chats as conversations, so it follows the same rule about who may read them.
 export { refuseOwnLeadsOnlyRole } from './services/conversation-reader.service';
+// The setup wizard asks whether the business has tried its agent in "Test the agent" before it may go live.
+export { hasTriedTheAgent } from './services/test-chat-facts.service';

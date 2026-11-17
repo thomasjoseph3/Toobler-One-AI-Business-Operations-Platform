@@ -936,7 +936,7 @@ describe('GET /api/v1/knowledge/settings', () => {
     const person = await createSignedInPerson(app, database);
     const response = await getSettings(person);
     expect(response.statusCode, response.body).toBe(200);
-    expect(response.json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+    expect(response.json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN', callbackPromiseMinutes: 15 });
   });
 
   it('lets every role read it, and answers 401 with nobody signed in', async () => {
@@ -954,16 +954,38 @@ describe('PUT /api/v1/knowledge/settings', () => {
     const person = await createSignedInPerson(app, database);
     const both = await putSettings(person, { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
     expect(both.statusCode, both.body).toBe(200);
-    expect(both.json()).toEqual({ timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+    expect(both.json()).toEqual({ timeZone: 'Asia/Dubai', defaultCountry: 'AE', callbackPromiseMinutes: 15 });
     expect((await putSettings(person, { defaultCountry: 'IN' })).json()).toEqual({
       timeZone: 'Asia/Dubai',
       defaultCountry: 'IN',
+      callbackPromiseMinutes: 15,
     });
     expect((await putSettings(person, { timeZone: 'Asia/Kolkata' })).json()).toEqual({
       timeZone: 'Asia/Kolkata',
       defaultCountry: 'IN',
+      callbackPromiseMinutes: 15,
     });
-    expect((await getSettings(person)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+    expect((await getSettings(person)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN', callbackPromiseMinutes: 15 });
+  });
+
+  it('changes how fast the business promises to call back, within 5 to 120 minutes, and refuses anything else', async () => {
+    const person = await createSignedInPerson(app, database);
+    const changed = await putSettings(person, { callbackPromiseMinutes: 30 });
+    expect(changed.statusCode, changed.body).toBe(200);
+    expect(changed.json().callbackPromiseMinutes).toBe(30);
+    expect((await getSettings(person)).json().callbackPromiseMinutes).toBe(30);
+    for (const minutes of [4, 121, 0, -5, 10.5, '15', null]) {
+      expect((await putSettings(person, { callbackPromiseMinutes: minutes })).statusCode, String(minutes)).toBe(400);
+    }
+    expect((await getSettings(person)).json().callbackPromiseMinutes).toBe(30); // none of the refused calls changed it
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', person.profile.business.id)
+      .where('kind', '=', 'business.settings_changed')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.fields).toEqual(['callbackPromiseMinutes']);
   });
 
   it('turns a small-letter country into capitals', async () => {
@@ -1001,7 +1023,7 @@ describe('PUT /api/v1/knowledge/settings', () => {
 
   it('writes nothing when the values sent are the ones already set', async () => {
     const person = await createSignedInPerson(app, database);
-    const response = await putSettings(person, { timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+    const response = await putSettings(person, { timeZone: 'Asia/Kolkata', defaultCountry: 'IN', callbackPromiseMinutes: 15 });
     expect(response.statusCode, response.body).toBe(200);
     const lines = await database.system
       .selectFrom('activity_log')
@@ -1026,7 +1048,7 @@ describe('PUT /api/v1/knowledge/settings', () => {
     expect(notACountry.json().error.code).toBe('INVALID_COUNTRY');
     expect((await putSettings(person, { name: 'Hacked Stays' })).statusCode).toBe(400);
     expect((await putSettings(person, { accountId: randomUUID(), timeZone: 'Asia/Dubai' })).statusCode).toBe(400);
-    expect((await getSettings(person)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+    expect((await getSettings(person)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN', callbackPromiseMinutes: 15 });
   });
 
   it('answers 403 to staff and to the "own leads only" role, 401 with nobody signed in, and 403 without the web app headers', async () => {
@@ -1045,7 +1067,7 @@ describe('PUT /api/v1/knowledge/settings', () => {
     const first = await createSignedInPerson(app, database);
     const second = await createSignedInPerson(app, database);
     await putSettings(first, { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
-    expect((await getSettings(second)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN' });
+    expect((await getSettings(second)).json()).toEqual({ timeZone: 'Asia/Kolkata', defaultCountry: 'IN', callbackPromiseMinutes: 15 });
   });
 
   it("makes a phone number typed without a country code follow the business's country", async () => {

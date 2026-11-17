@@ -77,3 +77,12 @@ export async function createSignedInPerson(
     profile: login.json(),
   };
 }
+
+/** Marks a business as live, the way the setup wizard's "Go live" does, so its website chat answers visitors. New test businesses are not live. */
+export async function makeBusinessLive(database: Database, accountId: string): Promise<void> {
+  await database.system
+    .updateTable('accounts')
+    .set({ live_at: new Date(), live_by: { kind: 'system', id: 'test' } })
+    .where('id', '=', accountId)
+    .execute();
+}

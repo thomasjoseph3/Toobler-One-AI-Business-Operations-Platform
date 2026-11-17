@@ -9,13 +9,23 @@ import type { Principal } from '../../../../kernel/http/guard';
 import * as accountsRepository from '../repositories/accounts.repository';
 
 /**
- * The business's own settings: its time zone and the country a phone number belongs to when typed without a country code.
+ * The business's own settings: its time zone, the country a phone number belongs to when typed without a country code, and how fast
+ * it promises to call back.
  * They live on the business itself (this module owns that table); the knowledge module's routes use this through
  * this module's index.ts. Other modules read the same two values from the signed-in person (`principal.timeZone`,
  * `principal.defaultCountry`), so they never read the business table.
  */
 export function createBusinessSettingsService({ database }: { database: Database }) {
   return {
+    /** The business's settings as they are now. 404 when there is no such business. */
+    async readBusinessSettings(accountId: string): Promise<BusinessSettings> {
+      const settings = await database.runInAccountTransaction(accountId, (transaction) =>
+        accountsRepository.findAccountSettings(transaction, accountId),
+      );
+      if (!settings) throw notFound('The business');
+      return settings;
+    },
+
     /**
      * Changes the time zone and/or the default country. Only what is sent changes, and sending the value already set
      * changes nothing and writes no log line. A country that phone numbers do not exist for answers 400 INVALID_COUNTRY.
@@ -25,8 +35,12 @@ export function createBusinessSettingsService({ database }: { database: Database
       principal: Pick<Principal, 'accountId' | 'userId'>,
       request: PutBusinessSettingsRequest,
     ): Promise<BusinessSettings> {
-      if (request.timeZone === undefined && request.defaultCountry === undefined) {
-        throw new ApiError(400, 'NOTHING_TO_CHANGE', 'Send a time zone or a default country.');
+      if (
+        request.timeZone === undefined &&
+        request.defaultCountry === undefined &&
+        request.callbackPromiseMinutes === undefined
+      ) {
+        throw new ApiError(400, 'NOTHING_TO_CHANGE', 'Send a time zone, a default country or a callback promise.');
       }
       if (request.defaultCountry !== undefined && !(getCountries() as string[]).includes(request.defaultCountry)) {
         throw new ApiError(
@@ -42,11 +56,17 @@ export function createBusinessSettingsService({ database }: { database: Database
         const current = await accountsRepository.findAccountSettings(transaction, accountId);
         if (!current) throw notFound('The business');
 
-        const changes: { timeZone?: string; defaultCountry?: string } = {};
+        const changes: { timeZone?: string; defaultCountry?: string; callbackPromiseMinutes?: number } = {};
         if (request.timeZone !== undefined && request.timeZone !== current.timeZone)
           changes.timeZone = request.timeZone;
         if (request.defaultCountry !== undefined && request.defaultCountry !== current.defaultCountry) {
           changes.defaultCountry = request.defaultCountry;
+        }
+        if (
+          request.callbackPromiseMinutes !== undefined &&
+          request.callbackPromiseMinutes !== current.callbackPromiseMinutes
+        ) {
+          changes.callbackPromiseMinutes = request.callbackPromiseMinutes;
         }
         const changedFields = Object.keys(changes);
         if (changedFields.length === 0) return current;

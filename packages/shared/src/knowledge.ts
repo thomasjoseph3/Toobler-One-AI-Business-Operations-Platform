@@ -250,17 +250,19 @@ export function isRealTimeZone(name: string): boolean {
   }
 }
 
-/** The business's time zone and default country. */
+/** The business's time zone, default country and how fast it promises to call back. */
 export const businessSettingsSchema = z.object({
   /** An IANA name like Asia/Kolkata. Times are stored in UTC and shown in this zone. */
   timeZone: z.string(),
   /** Two capital letters like IN. A phone number typed without a country code belongs to this country. */
   defaultCountry: z.string(),
+  /** How many minutes the business promises to call a customer back within while it is open (5 to 120). The AI agent says it. */
+  callbackPromiseMinutes: z.number().int().min(5).max(120),
 });
 export type BusinessSettings = z.infer<typeof businessSettingsSchema>;
 
 /**
- * What a manager sends to change the business's time zone and/or default country. Only the fields sent change. A country
+ * What a manager sends to change the business's time zone, default country and/or callback promise. Only the fields sent change. A country
  * is two letters (small letters are turned into capitals); the API checks it is a country phone numbers exist for.
  */
 export const putBusinessSettingsRequestSchema = z
@@ -278,6 +280,7 @@ export const putBusinessSettingsRequestSchema = z
       .toUpperCase()
       .regex(/^[A-Z]{2}$/, 'Use two letters, like IN')
       .optional(),
+    callbackPromiseMinutes: z.number().int().min(5, 'At least 5 minutes').max(120, 'At most 120 minutes').optional(),
   })
   .strict();
 export type PutBusinessSettingsRequest = z.infer<typeof putBusinessSettingsRequestSchema>;

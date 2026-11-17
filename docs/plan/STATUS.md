@@ -64,3 +64,21 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | **API docs (Swagger / OpenAPI)** | The routes already describe their shapes with zod, so a docs page can be generated. It is a small feature of its own, planned right after F03 is approved (owner agreed 2026-11-11). Packages to be vetted first; served in development only. | Built and merged (`/docs`, development only); brief: [API-docs-swagger.md](../features/API-docs-swagger.md). |
 
 When the designer's screens arrive, the F01-UI work is done as slices (one screen at a time, owner testing each), and it is approved separately.
+
+## UI catch-up block (owner decision 17 Nov 2026, R64)
+
+Before more backend features, the missing staff screens are built (existing routes only, no new routes), one screen per slice, the owner testing each. After the block, every new feature is built backend and screens together. F31 pauses after slice 4; its setup chat (slice 5) comes when the block reaches the setup wizard. Same design system v1.3, same pieces (`packages/ui`, `t()`, `useApiResource`); screens the designer has not drawn are designed by us and flagged in `docs/FRONTEND.md` section 5.
+
+| UI slice | Screen | Uses | Status |
+| --- | --- | --- | --- |
+| C1 | **Business profile** (Knowledge base → Business profile: sections A to H as a form, "From your website, please check" with Yes / Change, completeness card, time zone, country and callback promise) | F16 routes, `/knowledge/prefill` | built, waiting for the owner's check ([notes](../features/C1-business-profile.md)) |
+| C2 | **Setup page** (steps and progress bar, "Read my website" with the reading status, the checklist of what stops going live, apply industry words, Go live) in form mode | F31 slices 1 to 4 | planned |
+| C3 | **Test the agent** (a chat the owner tries; needed before going live) | F19 `/agent/test-chat` | planned |
+| C4 | **What you sell** (offerings and offers) and **suggested offerings** from the website reading | F17 | planned |
+| C5 | **FAQs and unanswered questions** | F18 | planned |
+| C6 | **Settings → Website chat** (colour, greeting, buttons, allowed websites, the line to copy, Check installation, test page link) | F20 | planned |
+| C7 | **Settings → AI keys and models**, and Settings → Modules | F37, F03 | planned |
+| C8 | **Contacts** (list, page, add, edit) | F04 | planned |
+| C9 | **Tickets** (list, page) | F14 | planned |
+| C10 | **Pipeline** changes from the designer's note (drag and drop, column menu working, mobile Change status) and Settings → Pipeline | F06 | planned |
+| C11 | **Conversations** (the list of chats, summaries and what they became) if the owner wants it before the Inbox (F21) | F15 | to decide |

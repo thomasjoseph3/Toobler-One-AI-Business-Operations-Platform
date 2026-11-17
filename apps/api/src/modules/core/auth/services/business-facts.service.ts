@@ -28,10 +28,36 @@ export interface BusinessIdentity {
   name: string;
   industry: string;
   timeZone: string;
+  /** How many minutes the business promises to call back within while it is open. */
+  callbackPromiseMinutes: number;
 }
 
-/** The business's name, kind of business and time zone, or undefined when the business does not exist. Runs in the business's own transaction. */
+/** The business's name, kind of business, time zone and callback promise, or undefined when the business does not exist. Runs in the business's own transaction. */
 export async function findBusinessIdentity(transaction: Db, accountId: string): Promise<BusinessIdentity | undefined> {
   const account = await accountsRepository.findAccountById(transaction, accountId);
-  return account ? { name: account.name, industry: account.industry, timeZone: account.timeZone } : undefined;
+  return account
+    ? {
+        name: account.name,
+        industry: account.industry,
+        timeZone: account.timeZone,
+        callbackPromiseMinutes: account.callbackPromiseMinutes,
+      }
+    : undefined;
+}
+
+/** When the business went live (started answering real customers), or null when it has not yet. Runs in the business's own transaction. */
+export async function findBusinessLiveAt(transaction: Db, accountId: string): Promise<Date | null> {
+  return (await accountsRepository.findLiveAt(transaction, accountId)) ?? null;
+}
+
+/**
+ * Marks the business live. Only the setup wizard's "Go live" calls this, after it has checked the business is ready. Returns the moment it
+ * went live, or null when it already was (the first moment is kept).
+ */
+export async function markBusinessLive(
+  transaction: Db,
+  accountId: string,
+  actor: { kind: string; id: string | null },
+): Promise<Date | null> {
+  return accountsRepository.markLive(transaction, accountId, actor);
 }

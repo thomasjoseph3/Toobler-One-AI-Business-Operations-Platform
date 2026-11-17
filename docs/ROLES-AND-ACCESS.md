@@ -173,6 +173,17 @@ Every route must say who may call it (a route without that declaration does not 
 | POST | `/api/v1/knowledge/unanswered/:id/answer` | Any signed-in person (every role) |
 | POST | `/api/v1/knowledge/unanswered/:id/dismiss` | Any signed-in person (every role) |
 
+### Setup wizard (F31)
+
+| Method | Address | Who can call it |
+| --- | --- | --- |
+| GET | `/api/v1/setup` | Managers only |
+| PATCH | `/api/v1/setup` | Managers only |
+| POST | `/api/v1/knowledge/prefill` | Managers only |
+| GET | `/api/v1/knowledge/prefill/:id` | Managers only |
+| POST | `/api/v1/setup/apply-preset` | Managers only |
+| POST | `/api/v1/setup/go-live` | Managers only |
+
 ### Offerings and offers (F17)
 
 | Method | Address | Who can call it |

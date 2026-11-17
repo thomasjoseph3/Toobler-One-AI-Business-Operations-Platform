@@ -2,7 +2,7 @@
 
 **Requirements:** `5-onboarding-and-launch/03-setup-wizard.md`; `3-ai-agents-and-channels/09-business-questions.md`; `requirements/API.md` (Setup wizard, Knowledge base → prefill); docs/plan/PHASE-1.md (F31); docs/SECURITY.md (SSRF, public fetches); docs/CONVERSATION-TYPES.md (not touched)
 **Depends on:** F01, F03, F06, F16, F17, F18, F19, F20, F37      **Module:** `core.setup` (core). The website reader sits inside it as `websiteReader` (also used later by F18's re-read and F33).
-**Status:** `in_progress` (brief written 17 Nov 2026; waiting for the owner to confirm the open points marked **Confirm**)
+**Status:** `in_progress`, **paused after slice 4** for the UI catch-up block (R64, 17 Nov 2026) (brief written 17 Nov 2026; waiting for the owner to confirm the open points marked **Confirm**)
 
 ## Feature guide
 
@@ -34,10 +34,10 @@
 - **Left behind:** the hotel `settings` fields, the platform "Add a business" form path, and the express middleware.
 
 ## Database
-Migration `042_setup_progress_and_prefill.sql` (numbers confirmed at build time):
-- `accounts.live_at timestamptz NULL` (null = not live) and `accounts.live_by jsonb`. Changed only through a narrow grant.
-- `setup_steps(account_id, step_key, status todo|done|skipped, updated_by, updated_at)` (RLS, forced). Steps are code (`steps.ts`); the table only holds progress.
-- `prefill_runs(id, account_id, kind website|listing, source_url, status queued|reading|done|failed, error_code, pages_read, found_count, created_by, created_at, finished_at)` (RLS). No page text is stored; only counts and the answers it made.
+Migrations, one per change (built so far: `042_setup_steps.sql`; the others come with their slices):
+- *(slice 4, built, 045)* `accounts.live_at timestamptz NULL` (null = not live) and `accounts.live_by jsonb`. Every business that existed is marked live by the migration (nothing stops working). Written only by the go-live service. *(slice 4, built, 044)* `accounts.callback_promise_minutes` (5 to 120, default 15).
+- *(slice 1, built, 042)* `setup_steps(account_id, step_key, status todo|done|skipped, updated_by, updated_at)` (RLS, forced). Steps are code (`setup/helpers/setup-steps.ts`); the table only holds what the owner marked (a step with no row is todo). Steps the system can check (About your business, What you sell) are never stored: they are worked out from the answers and offerings.
+- *(slice 3, built, 043)* `prefill_runs(id, account_id, kind website|listing, source_url, status queued|reading|done|failed, error_code, pages_read, found_count, created_by, created_at, finished_at)` (RLS). No page text is stored; only counts and the answers it made.
 - `business_answers` is unchanged (it already has `source`, `source_ref`, `status`). Offering suggestions: see Rules.
 - The older spec's `accounts.setup_progress jsonb` column is **not** used; a table gives a proper history and tests (see Differences).
 
@@ -133,3 +133,67 @@ Seven routes in at least four slices (2 + 2 + 1 + 2, plus the screens), never mo
 
 ## Review rounds
 (none yet)
+
+## Build log
+
+### Slice 1: setup steps and progress (built 17 Nov 2026, waiting for the owner's check)
+Routes: `GET /setup`, `PATCH /setup` (managers only). Eight steps for now: website, about_business, what_you_sell, situations, goals,
+pipeline, team, channels. `about_business` and `what_you_sell` are checked by the system (400 `STEP_CHECKED_BY_SYSTEM` if marked by
+hand). The promises, check and test-chat steps arrive with the slices that need them (4 and 5). Tests: 5 unit, 12 API (works, 401, 403,
+400, other business, CSRF, activity log, database refuses delete), plus the isolation entries for both routes.
+
+### Slice 2: the safe website reader (built 17 Nov 2026, waiting for the owner's check)
+No routes. Files in `apps/api/src/modules/core/setup/`: `helpers/public-address.ts` (which addresses are public, how a typed address is checked),
+`helpers/html-to-text.ts`, `helpers/read-html-page.ts` (title, text, phone/email/WhatsApp/map links, schema.org facts),
+`helpers/choose-pages-to-read.ts` (which pages are worth reading, sitemap parsing), `services/fetch-web-page.service.ts` (the safe fetch: public
+addresses only, checked on the connection itself, ports 80/443, 4 redirects each re-checked, 10 s, 10 MB), `services/read-website.service.ts`
+(home page, then the best 7 pages from its links and sitemap). Changed from the hotel agent: hotel-only words and facts (check-in times,
+amenities, pets, rooms, ayurveda) left out; errors have codes (`WEBSITE_NOT_PUBLIC`, `WEBSITE_TIMEOUT`, ...); a bug fixed (a first chunk bigger
+than the size limit gave an empty page). Tests: 78 unit (addresses, HTML, schema.org, page choice) and 17 against a real local web server
+(redirects, loops, gzip, errors, timeout, size limit, refusing private addresses and never connecting to them, a name that resolves to a private
+address, whole-site reading with robots.txt and sitemap, page text containing instructions). No new packages (Node built-ins only).
+
+### Slice 3: reading a website or Google listing into answers (built 17 Nov 2026, waiting for the owner's check)
+Routes: `POST /knowledge/prefill` (202, queues the job) and `GET /knowledge/prefill/{id}` (managers only). Migration `043_setup_prefill_runs.sql`.
+Job `setup.run_prefill`. New setting `GOOGLE_PLACES_API_KEY` (optional; empty = Google listings off).
+
+How a reading goes: the route checks the address at once (a private address, a short Google link or Google being off answers 400 before any waiting),
+saves a `queued` run and queues the job. The job reads the website (slice 2), takes what the pages themselves state (schema.org name, address, phones,
+emails, read by code), asks the AI (`extract_from_website` job, temperature 0, only the questions a website can fill in) and saves every answer
+through the knowledge module as **"Please check"** (`status = check`, `source = website` or `listing`, `source_ref` = the address). It never changes an
+answer the owner confirmed (counted as "left alone"). Google's answers (name, address, phone, opening hours, read by code, never by the AI) win over
+the website's for the same question. What the site seems to sell is kept on the run as **suggested offerings** (a price only when a page states one,
+turned into paise by code). Problems are written on the run in plain words with a code; a reading that found something is `done` with the part that
+failed noted (for example `AI_FAILED`), one that found nothing is `failed`.
+
+Limits: 10 readings a day per business (429 `PREFILL_LIMIT_REACHED`), one at a time (409 `PREFILL_ALREADY_RUNNING`; a reading stuck for 10 minutes does
+not block). Google listing input: the business name with its town, or a **long** Google Maps link; short links (`maps.app.goo.gl`) are refused because
+reading the name would mean following a link someone typed. **Not tested against the real Google** (no key yet): the client is tested with a pretend
+Google that answers in the shape Google documents; the first real key needs a real check.
+
+Tests: 24 API tests (`setup-prefill.test.ts`: start, 202, queue, 400 private addresses, 409, 429, queue failure, 401/403/404/400, CSRF; the job against a real
+local web server with a pretend AI and a pretend Google: answers wait for a check and are not counted, confirmed answers are never changed, bad AI
+answers dropped, instructions in a page are only data, AI down, website down, safe to run twice, other business, Google wins, Google off or finds
+nothing), 4 Google client tests, 17 unit tests for the new helpers, 2 new isolation entries (67 pass).
+
+### Slice 4: the industry's words, going live, and the callback promise (built 17 Nov 2026, waiting for the owner's check)
+Owner decisions (17 Nov 2026): the industry words are renames of the three open stages; step 8 is the callback minutes now and the alert number in F23.
+
+Routes: `POST /setup/apply-preset` and `POST /setup/go-live` (managers only). Migrations `044_accounts_callback_promise.sql`, `045_accounts_live.sql`.
+Also changed, with no new route: `GET`/`PUT /knowledge/settings` now carry `callbackPromiseMinutes` (5 to 120, default 15); the AI agent promises "within N minutes"
+with it (it was a fixed 15); two setup steps were added (`promises`, which the owner marks, and `test_agent`, which the system checks); the website chat says
+503 `NOT_OPEN_YET` ("We're not open for chat yet. Please check back soon.") until the business is live.
+
+**Apply preset:** a business of a known industry gets that industry's words for its three open stages (a hotel: New enquiry, Called, Rate sent). Only a stage that
+still has the standard word (New, Contacted, Quoted) is renamed; a stage the owner renamed is never touched; nothing is added or deleted, the stages keep their
+ids and leads; doing it again changes nothing. A general or "other" business keeps the standard words. The pipeline step becomes done. The word table is
+`helpers/industry-pipeline-presets.ts` (13 industries; **edit the words there**).
+
+**Go live:** refused with 409 `NOT_READY` and the list of blockers until every "needed to go live" question has a *confirmed* answer, the `promises` step is
+done (skipped does not count) and the agent has answered at least once in "Test the agent". Going live twice keeps the first moment.
+
+**Changes to earlier features (to record in their guides):** F16 (settings carry the callback promise), F19 (the promise minutes are the business's own),
+F20 (a business that is not live answers 503 `NOT_OPEN_YET`; test helpers mark their businesses live with `makeBusinessLive`).
+
+Tests: 7 new unit tests (readiness, presets), setup-go-live.test.ts (13 API tests), agent-callback-promise.test.ts (3), webchat not-open-yet test, settings tests,
+2 isolation entries (69 pass). A wide run before the fix showed exactly the expected webchat failures (30), now fixed.

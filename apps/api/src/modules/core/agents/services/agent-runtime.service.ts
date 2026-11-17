@@ -104,6 +104,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies) {
       return {
         businessName: identity.name,
         timeZone: identity.timeZone,
+        callbackPromiseMinutes: identity.callbackPromiseMinutes,
         knowledge: await findBusinessKnowledgeForTheAgent(transaction, { accountId, industryId: identity.industry }),
         whatWeSell: await findWhatTheAgentMaySee(transaction, {
           accountId,

@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Database } from '../src/kernel/database';
 import { createScriptedLlmProvider } from '../src/providers/llm';
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
-import { createSignedInPerson, type SignedInPerson } from './support/auth';
+import { createSignedInPerson, type SignedInPerson, makeBusinessLive } from './support/auth';
 import { openTestDatabase } from './support/harness';
 
 const SITE = 'https://nairstays.example';
@@ -60,6 +60,7 @@ const asStaff = (person: SignedInPerson, method: 'GET' | 'PATCH' | 'PUT', url: s
 
 async function newBusinessWithChat(allowedWebsites: string[] = [SITE]) {
   const person = await createSignedInPerson(app, database);
+  await makeBusinessLive(database, person.profile.business.id); // a business that has not gone live does not answer visitors
   await database.system
     .insertInto('ai_settings')
     .values({

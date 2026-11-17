@@ -58,3 +58,18 @@ export async function listMessagesOfConversation(
     .execute();
   return rows.map((row) => ({ id: row.id, sender: row.sender, body: row.body, createdAt: row.created_at }));
 }
+
+/** True when the business has a "Test the agent" chat in which the agent has answered at least once. */
+export async function hasTestChatWithAgentReply(db: Db, accountId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('conversation_messages')
+    .innerJoin('conversations', 'conversations.id', 'conversation_messages.conversation_id')
+    .select('conversation_messages.id')
+    .where('conversation_messages.account_id', '=', accountId)
+    .where('conversations.account_id', '=', accountId)
+    .where('conversations.is_test', '=', true)
+    .where('conversation_messages.sender', '=', 'agent')
+    .limit(1)
+    .executeTakeFirst();
+  return row !== undefined;
+}

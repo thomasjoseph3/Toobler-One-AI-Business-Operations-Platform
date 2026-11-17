@@ -10,3 +10,9 @@ export type {
   BusinessKnowledgeForTheAgent,
   SituationForTheAgent,
 } from './services/agent-knowledge.service';
+// The setup wizard (F31) reads which questions are answered through the profile service.
+export { createKnowledgeService } from './services/knowledge.service';
+// The setup wizard's reading job asks which questions a website can fill in, and saves what it read as "waiting for a check".
+export { createPrefilledAnswersService, listPrefillableQuestions } from './services/prefilled-answers.service';
+export type { PrefilledAnswer, SavePrefilledAnswersResult } from './services/prefilled-answers.service';
+export type { QuestionDefinition } from './helpers/question-types';

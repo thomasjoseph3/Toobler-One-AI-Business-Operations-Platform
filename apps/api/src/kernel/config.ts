@@ -63,6 +63,8 @@ const EnvironmentVariablesSchema = z.object({
   // Scrambles the AI keys that businesses save (AES-256-GCM): 32 random bytes written in base64. `npm run setup` adds one. Lose it and
   // every saved business key becomes unreadable (the keys would have to be entered again). Never log it, never share it.
   SECRETS_ENCRYPTION_KEY: z.string().default(''),
+  // Google Places (New) API key, used by the setup wizard to read a business's Google listing. Empty switches that off (the owner types the answers instead).
+  GOOGLE_PLACES_API_KEY: z.string().default(''),
 });
 
 export interface Config {
@@ -88,6 +90,8 @@ export interface Config {
   ai: { platformKeys: { gemini: string[]; openai: string[]; anthropic: string[] } };
   /** The server's secret for scrambling saved keys, or null when none is set (then saving a key answers 503). */
   secrets: { encryptionKey: Buffer | null };
+  /** The Google Places key for reading a business's Google listing, or null when it is not switched on. A secret: never log or return it. */
+  googlePlaces: { apiKey: string | null };
 }
 
 export class ConfigError extends Error {}
@@ -176,6 +180,7 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
       },
     },
     secrets: { encryptionKey: parseEncryptionKey(validEnvironment.SECRETS_ENCRYPTION_KEY) },
+    googlePlaces: { apiKey: validEnvironment.GOOGLE_PLACES_API_KEY.trim() || null },
   };
   if (config.mail.provider === 'smtp' && (!config.mail.smtp.host || !config.mail.from)) {
     throw new ConfigError('Bad configuration:\n  MAIL_PROVIDER=smtp needs SMTP_HOST and EMAIL_FROM to be set');

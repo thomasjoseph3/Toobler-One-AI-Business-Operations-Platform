@@ -10,6 +10,7 @@ import offerings from './core/offerings/module';
 import industries from './core/industries/module';
 import ai from './core/ai/module';
 import agents from './core/agents/module';
+import setup from './core/setup/module';
 import webchat from './channels/webchat/module';
 import accountModules from './core/module-switches/module';
 
@@ -27,5 +28,6 @@ export const modules: readonly ModuleManifest[] = [
   offerings,
   ai,
   agents,
+  setup,
   webchat,
 ];

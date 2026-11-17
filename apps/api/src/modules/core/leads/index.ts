@@ -4,5 +4,8 @@ export { createDefaultPipelineSetup } from './services/default-setup.service';
 // The conversation engine gives a new enquiry to the right lead (a new one, the open one, or a recently lost one reopened).
 export { applyLeadFromConversation } from './services/lead-from-conversation.service';
 export type { ConversationChannelForLead, LeadFromConversationResult } from './services/lead-from-conversation.service';
+// The setup wizard gives a business its industry's stage names through the pipeline service.
+export { createPipelineService } from './services/pipeline.service';
 // A staff correction ("this was not a sale") takes the lead off the board without deleting it.
 export { closeLeadAsReclassified } from './services/lead-reclassify.service';
+export { DEFAULT_STAGES } from './helpers/default-pipeline';

@@ -8,7 +8,7 @@ import conversationsModule from '../src/modules/core/conversations/module';
 import webchatModule from '../src/modules/channels/webchat/module';
 import { createScriptedLlmProvider, type LlmScript } from '../src/providers/llm';
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
-import { createSignedInPerson, type SignedInPerson } from './support/auth';
+import { createSignedInPerson, type SignedInPerson, makeBusinessLive } from './support/auth';
 import { openTestDatabase } from './support/harness';
 
 // The whole story of the website chat, the way a business lives it: a visitor chats on the business's website, goes quiet, and the chat is
@@ -113,6 +113,7 @@ async function runQueuedJobs(accountId: string) {
 
 async function newBusinessWithChat() {
   const person = await createSignedInPerson(app, database);
+  await makeBusinessLive(database, person.profile.business.id); // a business that has not gone live does not answer visitors
   const accountId = person.profile.business.id;
   await database.system.updateTable('accounts').set({ industry: 'general' }).where('id', '=', accountId).execute();
   await database.system

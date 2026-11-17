@@ -177,6 +177,11 @@ export interface AccountsTable {
   time_zone: Generated<string>;
   /** The country a phone number belongs to when typed without a country code, as two capital letters like IN. */
   default_country: Generated<string>;
+  /** How many minutes the business promises to call back within while it is open (5 to 120). */
+  callback_promise_minutes: Generated<number>;
+  /** When the business went live (started answering real customers); null until then. */
+  live_at: Date | null;
+  live_by: Json | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
@@ -576,6 +581,36 @@ export interface SituationsTable {
   updated_at: Generated<Date>;
 }
 
+/** The owner's progress on one setup step. A step with no row is "todo". Fenced by account_id; the primary key is (account_id, step_key). */
+export interface SetupStepsTable {
+  account_id: string;
+  step_key: string;
+  status: 'todo' | 'done' | 'skipped';
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One reading of a website or Google listing by the setup wizard. Fenced by account_id. Holds no page text. */
+export interface PrefillRunsTable {
+  id: string;
+  account_id: string;
+  website_url: string | null;
+  google_listing_text: string | null;
+  status: Generated<'queued' | 'reading' | 'done' | 'failed'>;
+  error_code: string | null;
+  error_message: string | null;
+  pages_read: Generated<number>;
+  answers_found: Generated<string[]>;
+  answers_skipped: Generated<number>;
+  /** Read back already parsed; written as JSON text. */
+  suggested_offerings: ColumnType<unknown, string | undefined, string>;
+  created_by: Json | null;
+  created_at: Generated<Date>;
+  finished_at: Date | null;
+}
+
 /** Something the business sells. Fenced by account_id. Money in paise; dates come back as text. */
 export interface OfferingsTable {
   id: string;
@@ -687,6 +722,8 @@ export interface DB {
   classification_corrections: ClassificationCorrectionsTable;
   business_answers: BusinessAnswersTable;
   situations: SituationsTable;
+  setup_steps: SetupStepsTable;
+  prefill_runs: PrefillRunsTable;
   offerings: OfferingsTable;
   offers: OffersTable;
   faqs: FaqsTable;

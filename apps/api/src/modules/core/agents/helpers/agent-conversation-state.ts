@@ -33,6 +33,8 @@ export interface PromiseContext {
   now: Date;
   timeZone: string;
   weeklyHours: WeeklyHoursValue | undefined;
+  /** How many minutes the business promises to call back within while it is open. Left out, the standard 15 is used. */
+  callbackMinutes?: number | undefined;
   /**
    * True when a promise was already made in an EARLIER message, so the customer has heard it and it cannot change. When it is false (or
    * left out), a promise made earlier in this same message has not been said yet, so a better one may replace it.

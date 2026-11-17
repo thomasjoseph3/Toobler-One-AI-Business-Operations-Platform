@@ -7,7 +7,7 @@ import { createIdleChatsService } from '../src/modules/channels/webchat/services
 import webchatModule from '../src/modules/channels/webchat/module';
 import { createScriptedLlmProvider, type LlmScript } from '../src/providers/llm';
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
-import { createSignedInPerson, type SignedInPerson } from './support/auth';
+import { createSignedInPerson, type SignedInPerson, makeBusinessLive } from './support/auth';
 import { openTestDatabase } from './support/harness';
 
 const SITE = 'https://nairstays.example';
@@ -66,6 +66,7 @@ const asVisitor = (
 
 async function newBusinessWithChat() {
   const person = await createSignedInPerson(app, database);
+  await makeBusinessLive(database, person.profile.business.id); // a business that has not gone live does not answer visitors
   await database.system
     .insertInto('ai_settings')
     .values({

@@ -5,6 +5,7 @@ import type { Database } from '../../../../kernel/database';
 import { ApiError, notFound, tooMany } from '../../../../kernel/errors';
 import type { ModuleGate } from '../../../../kernel/module-system/registry';
 import type { createAgentSavedTurnService } from '../../../core/agents';
+import { findBusinessLiveAt } from '../../../core/auth';
 import { createConversationRecordsService } from '../../../core/conversations';
 import { describeWidgetConfig } from '../helpers/describe-widget-config';
 import { readVisitorContact } from '../helpers/read-visitor-contact';
@@ -161,6 +162,14 @@ export function createWidgetChatService(input: {
     }): Promise<WidgetMessageResponse> {
       const { widget } = options;
       const { accountId } = widget;
+
+      // A business that has not gone live yet does not answer visitors (the setup wizard's "Go live"): it says so plainly
+      const liveAt = await database.runInAccountTransaction(accountId, (transaction) =>
+        findBusinessLiveAt(transaction, accountId),
+      );
+      if (liveAt === null) {
+        throw new ApiError(503, 'NOT_OPEN_YET', "We're not open for chat yet. Please check back soon.");
+      }
 
       if (input.limiters && !input.limiters.messagesPerKey.tryTake(widget.settings.widgetKey, now())) {
         throw tooMany('This chat is very busy right now. Please try again in a minute.');

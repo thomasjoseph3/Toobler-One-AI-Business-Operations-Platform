@@ -134,3 +134,51 @@ export async function confirmWaitingAnswers(
     .execute();
   return rows.map((row) => row.question_key);
 }
+
+/**
+ * Saves an answer the system read from a website or listing, waiting for the owner's check. It never touches an answer the owner has
+ * confirmed (typed or accepted): then nothing changes and false comes back. An answer already waiting is replaced by the newer reading.
+ * True when the answer was saved.
+ */
+export async function saveWaitingAnswer(
+  db: Db,
+  options: {
+    accountId: string;
+    questionKey: string;
+    value: unknown;
+    source: Exclude<AnswerSource, 'typed'>;
+    sourceReference: string | null;
+    actor: Actor;
+  },
+): Promise<boolean> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  const saved = await db
+    .insertInto('business_answers')
+    .values({
+      account_id: options.accountId,
+      question_key: options.questionKey,
+      value: JSON.stringify(options.value),
+      source: options.source,
+      source_ref: options.sourceReference,
+      status: 'check',
+      confirmed_by: null,
+      confirmed_at: null,
+      created_by: actorStamp,
+      updated_by: actorStamp,
+    })
+    .onConflict((conflict) =>
+      conflict
+        .columns(['account_id', 'question_key'])
+        .doUpdateSet({
+          value: JSON.stringify(options.value),
+          source: options.source,
+          source_ref: options.sourceReference,
+          updated_by: actorStamp,
+        })
+        // Only over an answer that is itself still waiting: a confirmed answer is the owner's and stays
+        .where('business_answers.status', '=', 'check'),
+    )
+    .returning('question_key')
+    .executeTakeFirst();
+  return saved !== undefined;
+}

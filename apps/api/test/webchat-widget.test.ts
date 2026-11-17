@@ -7,7 +7,7 @@ import { signVisitorToken } from '../src/modules/channels/webchat/helpers/visito
 import { MOST_MESSAGES_IN_A_WEB_CHAT } from '../src/modules/channels/webchat/services/widget-chat.service';
 import { createScriptedLlmProvider, type LlmScript } from '../src/providers/llm';
 import { buildTestApp, captureLogs, testConfig, unsafeRequestHeaders } from './support/app';
-import { createSignedInPerson, type SignedInPerson } from './support/auth';
+import { createSignedInPerson, type SignedInPerson, makeBusinessLive } from './support/auth';
 import { openTestDatabase } from './support/harness';
 
 const SITE = 'https://nairstays.example';
@@ -72,6 +72,7 @@ const asVisitor = (
 /** A new business that may use the platform's AI keys, with the chat set up for the test website. Gives the person and the widget key. */
 async function newBusinessWithChat(allowedWebsites: string[] = [SITE]) {
   const person = await createSignedInPerson(app, database);
+  await makeBusinessLive(database, person.profile.business.id); // a business that has not gone live does not answer visitors
   await database.system
     .insertInto('ai_settings')
     .values({
@@ -206,6 +207,26 @@ describe('OPTIONS /api/v1/public/widget/{key}/… (the browser asks permission f
 });
 
 describe('POST /api/v1/public/widget/{key}/messages', () => {
+  it('does not answer a business that has not gone live: 503 NOT_OPEN_YET, nothing saved, the agent never asked; it answers once the business is live', async () => {
+    const { accountId, key } = await newBusinessWithChat();
+    await database.system.updateTable('accounts').set({ live_at: null, live_by: null }).where('id', '=', accountId).execute();
+    let timesTheAgentWasAsked = 0;
+    script = () => {
+      timesTheAgentWasAsked += 1;
+      return { answer: 'Hello!' };
+    };
+    const refused = await asVisitor(key, 'POST', 'messages', { payload: { message: 'Hi there' } });
+    expect(refused.statusCode, refused.body).toBe(503);
+    expect(refused.json().error.code).toBe('NOT_OPEN_YET');
+    expect(await conversationsOf(accountId)).toHaveLength(0);
+    expect(timesTheAgentWasAsked).toBe(0);
+
+    await makeBusinessLive(database, accountId);
+    const answered = await asVisitor(key, 'POST', 'messages', { payload: { message: 'Hi there' } });
+    expect(answered.statusCode, answered.body).toBe(200);
+    expect(timesTheAgentWasAsked).toBe(1);
+  });
+
   it('starts a real chat: the agent answers, the chat and both messages are saved as a web chat of this business, not a test', async () => {
     const { accountId, key } = await newBusinessWithChat();
     script = () => ({ answer: 'Hello! How can I help?' });

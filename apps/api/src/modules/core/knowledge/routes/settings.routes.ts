@@ -4,18 +4,18 @@ import { businessSettingsSchema, putBusinessSettingsRequestSchema } from '@toobl
 import { unauthorized } from '../../../../kernel/errors';
 import { createBusinessSettingsService } from '../../auth';
 
-/** Registers /api/v1/knowledge/settings (read, change): the business's time zone and default country. */
+/** Registers /api/v1/knowledge/settings (read, change): the business's time zone, default country and callback promise. */
 export function settingsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const businessSettingsService = createBusinessSettingsService({ database: app.kernel.database });
 
-  // For any signed-in, verified person. The two values come with the signed-in person's details, read fresh on every request.
+  // For any signed-in, verified person. Read fresh on every request; the business comes from the session.
   typedApp.get(
     '/knowledge/settings',
     { config: { access: 'staff' }, schema: { response: { 200: businessSettingsSchema } } },
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
-      return { timeZone: request.principal.timeZone, defaultCountry: request.principal.defaultCountry };
+      return businessSettingsService.readBusinessSettings(request.principal.accountId);
     },
   );
 

@@ -28,7 +28,10 @@ let app: FastifyInstance;
 beforeAll(async () => {
   database = openTestDatabase();
   // Built like the development app, so it serves the OpenAPI document that lists every route
-  app = await buildTestApp(database, [], { config: { ...testConfig(), env: 'development', docsOrigin: DOCS_ORIGIN } });
+  app = await buildTestApp(database, [], {
+    config: { ...testConfig(), env: 'development', docsOrigin: DOCS_ORIGIN },
+    enqueueJob: async () => {}, // starting a reading queues a job; nothing runs it here
+  });
 });
 afterAll(async () => {
   await app.close();
@@ -69,6 +72,8 @@ interface BusinessAData {
   faqId: string;
   aiKeyId: string;
   unansweredQuestionId: string;
+  /** A's reading of its website (the setup wizard). */
+  prefillRunId: string;
   userId: string;
   secretWords: string;
 }
@@ -104,6 +109,7 @@ beforeAll(async () => {
   const stage = await sendOk(businessA, 'POST', '/pipeline/stages', { name: `Stage ${secretWords}` }, 201);
   await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
   await sendOk(businessA, 'PUT', '/knowledge/situations/discount_request', { choice: 'tell_current_offer' });
+  await sendOk(businessA, 'PATCH', '/setup', { step: 'pipeline', status: 'done' });
   await sendOk(businessA, 'PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
   const offering = await sendOk(
     businessA,
@@ -117,6 +123,8 @@ beforeAll(async () => {
     { kind: 'agent', id: null },
     `Does it work ${secretWords}?`,
   );
+  // A starts a reading of its website (the job is not run here: the isolation test only needs A's reading to exist)
+  const prefillRun = await sendOk(businessA, 'POST', '/knowledge/prefill', { websiteUrl: `https://${secretWords}.example` }, 202);
   // A saves an AI key of its own; B must never see it, its label, or be able to touch it
   const aiKey = await sendOk(
     businessA,
@@ -222,6 +230,7 @@ beforeAll(async () => {
     faqId: faq.id,
     aiKeyId: aiKey.id,
     unansweredQuestionId: unansweredQuestion?.id ?? '',
+    prefillRunId: prefillRun.id,
     userId: businessA.profile.user.id,
     secretWords,
   };
@@ -373,6 +382,16 @@ const attempts: Attempt[] = [
       method: 'PUT',
       url: '/knowledge/situations/discount_request',
       payload: { choice: 'prices_are_fixed' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'PATCH /api/v1/setup',
+    what: "mark the same setup step as A, and A's mark must stay as it was",
+    request: () => ({
+      method: 'PATCH',
+      url: '/setup',
+      payload: { step: 'pipeline', status: 'skipped' },
     }),
     expectedStatus: 200,
   },
@@ -588,6 +607,30 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'POST /api/v1/setup/apply-preset',
+    what: "apply the industry's words as B (B's own pipeline changes; A's stages must stay as they were)",
+    request: () => ({ method: 'POST', url: '/setup/apply-preset' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/setup/go-live',
+    what: 'go live as B (B is not ready, so 409; A must not be made live)',
+    request: () => ({ method: 'POST', url: '/setup/go-live' }),
+    expectedStatus: 409,
+  },
+  {
+    route: 'GET /api/v1/knowledge/prefill/{id}',
+    what: "read A's reading of its website",
+    request: () => ({ method: 'GET', url: `/knowledge/prefill/${dataOfA.prefillRunId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/knowledge/prefill',
+    what: 'start a reading as B (B gets its own; A\'s reading and answers must stay as they were)',
+    request: () => ({ method: 'POST', url: '/knowledge/prefill', payload: { websiteUrl: 'https://bobs-business.example' } }),
+    expectedStatus: 202,
+  },
+  {
     route: 'DELETE /api/v1/ai/keys/{id}',
     what: "remove A's AI key",
     request: () => ({ method: 'DELETE', url: `/ai/keys/${dataOfA.aiKeyId}` }),
@@ -710,6 +753,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/modules', url: '/modules' },
   { route: 'GET /api/v1/knowledge/questions', url: '/knowledge/questions' },
   { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
+  { route: 'GET /api/v1/setup', url: '/setup' },
   { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
   { route: 'GET /api/v1/offerings', url: '/offerings' },
   { route: 'GET /api/v1/knowledge/faqs', url: '/knowledge/faqs' },
@@ -774,6 +818,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/modules': 'covered by the list check',
   'GET /api/v1/knowledge/questions': 'covered by the list check',
   'GET /api/v1/knowledge/situations': 'covered by the list check',
+  'GET /api/v1/setup': 'covered by the list check',
   'GET /api/v1/knowledge/settings': 'covered by the list check',
   'GET /api/v1/offerings': 'covered by the list check',
   'GET /api/v1/offers': 'covered by the list check',
@@ -894,6 +939,7 @@ describe('isolation: business B tries to reach business A', () => {
     expect(await sendOk(businessA, 'GET', '/knowledge/settings')).toEqual({
       timeZone: 'Asia/Dubai',
       defaultCountry: 'AE',
+      callbackPromiseMinutes: 15,
     });
     const offeringsOfA = await sendOk(businessA, 'GET', '/offerings');
     expect(offeringsOfA.items).toHaveLength(1);

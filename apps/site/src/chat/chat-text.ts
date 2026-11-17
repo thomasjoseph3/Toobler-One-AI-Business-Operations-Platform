@@ -15,6 +15,7 @@ export const CHAT_TEXT = {
   tooLong: 'That message is too long. Please shorten it.',
   busy: 'The chat is busy right now. Please try again in a minute.',
   assistantUnavailable: "Sorry, I can't answer right now. Please try again in a moment.",
+  notOpenYet: "We're not open for chat yet. Please check back soon.",
   chatTooLong: 'This chat is long enough. Please end it and start a new one.',
   somethingWentWrong: 'Something went wrong. Please try again.',
   offline: 'You seem to be offline. Please check your connection and try again.',
