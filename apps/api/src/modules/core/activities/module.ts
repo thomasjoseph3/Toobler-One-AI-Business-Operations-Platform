@@ -1,5 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { activitiesRoutes } from './routes/activities.routes';
+import { handleLeadCreated, handleLeadMoved } from './services/timeline-events.service';
 
 /**
  * The activity timeline and notes (F07). A core module: always on. Built in slices of at most 2 routes
@@ -10,6 +11,8 @@ export default defineModule({
   kind: 'core',
   // A note is about a person and usually one of their leads (contacts, leads), and it shows who wrote it (auth)
   requires: ['core.auth', 'core.contacts', 'core.leads'],
+  // The lead's own news goes on its timeline: a new lead and a lead moving to another stage
+  events: { 'lead.created': handleLeadCreated, 'lead.moved': handleLeadMoved },
   routes: (app) => {
     activitiesRoutes(app);
   },

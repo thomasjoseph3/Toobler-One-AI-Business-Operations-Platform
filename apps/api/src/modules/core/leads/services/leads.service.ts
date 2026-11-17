@@ -217,7 +217,14 @@ export function createLeadsService({ database }: { database: Database }) {
           await publishEvent(transaction, {
             accountId,
             eventName: 'lead.created',
-            payload: { leadId, contactId: request.contactId, ownerUserId, offeringId: offering?.id ?? null },
+            // `createdBy` lets the timeline say who added the lead
+            payload: {
+              leadId,
+              contactId: request.contactId,
+              ownerUserId,
+              offeringId: offering?.id ?? null,
+              createdBy: { kind: actor.kind, id: actor.id },
+            },
           });
           return readLead(transaction, accountId, leadId);
         });
@@ -371,6 +378,7 @@ export function createLeadsService({ database }: { database: Database }) {
             throw new ApiError(400, 'LOST_REASON_NOT_ALLOWED', 'A reason is only for moving a lead to Lost.');
           }
 
+          const fromStage = await pipelineRepository.findStageById(transaction, accountId, current.stageId);
           const closing = targetStage.kind !== 'open';
           const reopening = !closing && current.closedAt !== null;
           const movedAt = new Date();
@@ -410,7 +418,16 @@ export function createLeadsService({ database }: { database: Database }) {
           await publishEvent(transaction, {
             accountId,
             eventName: 'lead.moved',
-            payload: { leadId, fromStageId: current.stageId, toStageId: targetStage.id },
+            // The stage names are the words of today, so the timeline can say "Moved from New to Contacted" even if a stage is renamed later
+            payload: {
+              leadId,
+              contactId: current.contactId,
+              fromStageId: current.stageId,
+              toStageId: targetStage.id,
+              fromStageName: fromStage?.name ?? null,
+              toStageName: targetStage.name,
+              movedBy: { kind: actor.kind, id: actor.id },
+            },
           });
           // Closing or reopening is news in its own right (a won lead, a lost lead, a lead that came back)
           if (targetStage.kind === 'won' || targetStage.kind === 'lost') {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ActivitiesListResponse } from '@toobler-one/shared';
+import type { ActivitiesListResponse, ActivityKind } from '@toobler-one/shared';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { useApiResource, type LoadState } from '../../api/useApiResource';
 import { t } from '../../app/i18n';
@@ -20,12 +20,13 @@ function describeNoteProblem(error: unknown): string {
 /**
  * The notes of a lead or of a person: loads them (`GET /activities?lead_id=` or `?contact_id=`), keeps what is on screen while they load
  * again, adds a note (`POST /notes`), changes one and deletes one. The note box is checked on the device first. A failed note keeps its
- * words so it can be sent again. `onChanged` is called after any note was added, changed or deleted, so a screen that shows a count can
+ * words so it can be sent again. `kind` narrows the list to one kind (the Notes panel asks for notes only; a timeline asks for all or one chip). `onChanged` is called after any note was added, changed or deleted, so a screen that shows a count can
  * ask again.
  */
 export function useNotes(
   target: NotesTarget,
   onChanged?: () => void,
+  kind?: ActivityKind,
 ): {
   state: LoadState<ActivitiesListResponse>;
   data: ActivitiesListResponse | null;
@@ -43,7 +44,7 @@ export function useNotes(
   /** Deletes one note (`DELETE /notes/{id}`, managers). Returns the problem in words, or null when it worked. */
   deleteNote: (noteId: string) => Promise<string | null>;
 } {
-  const resource = useApiResource<ActivitiesListResponse>(buildNotesPath(target));
+  const resource = useApiResource<ActivitiesListResponse>(buildNotesPath(target, kind));
   const kept = useKeptData(resource.state);
   const [noteText, setNoteTextState] = useState('');
   const [noteProblem, setNoteProblem] = useState<string | null>(null);

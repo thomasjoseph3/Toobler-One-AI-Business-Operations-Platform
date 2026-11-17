@@ -25,8 +25,21 @@ export function startingNotes(): PretendNotes {
         contactId: 'contact-0',
         leadId: 'lead-0',
         body: 'Great insights on the project, looking forward to the next steps!',
+        details: null,
         writtenBy: { kind: 'user', userId: 'user-colleague', name: 'Maya Chen', role: 'manager' },
         createdAt: new Date(Date.now() - 3_600_000).toISOString(),
+        editedAt: null,
+      },
+      // A line the system wrote when Maya moved the lead (F07 slice 4); the Notes panel asks for notes only and never shows it
+      {
+        id: 'line-1',
+        kind: 'stage_changed',
+        contactId: 'contact-0',
+        leadId: 'lead-0',
+        body: null,
+        details: { fromStageName: 'New', toStageName: 'Contacted' },
+        writtenBy: { kind: 'user', userId: 'user-colleague', name: 'Maya Chen', role: 'manager' },
+        createdAt: new Date(Date.now() - 7_200_000).toISOString(),
         editedAt: null,
       },
     ],
@@ -54,7 +67,10 @@ export function answerNotesCall(
   if (call.path === '/activities/counts' && call.method === 'GET') {
     const leadIds = (new URLSearchParams(call.search).get('lead_ids') ?? '').split(',').filter((id) => id !== '');
     const counts = Object.fromEntries(
-      leadIds.map((leadId) => [leadId, state.notes.filter((note) => note['leadId'] === leadId).length]),
+      leadIds.map((leadId) => [
+        leadId,
+        state.notes.filter((note) => note['leadId'] === leadId && note['kind'] === 'note').length,
+      ]),
     );
     return { status: 200, body: { counts } };
   }
@@ -80,8 +96,11 @@ export function answerNotesCall(
     const params = new URLSearchParams(call.search);
     const leadId = params.get('lead_id');
     const contactId = params.get('contact_id');
-    const items = state.notes.filter((note) =>
-      leadId !== null ? note['leadId'] === leadId : note['contactId'] === contactId,
+    const kind = params.get('kind');
+    const items = state.notes.filter(
+      (note) =>
+        (leadId !== null ? note['leadId'] === leadId : note['contactId'] === contactId) &&
+        (kind === null || note['kind'] === kind),
     );
     return { status: 200, body: { items, total: items.length, page: 1, limit: 100 } };
   }
@@ -103,11 +122,12 @@ export function answerNotesCall(
       body,
     });
     const note = {
-      id: `note-${state.notes.length + 1}`,
+      id: `note-${state.notes.filter((existing) => existing['kind'] === 'note').length + 1}`,
       kind: 'note',
       contactId,
       leadId,
       body,
+      details: null,
       writtenBy: { kind: 'user', userId: call.userId, name: call.userName, role: 'manager' },
       createdAt: new Date().toISOString(),
       editedAt: null,

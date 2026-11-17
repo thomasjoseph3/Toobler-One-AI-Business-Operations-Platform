@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
-// The activity timeline between the API and the web app. Slice 1 has one kind: notes on a lead (or on a contact).
+// The activity timeline between the API and the web app: notes written by people and agents, and lines the system writes by itself
+// (a lead was added, a lead moved to another stage).
 
-/** What kind of thing happened. Only notes exist so far; stage changes, calls, chats and so on join later. */
-export const activityKindSchema = z.enum(['note']);
+/** What kind of thing happened. Calls, chats and so on join later. */
+export const activityKindSchema = z.enum(['note', 'lead_created', 'stage_changed']);
 export type ActivityKind = z.infer<typeof activityKindSchema>;
 
 /** The longest note the API accepts. */
@@ -20,14 +21,23 @@ export const activityWriterSchema = z.object({
 });
 export type ActivityWriter = z.infer<typeof activityWriterSchema>;
 
+/** The facts of a system line. Stage names are the words of the day (a stage may be renamed later). */
+export const activityDetailsSchema = z.object({
+  fromStageName: z.string().optional(),
+  toStageName: z.string().optional(),
+});
+export type ActivityDetails = z.infer<typeof activityDetailsSchema>;
+
 export const activitySchema = z.object({
   id: z.string(),
   kind: activityKindSchema,
   contactId: z.string(),
   /** Null for a note written on a contact itself. */
   leadId: z.string().nullable(),
-  /** The note's words. */
+  /** The note's words; empty for a system line. */
   body: z.string().nullable(),
+  /** The facts of a system line (stage changes); null for a note. */
+  details: activityDetailsSchema.nullable(),
   writtenBy: activityWriterSchema,
   createdAt: z.string(),
   /** When the writer last changed the words; null if never. */

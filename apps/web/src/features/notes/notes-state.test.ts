@@ -12,6 +12,9 @@ import {
   formatTimeAgo,
   initialsOf,
   sortNotes,
+  describeSystemLine,
+  isSystemLine,
+  kindForTimelineFilter,
 } from './notes-state';
 
 const note = (id: string, createdAt: string): Activity => ({
@@ -20,6 +23,7 @@ const note = (id: string, createdAt: string): Activity => ({
   contactId: 'c',
   leadId: 'l',
   body: id,
+  details: null,
   writtenBy: { kind: 'user', userId: 'u', name: 'Maya Chen', role: 'manager' },
   createdAt,
   editedAt: null,
@@ -111,5 +115,55 @@ describe('addresses and requests', () => {
     expect(buildNoteCountsPath(['a', 'b', 'a'])).toBe('/activities/counts?lead_ids=a,b');
     expect(buildNoteCountsPath([])).toBeNull();
     expect(buildNoteCountsPath(Array.from({ length: 150 }, (_, index) => `id${index}`))!.split(',').length).toBe(100);
+  });
+});
+
+describe('the timeline lines the system writes', () => {
+  const line = (overrides: Partial<Activity>): Activity => ({
+    ...note('line', '2026-11-17T10:00:00Z'),
+    body: null,
+    ...overrides,
+  });
+
+  it('tells a line from a note', () => {
+    expect(isSystemLine(note('a', '2026-11-17T10:00:00Z'))).toBe(false);
+    expect(isSystemLine(line({ kind: 'stage_changed' }))).toBe(true);
+    expect(isSystemLine(line({ kind: 'lead_created' }))).toBe(true);
+  });
+
+  it('says who added the lead, or just that it was added', () => {
+    expect(describeSystemLine(line({ kind: 'lead_created' }))).toEqual({
+      messageKey: 'timeline.leadAddedBy',
+      values: { name: 'Maya Chen' },
+    });
+    const nobody = { kind: 'system' as const, userId: null, name: null, role: null };
+    expect(describeSystemLine(line({ kind: 'lead_created', writtenBy: nobody }))).toEqual({
+      messageKey: 'timeline.leadAdded',
+      values: {},
+    });
+  });
+
+  it('says the stages a lead moved between, with or without the doer', () => {
+    const details = { fromStageName: 'New', toStageName: 'Contacted' };
+    expect(describeSystemLine(line({ kind: 'stage_changed', details }))).toEqual({
+      messageKey: 'timeline.movedBy',
+      values: { name: 'Maya Chen', from: 'New', to: 'Contacted' },
+    });
+    const nobody = { kind: 'system' as const, userId: null, name: null, role: null };
+    expect(describeSystemLine(line({ kind: 'stage_changed', details, writtenBy: nobody })).messageKey).toBe(
+      'timeline.moved',
+    );
+    expect(describeSystemLine(line({ kind: 'stage_changed', details: { toStageName: 'Won' } })).messageKey).toBe(
+      'timeline.movedToBy',
+    );
+  });
+
+  it('asks the API for the kind a chip stands for, and for everything under All', () => {
+    expect(kindForTimelineFilter('all')).toBeUndefined();
+    expect(kindForTimelineFilter('note')).toBe('note');
+    expect(buildNotesPath({ kind: 'lead', id: 'l1' })).toBe('/activities?lead_id=l1&limit=100');
+    expect(buildNotesPath({ kind: 'lead', id: 'l1' }, 'stage_changed')).toBe(
+      '/activities?lead_id=l1&kind=stage_changed&limit=100',
+    );
   });
 });

@@ -1,6 +1,7 @@
 import { sql } from 'kysely';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
+import type { ActivityKind } from '@toobler-one/shared';
 
 // The SQL of the activity timeline. Every query names the business and runs inside that business's fence. Only this file touches the
 // `activities` table.
@@ -8,10 +9,11 @@ import type { Db } from '../../../../kernel/database';
 /** One activity as the database holds it. */
 export interface ActivityRow {
   id: string;
-  kind: 'note';
+  kind: ActivityKind;
   contactId: string;
   leadId: string | null;
   body: string | null;
+  details: Record<string, unknown> | null;
   byUserId: string | null;
   byAgent: string | null;
   createdAt: Date;
@@ -24,6 +26,7 @@ const ACTIVITY_COLUMNS = [
   'contact_id',
   'lead_id',
   'body',
+  'details',
   'by_user_id',
   'by_agent',
   'created_at',
@@ -33,10 +36,11 @@ const ACTIVITY_COLUMNS = [
 /** Turns a database row into an ActivityRow. */
 function toActivityRow(row: {
   id: string;
-  kind: 'note';
+  kind: ActivityKind;
   contact_id: string;
   lead_id: string | null;
   body: string | null;
+  details: unknown;
   by_user_id: string | null;
   by_agent: string | null;
   created_at: Date;
@@ -48,6 +52,7 @@ function toActivityRow(row: {
     contactId: row.contact_id,
     leadId: row.lead_id,
     body: row.body,
+    details: (row.details as Record<string, unknown> | null) ?? null,
     byUserId: row.by_user_id,
     byAgent: row.by_agent,
     createdAt: row.created_at,
@@ -100,7 +105,7 @@ export async function listActivities(
     accountId: string;
     leadId?: string | undefined;
     contactId?: string | undefined;
-    kind?: 'note' | undefined;
+    kind?: ActivityKind | undefined;
     limit: number;
     offset: number;
   },
@@ -204,4 +209,47 @@ export async function countNotesByLead(db: Db, accountId: string, leadIds: strin
     .groupBy('lead_id')
     .execute();
   return new Map(rows.flatMap((row) => (row.lead_id === null ? [] : [[row.lead_id, Number(row.total)] as const])));
+}
+
+/**
+ * Adds a line the system writes by itself (a lead was added, a lead moved to another stage). `sourceEventId` is the event that caused it:
+ * if that event is delivered a second time the line is already there and nothing is written. Returns true when a line was added.
+ */
+export async function insertSystemLine(
+  db: Db,
+  options: {
+    id: string;
+    accountId: string;
+    contactId: string;
+    leadId: string;
+    kind: 'lead_created' | 'stage_changed';
+    details: Record<string, string>;
+    byUserId: string | null;
+    byAgent: string | null;
+    sourceEventId: string;
+    actor: Actor;
+  },
+): Promise<boolean> {
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  const inserted = await db
+    .insertInto('activities')
+    .values({
+      id: options.id,
+      account_id: options.accountId,
+      contact_id: options.contactId,
+      lead_id: options.leadId,
+      kind: options.kind,
+      details: options.details,
+      by_user_id: options.byUserId,
+      by_agent: options.byAgent,
+      source_event_id: options.sourceEventId,
+      created_by: actorStamp,
+      updated_by: actorStamp,
+    })
+    .onConflict((conflict) =>
+      conflict.columns(['account_id', 'source_event_id']).where('source_event_id', 'is not', null).doNothing(),
+    )
+    .returning('id')
+    .executeTakeFirst();
+  return inserted !== undefined;
 }

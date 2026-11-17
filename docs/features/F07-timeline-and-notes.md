@@ -2,7 +2,32 @@
 
 **Requirements:** `2-crm-core/04-activity-timeline-and-notes.md`; `requirements/API.md` (Activity timeline and notes); the designer's frames `docs/design/screens/leads-note-panel.png` ("Leads - Note", Figma node 2024:3774) and `docs/design/screens/leads-list-with-activity-menu.png` (Figma node 2024:2730).
 **Depends on:** F04 contacts, F06 leads.      **Module:** `core.activities` (core).
-**Status:** `in_progress`: slices 1, 2 and 3 built (17 Nov 2026). Pulled ahead of F02 because the designer delivered the screen and the owner asked for it (R69, 17 Nov 2026).
+**Status:** `in_progress`: slices 1 to 4 built (17 Nov 2026). Pulled ahead of F02 because the designer delivered the screen and the owner asked for it (R69, 17 Nov 2026).
+
+## Feature guide
+
+**What it does.** Every lead and every person has a timeline: a running story of what happened. Staff write notes on it ("prefers a ground floor room"), and the system adds lines by itself: "Lead added by Anita" and "Maya moved it from New to Contacted". On the Leads list a small orange notes icon appears beside the date when a lead has notes; clicking it opens the Notes panel.
+
+**Why it is useful.** Whoever picks up a lead next, or the AI agent later, can see in one place what was said and what was done, without asking around or scrolling through chats.
+
+**A day in the life.** Priya calls about a December stay. Front desk writes "Wants a quiet room, 3 nights" on her lead. The lead is moved to Contacted; the timeline says who moved it and when. Next week a colleague opens the lead, sees the note and the stage history, and carries on without asking.
+
+**Who can do what.**
+- Managers and staff add notes and see timelines. The "own leads only" role sees only the timelines of its own leads (and no whole-person timeline).
+- Only the person who wrote a note can change its words (it then says "Edited"). Only managers can delete a note, after an "Are you sure?" that names the writer. A deleted note leaves every timeline but its row is kept.
+- Lines the system writes cannot be edited or deleted by anyone.
+
+**Settings and limits.** A note is 1 to 2000 characters. No settings. Filter chips above a timeline: All, Notes, Stage changes.
+
+**What it never does.** It never shows another business's notes. It never keeps the words of a note in the activity log or in events (ids only). It never lets a manager rewrite someone else's note.
+
+**Not part of it.** Attachments (not in the requirements), calls and chats on the timeline (later features), tasks and meetings (F08), a "job title" next to the writer's name (needs F02; the role Manager or Staff is shown).
+
+### For the tech team
+- **Module:** `core.activities` (requires `core.auth`, `core.contacts`, `core.leads`). Table `activities` (migrations 048, 049): kinds `note`, `lead_created`, `stage_changed`; `details` jsonb (stage names), `source_event_id` (one line per event).
+- **Routes:** `POST /notes`, `PATCH /notes/{id}`, `DELETE /notes/{id}`, `GET /activities`, `GET /activities/counts`.
+- **Events:** publishes `note.added`, `note.edited`, `note.deleted` (ids only). Subscribes to `lead.created` and `lead.moved` (payloads carry the contact, the stage names and who did it) and writes the system lines.
+- **Known limits:** the filter chip "Stage changes" shows moves only; "Lead added" shows under All. The lost reason is not on the line (events carry ids and small facts, never the business's words). A line is written when the event is delivered (a moment after the change), so it can appear a few seconds late.
 
 ## What the designer drew (17 Nov 2026, new)
 - **Notes panel** (a side panel, "Leads - Note"): a title "Notes" with a count badge; the lead's name under it; a sort "Recent Last"; the list of notes, each with the writer's round initials, their name, their role, how long ago, and the note in a bubble; a text box "Enter here"; an attach (paperclip) button; Cancel and Save. Opened from the **add-note icon** in a lead's row (and on the lead page).
@@ -45,3 +70,11 @@
 - **Screens:** on the Leads list a lead that has notes shows the small orange notes icon beside the date chip **all the time** (Figma), not only on hover; it opens the Notes panel, and its name says how many ("Notes for Priya: 3"). A lead without notes still shows the add-note icon only on hover. The counts are asked once for the leads on the page and again after a note is added, changed or deleted. On a contact's page the placeholder Timeline card is now a Notes card: every note on the person and on all their leads, newest first, with a box to write a note on the person (`POST /notes` with `contactId`); it is not shown to the "own leads only" role.
 - **Fix found on the way:** closing a dialog inside a dialog (the "Are you sure?" over the Notes panel) also closed the outer one. `Dialog` and `SidePanel` now react only to their own close event.
 - **Tests:** 4 API tests for the counts (counts and deleted notes, 0 for others' leads, own-leads-only role, 400s and 401), an isolation entry, 3 web rule tests, and 2 browser specs (icon follows adding and deleting; contact page notes).
+
+### Slice 4: stage changes and new leads on the timeline (built 17 Nov 2026)
+- **Routes: none new.** `GET /activities` now also answers the system lines and `kind` accepts `lead_created` and `stage_changed` (each line has `details` with the stage names; notes have `details: null`).
+- **Data:** migration `049_activities_lead_events.sql`: two more kinds, `details`, and `source_event_id` with a unique key so a second delivery of the same event writes nothing.
+- **Events:** the leads module now carries more in `lead.created` (`createdBy`) and `lead.moved` (`contactId`, `fromStageName`, `toStageName`, `movedBy`), still ids and small facts only. The activities module reacts to both (`services/timeline-events.service.ts`); the leads module does not know the timeline exists.
+- **Screens:** the lead page's timeline card and the contact page's notes card show the lines in one quiet sentence (no bubble, no Edit or Delete) and have the chips All, Notes, Stage changes (the designer's segmented control). The Notes panel on the list and the orange icon count notes only.
+- **Decision:** the lost reason is not written on the line (the existing rule keeps the business's own words out of events). The lead already shows its lost reason.
+- **Tests:** `test/activities-timeline.test.ts` (4: line once even when delivered twice, stage names kept after a rename, kind filter and totals and counts and no edit/delete of a line, odd event writes nothing and no leak between businesses), updated leads event expectations, 4 web rule tests and 2 browser specs.

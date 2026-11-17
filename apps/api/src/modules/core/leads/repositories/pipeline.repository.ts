@@ -161,14 +161,14 @@ export async function findStageById(
   db: Db,
   accountId: string,
   stageId: string,
-): Promise<{ id: string; pipelineId: string; kind: StageKind } | undefined> {
+): Promise<{ id: string; pipelineId: string; kind: StageKind; name: string } | undefined> {
   const row = await db
     .selectFrom('pipeline_stages')
-    .select(['id', 'pipeline_id', 'kind'])
+    .select(['id', 'pipeline_id', 'kind', 'name'])
     .where('account_id', '=', accountId)
     .where('id', '=', stageId)
     .executeTakeFirst();
-  return row ? { id: row.id, pipelineId: row.pipeline_id, kind: row.kind } : undefined;
+  return row ? { id: row.id, pipelineId: row.pipeline_id, kind: row.kind, name: row.name } : undefined;
 }
 
 /** Gives a stage a new name. */

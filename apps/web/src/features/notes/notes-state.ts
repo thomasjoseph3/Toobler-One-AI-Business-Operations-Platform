@@ -1,6 +1,6 @@
 // The rules of the Notes panel: initials for the round avatar, "1 hr. ago", the sort order, the role words and checking a note before it
 // is sent. Pure functions (no screen, no network), so each rule can be tested alone.
-import type { Activity, ActivityWriter } from '@toobler-one/shared';
+import type { Activity, ActivityKind, ActivityWriter } from '@toobler-one/shared';
 import { MAX_NOTE_LENGTH } from '@toobler-one/shared';
 import type { MessageKey } from '../../app/i18n';
 
@@ -82,10 +82,51 @@ export function canDeleteNote(role: string): boolean {
 /** What a set of notes belongs to: one lead, or one person (whose notes include those on all their leads). */
 export type NotesTarget = { kind: 'lead'; id: string } | { kind: 'contact'; id: string };
 
-/** The API address that lists the notes of a target, newest first (up to 100). */
-export function buildNotesPath(target: NotesTarget): string {
+/** The API address that lists the timeline of a target, newest first (up to 100), narrowed to one kind when `kind` is given. */
+export function buildNotesPath(target: NotesTarget, kind?: ActivityKind): string {
   const filter = target.kind === 'lead' ? `lead_id=${target.id}` : `contact_id=${target.id}`;
-  return `/activities?${filter}&limit=100`;
+  return `/activities?${filter}${kind ? `&kind=${kind}` : ''}&limit=100`;
+}
+
+/** What the filter chips above a timeline offer: everything, only notes, or only stage changes. */
+export type TimelineFilter = 'all' | 'note' | 'stage_changed';
+
+/** The kind to ask the API for under a chip (nothing for "All"). */
+export function kindForTimelineFilter(filter: TimelineFilter): ActivityKind | undefined {
+  return filter === 'all' ? undefined : filter;
+}
+
+/** True for a line the system wrote by itself (a lead was added, a lead moved): it has no bubble, no Edit and no Delete. */
+export function isSystemLine(activity: Activity): boolean {
+  return activity.kind !== 'note';
+}
+
+/**
+ * The plain sentence of a system line: which words to use and what to fill in. A person's or agent's name is used when the activity has
+ * one, otherwise the sentence is said without a doer ("Lead added").
+ */
+export function describeSystemLine(activity: Activity): {
+  messageKey: MessageKey;
+  values: Record<string, string>;
+} {
+  const doerName = activity.writtenBy.name;
+  const doer = doerName ?? '';
+  if (activity.kind === 'lead_created') {
+    return doerName === null
+      ? { messageKey: 'timeline.leadAdded', values: {} }
+      : { messageKey: 'timeline.leadAddedBy', values: { name: doer } };
+  }
+  const values = {
+    name: doer,
+    from: activity.details?.fromStageName ?? '',
+    to: activity.details?.toStageName ?? '',
+  };
+  if (values.from === '') {
+    return doerName === null
+      ? { messageKey: 'timeline.movedTo', values }
+      : { messageKey: 'timeline.movedToBy', values };
+  }
+  return doerName === null ? { messageKey: 'timeline.moved', values } : { messageKey: 'timeline.movedBy', values };
 }
 
 /** The request body that adds a note to a target: the words and exactly one of `leadId` or `contactId`. */

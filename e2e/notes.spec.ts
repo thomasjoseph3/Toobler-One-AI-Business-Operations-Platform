@@ -71,6 +71,33 @@ test.describe('Notes: on the lead page', () => {
   });
 });
 
+test.describe('Timeline: stage changes beside the notes', () => {
+  test('the lead page shows the stage change with the notes, and the chips narrow it down', async ({ page }) => {
+    await page.goto('/leads/lead-0');
+    await expect(page.getByText('Maya Chen moved it from New to Contacted')).toBeVisible();
+    await expect(page.getByText('Great insights on the project, looking forward to the next steps!')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Notes', exact: true }).click();
+    await expect(page.getByText('Great insights on the project, looking forward to the next steps!')).toBeVisible();
+    await expect(page.getByText('Maya Chen moved it from New to Contacted')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Stage changes' }).click();
+    await expect(page.getByText('Maya Chen moved it from New to Contacted')).toBeVisible();
+    await expect(page.getByText('Great insights on the project, looking forward to the next steps!')).toHaveCount(0);
+  });
+
+  test('the Notes panel on the list shows notes only, with no stage lines', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row icons are for tablets and desktops');
+    await page.goto('/leads');
+    const row = page.getByRole('row', { name: /Priya Menon 0/ });
+    await row.hover();
+    await row.getByRole('button', { name: 'Notes for Priya Menon 0' }).click();
+    const panel = page.getByRole('dialog', { name: 'Notes' });
+    await expect(panel).toContainText('Great insights on the project');
+    await expect(panel).not.toContainText('moved it from');
+  });
+});
+
 test.describe('Notes: changing and deleting', () => {
   test('the writer edits their own note in place, and it says Edited', async ({ page, pretendApi }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'The row icons are for tablets and desktops');

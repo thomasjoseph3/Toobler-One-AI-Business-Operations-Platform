@@ -8,7 +8,9 @@ import {
   describeWriterName,
   describeWriterRole,
   formatTimeAgo,
+  describeSystemLine,
   initialsOf,
+  isSystemLine,
 } from './notes-state';
 
 /** The writer's name: their own, or the words for an agent or a person who has left. */
@@ -126,6 +128,19 @@ export function NotesList({ notes, now, signedInUserId, signedInRole, onEditNote
       ) : null}
       <ul className="flex flex-col gap-4">
         {notes.map((note) => {
+          // A line the system wrote (a lead was added, a lead moved): one quiet sentence and when, no avatar or bubble
+          if (isSystemLine(note)) {
+            const line = describeSystemLine(note);
+            return (
+              <li
+                key={note.id}
+                className="text-body-xs flex flex-wrap items-baseline justify-between gap-x-2 text-text-secondary"
+              >
+                <span className="min-w-0">{formatMessage(line.messageKey, line.values)}</span>
+                <span className="shrink-0">{formatTimeAgo(note.createdAt, now)}</span>
+              </li>
+            );
+          }
           const roleKey = describeWriterRole(note.writtenBy);
           const canEdit = canEditNote(note, signedInUserId);
           const canDelete = canDeleteNote(signedInRole);

@@ -29,6 +29,7 @@ function toActivity(row: ActivityRow, writer: PersonSummary | undefined): Activi
     contactId: row.contactId,
     leadId: row.leadId,
     body: row.body,
+    details: row.details as Activity['details'],
     writtenBy: {
       kind: row.byUserId !== null ? 'user' : isAgent ? 'agent' : 'system',
       userId: row.byUserId,

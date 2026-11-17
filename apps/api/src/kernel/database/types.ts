@@ -560,10 +560,14 @@ export interface ActivitiesTable {
   account_id: string;
   contact_id: string;
   lead_id: string | null;
-  kind: 'note';
+  kind: 'note' | 'lead_created' | 'stage_changed';
   body: string | null;
   by_user_id: string | null;
   by_agent: string | null;
+  /** The facts of a system line (stage names, lost reason); empty for notes. */
+  details: Json | null;
+  /** The event that caused a system line, so a repeated delivery writes nothing twice; empty for notes. */
+  source_event_id: string | null;
   edited_at: Date | null;
   deleted_at: Date | null;
   created_by: Json | null;

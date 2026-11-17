@@ -102,7 +102,7 @@ export async function applyLeadFromConversation(
     await publishEvent(transaction, {
       accountId,
       eventName: 'lead.created',
-      payload: { leadId, contactId, ownerUserId, offeringId: null },
+      payload: { leadId, contactId, ownerUserId, offeringId: null, createdBy: { kind: actor.kind, id: actor.id } },
     });
   }
 

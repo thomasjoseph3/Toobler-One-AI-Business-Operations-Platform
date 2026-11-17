@@ -283,6 +283,7 @@ describe('POST /api/v1/leads', () => {
       contactId,
       ownerUserId: person.profile.user.id,
       offeringId: null,
+      createdBy: { kind: 'user', id: person.profile.user.id },
     });
     expect(JSON.stringify(logLine) + JSON.stringify(event)).not.toContain('Secret-interest-words');
     const stored = await database.system
@@ -1022,8 +1023,12 @@ describe('POST /api/v1/leads/{id}/move', () => {
     expect(events.map((event) => event.name).sort()).toEqual(['lead.lost', 'lead.moved']);
     expect(events.find((event) => event.name === 'lead.moved')?.payload).toEqual({
       leadId: lead.id,
+      contactId: lead.contactId,
       fromStageId: newStageId,
       toStageId: lostStageId,
+      fromStageName: 'New',
+      toStageName: 'Lost',
+      movedBy: { kind: 'user', id: person.profile.user.id },
     });
     expect(JSON.stringify(events) + JSON.stringify(logLine)).not.toContain('Went elsewhere');
     const stored = await database.system
