@@ -2,7 +2,7 @@
 
 **Requirements:** `5-onboarding-and-launch/03-setup-wizard.md`; `3-ai-agents-and-channels/09-business-questions.md`; `requirements/API.md` (Setup wizard, Knowledge base → prefill); docs/plan/PHASE-1.md (F31); docs/SECURITY.md (SSRF, public fetches); docs/CONVERSATION-TYPES.md (not touched)
 **Depends on:** F01, F03, F06, F16, F17, F18, F19, F20, F37      **Module:** `core.setup` (core). The website reader sits inside it as `websiteReader` (also used later by F18's re-read and F33).
-**Status:** `in_progress` (brief written 17 Nov 2026). Slices 1 to 5 and 7 built; the setup page and form screens are C1 and C2; the chat screen is slice 7.
+**Status:** `approved` on 17 Nov 2026 under the owner's standing instruction to go on without waiting (not yet reviewed by hand). Verified: gate, format, lint, typecheck, 2355 unit and API tests, 580+ browser tests (phone and desktop). Slices 1 to 5 and 7 built; the setup page and form screens are C1 and C2; the chat screen is slice 7.
 
 ## Feature guide
 

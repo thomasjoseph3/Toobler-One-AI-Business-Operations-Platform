@@ -25,7 +25,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F15 | Conversation types and the router | approved | [brief](../features/F15-conversation-types-and-router.md) | 2026-11-16 |
 | F19 | The AI agent (text) and Test the agent | approved | [brief](../features/F19-ai-agent-and-test-the-agent.md) | 2026-11-16 |
 | F20 | Website chat | approved | [brief](../features/F20-website-chat.md) | 2026-11-16 |
-| F31 | Setup wizard and fill from website | in_progress | [brief](../features/F31-setup-wizard.md) | |
+| F31 | Setup wizard and fill from website | approved | [brief](../features/F31-setup-wizard.md) | 2026-11-17 (by the owner's standing instruction to go on without waiting; the owner has not yet reviewed it by hand) |
 | F02 | Team, roles, teams and the activity log | planned | | |
 | F05 | Companies | planned | | |
 | F07 | Timeline and notes | planned | | |
