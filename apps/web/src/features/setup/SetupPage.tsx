@@ -83,6 +83,11 @@ export function SetupPage() {
             ? formatMessage('setup.progress.next', { step: t(STEP_DESCRIPTIONS[nextStep.key].titleKey as MessageKey) })
             : t('setup.progress.allDone')}
         </p>
+        <div className="mt-3">
+          <Link to="/setup/chat" className="text-body-md-semibold inline-flex h-10 items-center rounded-md bg-action px-4 text-action-text hover:bg-action-hover">
+            {t('setup.chat.open')}
+          </Link>
+        </div>
         <p className="text-body-md mt-2 text-text-secondary">
           <Link to="/knowledge" className="text-link underline underline-offset-2 hover:text-link-hover">
             {t('nav.knowledge')}
