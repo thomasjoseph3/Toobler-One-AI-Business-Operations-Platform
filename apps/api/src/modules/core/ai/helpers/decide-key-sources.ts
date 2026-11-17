@@ -8,7 +8,7 @@ export interface KeySourceDecision {
   useOwn: boolean;
   /** The platform's keys may be used (switched on for the business and not past the end date). */
   usePlatform: boolean;
-  /** Why the platform's keys are off when the mode wanted them: never switched on, the end date has passed, or this month's cap is used up. */
+  /** Why the platform's keys are off when the mode wanted them: never switched on, the end date has passed, or this month's call or token cap is used up. */
   platformBlockedBecause: 'not_enabled' | 'ended' | 'cap_reached' | null;
 }
 
@@ -24,13 +24,20 @@ export function decideKeySources(options: {
   platformMonthlyCallCap: number | null;
   /** Answered calls this month on the platform's keys. */
   platformCallsThisMonth: number;
+  /** Tokens a month allowed on the platform's keys, or null for no cap. */
+  platformMonthlyTokenCap: number | null;
+  /** Tokens (input + output) used this month on the platform's keys. */
+  platformTokensThisMonth: number;
   now: Date;
 }): KeySourceDecision {
   const wantsOwn = options.keyMode === 'own' || options.keyMode === 'own_then_platform';
   const wantsPlatform = options.keyMode === 'platform' || options.keyMode === 'own_then_platform';
   const ended = options.platformExpiresAt !== null && options.platformExpiresAt.getTime() <= options.now.getTime();
-  const capReached =
+  const callCapReached =
     options.platformMonthlyCallCap !== null && options.platformCallsThisMonth >= options.platformMonthlyCallCap;
+  const tokenCapReached =
+    options.platformMonthlyTokenCap !== null && options.platformTokensThisMonth >= options.platformMonthlyTokenCap;
+  const capReached = callCapReached || tokenCapReached;
   const platformBlockedBecause = !wantsPlatform
     ? null
     : !options.platformEnabled

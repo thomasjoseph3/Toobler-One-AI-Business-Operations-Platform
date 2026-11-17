@@ -4,7 +4,7 @@ import {
   buildAddKeyRequest,
   checkKeyForm,
   describeKeyStatus,
-  describeModeWarning,
+  describeWhichKeysAnswer,
   describePlatformUsage,
   describeTestOutcome,
   EMPTY_KEY_FORM,
@@ -65,26 +65,30 @@ describe('keys and tests', () => {
 });
 
 describe('the key mode and the platform’s part', () => {
-  const access = (enabled: boolean) => ({ enabled, monthlyCallCap: null, expiresAt: null });
+  const access = (enabled: boolean) => ({ enabled, monthlyCallCap: null, monthlyTokenCap: null, expiresAt: null });
 
-  it('warns when the chosen mode has nothing to use', () => {
-    expect(describeModeWarning('own', access(true), 0)).toBe('settings.ai.warn.noOwnKeys');
-    expect(describeModeWarning('platform', access(false), 2)).toBe('settings.ai.warn.platformOff');
-    expect(describeModeWarning('own_then_platform', access(false), 0)).toBe('settings.ai.warn.nothingToUse');
-    expect(describeModeWarning('own', access(false), 1)).toBeNull();
-    expect(describeModeWarning('own_then_platform', access(true), 0)).toBeNull();
+  it('says which keys will answer, with no choice asked', () => {
+    expect(describeWhichKeysAnswer(access(true), 2)).toBe('settings.ai.status.ownThenPlatform');
+    expect(describeWhichKeysAnswer(access(false), 2)).toBe('settings.ai.status.ownOnly');
+    expect(describeWhichKeysAnswer(access(true), 0)).toBe('settings.ai.status.platformOnly');
+    expect(describeWhichKeysAnswer(access(false), 0)).toBe('settings.ai.status.nothing');
   });
 
   it('describes the platform allowance and how much is used', () => {
-    expect(describePlatformUsage({ enabled: false, monthlyCallCap: null, usedThisMonth: 0, remainingThisMonth: null, expiresAt: null })).toEqual([{ key: 'settings.ai.platform.off', values: {} }]);
-    expect(describePlatformUsage({ enabled: true, monthlyCallCap: 1000, usedThisMonth: 250, remainingThisMonth: 750, expiresAt: '2026-12-31' })).toEqual([
+    expect(describePlatformUsage({ enabled: false, monthlyCallCap: null, monthlyTokenCap: null, tokensUsedThisMonth: 0, tokensRemainingThisMonth: null, usedThisMonth: 0, remainingThisMonth: null, expiresAt: null })).toEqual([{ key: 'settings.ai.platform.off', values: {} }]);
+    expect(describePlatformUsage({ enabled: true, monthlyCallCap: 1000, monthlyTokenCap: null, tokensUsedThisMonth: 0, tokensRemainingThisMonth: null, usedThisMonth: 250, remainingThisMonth: 750, expiresAt: '2026-12-31' })).toEqual([
       { key: 'settings.ai.platform.cap', values: { used: 250, cap: 1000, left: 750 } },
       { key: 'settings.ai.platform.expires', values: { date: '2026-12-31' } },
     ]);
-    expect(describePlatformUsage({ enabled: true, monthlyCallCap: null, usedThisMonth: 40, remainingThisMonth: null, expiresAt: null })[0]!.key).toBe('settings.ai.platform.noCap');
-    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 250 })).toBe(25);
-    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 5000 })).toBe(100);
-    expect(percentOfCapUsed({ monthlyCallCap: null, usedThisMonth: 5 })).toBe(0);
+    expect(describePlatformUsage({ enabled: true, monthlyCallCap: null, monthlyTokenCap: null, tokensUsedThisMonth: 0, tokensRemainingThisMonth: null, usedThisMonth: 40, remainingThisMonth: null, expiresAt: null })[0]!.key).toBe('settings.ai.platform.noCap');
+    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 250, monthlyTokenCap: null, tokensUsedThisMonth: 0 })).toBe(25);
+    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 5000, monthlyTokenCap: null, tokensUsedThisMonth: 0 })).toBe(100);
+    expect(percentOfCapUsed({ monthlyCallCap: null, usedThisMonth: 5, monthlyTokenCap: null, tokensUsedThisMonth: 0 })).toBe(0);
+    // the nearer of the two allowances counts: 10% of the calls but 80% of the tokens is 80%
+    expect(percentOfCapUsed({ monthlyCallCap: 1000, usedThisMonth: 100, monthlyTokenCap: 1_000_000, tokensUsedThisMonth: 800_000 })).toBe(80);
+    expect(describePlatformUsage({ enabled: true, monthlyCallCap: null, monthlyTokenCap: 1000, tokensUsedThisMonth: 400, tokensRemainingThisMonth: 600, usedThisMonth: 3, remainingThisMonth: null, expiresAt: null })).toEqual([
+      { key: 'settings.ai.platform.tokenCap', values: { used: 400, cap: 1000, left: 600 } },
+    ]);
   });
 });
 

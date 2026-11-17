@@ -17,6 +17,8 @@ export const aiPlatformAccessSchema = z.object({
   enabled: z.boolean(),
   /** Calls a month the business may make on the platform's keys, or null for no cap. */
   monthlyCallCap: z.number().int().nullable(),
+  /** Tokens a month the business may use on the platform's keys, or null for no cap. */
+  monthlyTokenCap: z.number().int().nullable(),
   /** When platform access ends, or null for no end date. */
   expiresAt: z.string().nullable(),
 });

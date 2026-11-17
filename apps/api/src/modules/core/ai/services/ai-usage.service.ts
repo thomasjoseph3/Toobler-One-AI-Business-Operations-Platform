@@ -86,6 +86,12 @@ export function createAiUsageService({
           platform: {
             enabled: access.platformEnabled,
             monthlyCallCap: cap,
+            monthlyTokenCap: access.platformMonthlyTokenCap,
+            tokensUsedThisMonth: access.platformTokensThisMonth,
+            tokensRemainingThisMonth:
+              access.platformMonthlyTokenCap === null
+                ? null
+                : Math.max(0, access.platformMonthlyTokenCap - access.platformTokensThisMonth),
             usedThisMonth,
             remainingThisMonth: cap === null ? null : Math.max(0, cap - usedThisMonth),
             expiresAt: access.platformExpiresAt ? access.platformExpiresAt.toISOString() : null,
@@ -109,6 +115,8 @@ export function createAiUsageService({
         platformExpiresAt: access.platformExpiresAt,
         platformMonthlyCallCap: access.platformMonthlyCallCap,
         platformCallsThisMonth: access.platformCallsThisMonth,
+        platformMonthlyTokenCap: access.platformMonthlyTokenCap,
+        platformTokensThisMonth: access.platformTokensThisMonth,
         now: today,
       });
       const catalogue = await findAllModels(database.system);

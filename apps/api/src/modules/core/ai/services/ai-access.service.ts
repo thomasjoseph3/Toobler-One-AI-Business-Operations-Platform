@@ -23,6 +23,9 @@ export interface AiAccess {
   platformMonthlyCallCap: number | null;
   /** Answered calls this month on the platform's keys (counted only when there is a cap, otherwise 0). */
   platformCallsThisMonth: number;
+  platformMonthlyTokenCap: number | null;
+  /** Tokens (input + output) this month on the platform's keys (counted only when there is a token cap, otherwise 0). */
+  platformTokensThisMonth: number;
   taskModels: TaskModels;
   /** The business's live keys per company, oldest first. */
   ownKeysByProvider: Map<LlmProviderId, OwnKeyToUse[]>;
@@ -43,12 +46,18 @@ export async function loadAiAccess(database: Database, accountId: string, now: D
       settings.platformMonthlyCallCap === null
         ? 0
         : await aiUsageRepository.countPlatformCallsSince(transaction, accountId, firstDayOfMonthText(now));
+    const platformTokensThisMonth =
+      settings.platformMonthlyTokenCap === null
+        ? 0
+        : await aiUsageRepository.countPlatformTokensSince(transaction, accountId, firstDayOfMonthText(now));
     return {
       keyMode: settings.keyMode,
       platformEnabled: settings.platformEnabled,
       platformExpiresAt: settings.platformExpiresAt,
       platformMonthlyCallCap: settings.platformMonthlyCallCap,
       platformCallsThisMonth,
+      platformMonthlyTokenCap: settings.platformMonthlyTokenCap,
+      platformTokensThisMonth,
       taskModels: settings.taskModels,
       ownKeysByProvider,
     };

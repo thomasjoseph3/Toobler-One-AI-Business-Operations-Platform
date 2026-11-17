@@ -39,14 +39,14 @@ async function setRole(person: SignedInPerson, role: 'manager' | 'staff' | 'staf
 }
 
 describe('GET /api/v1/ai/settings', () => {
-  it('gives the defaults to a business that has saved nothing: its own keys, no overrides, no platform access', async () => {
+  it('gives the defaults to a business that has saved nothing: own keys first then the platform’s, no overrides, no platform access', async () => {
     const manager = await createSignedInPerson(app, database);
     const response = await getSettings(manager);
     expect(response.statusCode, response.body).toBe(200);
     expect(response.json()).toEqual({
-      keyMode: 'own',
+      keyMode: 'own_then_platform',
       taskModels: {},
-      platformAccess: { enabled: false, monthlyCallCap: null, expiresAt: null },
+      platformAccess: { enabled: false, monthlyCallCap: null, monthlyTokenCap: null, expiresAt: null },
     });
     // looking does not create a row
     const rows = await database.system
@@ -72,6 +72,7 @@ describe('GET /api/v1/ai/settings', () => {
     expect((await getSettings(manager)).json().platformAccess).toEqual({
       enabled: true,
       monthlyCallCap: 500,
+      monthlyTokenCap: null,
       expiresAt: endsAt.toISOString(),
     });
   });
@@ -113,7 +114,7 @@ describe('PUT /api/v1/ai/settings', () => {
     // an empty set clears every override
     expect((await putSettings(manager, { taskModels: {} })).json().taskModels).toEqual({});
     // the key mode was never touched by these
-    expect(second.json().keyMode).toBe('own');
+    expect(second.json().keyMode).toBe('own_then_platform');
   });
 
   it('changes only the fields sent', async () => {
@@ -226,7 +227,7 @@ describe('PUT /api/v1/ai/settings', () => {
     const first = await createSignedInPerson(app, database);
     const second = await createSignedInPerson(app, database);
     await putSettings(first, { keyMode: 'platform' });
-    expect((await getSettings(second)).json().keyMode).toBe('own');
+    expect((await getSettings(second)).json().keyMode).toBe('own_then_platform');
   });
 });
 

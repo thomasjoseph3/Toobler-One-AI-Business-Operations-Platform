@@ -41,6 +41,11 @@ export type AiUsageGroup = z.infer<typeof aiUsageGroupSchema>;
 export const aiPlatformUsageSchema = z.object({
   enabled: z.boolean(),
   monthlyCallCap: z.number().int().nullable(),
+  monthlyTokenCap: z.number().int().nullable(),
+  /** Tokens (input + output) used this month on the platform's keys (counted only when there is a token cap). */
+  tokensUsedThisMonth: z.number().int(),
+  /** Tokens left this month, or null when there is no token cap. */
+  tokensRemainingThisMonth: z.number().int().nullable(),
   usedThisMonth: z.number().int(),
   /** Calls left this month, or null when there is no cap. */
   remainingThisMonth: z.number().int().nullable(),

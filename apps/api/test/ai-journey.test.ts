@@ -118,11 +118,11 @@ describe('Chapter 1: Nair Stays has not set up any AI yet', () => {
     const models = await anita.ok('GET', '/ai/models');
     expect(models.models.every((model: { available: boolean }) => model.available === false)).toBe(true);
     expect(await anita.ok('GET', '/ai/settings')).toEqual({
-      keyMode: 'own',
+      keyMode: 'own_then_platform',
       taskModels: {},
-      platformAccess: { enabled: false, monthlyCallCap: null, expiresAt: null },
+      platformAccess: { enabled: false, monthlyCallCap: null, monthlyTokenCap: null, expiresAt: null },
     });
-    await expect(ask()).rejects.toMatchObject({ status: 503, code: 'AI_NOT_AVAILABLE' });
+    await expect(ask()).rejects.toMatchObject({ status: 503, code: 'AI_ACCESS_NOT_ENABLED' });
     const status = await anita.ok('GET', '/ai/status');
     expect(status.tasks.every((task: { lastAnswer: unknown }) => task.lastAnswer === null)).toBe(true);
     for (const url of ['/ai/models', '/ai/settings', '/ai/keys', '/ai/usage', '/ai/status', '/ai/calls']) {
@@ -144,6 +144,7 @@ describe('Chapter 2: the platform lends its keys for a trial, with a cap', () =>
     expect((await anita.ok('GET', '/ai/settings')).platformAccess).toEqual({
       enabled: true,
       monthlyCallCap: 3,
+      monthlyTokenCap: null,
       expiresAt: endsAt,
     });
     const models = await anita.ok('GET', '/ai/models');

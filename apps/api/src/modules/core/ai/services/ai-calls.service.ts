@@ -122,7 +122,7 @@ function toNothingToTryError(sources: KeySourceDecision, hasOwnKeys: boolean): A
     return new ApiError(
       402,
       'AI_CAP_REACHED',
-      'This business has used all the calls the platform allowed it this month. Add your own key, or ask the platform team.',
+      'This business has used all the AI the platform allowed it this month. Add your own key, or ask the platform team.',
     );
   }
   return new ApiError(503, 'AI_NOT_AVAILABLE', 'No AI key is set up for this job yet.');
@@ -148,6 +148,8 @@ export function createAiService(dependencies: AiServiceDependencies) {
       platformExpiresAt: access.platformExpiresAt,
       platformMonthlyCallCap: access.platformMonthlyCallCap,
       platformCallsThisMonth: access.platformCallsThisMonth,
+      platformMonthlyTokenCap: access.platformMonthlyTokenCap,
+      platformTokensThisMonth: access.platformTokensThisMonth,
       now: new Date(),
     });
     const catalogue = await findAllModels(database.system);

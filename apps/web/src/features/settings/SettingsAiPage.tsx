@@ -5,11 +5,11 @@ import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { useKeptData } from '../knowledge/use-kept-resource';
 import { AiKeysCard } from './AiKeysCard';
-import { KeyModeCard } from './KeyModeCard';
+import { KeyStatusCard } from './KeyStatusCard';
 import { SettingsTabs } from './SettingsTabs';
 
 /**
- * Settings → AI: which keys the AI uses (own, the platform's, or own then the platform's) with what the platform allows, the business's own keys
+ * Settings → AI: which keys are in use (own first, then the platform's if the platform team allows it) with the allowance and what was used, the business's own keys
  * (add, test, delete) and what the AI used this month. Only managers may use it (the AI routes are manager-only). It keeps what is on screen
  * while a change reloads, and has loading and error states.
  */
@@ -49,7 +49,7 @@ function ManagerAiSettings() {
   }
   return (
     <>
-      <KeyModeCard keyMode={settings.data.keyMode} access={settings.data.platformAccess} usage={usage.data?.platform ?? null} ownKeyCount={keys.data.items.length} onChanged={reloadAll} />
+      <KeyStatusCard access={settings.data.platformAccess} usage={usage.data?.platform ?? null} ownKeyCount={keys.data.items.length} />
       <AiKeysCard keys={keys.data.items} onChanged={reloadAll} />
       {usage.data ? (
         <Card>

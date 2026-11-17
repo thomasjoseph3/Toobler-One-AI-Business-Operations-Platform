@@ -19,6 +19,7 @@ async function readAccess(transaction: Db, businessId: string): Promise<Platform
     keyMode: settings.keyMode,
     enabled: settings.platformEnabled,
     monthlyCallCap: settings.platformMonthlyCallCap,
+    monthlyTokenCap: settings.platformMonthlyTokenCap,
     expiresAt: settings.platformExpiresAt ? settings.platformExpiresAt.toISOString() : null,
     noticesEnabled: settings.noticesEnabled,
     ownKeyCount: await adminRepository.countOwnKeys(transaction, businessId),
@@ -55,7 +56,7 @@ export function createPlatformAiAccessService({ database }: { database: Database
         throw new ApiError(
           400,
           'NOTHING_TO_CHANGE',
-          'Send at least one of: enabled, monthlyCallCap, expiresAt, noticesEnabled.',
+          'Send at least one of: enabled, monthlyCallCap, monthlyTokenCap, expiresAt, noticesEnabled.',
         );
       }
       const adminActor: Actor = { kind: 'user', id: admin.userId };
@@ -69,6 +70,7 @@ export function createPlatformAiAccessService({ database }: { database: Database
           change: {
             enabled: request.enabled,
             monthlyCallCap: request.monthlyCallCap,
+            monthlyTokenCap: request.monthlyTokenCap,
             expiresAt:
               request.expiresAt === undefined
                 ? undefined

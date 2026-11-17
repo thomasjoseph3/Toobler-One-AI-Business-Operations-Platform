@@ -109,6 +109,18 @@ export async function countPlatformCallsSince(db: Db, accountId: string, fromDay
   return Number(row.total);
 }
 
+/** Tokens (input + output) used on the platform's keys from this day on (the number the monthly token cap is counted from). */
+export async function countPlatformTokensSince(db: Db, accountId: string, fromDay: string): Promise<number> {
+  const row = await db
+    .selectFrom('ai_usage')
+    .select(sql<string>`coalesce(sum(input_tokens + output_tokens), 0)`.as('total'))
+    .where('account_id', '=', accountId)
+    .where('key_source', '=', 'platform')
+    .where('day', '>=', fromDay)
+    .executeTakeFirstOrThrow();
+  return Number(row.total);
+}
+
 /** The totals of a set of calls. */
 export interface UsageTotals {
   calls: number;

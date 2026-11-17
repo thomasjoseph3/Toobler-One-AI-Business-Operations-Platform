@@ -44,9 +44,10 @@ describe('GET /api/v1/platform/businesses/{id}/ai-access', () => {
     expect(response.json()).toEqual({
       businessId: business.profile.business.id,
       businessName: stored.name,
-      keyMode: 'own',
+      keyMode: 'own_then_platform',
       enabled: false,
       monthlyCallCap: null,
+      monthlyTokenCap: null,
       expiresAt: null,
       noticesEnabled: true,
       ownKeyCount: 0,
@@ -93,6 +94,7 @@ describe('PUT /api/v1/platform/businesses/{id}/ai-access', () => {
     expect(response.json()).toMatchObject({
       enabled: true,
       monthlyCallCap: 300,
+      monthlyTokenCap: null,
       expiresAt: endsAt,
       noticesEnabled: true,
     });
@@ -101,7 +103,19 @@ describe('PUT /api/v1/platform/businesses/{id}/ai-access', () => {
       url: '/api/v1/ai/settings',
       headers: { ...unsafeRequestHeaders, cookie: business.cookieHeader },
     });
-    expect(seenByBusiness.json().platformAccess).toEqual({ enabled: true, monthlyCallCap: 300, expiresAt: endsAt });
+    expect(seenByBusiness.json().platformAccess).toEqual({ enabled: true, monthlyCallCap: 300, monthlyTokenCap: null, expiresAt: endsAt });
+  });
+
+  it('sets and clears a monthly token cap, which the business sees', async () => {
+    const business = await createSignedInPerson(app, database);
+    const id = business.profile.business.id;
+    const set = await putAccess(platformAdmin, id, { enabled: true, monthlyTokenCap: 2_000_000 });
+    expect(set.statusCode, set.body).toBe(200);
+    expect(set.json()).toMatchObject({ monthlyTokenCap: 2_000_000, monthlyCallCap: null });
+    const seenByBusiness = await app.inject({ method: 'GET', url: '/api/v1/ai/settings', headers: { ...unsafeRequestHeaders, cookie: business.cookieHeader } });
+    expect(seenByBusiness.json().platformAccess.monthlyTokenCap).toBe(2_000_000);
+    const cleared = await putAccess(platformAdmin, id, { monthlyTokenCap: null });
+    expect(cleared.json().monthlyTokenCap).toBeNull();
   });
 
   it('changes only the fields sent, and null clears the cap and the end date', async () => {
@@ -114,6 +128,7 @@ describe('PUT /api/v1/platform/businesses/{id}/ai-access', () => {
     expect(cleared.json()).toMatchObject({
       enabled: true,
       monthlyCallCap: null,
+      monthlyTokenCap: null,
       expiresAt: null,
       noticesEnabled: false,
     });
@@ -204,6 +219,9 @@ describe('PUT /api/v1/platform/businesses/{id}/ai-access', () => {
       { monthlyCallCap: -1 },
       { monthlyCallCap: 10_000_001 },
       { monthlyCallCap: 1.5 },
+      { monthlyTokenCap: -1 },
+      { monthlyTokenCap: 100_000_000_001 },
+      { monthlyTokenCap: 2.5 },
       { expiresAt: 'tomorrow' },
       { expiresAt: '2031-06-30' },
       { enabled: 'yes' },

@@ -100,6 +100,7 @@ export interface AiSettingsTable {
   task_models: Generated<Json>;
   platform_enabled: Generated<boolean>;
   platform_monthly_call_cap: number | null;
+  platform_monthly_token_cap: number | null;
   platform_expires_at: Date | null;
   notices_enabled: Generated<boolean>;
   created_by: Json | null;

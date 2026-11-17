@@ -369,6 +369,28 @@ describe('GET /api/v1/ai/usage', () => {
     expect(body.platform).toMatchObject({ usedThisMonth: 3, remainingThisMonth: 7 });
   });
 
+  it('counts tokens on the platform’s keys against the token cap, and stops the platform’s keys when it is used up', async () => {
+    const { manager, accountId } = await newBusiness();
+    await database.system
+      .updateTable('ai_settings')
+      .set({ platform_monthly_token_cap: 500 })
+      .where('account_id', '=', accountId)
+      .execute();
+    const service = serviceWith(() => ({ answer: 'ok', usage: { inputTokens: 200, outputTokens: 50, cachedTokens: 0 } }));
+    // 250 tokens a call: two calls leave exactly 0 of the 500, so the third is refused
+    await service.generateText({ accountId, tag, prompt });
+    await service.generateText({ accountId, tag, prompt });
+    expect((await get(manager, '/ai/usage')).json().platform).toMatchObject({
+      monthlyTokenCap: 500,
+      tokensUsedThisMonth: 500,
+      tokensRemainingThisMonth: 0,
+    });
+    await expect(service.generateText({ accountId, tag, prompt })).rejects.toMatchObject({
+      status: 402,
+      code: 'AI_CAP_REACHED',
+    });
+  });
+
   it('splits by job, agent, channel, model and day', async () => {
     const { manager, accountId } = await newBusiness();
     const service = serviceWith(() => ({ answer: 'ok', usage: { inputTokens: 10, outputTokens: 1, cachedTokens: 5 } }));

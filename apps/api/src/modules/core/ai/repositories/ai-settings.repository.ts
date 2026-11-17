@@ -12,16 +12,19 @@ export interface AiSettingsRow {
   taskModels: TaskModels;
   platformEnabled: boolean;
   platformMonthlyCallCap: number | null;
+  /** Tokens (input + output) a month allowed on the platform's keys, or null for no cap. */
+  platformMonthlyTokenCap: number | null;
   platformExpiresAt: Date | null;
   noticesEnabled: boolean;
 }
 
 /** What a business has before anyone has saved a setting: its own keys only, and no platform access. */
 export const DEFAULT_AI_SETTINGS: AiSettingsRow = {
-  keyMode: 'own',
+  keyMode: 'own_then_platform',
   taskModels: {},
   platformEnabled: false,
   platformMonthlyCallCap: null,
+  platformMonthlyTokenCap: null,
   platformExpiresAt: null,
   noticesEnabled: true,
 };
@@ -35,6 +38,7 @@ export async function findSettings(db: Db, accountId: string): Promise<AiSetting
     taskModels: row.task_models as TaskModels,
     platformEnabled: row.platform_enabled,
     platformMonthlyCallCap: row.platform_monthly_call_cap,
+    platformMonthlyTokenCap: row.platform_monthly_token_cap,
     platformExpiresAt: row.platform_expires_at,
     noticesEnabled: row.notices_enabled,
   };

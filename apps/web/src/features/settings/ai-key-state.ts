@@ -1,7 +1,6 @@
 import type {
   AddAiKeyRequest,
   AiKey,
-  AiKeyMode,
   AiKeyStatus,
   AiKeyTestOutcome,
   AiPlatformAccess,
@@ -86,39 +85,40 @@ export function groupKeysByProvider(keys: readonly AiKey[]): Array<{ provider: A
   return AI_PROVIDERS.map((provider) => ({ provider, keys: keys.filter((key) => key.provider === provider) })).filter((group) => group.keys.length > 0);
 }
 
-/** The words for each way of choosing which keys the AI uses, and what it means. */
-export const KEY_MODES: ReadonlyArray<{ mode: AiKeyMode; labelKey: MessageKey; helpKey: MessageKey }> = [
-  { mode: 'own_then_platform', labelKey: 'settings.ai.mode.ownThenPlatform', helpKey: 'settings.ai.mode.ownThenPlatformHelp' },
-  { mode: 'own', labelKey: 'settings.ai.mode.own', helpKey: 'settings.ai.mode.ownHelp' },
-  { mode: 'platform', labelKey: 'settings.ai.mode.platform', helpKey: 'settings.ai.mode.platformHelp' },
-];
-
 /**
- * Whether the business can use a mode at all: a mode that needs the platform's keys needs the platform to have allowed them, and a mode that
- * needs its own keys needs at least one saved. The page warns instead of blocking, because the API lets the manager choose either way.
+ * Which keys will answer for the business, as one line of words. The rule is fixed (own keys first, then the platform's if the
+ * platform team has switched them on), so nothing is asked: this only says what is in use, or that nothing is.
  */
-export function describeModeWarning(mode: AiKeyMode, access: AiPlatformAccess, ownKeyCount: number): MessageKey | null {
-  if (mode === 'own' && ownKeyCount === 0) return 'settings.ai.warn.noOwnKeys';
-  if (mode === 'platform' && !access.enabled) return 'settings.ai.warn.platformOff';
-  if (mode === 'own_then_platform' && ownKeyCount === 0 && !access.enabled) return 'settings.ai.warn.nothingToUse';
-  return null;
+export function describeWhichKeysAnswer(access: AiPlatformAccess, ownKeyCount: number): MessageKey {
+  if (ownKeyCount > 0 && access.enabled) return 'settings.ai.status.ownThenPlatform';
+  if (ownKeyCount > 0) return 'settings.ai.status.ownOnly';
+  if (access.enabled) return 'settings.ai.status.platformOnly';
+  return 'settings.ai.status.nothing';
 }
 
-/** The platform's part for the manager: whether it is allowed, the cap, what was used this month and when it ends. */
+/** The platform's part for the manager: whether it is allowed, the call and token allowances, what was used this month and when it ends. */
 export function describePlatformUsage(usage: AiPlatformUsage): Array<{ key: MessageKey; values: Record<string, string | number> }> {
   if (!usage.enabled) return [{ key: 'settings.ai.platform.off', values: {} }];
   const lines: Array<{ key: MessageKey; values: Record<string, string | number> }> = [];
-  lines.push(
-    usage.monthlyCallCap === null
-      ? { key: 'settings.ai.platform.noCap', values: { used: usage.usedThisMonth } }
-      : { key: 'settings.ai.platform.cap', values: { used: usage.usedThisMonth, cap: usage.monthlyCallCap, left: usage.remainingThisMonth ?? 0 } },
-  );
+  if (usage.monthlyCallCap !== null) {
+    lines.push({ key: 'settings.ai.platform.cap', values: { used: usage.usedThisMonth, cap: usage.monthlyCallCap, left: usage.remainingThisMonth ?? 0 } });
+  }
+  if (usage.monthlyTokenCap !== null) {
+    lines.push({ key: 'settings.ai.platform.tokenCap', values: { used: usage.tokensUsedThisMonth, cap: usage.monthlyTokenCap, left: usage.tokensRemainingThisMonth ?? 0 } });
+  }
+  // With no limit of either kind, say so
+  if (usage.monthlyCallCap === null && usage.monthlyTokenCap === null) {
+    lines.push({ key: 'settings.ai.platform.noCap', values: { used: usage.usedThisMonth } });
+  }
   if (usage.expiresAt) lines.push({ key: 'settings.ai.platform.expires', values: { date: usage.expiresAt } });
   return lines;
 }
 
-/** How much of the platform's monthly allowance is used, as a whole percent (0 when there is no cap). */
-export function percentOfCapUsed(usage: Pick<AiPlatformUsage, 'monthlyCallCap' | 'usedThisMonth'>): number {
-  if (usage.monthlyCallCap === null || usage.monthlyCallCap === 0) return 0;
-  return Math.min(100, Math.round((usage.usedThisMonth / usage.monthlyCallCap) * 100));
+/** How much of the platform's monthly allowance is used, as a whole percent: the more used of the calls and the tokens (0 when there is no cap). */
+export function percentOfCapUsed(
+  usage: Pick<AiPlatformUsage, 'monthlyCallCap' | 'usedThisMonth' | 'monthlyTokenCap' | 'tokensUsedThisMonth'>,
+): number {
+  const percentOf = (used: number, cap: number | null): number =>
+    cap === null || cap === 0 ? 0 : Math.min(100, Math.round((used / cap) * 100));
+  return Math.max(percentOf(usage.usedThisMonth, usage.monthlyCallCap), percentOf(usage.tokensUsedThisMonth, usage.monthlyTokenCap));
 }

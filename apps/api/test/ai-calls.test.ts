@@ -263,7 +263,7 @@ describe('the AI service on the platform’s keys', () => {
           },
         ],
       }),
-    ).rejects.toMatchObject({ status: 503, code: 'AI_NOT_AVAILABLE' });
+    ).rejects.toMatchObject({ status: 503, code: 'AI_ACCESS_NOT_ENABLED' });
     expect(toolRan).toBe(false);
   });
 
@@ -298,12 +298,12 @@ describe('what the platform allows the business', () => {
     expect((await service.generateText({ accountId: running.accountId, tag, prompt })).text).toBe('ok');
   });
 
-  it('a business with no settings at all gets its own keys only: nothing to try without a key (503)', async () => {
+  it('a business with no settings at all uses own keys first then the platform’s: with neither, nothing to try (503, platform not switched on)', async () => {
     const manager = await createSignedInPerson(app, database);
     const { service } = serviceWith({ gemini: ['allow-c1'] }, () => ({ answer: 'never' }));
     await expect(service.generateText({ accountId: manager.profile.business.id, tag, prompt })).rejects.toMatchObject({
       status: 503,
-      code: 'AI_NOT_AVAILABLE',
+      code: 'AI_ACCESS_NOT_ENABLED',
     });
   });
 });

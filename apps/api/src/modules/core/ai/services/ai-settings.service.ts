@@ -18,6 +18,7 @@ export function toAiSettings(row: AiSettingsRow): AiSettings {
     platformAccess: {
       enabled: row.platformEnabled,
       monthlyCallCap: row.platformMonthlyCallCap,
+      monthlyTokenCap: row.platformMonthlyTokenCap,
       expiresAt: row.platformExpiresAt ? row.platformExpiresAt.toISOString() : null,
     },
   };

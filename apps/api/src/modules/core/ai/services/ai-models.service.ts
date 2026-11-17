@@ -23,6 +23,8 @@ export async function listAiModels(database: Database, config: Config, accountId
     platformExpiresAt: access.platformExpiresAt,
     platformMonthlyCallCap: access.platformMonthlyCallCap,
     platformCallsThisMonth: access.platformCallsThisMonth,
+    platformMonthlyTokenCap: access.platformMonthlyTokenCap,
+    platformTokensThisMonth: access.platformTokensThisMonth,
     now: new Date(),
   });
 

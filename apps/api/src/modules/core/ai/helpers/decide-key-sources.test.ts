@@ -14,6 +14,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: null,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }),
     ).toEqual({
@@ -31,6 +33,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: null,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }),
     ).toEqual({
@@ -45,6 +49,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: null,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }),
     ).toEqual({
@@ -62,6 +68,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: past,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }),
     ).toMatchObject({
@@ -75,6 +83,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: future,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }).usePlatform,
     ).toBe(true);
@@ -86,6 +96,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: now,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }).usePlatform,
     ).toBe(false);
@@ -99,6 +111,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: null,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }),
     ).toEqual({
@@ -113,6 +127,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: null,
         platformMonthlyCallCap: null,
         platformCallsThisMonth: 0,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }),
     ).toEqual({
@@ -122,12 +138,33 @@ describe('decideKeySources', () => {
     });
   });
 
+  it('stops the platform’s keys when this month’s token cap is used up, whatever the call count', () => {
+    const base = {
+      keyMode: 'platform' as const,
+      platformEnabled: true,
+      platformExpiresAt: null,
+      platformMonthlyCallCap: null,
+      platformCallsThisMonth: 0,
+      platformMonthlyTokenCap: 1_000_000,
+      now,
+    };
+    expect(decideKeySources({ ...base, platformTokensThisMonth: 999_999 }).usePlatform).toBe(true);
+    expect(decideKeySources({ ...base, platformTokensThisMonth: 1_000_000 })).toMatchObject({
+      usePlatform: false,
+      platformBlockedBecause: 'cap_reached',
+    });
+    // no token cap (null) means no limit
+    expect(decideKeySources({ ...base, platformMonthlyTokenCap: null, platformTokensThisMonth: 9e9 }).usePlatform).toBe(true);
+  });
+
   it('stops the platform’s keys when this month’s cap is used up, and not before', () => {
     const base = {
       keyMode: 'platform' as const,
       platformEnabled: true,
       platformExpiresAt: null,
       platformMonthlyCallCap: 100,
+      platformMonthlyTokenCap: null,
+      platformTokensThisMonth: 0,
       now,
     };
     expect(decideKeySources({ ...base, platformCallsThisMonth: 99 }).usePlatform).toBe(true);
@@ -151,6 +188,8 @@ describe('decideKeySources', () => {
         platformExpiresAt: null,
         platformMonthlyCallCap: 10,
         platformCallsThisMonth: 10,
+        platformMonthlyTokenCap: null,
+        platformTokensThisMonth: 0,
         now,
       }),
     ).toEqual({ useOwn: true, usePlatform: false, platformBlockedBecause: 'cap_reached' });

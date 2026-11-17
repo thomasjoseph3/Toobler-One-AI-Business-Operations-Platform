@@ -26,6 +26,7 @@ export async function countOwnKeys(db: Db, businessId: string): Promise<number> 
 export interface PlatformSettingsChange {
   enabled?: boolean | undefined;
   monthlyCallCap?: number | null | undefined;
+  monthlyTokenCap?: number | null | undefined;
   expiresAt?: Date | null | undefined;
   noticesEnabled?: boolean | undefined;
 }
@@ -40,6 +41,7 @@ export async function savePlatformSettings(
   const columns = {
     ...(change.enabled !== undefined ? { platform_enabled: change.enabled } : {}),
     ...(change.monthlyCallCap !== undefined ? { platform_monthly_call_cap: change.monthlyCallCap } : {}),
+    ...(change.monthlyTokenCap !== undefined ? { platform_monthly_token_cap: change.monthlyTokenCap } : {}),
     ...(change.expiresAt !== undefined ? { platform_expires_at: change.expiresAt } : {}),
     ...(change.noticesEnabled !== undefined ? { notices_enabled: change.noticesEnabled } : {}),
   };

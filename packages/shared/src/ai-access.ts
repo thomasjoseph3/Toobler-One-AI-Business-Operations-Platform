@@ -7,6 +7,9 @@ import { aiKeyModeSchema } from './ai-settings';
 /** The most calls a month the platform will ever allow a business, as a sanity limit on what an admin can type. */
 export const MAX_PLATFORM_MONTHLY_CALL_CAP = 10_000_000;
 
+/** The most tokens a month the platform will ever allow a business (a hundred billion), as a sanity limit on what an admin can type. */
+export const MAX_PLATFORM_MONTHLY_TOKEN_CAP = 100_000_000_000;
+
 /** A business's platform AI access, as a platform admin sees it. */
 export const platformAiAccessSchema = z.object({
   businessId: z.string(),
@@ -17,6 +20,8 @@ export const platformAiAccessSchema = z.object({
   enabled: z.boolean(),
   /** Calls a month on the platform's keys, or null for no cap. */
   monthlyCallCap: z.number().int().nullable(),
+  /** Tokens (input + output) a month on the platform's keys, or null for no cap. */
+  monthlyTokenCap: z.number().int().nullable(),
   /** When the access ends, or null for no end date. */
   expiresAt: z.string().nullable(),
   /** Whether warning emails (key problems, retiring models) go out for this business. */
@@ -31,6 +36,7 @@ export const updateAiAccessRequestSchema = z
   .object({
     enabled: z.boolean().optional(),
     monthlyCallCap: z.number().int().min(0).max(MAX_PLATFORM_MONTHLY_CALL_CAP).nullable().optional(),
+    monthlyTokenCap: z.number().int().min(0).max(MAX_PLATFORM_MONTHLY_TOKEN_CAP).nullable().optional(),
     expiresAt: z.iso.datetime().nullable().optional(),
     noticesEnabled: z.boolean().optional(),
   })

@@ -6,7 +6,7 @@
 ## Feature guide
 
 **AI tab.** The AI that answers your customers runs on a key from an AI company (Google Gemini, OpenAI or Anthropic). This page lets a manager decide where the key comes from and manage their own keys.
-- **Which keys the AI uses:** *my own keys first, then the platform's* (the default), *only my own*, or *only the platform's*. The page warns when a choice would leave the AI with nothing to answer with (for example "only my own" with no key saved).
+- **Which keys the AI uses (changed 17 Nov 2026, R65):** the business is not asked. The rule is fixed: its own keys first, then the platform's if the platform team switched them on for it. The page says which keys are answering now, and nudges the business to add its own key when the platform allowance is nearly used up.
 - **The platform's keys:** whether Toobler has switched them on for the business, the monthly allowance, how much is used this month (with a bar) and when the allowance ends.
 - **Your own keys:** add a key (company, a name you will recognise, the key), **test** it (it says in words whether it works, was rejected, ran out of quota, or cannot use a model), and **delete** it (after "Are you sure?" naming it). A saved key is shown only as its last four characters and is never shown again.
 - **AI use this month:** calls, failures, and how often a back-up key or model was used.
