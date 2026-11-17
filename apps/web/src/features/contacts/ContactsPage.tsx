@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import type { ContactsListResponse } from '@toobler-one/shared';
 import { Alert, Button, Card, ContactsIcon, EmptyState, ErrorState, LoadingState, Pagination, PlusIcon, SelectField, TextField } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
@@ -20,6 +20,12 @@ import {
 /** How long to wait after the last key press before searching, so typing does not search on every letter. */
 const SEARCH_DELAY_MILLISECONDS = 300;
 
+/** Reads the message another page left behind in the navigation (for example "Priya was deleted."), or nothing. */
+function readNoticeTextFromState(state: unknown): string | null {
+  const notice = (state as { notice?: { text?: unknown } } | null)?.notice;
+  return typeof notice?.text === 'string' ? notice.text : null;
+}
+
 /**
  * The Contacts page: a search box, a stage filter and Add contact, then the people as a table (tablet and desktop) or cards
  * (phone), 25 to a page. What is shown (search, stage, page) lives in the web address, so a refresh or the Back button keeps
@@ -33,7 +39,9 @@ export function ContactsPage() {
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   // A counter so each opening of the panel starts with an empty form
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
-  const [notice, setNotice] = useState<string | null>(null);
+  // A confirmation the contact page left behind ("Priya was deleted.") shows first
+  const location = useLocation();
+  const [notice, setNotice] = useState<string | null>(readNoticeTextFromState(location.state));
 
   // Changes part of the view. Anything but the page starts again at page 1.
   const changeView = (changes: Partial<ContactsView>) => setSearchParams(writeContactsView({ ...view, page: 1, ...changes }));

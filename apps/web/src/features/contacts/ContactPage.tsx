@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { ArrowLeft, Mail } from 'lucide-react';
-import { Link, useLocation, useParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams } from 'react-router';
 import type { Contact } from '@toobler-one/shared';
-import { Alert, Button, ButtonLink, Card, ContactsIcon, EmptyState, ErrorState, LoadingState, PhoneIcon, Tag, WhatsappIcon } from '@toobler-one/ui';
+import { Alert, Button, ButtonLink, Card, ConfirmDialog, ContactsIcon, EmptyState, ErrorState, LoadingState, PhoneIcon, Tag, WhatsappIcon } from '@toobler-one/ui';
+import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
-import { t } from '../../app/i18n';
+import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { findLeadDisplayName, toWhatsappDigits, formatMoment } from '../leads/lead-display';
 import { findLifecycleLabelKey, findLifecycleTagTone } from './contacts-view';
+import { describeContactSaveProblem } from './contact-problem';
 import { EditContactPanel } from './EditContactPanel';
 
 /** One small label and value in the details card. */
@@ -28,12 +30,16 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function ContactPage() {
   const { contactId = '' } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const { sessionState } = useSession();
   const contactResource = useApiResource<Contact>(`/contacts/${contactId}`);
   const [isEditOpen, setIsEditOpen] = useState(false);
   // A counter so each opening of the panel starts from what the contact has now
   const [editOpenCount, setEditOpenCount] = useState(0);
   const [isSavedNoticeShown, setIsSavedNoticeShown] = useState(false);
+  const [isDeleteAsked, setIsDeleteAsked] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
   const listSearch = (location.state as { listSearch?: string } | null)?.listSearch ?? '';
   const backLink = (
     <Link to={{ pathname: '/contacts', search: listSearch }} className="text-body-md-semibold mb-4 inline-flex items-center gap-1 text-link hover:text-link-hover">
@@ -71,12 +77,30 @@ export function ContactPage() {
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
   if (sessionState.status !== 'signedIn') return null;
   const { timeZone } = sessionState.profile.business;
+  // Only managers can delete (the API refuses staff), so only they are shown the button
+  const isManager = sessionState.profile.user.role === 'manager';
   const contact = contactResource.state.data;
   const displayName = findLeadDisplayName(contact);
   const handleSaved = () => {
     setIsEditOpen(false);
     setIsSavedNoticeShown(true);
     contactResource.reload();
+  };
+  // Deletes the contact (after the person said yes), then goes back to the list with a confirmation.
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    setDeleteProblem(null);
+    try {
+      await apiRequest('DELETE', `/contacts/${contact.id}`);
+      navigate(
+        { pathname: '/contacts', search: listSearch },
+        { state: { notice: { tone: 'success', text: formatMessage('contactPage.delete.done', { name: displayName }) } } },
+      );
+    } catch (error) {
+      setDeleteProblem(describeContactSaveProblem(error));
+      setIsDeleteAsked(false);
+      setIsDeleting(false);
+    }
   };
   const openEditPanel = () => {
     setIsSavedNoticeShown(false);
@@ -87,6 +111,11 @@ export function ContactPage() {
   return (
     <>
       {backLink}
+      {deleteProblem !== null ? (
+        <Alert tone="error" className="mb-4">
+          {deleteProblem}
+        </Alert>
+      ) : null}
       {isSavedNoticeShown ? (
         <Alert tone="success" className="mb-4" action={<Button variant="link" onClick={() => setIsSavedNoticeShown(false)}>{t('contacts.dismiss')}</Button>}>
           {t('contactPage.saved')}
@@ -119,6 +148,11 @@ export function ContactPage() {
             <Button size="compact" onClick={openEditPanel}>
               {t('contactPage.edit.button')}
             </Button>
+            {isManager ? (
+              <Button size="compact" variant="destructive" onClick={() => setIsDeleteAsked(true)}>
+                {t('contactPage.delete.button')}
+              </Button>
+            ) : null}
           </div>
         </div>
       </Card>
@@ -138,6 +172,18 @@ export function ContactPage() {
           <p className="text-body-md text-text-secondary">{t('contactPage.timeline.soon')}</p>
         </Card>
       </div>
+      <ConfirmDialog
+        isOpen={isDeleteAsked}
+        tone="danger"
+        title={formatMessage('contactPage.delete.title', { name: displayName })}
+        description={t('contactPage.delete.description')}
+        confirmLabel={t('contactPage.delete.confirm')}
+        cancelLabel={t('contacts.form.cancel')}
+        closeLabel={t('contactPage.delete.close')}
+        isConfirming={isDeleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setIsDeleteAsked(false)}
+      />
       <EditContactPanel key={editOpenCount} contact={contact} isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} onSaved={handleSaved} />
     </>
   );
