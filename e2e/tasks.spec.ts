@@ -160,6 +160,50 @@ test.describe('Changing tasks', () => {
   });
 });
 
+test.describe('Closing a lead with open tasks', () => {
+  test('asks whether to mark the open tasks done after the lead is won, and marks them when told to', async ({
+    page,
+    pretendApi,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row menu is checked on desktop');
+    await page.goto('/leads');
+    await page.getByRole('button', { name: 'More actions for Priya Menon 0' }).click();
+    await page.getByRole('group', { name: 'Actions for Priya Menon 0' }).getByRole('button', { name: 'Won' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Close the open tasks for Priya Menon 0?' });
+    await expect(dialog).toContainText('This lead still has 3 open tasks. Mark them all done?');
+    await dialog.getByRole('button', { name: 'Mark done' }).click();
+    await expect(page.getByText('3 tasks for Priya Menon 0 are marked done.')).toBeVisible();
+    expect(pretendApi.tasks.patchedTasks.map((change) => change.body)).toEqual([
+      { done: true },
+      { done: true },
+      { done: true },
+    ]);
+  });
+
+  test('leaves the tasks open when told so', async ({ page, pretendApi }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row menu is checked on desktop');
+    await page.goto('/leads');
+    await page.getByRole('button', { name: 'More actions for Priya Menon 0' }).click();
+    await page.getByRole('group', { name: 'Actions for Priya Menon 0' }).getByRole('button', { name: 'Won' }).click();
+    await page
+      .getByRole('dialog', { name: /Close the open tasks/ })
+      .getByRole('button', { name: 'Leave them open' })
+      .click();
+    await expect(page.getByRole('dialog', { name: /Close the open tasks/ })).toHaveCount(0);
+    expect(pretendApi.tasks.patchedTasks).toEqual([]);
+  });
+
+  test('asks nothing when the lead has no open tasks', async ({ page, pretendApi }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row menu is checked on desktop');
+    pretendApi.tasks.tasks = pretendApi.tasks.tasks.filter((task) => task['bucket'] === 'done');
+    await page.goto('/leads');
+    await page.getByRole('button', { name: 'More actions for Priya Menon 0' }).click();
+    await page.getByRole('group', { name: 'Actions for Priya Menon 0' }).getByRole('button', { name: 'Won' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Priya Menon 0 moved to Won.' })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /Close the open tasks/ })).toHaveCount(0);
+  });
+});
+
 test.describe('Tasks on a lead', () => {
   test('Create Task in the activity icon of a lead’s row opens the form about that lead', async ({
     page,

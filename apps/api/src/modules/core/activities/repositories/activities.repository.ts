@@ -105,7 +105,7 @@ export async function listActivities(
     accountId: string;
     leadId?: string | undefined;
     contactId?: string | undefined;
-    kind?: ActivityKind | undefined;
+    kind?: readonly ActivityKind[] | undefined;
     limit: number;
     offset: number;
   },
@@ -113,7 +113,7 @@ export async function listActivities(
   let query = db.selectFrom('activities').where('account_id', '=', options.accountId).where('deleted_at', 'is', null);
   if (options.leadId !== undefined) query = query.where('lead_id', '=', options.leadId);
   if (options.contactId !== undefined) query = query.where('contact_id', '=', options.contactId);
-  if (options.kind !== undefined) query = query.where('kind', '=', options.kind);
+  if (options.kind !== undefined) query = query.where('kind', 'in', [...options.kind]);
 
   const totalRow = await query.select(sql<string>`count(*)`.as('total')).executeTakeFirstOrThrow();
   const rows = await query
@@ -221,8 +221,8 @@ export async function insertSystemLine(
     id: string;
     accountId: string;
     contactId: string;
-    leadId: string;
-    kind: 'lead_created' | 'stage_changed';
+    leadId: string | null;
+    kind: 'lead_created' | 'stage_changed' | 'task_created' | 'task_completed';
     details: Record<string, string>;
     byUserId: string | null;
     byAgent: string | null;

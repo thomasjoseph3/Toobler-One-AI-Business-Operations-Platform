@@ -2,7 +2,7 @@ import { SegmentedControl } from '@toobler-one/ui';
 import { t } from '../../app/i18n';
 import type { TimelineFilter } from './notes-state';
 
-/** The chips above a timeline: All, Notes, Stage changes. */
+/** The chips above a timeline: All, Notes, Stage changes, Tasks. */
 export function TimelineFilterChips({
   value,
   onChange,
@@ -20,6 +20,7 @@ export function TimelineFilterChips({
           { value: 'all', label: t('timeline.filter.all') },
           { value: 'note', label: t('timeline.filter.notes') },
           { value: 'stage_changed', label: t('timeline.filter.stageChanges') },
+          { value: 'task', label: t('timeline.filter.tasks') },
         ]}
       />
     </div>

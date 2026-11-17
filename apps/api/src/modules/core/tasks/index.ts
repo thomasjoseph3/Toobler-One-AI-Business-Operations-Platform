@@ -1,3 +1,4 @@
 // The public face of the tasks module: the only file other modules may import from it.
-// Nothing else uses it yet; later slices add what the leads module and the AI agent need from it.
-export {};
+// The activities module (F07) reads a task's words through it to write "added the task ..." on a timeline.
+export { findTaskSummary } from './services/task-summaries.service';
+export type { TaskSummary } from './services/task-summaries.service';

@@ -585,7 +585,7 @@ export interface ActivitiesTable {
   account_id: string;
   contact_id: string;
   lead_id: string | null;
-  kind: 'note' | 'lead_created' | 'stage_changed';
+  kind: 'note' | 'lead_created' | 'stage_changed' | 'task_created' | 'task_completed';
   body: string | null;
   by_user_id: string | null;
   by_agent: string | null;

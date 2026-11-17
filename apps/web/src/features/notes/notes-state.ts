@@ -82,18 +82,20 @@ export function canDeleteNote(role: string): boolean {
 /** What a set of notes belongs to: one lead, or one person (whose notes include those on all their leads). */
 export type NotesTarget = { kind: 'lead'; id: string } | { kind: 'contact'; id: string };
 
-/** The API address that lists the timeline of a target, newest first (up to 100), narrowed to one kind when `kind` is given. */
-export function buildNotesPath(target: NotesTarget, kind?: ActivityKind): string {
+/** The API address that lists the timeline of a target, newest first (up to 100), narrowed to some kinds when `kinds` are given. */
+export function buildNotesPath(target: NotesTarget, kinds?: readonly ActivityKind[]): string {
   const filter = target.kind === 'lead' ? `lead_id=${target.id}` : `contact_id=${target.id}`;
-  return `/activities?${filter}${kind ? `&kind=${kind}` : ''}&limit=100`;
+  return `/activities?${filter}${kinds && kinds.length > 0 ? `&kind=${kinds.join(',')}` : ''}&limit=100`;
 }
 
-/** What the filter chips above a timeline offer: everything, only notes, or only stage changes. */
-export type TimelineFilter = 'all' | 'note' | 'stage_changed';
+/** What the filter chips above a timeline offer: everything, only notes, only stage changes, or only tasks. */
+export type TimelineFilter = 'all' | 'note' | 'stage_changed' | 'task';
 
-/** The kind to ask the API for under a chip (nothing for "All"). */
-export function kindForTimelineFilter(filter: TimelineFilter): ActivityKind | undefined {
-  return filter === 'all' ? undefined : filter;
+/** The kinds to ask the API for under a chip (nothing for "All"; the Tasks chip is a task being added and a task being completed). */
+export function kindForTimelineFilter(filter: TimelineFilter): ActivityKind[] | undefined {
+  if (filter === 'all') return undefined;
+  if (filter === 'task') return ['task_created', 'task_completed'];
+  return [filter];
 }
 
 /** True for a line the system wrote by itself (a lead was added, a lead moved): it has no bubble, no Edit and no Delete. */
@@ -115,6 +117,17 @@ export function describeSystemLine(activity: Activity): {
     return doerName === null
       ? { messageKey: 'timeline.leadAdded', values: {} }
       : { messageKey: 'timeline.leadAddedBy', values: { name: doer } };
+  }
+  if (activity.kind === 'task_created' || activity.kind === 'task_completed') {
+    const title = activity.details?.taskTitle ?? '';
+    const isCreated = activity.kind === 'task_created';
+    if (doerName === null) {
+      return { messageKey: isCreated ? 'timeline.taskAdded' : 'timeline.taskCompleted', values: { title } };
+    }
+    return {
+      messageKey: isCreated ? 'timeline.taskAddedBy' : 'timeline.taskCompletedBy',
+      values: { name: doer, title },
+    };
   }
   const values = {
     name: doer,

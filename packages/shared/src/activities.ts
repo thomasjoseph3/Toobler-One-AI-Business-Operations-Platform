@@ -4,7 +4,7 @@ import { z } from 'zod';
 // (a lead was added, a lead moved to another stage).
 
 /** What kind of thing happened. Calls, chats and so on join later. */
-export const activityKindSchema = z.enum(['note', 'lead_created', 'stage_changed']);
+export const activityKindSchema = z.enum(['note', 'lead_created', 'stage_changed', 'task_created', 'task_completed']);
 export type ActivityKind = z.infer<typeof activityKindSchema>;
 
 /** The longest note the API accepts. */
@@ -25,6 +25,9 @@ export type ActivityWriter = z.infer<typeof activityWriterSchema>;
 export const activityDetailsSchema = z.object({
   fromStageName: z.string().optional(),
   toStageName: z.string().optional(),
+  /** For a task line: what the task says and what kind of task it is (as they were then). */
+  taskTitle: z.string().optional(),
+  taskKind: z.enum(['call', 'whatsapp', 'email', 'todo']).optional(),
 });
 export type ActivityDetails = z.infer<typeof activityDetailsSchema>;
 
@@ -64,12 +67,17 @@ export type CreateNoteRequest = z.infer<typeof createNoteRequestSchema>;
 
 /**
  * The timeline of one lead (`lead_id`) or of one person (`contact_id`: every lead of theirs too), newest first. One of the two is
- * needed. `kind` narrows it to one kind.
+ * needed. `kind` narrows it to one kind or several.
  */
 export const listActivitiesQuerySchema = z.object({
   lead_id: z.uuid().optional(),
   contact_id: z.uuid().optional(),
-  kind: activityKindSchema.optional(),
+  /** One kind, or several separated by commas (`task_created,task_completed`). */
+  kind: z
+    .string()
+    .transform((text) => text.split(',').filter((kind) => kind.trim() !== ''))
+    .pipe(z.array(activityKindSchema).min(1).max(5))
+    .optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });

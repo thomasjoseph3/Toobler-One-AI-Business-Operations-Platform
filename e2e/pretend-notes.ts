@@ -30,6 +30,18 @@ export function startingNotes(): PretendNotes {
         createdAt: new Date(Date.now() - 3_600_000).toISOString(),
         editedAt: null,
       },
+      // A line the system wrote when Maya added a task (F08)
+      {
+        id: 'line-2',
+        kind: 'task_created',
+        contactId: 'contact-0',
+        leadId: 'lead-0',
+        body: null,
+        details: { taskTitle: 'Call Priya about the quote', taskKind: 'call' },
+        writtenBy: { kind: 'user', userId: 'user-colleague', name: 'Maya Chen', role: 'manager' },
+        createdAt: new Date(Date.now() - 10_800_000).toISOString(),
+        editedAt: null,
+      },
       // A line the system wrote when Maya moved the lead (F07 slice 4); the Notes panel asks for notes only and never shows it
       {
         id: 'line-1',
@@ -100,7 +112,7 @@ export function answerNotesCall(
     const items = state.notes.filter(
       (note) =>
         (leadId !== null ? note['leadId'] === leadId : note['contactId'] === contactId) &&
-        (kind === null || note['kind'] === kind),
+        (kind === null || kind.split(',').includes(String(note['kind']))),
     );
     return { status: 200, body: { items, total: items.length, page: 1, limit: 100 } };
   }

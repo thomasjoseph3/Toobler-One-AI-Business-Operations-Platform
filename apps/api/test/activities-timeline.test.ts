@@ -3,7 +3,12 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createContextFactory } from '../src/kernel/context';
 import type { Database } from '../src/kernel/database';
 import type { DomainEvent } from '../src/kernel/events/events';
-import { handleLeadCreated, handleLeadMoved } from '../src/modules/core/activities/services/timeline-events.service';
+import {
+  handleLeadCreated,
+  handleLeadMoved,
+  handleTaskCompleted,
+  handleTaskCreated,
+} from '../src/modules/core/activities/services/timeline-events.service';
 import { buildTestApp } from './support/app';
 import { createSignedInPerson } from './support/auth';
 import { createPretendBrowser, type PretendBrowser } from './support/browser';
@@ -75,7 +80,7 @@ async function addContactAndLead(person: Person, name: string): Promise<{ contac
 /** Hands every saved event of this name for this lead to the handler, the way the dispatcher would, and returns how many it handled. */
 async function deliverEvents(
   person: Person,
-  eventName: 'lead.created' | 'lead.moved',
+  eventName: 'lead.created' | 'lead.moved' | 'task.created' | 'task.completed',
   leadId: string,
   handler: typeof handleLeadCreated,
 ): Promise<number> {
@@ -187,5 +192,71 @@ describe('stage changes and new leads on the timeline', () => {
     expect(timeline.total).toBe(1);
     const other = await second.browser.send('GET', `/api/v1/activities?lead_id=${leadId}`);
     expect(other.statusCode).toBe(404);
+  });
+
+  it('writes "added the task" and "completed the task" with the task words kept as they were, and filters them with the Tasks kinds', async () => {
+    const owner = await signUpAndSignIn();
+    const { leadId, contactId } = await addContactAndLead(owner, 'Priya Menon');
+    const task = await sendOk(
+      owner,
+      'POST',
+      '/tasks',
+      { leadId, kind: 'call', title: 'Call Priya at nine', dueAt: '2030-01-01T10:00:00Z' },
+      201,
+    );
+    await sendOk(owner, 'PATCH', `/tasks/${task.id}`, { done: true });
+    // Words change later: the line keeps what it said then
+    await deliverEvents(owner, 'task.created', leadId, handleTaskCreated);
+    await database.system.updateTable('tasks').set({ title: 'Renamed later' }).where('id', '=', task.id).execute();
+    await deliverEvents(owner, 'task.completed', leadId, handleTaskCompleted);
+    await deliverEvents(owner, 'task.created', leadId, handleTaskCreated);
+    const lines = await sendOk(owner, 'GET', `/activities?lead_id=${leadId}&kind=task_created,task_completed`);
+    expect(lines.total).toBe(2);
+    const created = lines.items.find((item: { kind: string }) => item.kind === 'task_created');
+    const completed = lines.items.find((item: { kind: string }) => item.kind === 'task_completed');
+    expect(created.details).toEqual({ taskTitle: 'Call Priya at nine', taskKind: 'call' });
+    expect(completed.details).toEqual({ taskTitle: 'Renamed later', taskKind: 'call' });
+    expect(created.writtenBy).toMatchObject({ kind: 'user', userId: owner.userId, name: 'Anita Nair' });
+    // They are not notes: no edit, no delete, not counted for the orange icon
+    expect((await owner.browser.send('DELETE', `/api/v1/notes/${created.id}`)).statusCode).toBe(404);
+    expect((await sendOk(owner, 'GET', `/activities/counts?lead_ids=${leadId}`)).counts[leadId]).toBe(0);
+    // The person's timeline carries them too, and a bad kind is a 400
+    expect((await sendOk(owner, 'GET', `/activities?contact_id=${contactId}&kind=task_created`)).total).toBe(1);
+    expect((await owner.browser.send('GET', `/api/v1/activities?lead_id=${leadId}&kind=meeting`)).statusCode).toBe(400);
+  });
+
+  it('writes a task on a person alone on the person’s timeline', async () => {
+    const owner = await signUpAndSignIn();
+    const { contactId } = await addContactAndLead(owner, 'Priya Menon');
+    const task = await sendOk(
+      owner,
+      'POST',
+      '/tasks',
+      { contactId, title: 'Send the brochure', dueAt: '2030-01-01T10:00:00Z' },
+      201,
+    );
+    const rows = await database.system
+      .selectFrom('domain_events')
+      .selectAll()
+      .where('account_id', '=', owner.businessId)
+      .where('name', '=', 'task.created')
+      .execute();
+    const event = rows.find((row) => (row.payload as { taskId?: string }).taskId === task.id)!;
+    await handleTaskCreated(
+      {
+        id: event.id,
+        accountId: event.account_id,
+        name: event.name,
+        payload: event.payload as Record<string, unknown>,
+        occurredAt: event.occurred_at,
+      },
+      createContextFactory(database)(owner.businessId, { kind: 'system', id: 'core.activities' }),
+    );
+    const timeline = await sendOk(owner, 'GET', `/activities?contact_id=${contactId}&kind=task_created`);
+    expect(timeline.items[0]).toMatchObject({
+      kind: 'task_created',
+      leadId: null,
+      details: { taskTitle: 'Send the brochure' },
+    });
   });
 });

@@ -333,3 +333,17 @@ export async function markLateAlerted(
     .where('id', '=', options.taskId)
     .execute();
 }
+
+/** The words and kind of a task, whether or not it was deleted since (for a timeline line about it). Undefined for an unknown id or another business's task. */
+export async function findTaskWords(
+  db: Db,
+  accountId: string,
+  taskId: string,
+): Promise<{ id: string; title: string; kind: TaskKind } | undefined> {
+  return db
+    .selectFrom('tasks')
+    .select(['id', 'title', 'kind'])
+    .where('account_id', '=', accountId)
+    .where('id', '=', taskId)
+    .executeTakeFirst();
+}

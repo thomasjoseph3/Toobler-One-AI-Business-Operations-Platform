@@ -1,6 +1,7 @@
 import type { AccountContext } from '../../../../kernel/context';
 import type { DomainEvent } from '../../../../kernel/events/events';
 import { uuidv7 } from '../../../../kernel/ids';
+import { findTaskSummary } from '../../tasks';
 import * as activitiesRepository from '../repositories/activities.repository';
 
 /** Reads a text value from an event's payload, or undefined when it is missing or not text. */
@@ -77,4 +78,47 @@ export async function handleLeadMoved(event: DomainEvent, accountContext: Accoun
       actor: accountContext.actor,
     });
   });
+}
+
+/**
+ * Writes a task line ("added the task ..." or "completed the task ...") on the timeline of the task's lead, or of its person when it has
+ * no lead. The task's words are read from the task itself (events carry ids only) and kept with the line as they were then. Does nothing
+ * when the event lacks ids or the task is gone.
+ */
+async function writeTaskLine(
+  event: DomainEvent,
+  accountContext: AccountContext,
+  kind: 'task_created' | 'task_completed',
+  writerKey: string,
+): Promise<void> {
+  const taskId = readText(event.payload, 'taskId');
+  const contactId = readText(event.payload, 'contactId');
+  if (taskId === undefined || contactId === undefined) return;
+  const leadId = readText(event.payload, 'leadId');
+  const writer = readWriter(event.payload, writerKey);
+  await accountContext.runInAccountTransaction(async (transaction) => {
+    const task = await findTaskSummary(transaction, { accountId: accountContext.accountId, taskId });
+    if (!task) return;
+    await activitiesRepository.insertSystemLine(transaction, {
+      id: uuidv7(),
+      accountId: accountContext.accountId,
+      contactId,
+      leadId: leadId ?? null,
+      kind,
+      details: { taskTitle: task.title, taskKind: task.kind },
+      ...writer,
+      sourceEventId: event.id,
+      actor: accountContext.actor,
+    });
+  });
+}
+
+/** Reacts to "a task was added": writes "added the task ..." on the timeline. Safe to run twice for the same event. */
+export async function handleTaskCreated(event: DomainEvent, accountContext: AccountContext): Promise<void> {
+  await writeTaskLine(event, accountContext, 'task_created', 'createdBy');
+}
+
+/** Reacts to "a task was ticked off": writes "completed the task ..." on the timeline. Safe to run twice for the same event. */
+export async function handleTaskCompleted(event: DomainEvent, accountContext: AccountContext): Promise<void> {
+  await writeTaskLine(event, accountContext, 'task_completed', 'by');
 }

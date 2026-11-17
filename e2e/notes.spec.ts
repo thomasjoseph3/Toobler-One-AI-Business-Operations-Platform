@@ -86,6 +86,15 @@ test.describe('Timeline: stage changes beside the notes', () => {
     await expect(page.getByText('Great insights on the project, looking forward to the next steps!')).toHaveCount(0);
   });
 
+  test('the Tasks chip shows the task lines and nothing else', async ({ page }) => {
+    await page.goto('/leads/lead-0');
+    await expect(page.getByText('Maya Chen added the task “Call Priya about the quote”')).toBeVisible();
+    await page.getByRole('button', { name: 'Tasks', exact: true }).click();
+    await expect(page.getByText('Maya Chen added the task “Call Priya about the quote”')).toBeVisible();
+    await expect(page.getByText('Maya Chen moved it from New to Contacted')).toHaveCount(0);
+    await expect(page.getByText('Great insights on the project, looking forward to the next steps!')).toHaveCount(0);
+  });
+
   test('the Notes panel on the list shows notes only, with no stage lines', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'The row icons are for tablets and desktops');
     await page.goto('/leads');

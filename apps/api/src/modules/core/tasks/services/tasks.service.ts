@@ -141,7 +141,15 @@ export function createTasksService({ database }: { database: Database }) {
         await publishEvent(transaction, {
           accountId,
           eventName: 'task.created',
-          payload: { taskId: row.id, leadId, contactId, ownerUserId, kind: row.kind },
+          // `createdBy` lets the timeline say who added the task
+          payload: {
+            taskId: row.id,
+            leadId,
+            contactId,
+            ownerUserId,
+            kind: row.kind,
+            createdBy: { kind: actor.kind, id: actor.id },
+          },
         });
         const now = new Date();
         const [task] = await withPeople(
@@ -283,7 +291,12 @@ export function createTasksService({ database }: { database: Database }) {
           // Which fields changed, never their values
           details: { recordType: 'task', recordId: taskId, fields: changedFields },
         });
-        const eventPayload = { taskId, leadId: row.leadId, contactId: row.contactId };
+        const eventPayload = {
+          taskId,
+          leadId: row.leadId,
+          contactId: row.contactId,
+          by: { kind: actor.kind, id: actor.id },
+        };
         await publishEvent(transaction, {
           accountId,
           eventName: 'task.updated',

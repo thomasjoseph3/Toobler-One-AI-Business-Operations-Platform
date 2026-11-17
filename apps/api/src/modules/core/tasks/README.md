@@ -19,3 +19,5 @@ Reads the lead (leads `findLeadReference`), the person (contacts `findContactSum
 Events published (ids only, never the title): `task.created`, `task.updated`, `task.completed`, `task.reopened`, `task.reassigned`, `task.deleted`.
 
 Jobs: `tasks.send_alerts` (every minute, queues one job per business) and `tasks.send_alerts_for_business` (reminder before a task is due to its owner, late alert after to the managers; email only for now). Events: `task.reminder_sent`, `task.late_alerted`.
+
+Other modules reach it only through `index.ts`: `findTaskSummary` (the activities module reads a task's words to write its timeline line). Events published also: `task.created` carries `createdBy`, `task.updated` and `task.completed` carry `by` (who).

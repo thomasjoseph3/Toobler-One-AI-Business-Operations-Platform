@@ -160,10 +160,27 @@ describe('the timeline lines the system writes', () => {
 
   it('asks the API for the kind a chip stands for, and for everything under All', () => {
     expect(kindForTimelineFilter('all')).toBeUndefined();
-    expect(kindForTimelineFilter('note')).toBe('note');
+    expect(kindForTimelineFilter('note')).toEqual(['note']);
+    expect(kindForTimelineFilter('task')).toEqual(['task_created', 'task_completed']);
     expect(buildNotesPath({ kind: 'lead', id: 'l1' })).toBe('/activities?lead_id=l1&limit=100');
-    expect(buildNotesPath({ kind: 'lead', id: 'l1' }, 'stage_changed')).toBe(
+    expect(buildNotesPath({ kind: 'lead', id: 'l1' }, ['stage_changed'])).toBe(
       '/activities?lead_id=l1&kind=stage_changed&limit=100',
+    );
+  });
+
+  it('says the task lines with the task words, with or without the doer', () => {
+    const details = { taskTitle: 'Call Priya', taskKind: 'call' as const };
+    expect(describeSystemLine(line({ kind: 'task_created', details }))).toEqual({
+      messageKey: 'timeline.taskAddedBy',
+      values: { name: 'Maya Chen', title: 'Call Priya' },
+    });
+    const nobody = { kind: 'system' as const, userId: null, name: null, role: null };
+    expect(describeSystemLine(line({ kind: 'task_completed', details, writtenBy: nobody }))).toEqual({
+      messageKey: 'timeline.taskCompleted',
+      values: { title: 'Call Priya' },
+    });
+    expect(buildNotesPath({ kind: 'lead', id: 'l1' }, ['task_created', 'task_completed'])).toBe(
+      '/activities?lead_id=l1&kind=task_created,task_completed&limit=100',
     );
   });
 });

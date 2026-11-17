@@ -21,7 +21,7 @@ export interface NotesPanelProps {
  * on screen while it loads again, and shows the new note as soon as it is saved. Show it only while it is open.
  */
 export function NotesPanel({ leadId, leadName, onClose, onChanged }: NotesPanelProps) {
-  const notes = useNotes({ kind: 'lead', id: leadId }, onChanged, 'note');
+  const notes = useNotes({ kind: 'lead', id: leadId }, onChanged, ['note']);
   const { sessionState } = useSession();
   const signedInUserId = sessionState.status === 'signedIn' ? sessionState.profile.user.id : '';
   const signedInRole = sessionState.status === 'signedIn' ? sessionState.profile.user.role : '';

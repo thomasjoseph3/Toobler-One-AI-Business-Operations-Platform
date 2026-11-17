@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/05-tasks-and-reminders.md`; `requirements/API.md` (Tasks and reminders); the designer's activity menu (Create Task, Create Meeting, Create Call) in the Leads list frame `docs/design/screens/leads-list-with-activity-menu.png`.
 **Depends on:** F04 contacts, F06 leads, F07 timeline.      **Module:** `core.tasks` (core).
-**Status:** `in_progress`: slices 1 to 3 built (17 Nov 2026).
+**Status:** `in_progress`: slices 1 to 4 built (17 Nov 2026); the AI agent's promises becoming tasks is the one open item (see the end).
 
 ## Feature guide
 
@@ -20,7 +20,7 @@
 
 **What it never does.** It never shows another business's tasks. It never keeps a task's words in the activity log or in events (ids only).
 
-**Not part of it (yet).** Handing a task to a colleague from the screens (the API does it; the screen waits for the team list of F02); asking whether to close open tasks when a lead is won or lost, and tasks on the timeline (slice 4); Create Meeting and Create Call in the activity menu (later phases, they are not drawn dead).
+**Not part of it (yet).** Handing a task to a colleague from the screens (the API does it; the screen waits for the team list of F02); the AI agent adding a task for each promise it makes (see "Still open" at the end); Create Meeting and Create Call in the activity menu (later phases, they are not drawn dead).
 
 ### For the tech team
 - **Module:** `core.tasks` (requires `core.auth`, `core.contacts`, `core.leads`). Table `tasks` (migration 050): kind `call | whatsapp | email | todo`, `due_at`, `owner_user_id`, `done_at`, `created_by_agent`, `reminded_at`, `overdue_alerted_at`, `deleted_at`. Composite keys keep a task, its lead and its owner in one business.
@@ -34,7 +34,8 @@
 | 1 | Add a task, list tasks by tab; Tasks page, Add task form, Create Task in the lead row, tasks on the lead page | 2 |
 | 2 | Complete, snooze, reassign, edit, delete (`PATCH /tasks/{id}`, `DELETE /tasks/{id}`) with "Are you sure?" | 2 |
 | 3 | Reminder before and late alert after (jobs, no routes; notifications provider console/email now) | 0 |
-| 4 | Ask about open tasks when a lead is Won or Lost; tasks on the timeline; the AI's tasks; hand-over on removing a person (F02) | 0 |
+| 4 | Ask about open tasks when a lead is Won or Lost; tasks on the timeline | 0 |
+| later | The AI's tasks (needs the agent's stored promise); hand-over on removing a person (F02); WhatsApp reminders (F25) | 0 |
 
 ## Decisions
 - Tabs are disjoint: a task is in exactly one of Overdue, Today, Upcoming, Done (Today means due from now to the end of the business's day).
@@ -64,3 +65,13 @@
 - **Safety:** the email goes out first and the task is marked afterwards, so a failed send is tried again the next minute; a task nobody can be told about (no confirmed address) is marked anyway so it is not checked every minute. Only confirmed email addresses are used. The words in the email are escaped, so staff-written text can never become HTML. One log line (`tasks.reminder_sent`, `tasks.late_alert_sent`) and one event (`task.reminder_sent`, `task.late_alerted`) per alert: ids only, never the words or the address.
 - **Channel:** email only for now (console in development, a real mail server in production). WhatsApp reminders arrive with F25 (the requirement's "better than HubSpot"), through the same two emails' words.
 - **Tests:** 9 API tests in `test/task-alerts.test.ts` with a recording mail sender and a chosen "now" (once only, the default and custom minutes, quiet for far/done/deleted/past tasks, mail failure then retry, unreachable owner marked, managers only with confirmed addresses, 15 minutes of waiting, a day-old task quiet, snooze clears the marks, businesses never mix) and 7 tests of the email words (including that staff words are escaped).
+
+### Slice 4: the open-tasks question and tasks on the timeline (built 17 Nov 2026)
+- **Routes: none new.** `GET /activities` now also takes several kinds at once (`kind=task_created,task_completed`; one kind still works).
+- **Won or Lost:** when a lead is moved to Won or Lost (from the list menu, the pipeline board or the lead page), and it still has open tasks, the screen asks "Close the open tasks for <name>?" ("This lead still has 3 open tasks. Mark them all done?" with Mark done / Leave them open). It uses the existing routes (`GET /tasks?lead_id=` and `PATCH /tasks/{id}`), and never blocks the move: if the tasks cannot be read, nothing is asked.
+- **Timeline:** migration `052_activities_task_lines.sql` adds two kinds, `task_created` and `task_completed`. The activities module writes "Anita added the task “Call Priya”" and "Anita completed the task “Call Priya”" on the lead's timeline (the person's timeline when the task has no lead) when `task.created` and `task.completed` arrive. Events still carry ids only: the handler reads the task's words through `tasks/index.ts` (`findTaskSummary`) and keeps them with the line as they were then. The timeline cards have a fourth chip, Tasks.
+- **Tests:** 2 more API tests (task lines once, words kept after a rename, kind lists, not notes, 400 for a bad kind; a task on a person alone), web rule tests for the lines and the kind lists, and 4 browser specs (the question: yes, leave open, nothing to ask; the Tasks chip).
+
+### Still open (F08)
+- **The AI agent adds a task for every promise it makes** ("Every AI promise creates exactly one task"). The tasks module is ready for it (a task has `created_by_agent`); what is missing is storing the agent's promise (its time and owner) where the task can be made from it, which belongs to the agent (F19) and the conversation outcome. To be built as its own slice with the agent's team, not guessed here.
+- Handing a task to a colleague from the screens (the API does it) needs the team list of F02; WhatsApp reminders come with F25; Create Meeting and Create Call are later phases.

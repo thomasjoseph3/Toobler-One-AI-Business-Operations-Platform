@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import type { Lead, PipelineStage } from '@toobler-one/shared';
+import type { Lead, PipelineStage, TasksListResponse } from '@toobler-one/shared';
 import { ConfirmDialog } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { formatMessage, t } from '../../app/i18n';
@@ -60,6 +60,8 @@ export function useLeadActions({
     stage: PipelineStage;
   } | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ lead: Lead; displayName: string } | null>(null);
+  // The question after a lead was won or lost and still has open tasks: close them too?
+  const [pendingTaskClose, setPendingTaskClose] = useState<{ displayName: string; taskIds: string[] } | null>(null);
   const [isActing, setIsActing] = useState(false);
 
   // The words for a refusal. A lead that is gone (deleted by someone else) also loads the screen's data again.
@@ -108,7 +110,44 @@ export function useLeadActions({
       // A screen that already shows the move does not need to load everything again
       putBack === undefined,
     );
-    if (!worked) putBack?.();
+    if (!worked) {
+      putBack?.();
+      return;
+    }
+    if (stage.kind === 'won' || stage.kind === 'lost') await askAboutOpenTasks(lead, displayName);
+  };
+
+  // After a lead is won or lost: if it still has open tasks, asks whether to mark them done. Never blocks the move: if the tasks cannot be read, nothing is asked.
+  const askAboutOpenTasks = async (lead: Lead, displayName: string) => {
+    try {
+      const openTasks = await apiRequest<TasksListResponse>('GET', `/tasks?lead_id=${lead.id}&limit=100`);
+      if (openTasks.items.length > 0) {
+        setPendingTaskClose({ displayName, taskIds: openTasks.items.map((task) => task.id) });
+      }
+    } catch {
+      // The lead was moved; the tasks stay open and can be closed from the lead's page
+    }
+  };
+
+  // Marks the open tasks done after the person said yes
+  const confirmTaskClose = async () => {
+    if (pendingTaskClose === null) return;
+    const { displayName, taskIds } = pendingTaskClose;
+    setIsActing(true);
+    try {
+      await Promise.all(taskIds.map((taskId) => apiRequest('PATCH', `/tasks/${taskId}`, { done: true })));
+      setNotice({
+        tone: 'success',
+        text: formatMessage(taskIds.length === 1 ? 'tasks.closeOpen.done.one' : 'tasks.closeOpen.done.many', {
+          name: displayName,
+          count: taskIds.length,
+        }),
+      });
+    } catch {
+      setNotice({ tone: 'error', text: t('tasks.closeOpen.failed') });
+    }
+    setIsActing(false);
+    setPendingTaskClose(null);
   };
   const moveToStage = (lead: Lead, displayName: string, stage: PipelineStage) => {
     // A lead can only be lost with a reason, so that asks first; every other move goes straight through
@@ -175,6 +214,21 @@ export function useLeadActions({
           onCancel={() => setPendingLostMove(null)}
         />
       ) : null}
+      <ConfirmDialog
+        isOpen={pendingTaskClose !== null}
+        title={formatMessage('tasks.closeOpen.title', { name: pendingTaskClose?.displayName ?? '' })}
+        description={
+          pendingTaskClose?.taskIds.length === 1
+            ? t('tasks.closeOpen.description.one')
+            : formatMessage('tasks.closeOpen.description.many', { count: pendingTaskClose?.taskIds.length ?? 0 })
+        }
+        confirmLabel={t('tasks.closeOpen.confirm')}
+        cancelLabel={t('tasks.closeOpen.cancel')}
+        closeLabel={t('tasks.closeOpen.close')}
+        isConfirming={isActing}
+        onConfirm={() => void confirmTaskClose()}
+        onCancel={() => setPendingTaskClose(null)}
+      />
       <ConfirmDialog
         isOpen={pendingDelete !== null}
         tone="danger"
