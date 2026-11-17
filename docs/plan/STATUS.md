@@ -76,7 +76,7 @@ Before more backend features, the missing staff screens are built (existing rout
 | C4 | **What you sell** (offerings and offers) and **suggested offerings** from the website reading | F17 | built, waiting for the owner's check ([notes](../features/C4-what-you-sell.md)) |
 | C5 | **FAQs and unanswered questions** | F18 | built, waiting for the owner's check ([notes](../features/C5-faqs.md)) |
 | C6 | **Settings → Website chat** (colour, greeting, buttons, allowed websites, the line to copy, Check installation, test page link) | F20 | built, waiting for the owner's check ([notes](../features/C6-channels-website-chat.md)) |
-| C7 | **Settings → AI keys and models**, and Settings → Modules | F37, F03 | planned |
+| C7 | **Settings → AI keys and models**, and Settings → Modules | F37, F03 | built, waiting for the owner's check ([notes](../features/C7-settings-ai-and-modules.md)) |
 | C8 | **Contacts** (list, page, add, edit) | F04 | planned |
 | C9 | **Tickets** (list, page) | F14 | planned |
 | C10 | **Pipeline** changes from the designer's note (drag and drop, column menu working, mobile Change status) and Settings → Pipeline | F06 | planned |

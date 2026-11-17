@@ -2,6 +2,7 @@ import { test as base, expect } from '@playwright/test';
 import { answerFaqsCall, startingFaqs, type PretendFaqs } from './pretend-faqs';
 import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
+import { answerSettingsCall, startingSettings, type PretendSettings } from './pretend-settings';
 import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
 import { answerSalesCall, startingSales, type PretendSales } from './pretend-sales';
 import { answerSetupCall, startingSetup, type PretendSetup } from './pretend-setup';
@@ -79,6 +80,8 @@ export interface PretendApi {
   faqs: PretendFaqs;
   /** The website chat settings (Channels). */
   webchat: PretendWebchat;
+  /** Settings: the AI key mode, own keys, usage and the modules. */
+  settings: PretendSettings;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -206,6 +209,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         sales: startingSales(),
         faqs: startingFaqs(),
         webchat: startingWebchat(),
+        settings: startingSettings(),
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -217,6 +221,17 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path.startsWith('/ai/') || path.startsWith('/modules')) {
+          const settingsAnswer = answerSettingsCall(pretendApi.settings, {
+            method: request.method(),
+            path,
+            body: request.method() === 'GET' || request.method() === 'DELETE' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            role: pretendApi.role,
+          });
+          if (settingsAnswer) {
+            return route.fulfill(settingsAnswer.body === undefined ? { status: settingsAnswer.status } : json(settingsAnswer.status, settingsAnswer.body));
+          }
         }
         if (path === '/channels/webchat') {
           const webchatAnswer = answerWebchatCall(pretendApi.webchat, {

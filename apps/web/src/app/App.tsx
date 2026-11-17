@@ -5,6 +5,8 @@ import { FaqsPage } from '../features/faqs/FaqsPage';
 import { KnowledgePage } from '../features/knowledge/KnowledgePage';
 import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
+import { ModulesPage } from '../features/settings/ModulesPage';
+import { SettingsAiPage } from '../features/settings/SettingsAiPage';
 import { SetupPage } from '../features/setup/SetupPage';
 import { WhatYouSellPage } from '../features/what-you-sell/WhatYouSellPage';
 import { TestAgentPage } from '../features/test-agent/TestAgentPage';
@@ -30,6 +32,7 @@ function pageFor(item: NavigationItem) {
   if (item.id === 'knowledge') return <KnowledgePage />;
   if (item.id === 'setup') return <SetupPage />;
   if (item.id === 'channels') return <ChannelsPage />;
+  if (item.id === 'settings') return <SettingsAiPage />;
   return <PlaceholderPage item={item} />;
 }
 
@@ -56,6 +59,7 @@ export function App() {
                 <Route path="/knowledge/test-agent" element={<TestAgentPage />} />
                 <Route path="/knowledge/what-you-sell" element={<WhatYouSellPage />} />
                 <Route path="/knowledge/faqs" element={<FaqsPage />} />
+                <Route path="/settings/modules" element={<ModulesPage />} />
                 {UiGallery ? (
                   <Route
                     path="/dev/ui"
