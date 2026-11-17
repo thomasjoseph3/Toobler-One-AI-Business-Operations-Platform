@@ -3,6 +3,7 @@ import type { Contact } from '@toobler-one/shared';
 import { buildCreateContactRequest, buildUpdateContactRequest, checkContactForm, contactToFormFields } from './contact-form';
 import {
   buildContactsPath,
+  countActiveContactFilters,
   isContactsViewFiltered,
   readContactsView,
   writeContactsView,
@@ -24,6 +25,8 @@ describe('the contacts view in the web address', () => {
     expect(buildContactsPath(DEFAULT_CONTACTS_VIEW)).toBe('/contacts?page=1&limit=25');
     expect(buildContactsPath({ searchText: 'a b', lifecycleStage: 'not_a_fit', page: 2 })).toBe('/contacts?q=a+b&lifecycleStage=not_a_fit&page=2&limit=25');
     expect(isContactsViewFiltered(DEFAULT_CONTACTS_VIEW)).toBe(false);
+    expect(countActiveContactFilters(DEFAULT_CONTACTS_VIEW)).toBe(0);
+    expect(countActiveContactFilters({ searchText: 'a', lifecycleStage: 'lead', page: 1 })).toBe(2);
     expect(isContactsViewFiltered({ ...DEFAULT_CONTACTS_VIEW, searchText: 'x' })).toBe(true);
   });
 });

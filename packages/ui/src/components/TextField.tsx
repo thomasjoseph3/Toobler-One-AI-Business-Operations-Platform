@@ -9,7 +9,10 @@ export interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   helperText?: string;
   /** When set the field is in its error state and the message shows below it. */
   errorMessage?: string;
-  size?: 'standard' | 'touch';
+  /** `compact` is 32 px high, to sit in a toolbar beside compact buttons (proposed to the designer in docs/FRONTEND.md). */
+  size?: 'standard' | 'touch' | 'compact';
+  /** Hides the label from sight but keeps it for screen readers: for a toolbar search box whose placeholder says what it is for. */
+  isLabelHidden?: boolean;
 }
 
 /** A labelled text input with helper text and an error message, wired up for screen readers. */
@@ -19,6 +22,7 @@ export function TextField({
   helperText,
   errorMessage,
   size = 'standard',
+  isLabelHidden = false,
   className,
   ...rest
 }: TextFieldProps) {
@@ -29,7 +33,7 @@ export function TextField({
     [errorMessage ? errorId : null, helperText ? helperId : null].filter(Boolean).join(' ') || undefined;
   return (
     <div className={joinClassNames('flex flex-col gap-1', className)}>
-      <label htmlFor={inputId} className="text-label-sm text-text-primary">
+      <label htmlFor={inputId} className={joinClassNames("text-label-sm text-text-primary", isLabelHidden ? "sr-only" : undefined)}>
         {label}
         {requirementLabel ? <span className="text-text-secondary"> ({requirementLabel})</span> : null}
       </label>
@@ -41,7 +45,7 @@ export function TextField({
           'text-body-md w-full rounded-md border bg-input px-3 text-text-primary placeholder:text-text-tertiary',
           'hover:border-border-emphasis read-only:bg-surface-subtle disabled:cursor-not-allowed disabled:bg-surface-subtle disabled:text-text-disabled',
           errorMessage ? 'border-error' : 'border-border-default',
-          size === 'touch' ? 'h-11' : 'h-10',
+          size === 'touch' ? 'h-11' : size === 'compact' ? 'text-body-sm h-8' : 'h-10',
         )}
         {...rest}
       />

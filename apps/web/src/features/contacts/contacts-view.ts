@@ -1,6 +1,6 @@
 // What the Contacts list shows (search text, one lifecycle filter, the page) and how that is kept in the web address.
 // Pure functions (no screen, no network), so each rule can be tested alone.
-import type { Contact, LifecycleStage } from '@toobler-one/shared';
+import type { LifecycleStage } from '@toobler-one/shared';
 import type { TagTone } from '@toobler-one/ui';
 import type { MessageKey } from '../../app/i18n';
 
@@ -74,7 +74,7 @@ export function isContactsViewFiltered(view: ContactsView): boolean {
   return view.searchText.trim() !== '' || view.lifecycleStage !== 'all';
 }
 
-/** The phone and email of a contact on one line, for the phone-sized card. */
-export function describeContactDetails(contact: Pick<Contact, 'phone' | 'email'>): string {
-  return [contact.phone, contact.email].filter((value): value is string => value !== null).join(' · ');
+/** How many filters are on (the number on the Filter button): the stage filter, and the search text if there is one. */
+export function countActiveContactFilters(view: ContactsView): number {
+  return (view.lifecycleStage !== 'all' ? 1 : 0) + (view.searchText.trim() !== '' ? 1 : 0);
 }

@@ -103,3 +103,13 @@ export function describeTicketOwner(ticket: Pick<Ticket, 'ownerUserId'>, signedI
   if (ticket.ownerUserId === null) return 'nobody';
   return ticket.ownerUserId === signedInUserId ? 'you' : 'teamMember';
 }
+
+/** How many filters are on (the number on the Filter button): each one that differs from the first view. */
+export function countActiveTicketFilters(view: TicketsView): number {
+  return (
+    (view.status !== DEFAULT_TICKETS_VIEW.status ? 1 : 0) +
+    (view.owner !== 'all' ? 1 : 0) +
+    (view.type !== 'all' ? 1 : 0) +
+    (view.priority !== 'all' ? 1 : 0)
+  );
+}

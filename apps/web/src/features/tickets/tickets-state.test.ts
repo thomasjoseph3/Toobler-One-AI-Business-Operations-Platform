@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCreateTicketRequest, checkTicketForm, EMPTY_TICKET_FORM } from './ticket-form';
-import { buildTicketsPath, DEFAULT_TICKETS_VIEW, describeTicketOwner, isTicketsViewFiltered, readTicketsView, writeTicketsView } from './tickets-view';
+import { buildTicketsPath, countActiveTicketFilters, DEFAULT_TICKETS_VIEW, describeTicketOwner, isTicketsViewFiltered, readTicketsView, writeTicketsView } from './tickets-view';
 
 describe('the tickets view in the web address', () => {
   it('starts with open tickets, and falls back to that for anything not understood', () => {
@@ -25,6 +25,8 @@ describe('the tickets view in the web address', () => {
 
   it('knows when a filter is on, and who owns a ticket', () => {
     expect(isTicketsViewFiltered(DEFAULT_TICKETS_VIEW)).toBe(false);
+    expect(countActiveTicketFilters(DEFAULT_TICKETS_VIEW)).toBe(0);
+    expect(countActiveTicketFilters({ status: 'all', owner: 'me', type: 'all', priority: 'high', page: 1 })).toBe(3);
     expect(isTicketsViewFiltered({ ...DEFAULT_TICKETS_VIEW, status: 'done' })).toBe(true);
     expect(describeTicketOwner({ ownerUserId: null }, 'u1')).toBe('nobody');
     expect(describeTicketOwner({ ownerUserId: 'u1' }, 'u1')).toBe('you');
