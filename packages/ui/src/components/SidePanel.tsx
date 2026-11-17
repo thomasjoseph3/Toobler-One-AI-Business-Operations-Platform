@@ -42,14 +42,15 @@ export function SidePanel({ isOpen, onClose, title, closeLabel, footer, children
       }}
       className="fixed inset-0 m-0 h-full max-h-none w-full max-w-none bg-transparent p-0 backdrop:bg-scrim"
     >
-      <div className="ml-auto flex h-full w-full flex-col bg-surface text-text-primary shadow-lg md:w-[480px] md:rounded-l-xl md:border-l md:border-border-default">
+      <div className="ml-auto flex h-full max-h-full min-h-0 w-full flex-col bg-surface text-text-primary shadow-lg md:w-[480px] md:rounded-l-xl md:border-l md:border-border-default">
         <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border-subtle px-4 md:px-6">
           <h2 id={titleId} className="text-heading-lg">
             {title}
           </h2>
           <IconButton label={closeLabel} icon={<X aria-hidden className="size-5" />} onClick={onClose} />
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4 md:px-6">{children}</div>
+        {/* min-h-0 lets this area shrink and scroll inside the panel in every browser; overscroll-contain keeps the page behind from taking the scroll */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 md:px-6">{children}</div>
         {footer ? (
           <div className="flex shrink-0 justify-end gap-2 border-t border-border-subtle px-4 py-3 md:px-6">
             {footer}

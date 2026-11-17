@@ -3,6 +3,8 @@ import { BrowserRouter, Route, Routes } from 'react-router';
 import { ChannelsPage } from '../features/channels/ChannelsPage';
 import { FaqsPage } from '../features/faqs/FaqsPage';
 import { KnowledgePage } from '../features/knowledge/KnowledgePage';
+import { ContactPage } from '../features/contacts/ContactPage';
+import { ContactsPage } from '../features/contacts/ContactsPage';
 import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
 import { ModulesPage } from '../features/settings/ModulesPage';
@@ -29,6 +31,7 @@ const UiGallery = import.meta.env.DEV
 /** The page for one menu entry: its real screen when it has one, otherwise the "not built yet" page. */
 function pageFor(item: NavigationItem) {
   if (item.id === 'leads') return <LeadsPage />;
+  if (item.id === 'contacts') return <ContactsPage />;
   if (item.id === 'knowledge') return <KnowledgePage />;
   if (item.id === 'setup') return <SetupPage />;
   if (item.id === 'channels') return <ChannelsPage />;
@@ -56,6 +59,7 @@ export function App() {
                   />
                 ))}
                 <Route path="/leads/:leadId" element={<LeadPage />} />
+                <Route path="/contacts/:contactId" element={<ContactPage />} />
                 <Route path="/knowledge/test-agent" element={<TestAgentPage />} />
                 <Route path="/knowledge/what-you-sell" element={<WhatYouSellPage />} />
                 <Route path="/knowledge/faqs" element={<FaqsPage />} />
