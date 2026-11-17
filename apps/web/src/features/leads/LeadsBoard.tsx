@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import type { BoardColumn, Lead, PipelineStage } from '@toobler-one/shared';
-import { ActionMenu, ActivityIcon, Button, CalendarIcon, IconButton, PhoneIcon, PlusIcon, Tag } from '@toobler-one/ui';
+import { ActionMenu, type ActionMenuItem, ActivityIcon, Button, CalendarIcon, IconButton, PhoneIcon, PlusIcon, Tag } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
+import { listOpenStageIdsInOrder, moveStageInOrder, type ColumnDirection } from './stage-order';
 import { LeadNameLink } from './LeadNameLink';
 import {
   findChannelLabel,
@@ -29,6 +30,10 @@ export interface LeadsBoardProps {
   onRenameColumn: (stage: PipelineStage) => void;
   /** Opens the box to add a column. */
   onAddColumn: () => void;
+  /** Moves a column one place left or right (open columns only; Won and Lost stay last). */
+  onMoveColumn: (stage: PipelineStage, direction: ColumnDirection) => void;
+  /** Opens the "Are you sure?" for deleting a column (open columns only). */
+  onDeleteColumn: (stage: PipelineStage) => void;
 }
 
 /** One lead as a card (Figma pipeline card): name and menu, the source and the phone, the owner, and the callback date or the activity shortcut. */
@@ -100,12 +105,37 @@ function LeadCard({
   );
 }
 
+/** The choices in one column's "…" menu: rename for every column; move left, move right and delete only for open columns (Won and Lost always stay last and cannot be removed). */
+function buildColumnMenuItems(
+  columnStage: BoardColumn['stage'],
+  stages: readonly PipelineStage[],
+  openStageIdsInOrder: readonly string[],
+  actions: Pick<LeadsBoardProps, 'onRenameColumn' | 'onMoveColumn' | 'onDeleteColumn'>,
+): ActionMenuItem[] {
+  const stage = stages.find((candidate) => candidate.id === columnStage.id);
+  if (stage === undefined) return [];
+  const items: ActionMenuItem[] = [{ id: 'rename', label: t('pipeline.rename.title'), onSelect: () => actions.onRenameColumn(stage) }];
+  if (stage.kind !== 'open') return items;
+  if (moveStageInOrder(openStageIdsInOrder, stage.id, 'left') !== null) {
+    items.push({ id: 'left', label: t('pipeline.moveLeft'), onSelect: () => actions.onMoveColumn(stage, 'left') });
+  }
+  if (moveStageInOrder(openStageIdsInOrder, stage.id, 'right') !== null) {
+    items.push({ id: 'right', label: t('pipeline.moveRight'), onSelect: () => actions.onMoveColumn(stage, 'right') });
+  }
+  // The last open column cannot be deleted: a pipeline needs at least one
+  if (openStageIdsInOrder.length > 1) {
+    items.push({ id: 'delete', label: t('pipeline.delete.menu'), group: 'delete', tone: 'danger', onSelect: () => actions.onDeleteColumn(stage) });
+  }
+  return items;
+}
+
 /**
  * The Pipeline view (Figma "Leads Pipeline"): a board with one column per stage, side by side. Each column has the stage's tag
  * with how many leads it holds, and its newest leads as cards (up to 50: if there are more, it says so). The board scrolls
  * sideways when the stages do not fit, and each column scrolls up and down on its own, so the toolbar above stays in view.
  */
-export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRowMenu, onMoveLead, canEditColumns, onRenameColumn, onAddColumn }: LeadsBoardProps) {
+export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRowMenu, onMoveLead, canEditColumns, onRenameColumn, onAddColumn, onMoveColumn, onDeleteColumn }: LeadsBoardProps) {
+  const openStageIdsInOrderForMoves = listOpenStageIdsInOrder(stages);
   // The card being dragged and the column it is over, so the column can show where it would land
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null);
   const [columnUnderCard, setColumnUnderCard] = useState<string | null>(null);
@@ -164,16 +194,7 @@ export function LeadsBoard({ columns, signedInUserId, timeZone, stages, renderRo
               <ActionMenu
                 triggerLabel={formatMessage('leads.board.columnMore', { stage: column.stage.name })}
                 panelLabel={formatMessage('leads.board.columnMenu', { stage: column.stage.name })}
-                items={[
-                  {
-                    id: 'rename',
-                    label: t('pipeline.rename.title'),
-                    onSelect: () => {
-                      const stage = stages.find((candidate) => candidate.id === column.stage.id);
-                      if (stage) onRenameColumn(stage);
-                    },
-                  },
-                ]}
+                items={buildColumnMenuItems(column.stage, stages, openStageIdsInOrderForMoves, { onRenameColumn, onMoveColumn, onDeleteColumn })}
               />
             ) : null}
           </header>

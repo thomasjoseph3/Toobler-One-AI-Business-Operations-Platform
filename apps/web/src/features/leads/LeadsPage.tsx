@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import type { LeadsResponse, Pipeline, PipelineStage } from '@toobler-one/shared';
 import { Alert, Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
+import { ApiRequestError, apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
 import { LeadsBoard } from './LeadsBoard';
+import { DeleteStageDialog } from './DeleteStageDialog';
 import { StageNameDialog } from './StageNameDialog';
+import { listOpenStageIdsInOrder, moveStageInOrder, type ColumnDirection } from './stage-order';
 import { LeadCards, LeadsTable } from './LeadsTable';
 import { LeadsToolbar } from './LeadsToolbar';
 import {
@@ -41,6 +44,7 @@ export function LeadsPage() {
   const [isCreatePanelOpen, setIsCreatePanelOpen] = useState(false);
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
   // The box for naming a column: closed, adding a new one, or renaming one
+  const [stageToDelete, setStageToDelete] = useState<PipelineStage | null>(null);
   const [stageDialog, setStageDialog] = useState<{ stageToRename: PipelineStage | null } | null>(null);
   const view = readLeadsView(searchParams);
   const signedInUser =
@@ -79,6 +83,19 @@ export function LeadsPage() {
     pipelineResource.reload();
   };
 
+  // Moves a column one place (reorders the open columns with POST /pipeline/stages/reorder) and shows the board again
+  const moveColumn = async (stage: PipelineStage, direction: ColumnDirection) => {
+    const newOrder = moveStageInOrder(listOpenStageIdsInOrder(stages), stage.id, direction);
+    if (newOrder === null) return;
+    try {
+      await apiRequest('POST', '/pipeline/stages/reorder', { stageIds: newOrder });
+      actions.showNotice({ tone: 'success', text: formatMessage('pipeline.notice.moved', { name: stage.name }) });
+    } catch (error) {
+      actions.showNotice({ tone: 'error', text: error instanceof ApiRequestError && error.status === 403 ? t('leads.error.forbidden') : t('leads.error.unknown') });
+    }
+    reloadAll();
+  };
+
   const openCreatePanel = () => {
     actions.dismissNotice();
     setCreatePanelOpenCount((count) => count + 1);
@@ -115,6 +132,18 @@ export function LeadsPage() {
         onCreated={handleLeadCreated}
       />
       {actions.dialogs}
+      {stageToDelete !== null ? (
+        <DeleteStageDialog
+          stage={stageToDelete}
+          otherOpenStages={stages.filter((stage) => stage.kind === 'open' && stage.id !== stageToDelete.id)}
+          onClose={() => setStageToDelete(null)}
+          onDeleted={(stageName) => {
+            setStageToDelete(null);
+            actions.showNotice({ tone: 'success', text: formatMessage('pipeline.notice.deleted', { name: stageName }) });
+            reloadAll();
+          }}
+        />
+      ) : null}
       {stageDialog !== null ? (
         <StageNameDialog
           stageToRename={stageDialog.stageToRename}
@@ -208,6 +237,8 @@ export function LeadsPage() {
           canEditColumns={user.role === 'manager'}
           onRenameColumn={(stage) => setStageDialog({ stageToRename: stage })}
           onAddColumn={() => setStageDialog({ stageToRename: null })}
+          onMoveColumn={(stage, direction) => void moveColumn(stage, direction)}
+          onDeleteColumn={setStageToDelete}
         />
       </div>
     );
