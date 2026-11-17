@@ -2,6 +2,7 @@ import type { Ticket } from '@toobler-one/shared';
 import { Card, Checkbox, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow, Tag } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import { findLeadDisplayName, findOwnerLabel, formatMoment } from '../leads/lead-display';
+import { TicketNameLink } from './TicketNameLink';
 import { findPriorityLabelKey, findPriorityTagTone, findTypeLabelKey } from './tickets-view';
 
 export interface TicketsTableProps {
@@ -51,7 +52,9 @@ export function TicketsTable({ tickets, signedInUserId, timeZone, selectedTicket
                 <Checkbox label={formatMessage('tickets.selectOne', { title: ticket.title })} isLabelHidden checked={selectedTicketIds.has(ticket.id)} onChange={() => onToggleTicket(ticket.id)} />
               </div>
             </TableCell>
-            <TableCell className="max-w-[260px] break-words text-text-primary">{ticket.title}</TableCell>
+            <TableCell className="max-w-[260px] break-words text-text-primary">
+              <TicketNameLink ticketId={ticket.id}>{ticket.title}</TicketNameLink>
+            </TableCell>
             <TableCell>{findLeadDisplayName(ticket.contact)}</TableCell>
             <TableCell>{t(findTypeLabelKey(ticket.type))}</TableCell>
             <TableCell>
@@ -77,7 +80,9 @@ export function TicketCards({ tickets, signedInUserId }: Pick<TicketsTableProps,
         <li key={ticket.id}>
           <Card isCompact className="flex flex-col gap-2">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-body-md-semibold min-w-0 break-words text-text-primary">{ticket.title}</p>
+              <p className="text-body-md-semibold min-w-0 break-words text-text-primary">
+                <TicketNameLink ticketId={ticket.id}>{ticket.title}</TicketNameLink>
+              </p>
               <div className="flex shrink-0 items-center gap-1">
                 <PriorityTag ticket={ticket} />
                 <StatusTag ticket={ticket} />

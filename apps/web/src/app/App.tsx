@@ -4,6 +4,7 @@ import { ChannelsPage } from '../features/channels/ChannelsPage';
 import { FaqsPage } from '../features/faqs/FaqsPage';
 import { KnowledgePage } from '../features/knowledge/KnowledgePage';
 import { ContactPage } from '../features/contacts/ContactPage';
+import { TicketPage } from '../features/tickets/TicketPage';
 import { TicketsPage } from '../features/tickets/TicketsPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { LeadPage } from '../features/leads/LeadPage';
@@ -62,6 +63,7 @@ export function App() {
                 ))}
                 <Route path="/leads/:leadId" element={<LeadPage />} />
                 <Route path="/contacts/:contactId" element={<ContactPage />} />
+                <Route path="/tickets/:ticketId" element={<TicketPage />} />
                 <Route path="/knowledge/test-agent" element={<TestAgentPage />} />
                 <Route path="/knowledge/what-you-sell" element={<WhatYouSellPage />} />
                 <Route path="/knowledge/faqs" element={<FaqsPage />} />
