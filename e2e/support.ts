@@ -3,6 +3,7 @@ import { answerFaqsCall, startingFaqs, type PretendFaqs } from './pretend-faqs';
 import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
 import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
+import { answerTasksCall, startingTasks, type PretendTasks } from './pretend-tasks';
 import { answerSettingsCall, startingSettings, type PretendSettings } from './pretend-settings';
 import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
 import { answerSalesCall, startingSales, type PretendSales } from './pretend-sales';
@@ -85,6 +86,8 @@ export interface PretendApi {
   settings: PretendSettings;
   /** Notes on a lead (the Notes panel and the lead page). */
   notes: PretendNotes;
+  /** Tasks (the Tasks page, the lead page and the Add task form). */
+  tasks: PretendTasks;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -214,6 +217,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         webchat: startingWebchat(),
         settings: startingSettings(),
         notes: startingNotes(),
+        tasks: startingTasks(PRETEND_PROFILE.user.id, PRETEND_PROFILE.user.name),
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -225,6 +229,18 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path === '/tasks') {
+          const profile = profileFor(pretendApi);
+          const tasksAnswer = answerTasksCall(pretendApi.tasks, {
+            method: request.method(),
+            path,
+            search: new URL(request.url()).search,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            userName: profile.user.name,
+            userId: profile.user.id,
+          });
+          if (tasksAnswer) return route.fulfill(json(tasksAnswer.status, tasksAnswer.body));
         }
         if (
           path === '/activities' ||

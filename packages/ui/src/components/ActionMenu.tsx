@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { joinClassNames } from '../join-class-names';
 import { MoreIcon } from '../icons';
 import { Button } from './Button';
@@ -24,6 +24,8 @@ export interface ActionMenuProps {
   triggerLabel: string;
   /** When given, the menu opens from a button with these words ("Actions") instead of the "…" icon, for a page where the icon alone would be easy to miss. */
   triggerText?: string;
+  /** The icon on the button when it is not the "…" (for example the activity pulse icon in a lead's row). */
+  triggerIcon?: ReactNode;
   /** What the opened list is for. */
   panelLabel: string;
   items: readonly ActionMenuItem[];
@@ -35,7 +37,14 @@ export interface ActionMenuProps {
  * The "…" menu on a row (Figma "more"): a button that opens a short list of actions under it. The list closes on Escape, on a press
  * outside it, and after an action is chosen. The actions are plain buttons in the normal Tab order.
  */
-export function ActionMenu({ triggerLabel, triggerText, panelLabel, items, groupHeadings = {} }: ActionMenuProps) {
+export function ActionMenu({
+  triggerLabel,
+  triggerText,
+  triggerIcon,
+  panelLabel,
+  items,
+  groupHeadings = {},
+}: ActionMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   // Where the list is drawn on the screen: fixed to the window (so a scrolling table cannot cut it off), under the button, or above it near the bottom
   const [panelPlace, setPanelPlace] = useState<{ right: number; top?: number; bottom?: number } | null>(null);
@@ -87,7 +96,7 @@ export function ActionMenu({ triggerLabel, triggerText, panelLabel, items, group
         <IconButton
           label={triggerLabel}
           size="compact"
-          icon={<MoreIcon size={20} />}
+          icon={triggerIcon ?? <MoreIcon size={20} />}
           aria-haspopup="true"
           aria-expanded={isOpen}
           onClick={toggle}

@@ -653,6 +653,22 @@ const attempts: Attempt[] = [
     expectedStatus: 200,
   },
   {
+    route: 'POST /api/v1/tasks',
+    what: "add a task on A's lead",
+    request: () => ({
+      method: 'POST',
+      url: '/tasks',
+      payload: { leadId: dataOfA.leadId, title: 'Hacked task', dueAt: '2030-01-01T10:00:00Z' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/tasks',
+    what: "read the tasks of A's lead",
+    request: () => ({ method: 'GET', url: `/tasks?lead_id=${dataOfA.leadId}` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/setup/chat',
     what: "answer a question in the setup chat as B (B's own answer is saved; A's answers must stay as they were)",
     request: () => ({

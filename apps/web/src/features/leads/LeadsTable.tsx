@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Lead } from '@toobler-one/shared';
 import {
+  ActionMenu,
   ActivityIcon,
   AddNoteIcon,
   CalendarIcon,
@@ -39,6 +40,8 @@ export interface LeadsTableProps {
   renderRowMenu: (lead: Lead, displayName: string) => ReactNode;
   /** Opens the Notes panel of one lead (the add-note icon of its row). */
   onOpenNotes: (lead: Lead, displayName: string) => void;
+  /** Opens the Add task form for one lead (Create Task in the activity icon's menu). */
+  onCreateTask: (lead: Lead, displayName: string) => void;
   /** How many notes each lead has (a lead missing here has none shown): a lead with notes shows the orange notes icon all the time. */
   noteCounts: Readonly<Record<string, number>>;
 }
@@ -64,6 +67,7 @@ export function LeadsTable({
   onToggleAllLeads,
   renderRowMenu,
   onOpenNotes,
+  onCreateTask,
   noteCounts,
 }: LeadsTableProps) {
   const areAllSelected = leads.length > 0 && leads.every((lead) => selectedLeadIds.has(lead.id));
@@ -129,15 +133,18 @@ export function LeadsTable({
                     </button>
                   ) : null}
                   <div className="invisible flex items-center gap-1 group-focus-within:visible group-hover:visible">
-                    {callbackDate ? null : (
-                      <IconButton
-                        label={t('leads.row.logActivity')}
-                        size="compact"
-                        icon={<ActivityIcon size={20} />}
-                        aria-disabled
-                        title={t('leads.notYet')}
-                      />
-                    )}
+                    <ActionMenu
+                      triggerLabel={formatMessage('tasks.menu.label', { name: displayName })}
+                      triggerIcon={<ActivityIcon size={20} />}
+                      panelLabel={t('tasks.menu.panel')}
+                      items={[
+                        {
+                          id: 'create-task',
+                          label: t('tasks.menu.create'),
+                          onSelect: () => onCreateTask(lead, displayName),
+                        },
+                      ]}
+                    />
                     {noteCount > 0 ? null : (
                       <IconButton
                         label={formatMessage('leads.row.addNoteFor', { name: displayName })}

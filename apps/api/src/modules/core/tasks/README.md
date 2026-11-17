@@ -1,0 +1,18 @@
+# core.tasks: tasks and reminders
+
+Built in slices of at most 2 API routes (see `docs/features/F08-tasks-and-reminders.md`).
+
+| Folder          | What is in it                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------- |
+| `routes/`       | `tasks.routes.ts`: `POST /tasks`, `GET /tasks`                                                       |
+| `services/`     | `tasks.service.ts`: add a task, list one tab of tasks with the tab numbers, log and events          |
+| `repositories/` | `tasks.repository.ts`: the SQL for `tasks`                                                           |
+| `helpers/`      | `day-bounds.ts`: where "today" ends in the business's time zone, and which tab a task is in (pure)  |
+
+A task is about a person and usually one of their leads, has one owner and a due time. The tab (Overdue, Today, Upcoming, Done) is
+worked out from the due time and the business's time zone every time, never stored. The "own leads only" role sees only the tasks it owns.
+
+Reads the lead (leads `findLeadReference`), the person (contacts `findContactSummaries`), the owner's name and the business's time zone
+(auth `findPeopleSummaries`, `findBusinessIdentity`), always through those modules' `index.ts`.
+
+Events published (ids only, never the title): `task.created`.

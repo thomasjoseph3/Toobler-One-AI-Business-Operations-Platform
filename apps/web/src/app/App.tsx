@@ -7,6 +7,7 @@ import { ContactPage } from '../features/contacts/ContactPage';
 import { SetupChatPage } from '../features/setup/SetupChatPage';
 import { TicketPage } from '../features/tickets/TicketPage';
 import { TicketsPage } from '../features/tickets/TicketsPage';
+import { TasksPage } from '../features/tasks/TasksPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
@@ -36,6 +37,7 @@ function pageFor(item: NavigationItem) {
   if (item.id === 'leads') return <LeadsPage />;
   if (item.id === 'contacts') return <ContactsPage />;
   if (item.id === 'tickets') return <TicketsPage />;
+  if (item.id === 'tasks') return <TasksPage />;
   if (item.id === 'knowledge') return <KnowledgePage />;
   if (item.id === 'setup') return <SetupPage />;
   if (item.id === 'channels') return <ChannelsPage />;

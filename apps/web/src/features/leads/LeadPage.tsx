@@ -26,6 +26,7 @@ import {
   toWhatsappDigits,
 } from './lead-display';
 import { LeadNotesCard } from '../notes/LeadNotesCard';
+import { LeadTasksCard } from '../tasks/LeadTasksCard';
 import { LeadDetailsCard } from './LeadDetailsCard';
 import { readNoticeFromState, useLeadActions } from './useLeadActions';
 
@@ -216,6 +217,7 @@ export function LeadPage() {
               leadResource.reload();
             }}
           />
+          <LeadTasksCard leadId={lead.id} leadDisplayName={displayName} />
           <LeadNotesCard leadId={lead.id} />
         </div>
         <div className="flex flex-col gap-6">

@@ -26,3 +26,4 @@ export * from './webchat';
 export * from './setup';
 export * from './setup-chat';
 export * from './activities';
+export * from './tasks';

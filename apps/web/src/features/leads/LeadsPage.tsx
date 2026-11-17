@@ -19,6 +19,7 @@ import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
 import { useNoteCounts } from '../notes/useNoteCounts';
 import { NotesPanel } from '../notes/NotesPanel';
+import { CreateTaskPanel } from '../tasks/CreateTaskPanel';
 import { LeadsBoard } from './LeadsBoard';
 import { DeleteStageDialog } from './DeleteStageDialog';
 import { StageNameDialog } from './StageNameDialog';
@@ -56,6 +57,8 @@ export function LeadsPage() {
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
   // The lead whose Notes panel is open (the add-note icon of its row), or none
   const [notesLead, setNotesLead] = useState<{ id: string; displayName: string } | null>(null);
+  // The lead the Add task form is open for (from the activity icon's menu in its row)
+  const [taskLead, setTaskLead] = useState<{ id: string; displayName: string } | null>(null);
   const [stageToDelete, setStageToDelete] = useState<PipelineStage | null>(null);
   // The box for naming a column: closed, adding a new one, or renaming one
   const [stageDialog, setStageDialog] = useState<{ stageToRename: PipelineStage | null } | null>(null);
@@ -176,6 +179,19 @@ export function LeadsPage() {
         onCreated={handleLeadCreated}
       />
       {actions.dialogs}
+      {taskLead !== null ? (
+        <CreateTaskPanel
+          key={taskLead.id}
+          isOpen
+          onClose={() => setTaskLead(null)}
+          timeZone={business.timeZone}
+          forLead={taskLead}
+          onCreated={(title) => {
+            setTaskLead(null);
+            actions.showNotice({ tone: 'success', text: formatMessage('tasks.created', { title }) });
+          }}
+        />
+      ) : null}
       {notesLead !== null ? (
         <NotesPanel
           key={notesLead.id}
@@ -360,6 +376,7 @@ export function LeadsPage() {
           onToggleAllLeads={toggleAllLeads}
           renderRowMenu={actions.renderRowMenu}
           onOpenNotes={(lead, displayName) => setNotesLead({ id: lead.id, displayName })}
+          onCreateTask={(lead, displayName) => setTaskLead({ id: lead.id, displayName })}
           noteCounts={noteCounts.counts}
         />
         {footer}

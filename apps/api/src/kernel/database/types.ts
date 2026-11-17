@@ -554,7 +554,28 @@ export interface TicketNotesTable {
   created_at: Generated<Date>;
 }
 
-/** One thing that happened with a person and, usually, one of their leads (today: a note). Fenced by account_id. */
+/** A to-do with an owner and a due time, about a person and usually one of their leads (F08). Fenced by account_id. */
+export interface TasksTable {
+  id: string;
+  account_id: string;
+  contact_id: string;
+  lead_id: string | null;
+  kind: 'call' | 'whatsapp' | 'email' | 'todo';
+  title: string;
+  due_at: Date;
+  owner_user_id: string;
+  done_at: Date | null;
+  created_by_agent: string | null;
+  reminded_at: Date | null;
+  overdue_alerted_at: Date | null;
+  deleted_at: Date | null;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One thing that happened with a person and, usually, one of their leads (a note, or a line the system wrote). Fenced by account_id. */
 export interface ActivitiesTable {
   id: string;
   account_id: string;
@@ -736,6 +757,7 @@ export interface DB {
   tickets: TicketsTable;
   ticket_notes: TicketNotesTable;
   activities: ActivitiesTable;
+  tasks: TasksTable;
   conversation_types: ConversationTypesTable;
   block_list: BlockListTable;
   conversations: ConversationsTable;
