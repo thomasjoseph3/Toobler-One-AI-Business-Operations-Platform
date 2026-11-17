@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
 import type { BusinessSettings, KnowledgeQuestionsResponse, SituationsResponse } from '@toobler-one/shared';
 import { Button, ErrorState, LoadingState, Card } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
 import { t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { BusinessSettingsCard } from './BusinessSettingsCard';
+import { KnowledgeTabs } from './KnowledgeTabs';
 import { ProfileProgressCard } from './ProfileProgressCard';
 import { ProfileSection } from './ProfileSection';
 import { findWaitingQuestionKeys, groupQuestionsBySection } from './profile-state';
@@ -56,8 +58,17 @@ export function KnowledgePage() {
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
+      <KnowledgeTabs />
       <p className="text-body-md text-text-secondary">{t('knowledge.intro')}</p>
-      {canEdit ? null : <p className="text-body-md text-text-secondary">{t('knowledge.managersOnly')}</p>}
+      {canEdit ? (
+        <p className="text-body-md flex flex-wrap gap-x-6 gap-y-1 text-text-secondary">
+          <Link to="/setup" className="text-link underline underline-offset-2 hover:text-link-hover">
+            {t('knowledge.setupLink')}
+          </Link>
+        </p>
+      ) : (
+        <p className="text-body-md text-text-secondary">{t('knowledge.managersOnly')}</p>
+      )}
       <ProfileProgressCard
         progress={questionsData.data.progress}
         questionTexts={questionTexts}
@@ -65,9 +76,9 @@ export function KnowledgePage() {
         canEdit={canEdit}
         onChanged={questionsResource.reload}
       />
-      {canEdit ? <ReadWebsiteCard onFinished={questionsResource.reload} /> : null}
+      {canEdit ? <ReadWebsiteCard businessId={sessionState.profile.business.id} onFinished={questionsResource.reload} /> : null}
       {settingsData.data ? (
-        <BusinessSettingsCard key={JSON.stringify(settingsData.data)} settings={settingsData.data} canEdit={canEdit} onSaved={settingsResource.reload} />
+        <BusinessSettingsCard settings={settingsData.data} canEdit={canEdit} onSaved={settingsResource.reload} />
       ) : null}
       {groups.map((group) => (
         <ProfileSection

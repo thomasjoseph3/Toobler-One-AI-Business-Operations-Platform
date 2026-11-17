@@ -156,6 +156,11 @@ export function startingKnowledge(): PretendKnowledge {
   };
 }
 
+/** The keys of the "needed to go live" questions that have no confirmed answer. */
+export function neededMissingKeys(knowledge: PretendKnowledge): string[] {
+  return progressOf(knowledge).neededToGoLiveStillMissing;
+}
+
 /** How complete the profile is, worked out from the questions the way the API does it (confirmed answers count). */
 function progressOf(knowledge: PretendKnowledge) {
   const counted = knowledge.questions.filter((item) => item['handledElsewhere'] === null || item['elsewhereStatus'] !== 'not_tracked');

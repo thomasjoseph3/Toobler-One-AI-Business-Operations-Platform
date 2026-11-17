@@ -8,6 +8,9 @@ import { UserMenu } from './UserMenu';
 /** The words for the heading of the page at this address: the menu entry's name, "UI gallery" for the developer page, else the product name. */
 function findPageTitle(pathname: string): string {
   if (pathname.startsWith('/dev/ui')) return t('topBar.uiGalleryTitle');
+  if (pathname === '/knowledge/test-agent') return t('testAgent.title');
+  if (pathname === '/knowledge/what-you-sell') return t('knowledgeTabs.whatYouSell');
+  if (pathname === '/knowledge/faqs') return t('knowledgeTabs.faqs');
   const menuItem = NAVIGATION_ITEMS.find((item) =>
     item.path === '/' ? pathname === '/' : pathname === item.path || pathname.startsWith(`${item.path}/`),
   );

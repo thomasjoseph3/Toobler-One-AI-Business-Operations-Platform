@@ -18,7 +18,8 @@ test.describe('Business profile', () => {
     }
     await expect(page.getByText('Mon: 09:00 to 18:00')).toBeVisible();
     await expect(page.getByText('Free cancellation up to 48 hours before.')).toBeVisible();
-    await expect(page.getByText('Answer this in What you sell (coming next)')).toBeVisible(); // answered in another feature
+    await expect(page.getByText('Answer this in What you sell')).toBeVisible(); // answered in another feature
+    await expect(page.getByRole('link', { name: 'Open What you sell' }).first()).toHaveAttribute('href', '/knowledge/what-you-sell');
   });
 
   test('marks an answer from the website "Please check" and says where it came from', async ({ page }) => {
@@ -169,7 +170,7 @@ test.describe('Settings and situations', () => {
     await expect(minutes).toHaveValue('15');
     await minutes.fill('3');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByText(/Between 5 and 120/).nth(1)).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: /Between 5 and 120/ })).toBeVisible();
     expect(pretendApi.knowledge.savedSettings).toEqual([]);
     await minutes.fill('30');
     await page.getByRole('button', { name: 'Save', exact: true }).click();

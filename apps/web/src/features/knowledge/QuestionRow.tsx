@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 import type { KnowledgeQuestion } from '@toobler-one/shared';
 import { Alert, Badge, Button } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
@@ -70,7 +71,10 @@ export function QuestionRow(props: {
         <>
           {state === 'elsewhere_done' || state === 'elsewhere_open' ? (
             <p className="text-body-md text-text-secondary">
-              {t(state === 'elsewhere_done' ? 'knowledge.question.elsewhereDone' : 'knowledge.question.elsewhereOpen')}
+              {t(state === 'elsewhere_done' ? 'knowledge.question.elsewhereDone' : 'knowledge.question.elsewhereOpen')}{' '}
+              <Link to="/knowledge/what-you-sell" className="text-link underline underline-offset-2 hover:text-link-hover">
+                {t('knowledge.question.elsewhereLink')}
+              </Link>
             </p>
           ) : lines.length > 0 ? (
             <div className="flex flex-col gap-1">

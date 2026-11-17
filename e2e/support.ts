@@ -1,5 +1,9 @@
 import { test as base, expect } from '@playwright/test';
+import { answerFaqsCall, startingFaqs, type PretendFaqs } from './pretend-faqs';
 import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
+import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
+import { answerSalesCall, startingSales, type PretendSales } from './pretend-sales';
+import { answerSetupCall, startingSetup, type PretendSetup } from './pretend-setup';
 
 /** The person the pretend API signs in. */
 export const PRETEND_PROFILE = {
@@ -64,6 +68,14 @@ export interface PretendApi {
   leadEditRefusal: { status: number; code: string; message: string } | null;
   /** The business profile (Knowledge base): questions, answers, situations, settings and the reading of the website. */
   knowledge: PretendKnowledge;
+  /** The setup wizard: the steps, what the owner marked, the industry words and going live. */
+  setup: PretendSetup;
+  /** "Test the agent": what the page sent, and a way to make the agent refuse. */
+  agent: PretendAgent;
+  /** What you sell: the offerings and offers, what the page sent, and a way to make it refuse. */
+  sales: PretendSales;
+  /** FAQs and unanswered questions. */
+  faqs: PretendFaqs;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -186,6 +198,10 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         missingLeadIds: [],
         leadEditRefusal: null,
         knowledge: startingKnowledge(),
+        setup: startingSetup(),
+        agent: startingAgent(),
+        sales: startingSales(),
+        faqs: startingFaqs(),
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -197,6 +213,52 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path.startsWith('/offerings') || path.startsWith('/offers')) {
+          const salesAnswer = answerSalesCall(pretendApi.sales, {
+            method: request.method(),
+            path,
+            search: new URL(request.url()).search,
+            body: request.method() === 'GET' || request.method() === 'DELETE' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            role: pretendApi.role,
+          });
+          if (salesAnswer) {
+            return route.fulfill(salesAnswer.body === undefined ? { status: salesAnswer.status } : json(salesAnswer.status, salesAnswer.body));
+          }
+        }
+        if (path.startsWith('/agent/')) {
+          const agentAnswer = answerAgentCall(pretendApi.agent, pretendApi.setup, {
+            method: request.method(),
+            path,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+          });
+          if (agentAnswer) {
+            return route.fulfill(agentAnswer.body === undefined ? { status: agentAnswer.status } : json(agentAnswer.status, agentAnswer.body));
+          }
+        }
+        if (path.startsWith('/setup')) {
+          const setupAnswer = answerSetupCall(pretendApi.setup, pretendApi.knowledge, {
+            method: request.method(),
+            path,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            role: pretendApi.role,
+          });
+          if (setupAnswer) {
+            return route.fulfill(
+              setupAnswer.body === undefined ? { status: setupAnswer.status } : json(setupAnswer.status, setupAnswer.body),
+            );
+          }
+        }
+        if (/^\/knowledge\/(faqs|unanswered|search)/.test(path)) {
+          const faqsAnswer = answerFaqsCall(pretendApi.faqs, {
+            method: request.method(),
+            path,
+            search: new URL(request.url()).search,
+            body: request.method() === 'GET' || request.method() === 'DELETE' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+          });
+          if (faqsAnswer) {
+            return route.fulfill(faqsAnswer.body === undefined ? { status: faqsAnswer.status } : json(faqsAnswer.status, faqsAnswer.body));
+          }
         }
         if (path.startsWith('/knowledge/')) {
           const knowledgeAnswer = answerKnowledgeCall(pretendApi.knowledge, {

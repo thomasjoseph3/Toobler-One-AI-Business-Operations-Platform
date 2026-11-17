@@ -72,10 +72,9 @@ Before more backend features, the missing staff screens are built (existing rout
 | UI slice | Screen | Uses | Status |
 | --- | --- | --- | --- |
 | C1 | **Business profile** (Knowledge base → Business profile: sections A to H as a form, "From your website, please check" with Yes / Change, completeness card, time zone, country and callback promise) | F16 routes, `/knowledge/prefill` | built, waiting for the owner's check ([notes](../features/C1-business-profile.md)) |
-| C2 | **Setup page** (steps and progress bar, "Read my website" with the reading status, the checklist of what stops going live, apply industry words, Go live) in form mode | F31 slices 1 to 4 | planned |
-| C3 | **Test the agent** (a chat the owner tries; needed before going live) | F19 `/agent/test-chat` | planned |
-| C4 | **What you sell** (offerings and offers) and **suggested offerings** from the website reading | F17 | planned |
-| C5 | **FAQs and unanswered questions** | F18 | planned |
+| C2 | **Setup page** (steps and progress bar, "Read my website" with the reading status, the checklist of what stops going live, apply industry words, Go live) in form mode | C3 | **Test the agent** (a chat the owner tries; needed before going live) | F19 `/agent/test-chat` | built, waiting for the owner's check ([notes](../features/C2-setup-guide.md)) |
+| C4 | **What you sell** (offerings and offers) and **suggested offerings** from the website reading | F17 | built, waiting for the owner's check ([notes](../features/C4-what-you-sell.md)) |
+| C5 | **FAQs and unanswered questions** | F18 | built, waiting for the owner's check ([notes](../features/C5-faqs.md)) |
 | C6 | **Settings → Website chat** (colour, greeting, buttons, allowed websites, the line to copy, Check installation, test page link) | F20 | planned |
 | C7 | **Settings → AI keys and models**, and Settings → Modules | F37, F03 | planned |
 | C8 | **Contacts** (list, page, add, edit) | F04 | planned |

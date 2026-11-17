@@ -1,8 +1,12 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { FaqsPage } from '../features/faqs/FaqsPage';
 import { KnowledgePage } from '../features/knowledge/KnowledgePage';
 import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
+import { SetupPage } from '../features/setup/SetupPage';
+import { WhatYouSellPage } from '../features/what-you-sell/WhatYouSellPage';
+import { TestAgentPage } from '../features/test-agent/TestAgentPage';
 import { RequireSignIn } from '../auth/RequireSignIn';
 import { SessionProvider } from '../auth/session';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -23,6 +27,7 @@ const UiGallery = import.meta.env.DEV
 function pageFor(item: NavigationItem) {
   if (item.id === 'leads') return <LeadsPage />;
   if (item.id === 'knowledge') return <KnowledgePage />;
+  if (item.id === 'setup') return <SetupPage />;
   return <PlaceholderPage item={item} />;
 }
 
@@ -46,6 +51,9 @@ export function App() {
                   />
                 ))}
                 <Route path="/leads/:leadId" element={<LeadPage />} />
+                <Route path="/knowledge/test-agent" element={<TestAgentPage />} />
+                <Route path="/knowledge/what-you-sell" element={<WhatYouSellPage />} />
+                <Route path="/knowledge/faqs" element={<FaqsPage />} />
                 {UiGallery ? (
                   <Route
                     path="/dev/ui"

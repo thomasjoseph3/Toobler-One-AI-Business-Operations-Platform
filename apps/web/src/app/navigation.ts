@@ -1,4 +1,4 @@
-import { BookOpen, Plug } from 'lucide-react';
+import { BookOpen, ListChecks, Plug } from 'lucide-react';
 import {
   CompaniesIcon,
   ContactsIcon,
@@ -28,6 +28,11 @@ export interface NavigationItem {
   group: 'workspace' | 'crm' | 'aiAndCommunication' | 'footer';
   /** Phone: the four most-used pages sit in the bottom bar; everything else is under "More". */
   isInBottomBar: boolean;
+  /**
+   * True for a page that has a route and a title but no place in the menus: the sidebar has no room for more (the designer's frame fits a
+   * 640 px window exactly), so the page is reached from where it is needed (the Today card, the business profile).
+   */
+  isHiddenFromMenu?: boolean;
 }
 
 export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
@@ -39,6 +44,16 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     icon: TodayIcon,
     group: 'workspace',
     isInBottomBar: true,
+  },
+  {
+    id: 'setup',
+    labelKey: 'nav.setup',
+    descriptionKey: 'page.setup.description',
+    path: '/setup',
+    icon: ListChecks,
+    group: 'workspace',
+    isInBottomBar: false,
+    isHiddenFromMenu: true,
   },
   {
     id: 'leads',

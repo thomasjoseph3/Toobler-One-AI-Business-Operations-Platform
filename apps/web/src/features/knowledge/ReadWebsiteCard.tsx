@@ -3,7 +3,9 @@ import type { PrefillRun } from '@toobler-one/shared';
 import { Alert, Button, Card, TextField } from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { formatMessage, t } from '../../app/i18n';
+import { Link } from 'react-router';
 import { paiseToRupeesText } from './answer-draft';
+import { rememberReading } from './last-reading';
 import { describeSaveProblem } from './problem-message';
 import { describeReading, nextReadingCheckDelayMilliseconds } from './profile-state';
 
@@ -44,7 +46,7 @@ function useReadingRun(runId: string | null, onFinished: () => void) {
 }
 
 /** "Fill this in from your website": the address box, the progress while it reads, what it found, and the things the site seems to sell. */
-export function ReadWebsiteCard({ onFinished }: { onFinished: () => void }) {
+export function ReadWebsiteCard({ businessId, onFinished }: { businessId: string; onFinished: () => void }) {
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [runId, setRunId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export function ReadWebsiteCard({ onFinished }: { onFinished: () => void }) {
     try {
       const started = await apiRequest<PrefillRun>('POST', '/knowledge/prefill', { websiteUrl: websiteUrl.trim() });
       setRunId(started.id);
+      rememberReading(businessId, started.id); // so What you sell can offer what this reading finds
     } catch (error) {
       setProblem(describeSaveProblem(error));
     } finally {
@@ -125,7 +128,12 @@ export function ReadWebsiteCard({ onFinished }: { onFinished: () => void }) {
                 </li>
               ))}
             </ul>
-            <p className="text-label-sm mt-1 text-text-secondary">{t('knowledge.reading.suggestionsHelp')}</p>
+            <p className="text-label-sm mt-1 text-text-secondary">
+              {t('knowledge.reading.suggestionsHelp')}{' '}
+              <Link to="/knowledge/what-you-sell" className="text-link underline underline-offset-2 hover:text-link-hover">
+                {t('knowledge.reading.suggestionsLink')}
+              </Link>
+            </p>
           </div>
         ) : null}
       </div>

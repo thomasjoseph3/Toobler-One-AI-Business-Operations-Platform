@@ -50,7 +50,7 @@ function CompactSidebarLink({ item }: { item: NavigationItem }) {
 /** The menu groups without the footer (Settings), each with its items, in the order they appear. */
 const MENU_GROUPS = NAVIGATION_GROUPS.filter((group) => group.id !== 'footer').map((group) => ({
   group,
-  items: NAVIGATION_ITEMS.filter((item) => item.group === group.id),
+  items: NAVIGATION_ITEMS.filter((item) => item.group === group.id && !item.isHiddenFromMenu),
 }));
 const FOOTER_ITEMS = NAVIGATION_ITEMS.filter((item) => item.group === 'footer');
 

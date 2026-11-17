@@ -28,7 +28,7 @@ export function BottomBar() {
   }, [isMoreOpen]);
 
   const barItems = NAVIGATION_ITEMS.filter((item) => item.isInBottomBar);
-  const moreItems = NAVIGATION_ITEMS.filter((item) => !item.isInBottomBar);
+  const moreItems = NAVIGATION_ITEMS.filter((item) => !item.isInBottomBar && !item.isHiddenFromMenu);
 
   return (
     <>

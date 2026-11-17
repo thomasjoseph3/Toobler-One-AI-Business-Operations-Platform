@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react';
 import { Link } from 'react-router';
 import { Card, EmptyState } from '@toobler-one/ui';
+import { SetupChecklistCard } from '../features/setup/SetupChecklistCard';
 import { t, type MessageKey, type PageId } from '../app/i18n';
 import type { NavigationItem } from '../app/navigation';
 
@@ -42,6 +43,11 @@ export function PlaceholderPage({ item }: { item: NavigationItem }) {
         {isToday ? <h2 className="text-heading-xl text-text-primary">{greetingFor(now)}</h2> : null}
         <p className="text-body-md text-text-secondary">{description}</p>
       </div>
+      {isToday ? (
+        <div className="mb-6">
+          <SetupChecklistCard />
+        </div>
+      ) : null}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <Card>
           <EmptyState
