@@ -4,6 +4,7 @@ import { ChannelsPage } from '../features/channels/ChannelsPage';
 import { FaqsPage } from '../features/faqs/FaqsPage';
 import { KnowledgePage } from '../features/knowledge/KnowledgePage';
 import { ContactPage } from '../features/contacts/ContactPage';
+import { TicketsPage } from '../features/tickets/TicketsPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
@@ -32,6 +33,7 @@ const UiGallery = import.meta.env.DEV
 function pageFor(item: NavigationItem) {
   if (item.id === 'leads') return <LeadsPage />;
   if (item.id === 'contacts') return <ContactsPage />;
+  if (item.id === 'tickets') return <TicketsPage />;
   if (item.id === 'knowledge') return <KnowledgePage />;
   if (item.id === 'setup') return <SetupPage />;
   if (item.id === 'channels') return <ChannelsPage />;

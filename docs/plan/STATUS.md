@@ -78,6 +78,6 @@ Before more backend features, the missing staff screens are built (existing rout
 | C6 | **Settings → Website chat** (colour, greeting, buttons, allowed websites, the line to copy, Check installation, test page link) | F20 | built, waiting for the owner's check ([notes](../features/C6-channels-website-chat.md)) |
 | C7 | **Settings → AI keys and models**, and Settings → Modules | F37, F03 | built, waiting for the owner's check ([notes](../features/C7-settings-ai-and-modules.md)) |
 | C8 | **Contacts** (list, page, add, edit) | F04 | in progress: built (slices 1 list + add, 2 page + edit committed; 3 delete built), waiting for the owner's check of slice 3 ([notes](../features/C8-contacts.md)) |
-| C9 | **Tickets** (list, page) | F14 | planned |
+| C9 | **Tickets** (list, page) | F14 | in progress: slice 1 (list + add) built, waiting for the owner's check ([notes](../features/C9-tickets.md)) |
 | C10 | **Pipeline** changes from the designer's note (drag and drop, column menu working, mobile Change status) and Settings → Pipeline | F06 | planned |
 | C11 | **Conversations** (the list of chats, summaries and what they became) if the owner wants it before the Inbox (F21) | F15 | to decide |
