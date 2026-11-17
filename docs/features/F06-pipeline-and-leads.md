@@ -277,3 +277,14 @@ Known limits, recorded rather than hidden:
 - **Slice 8, deleting a lead.** `DELETE /leads/{id}` is manager-only and answers 204. It is a soft delete (the row stays). The lead disappears from the board, the lists and the stage counts; the contact's lifecycle stage is worked out again without it (a lead goes back to new, a customer whose only won lead was deleted goes back to new), and the contact can be given a new lead. A second delete, another business's lead and an unknown id answer 404; two deletes at once let one succeed.
 - **Slice 9, sharing out new leads (R37).** `GET /assignment-rules` and `PUT /assignment-rules` are manager-only. The rule is either `one_person` (with `userId`) or `round_robin` (with `userIds`, in turn order, 1 to 50, no repeats). The brief had planned to rotate over all staff, but the leads module cannot read the users table (auth owns it and already requires leads), so the manager names the people instead; they are kept in `assignment_rule_people` (migration `012`) and the database checks they work for the business. F02 will turn this list into a team. A new lead takes the named owner if the request names one (this does not use up a turn), otherwise the rule picks: the one person, or the next person after the one who got the last lead, wrapping round. Changing the rule starts the rotation from the first person. The rule row is locked while a lead picks its owner, so leads added at the same moment get different people, and a lead that fails to save does not use up a turn. Migration `012` also makes the rule's own people check the business (they only had to exist before).
 - Not built, by design: "by offering" (F17), and refusing disabled people (F02).
+
+## Designer's note on the Pipeline view (received 17 Nov 2026, parked by the owner)
+
+Not built yet. The owner chose to finish F31 first and to update the board together with F07 (timeline and notes).
+
+- Leads are cards grouped into status columns; each column shows its lead count.
+- **Drag a card to another column** to change its status (this replaces the "menu only, no drag" choice of 13 Nov 2026).
+- Users can **add columns, edit titles or delete them**; column changes also update the Status labels in List view.
+- Cards have quick actions: **Call**, **Message**, **Add activity**, **Add note** (the last two need F07 and F08).
+- On small screens the columns scroll sideways.
+- On mobile, tap a card to open its details, then **Change status** and pick the new status. **No status controls on the cards** (so the card "…" menu goes away on mobile).
