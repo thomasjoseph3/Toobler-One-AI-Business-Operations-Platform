@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Badge, Button, ErrorState, LoadingState, SelectField, SidePanel, TextAreaField } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
+import { useSession } from '../../auth/session';
 import { NotesList } from './NotesList';
 import { sortNotes, type NotesOrder } from './notes-state';
 import { useLeadNotes } from './useLeadNotes';
@@ -19,6 +20,9 @@ export interface NotesPanelProps {
  */
 export function NotesPanel({ leadId, leadName, onClose }: NotesPanelProps) {
   const notes = useLeadNotes(leadId);
+  const { sessionState } = useSession();
+  const signedInUserId = sessionState.status === 'signedIn' ? sessionState.profile.user.id : '';
+  const signedInRole = sessionState.status === 'signedIn' ? sessionState.profile.user.role : '';
   const [order, setOrder] = useState<NotesOrder>('recentLast');
   const listEndRef = useRef<HTMLDivElement>(null);
   const items = notes.data?.items ?? [];
@@ -89,7 +93,16 @@ export function NotesPanel({ leadId, leadName, onClose }: NotesPanelProps) {
       {notes.data !== null && items.length === 0 ? (
         <p className="text-body-md text-text-secondary">{t('notes.empty')}</p>
       ) : null}
-      {items.length > 0 ? <NotesList notes={sorted} now={new Date()} /> : null}
+      {items.length > 0 ? (
+        <NotesList
+          notes={sorted}
+          now={new Date()}
+          signedInUserId={signedInUserId}
+          signedInRole={signedInRole}
+          onEditNote={notes.editNote}
+          onDeleteNote={notes.deleteNote}
+        />
+      ) : null}
       <div ref={listEndRef} />
       {notes.noteProblem && items.length === 0 ? <Alert tone="error">{notes.noteProblem}</Alert> : null}
     </SidePanel>

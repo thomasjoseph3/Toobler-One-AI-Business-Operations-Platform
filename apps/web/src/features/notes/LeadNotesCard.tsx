@@ -1,5 +1,6 @@
 import { Button, Card, ErrorState, LoadingState, TextAreaField } from '@toobler-one/ui';
 import { t } from '../../app/i18n';
+import { useSession } from '../../auth/session';
 import { NotesList } from './NotesList';
 import { sortNotes } from './notes-state';
 import { useLeadNotes } from './useLeadNotes';
@@ -10,6 +11,9 @@ import { useLeadNotes } from './useLeadNotes';
  */
 export function LeadNotesCard({ leadId }: { leadId: string }) {
   const notes = useLeadNotes(leadId);
+  const { sessionState } = useSession();
+  const signedInUserId = sessionState.status === 'signedIn' ? sessionState.profile.user.id : '';
+  const signedInRole = sessionState.status === 'signedIn' ? sessionState.profile.user.role : '';
   const items = notes.data?.items ?? [];
   return (
     <Card>
@@ -43,7 +47,16 @@ export function LeadNotesCard({ leadId }: { leadId: string }) {
       {notes.data !== null && items.length === 0 ? (
         <p className="text-body-md text-text-secondary">{t('notes.empty')}</p>
       ) : null}
-      {items.length > 0 ? <NotesList notes={sortNotes(items, 'recentFirst')} now={new Date()} /> : null}
+      {items.length > 0 ? (
+        <NotesList
+          notes={sortNotes(items, 'recentFirst')}
+          now={new Date()}
+          signedInUserId={signedInUserId}
+          signedInRole={signedInRole}
+          onEditNote={notes.editNote}
+          onDeleteNote={notes.deleteNote}
+        />
+      ) : null}
     </Card>
   );
 }

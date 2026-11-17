@@ -1,4 +1,10 @@
-import type { Activity, ActivitiesListResponse, CreateNoteRequest, ListActivitiesQuery } from '@toobler-one/shared';
+import type {
+  Activity,
+  ActivitiesListResponse,
+  CreateNoteRequest,
+  ListActivitiesQuery,
+  UpdateNoteRequest,
+} from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
@@ -100,6 +106,77 @@ export function createActivitiesService({ database }: { database: Database }) {
         });
         const [activity] = await withWriters(transaction, accountId, [row]);
         return activity!;
+      });
+    },
+
+    /**
+     * Changes the words of a note. Only the person who wrote it may (403 for anyone else, even a manager, and for an agent's note); the
+     * "own leads only" role can change it only while the lead is still its own. An unknown note, a deleted one and another business's
+     * answer 404. Sending the words it already has changes nothing and writes no log line. Otherwise the note is marked edited, one
+     * log line (never the words) and the `note.edited` event are written, and the note comes back.
+     */
+    async updateNote(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
+      noteId: string,
+      request: UpdateNoteRequest,
+    ): Promise<Activity> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const note = await activitiesRepository.lockNoteForChange(transaction, accountId, noteId);
+        if (!note) throw notFound('That note');
+        if (principal.role === 'staff_own') {
+          // A note on a person, or on a lead that is not theirs, is not theirs to see
+          const lead =
+            note.leadId === null
+              ? undefined
+              : await findLeadReference(transaction, {
+                  accountId,
+                  leadId: note.leadId,
+                  visibleToUserId: principal.userId,
+                });
+          if (!lead) throw notFound('That note');
+        }
+        if (note.byUserId !== principal.userId) {
+          throw new ApiError(403, 'FORBIDDEN', 'You can only change notes you wrote.');
+        }
+        // Sending the words it already has changes nothing
+        if (note.body !== request.body) {
+          await activitiesRepository.updateNoteBody(transaction, { accountId, noteId, body: request.body, actor });
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'activities.note_edited',
+            // That a note was changed, never its words
+            details: { recordType: 'activity', recordId: noteId },
+          });
+          await publishEvent(transaction, { accountId, eventName: 'note.edited', payload: { activityId: noteId } });
+        }
+        const current = await activitiesRepository.findNoteById(transaction, accountId, noteId);
+        const [activity] = await withWriters(transaction, accountId, current ? [current] : []);
+        return activity!;
+      });
+    },
+
+    /**
+     * Deletes a note the soft way (managers only: the route's guard answers 403 to everyone else). It disappears from every timeline and its
+     * row is kept. An unknown note, an already deleted one and another business's note answer 404. One log line (never the words) and the
+     * `note.deleted` event are written.
+     */
+    async deleteNote(principal: Pick<Principal, 'accountId' | 'userId'>, noteId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        const note = await activitiesRepository.lockNoteForChange(transaction, accountId, noteId);
+        if (!note) throw notFound('That note');
+        await activitiesRepository.softDeleteNote(transaction, { accountId, noteId, actor });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'activities.note_deleted',
+          details: { recordType: 'activity', recordId: noteId },
+        });
+        await publishEvent(transaction, { accountId, eventName: 'note.deleted', payload: { activityId: noteId } });
       });
     },
 

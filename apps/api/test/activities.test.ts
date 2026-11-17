@@ -52,7 +52,7 @@ async function sendOk(
 }
 
 /** The status and error code of a request that is expected to be refused. */
-async function refused(person: Person, method: 'GET' | 'POST', url: string, payload?: object) {
+async function refused(person: Person, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', url: string, payload?: object) {
   const response = await person.browser.send(method, `/api/v1${url}`, payload);
   return { status: response.statusCode, code: response.json()?.error?.code as string | undefined };
 }
@@ -293,5 +293,182 @@ describe('GET /api/v1/activities', () => {
     const note = await sendOk(owner, 'POST', '/notes', { leadId, body: 'Will vanish' }, 201);
     await database.system.updateTable('activities').set({ deleted_at: new Date() }).where('id', '=', note.id).execute();
     expect((await sendOk(owner, 'GET', `/activities?lead_id=${leadId}`)).total).toBe(0);
+  });
+});
+
+/** Adds a colleague of the business (straight into the database: the team screens come with F02) and a note they wrote on a lead. */
+async function addColleagueNote(person: Person, leadId: string, contactId: string) {
+  const colleagueId = randomUUID();
+  await database.system
+    .insertInto('users')
+    .values({
+      id: colleagueId,
+      account_id: person.businessId,
+      email: `c-${colleagueId.slice(0, 8)}@example.com`,
+      name: 'Rahul Kumar',
+      mobile_e164: null,
+      mobile_key: null,
+      role: 'staff',
+    })
+    .execute();
+  const noteId = randomUUID();
+  await database.system
+    .insertInto('activities')
+    .values({
+      id: noteId,
+      account_id: person.businessId,
+      contact_id: contactId,
+      lead_id: leadId,
+      kind: 'note',
+      body: "Rahul's note",
+      by_user_id: colleagueId,
+      by_agent: null,
+      created_by: null,
+      updated_by: null,
+    })
+    .execute();
+  return noteId;
+}
+
+describe('PATCH /api/v1/notes/{id}', () => {
+  it('changes your own note, marks it edited, and writes one log line and one event without the words', async () => {
+    const owner = await signUpAndSignIn();
+    const { leadId } = await addContactAndLead(owner, 'Priya Menon');
+    const note = await sendOk(owner, 'POST', '/notes', { leadId, body: 'Prefers ground floor' }, 201);
+    const edited = await sendOk(owner, 'PATCH', `/notes/${note.id}`, {
+      body: '  Prefers ground floor, near the lift  ',
+    });
+    expect(edited).toMatchObject({
+      id: note.id,
+      body: 'Prefers ground floor, near the lift',
+      writtenBy: { name: 'Anita Nair' },
+    });
+    expect(edited.editedAt).not.toBeNull();
+    const logs = await database.system
+      .selectFrom('activity_log')
+      .select('kind')
+      .where('record_id', '=', note.id)
+      .orderBy('id')
+      .execute();
+    expect(logs.map((log) => log.kind)).toEqual(['activities.note_added', 'activities.note_edited']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .select(['name', 'payload'])
+      .where('account_id', '=', owner.businessId)
+      .where('name', '=', 'note.edited')
+      .execute();
+    expect(events).toHaveLength(1);
+    expect(JSON.stringify(events)).not.toContain('near the lift');
+    expect((await sendOk(owner, 'GET', `/activities?lead_id=${leadId}`)).items[0].body).toBe(
+      'Prefers ground floor, near the lift',
+    );
+  });
+
+  it('changes nothing, and writes nothing, when the words are the same', async () => {
+    const owner = await signUpAndSignIn();
+    const { leadId } = await addContactAndLead(owner, 'Priya Menon');
+    const note = await sendOk(owner, 'POST', '/notes', { leadId, body: 'Same words' }, 201);
+    const again = await sendOk(owner, 'PATCH', `/notes/${note.id}`, { body: 'Same words' });
+    expect(again.editedAt).toBeNull();
+    const logs = await database.system
+      .selectFrom('activity_log')
+      .select('kind')
+      .where('record_id', '=', note.id)
+      .execute();
+    expect(logs.map((log) => log.kind)).toEqual(['activities.note_added']);
+  });
+
+  it('answers 403 for a note someone else wrote (even to a manager), and 404 for an unknown, a deleted and another business’s note', async () => {
+    const owner = await signUpAndSignIn();
+    const stranger = await signUpAndSignIn();
+    const { leadId, contactId } = await addContactAndLead(owner, 'Priya Menon');
+    const colleaguesNote = await addColleagueNote(owner, leadId, contactId);
+    expect((await refused(owner, 'PATCH', `/notes/${colleaguesNote}`, { body: 'Mine now' } as object)).status).toBe(
+      403,
+    );
+    expect((await refused(owner, 'PATCH', `/notes/${randomUUID()}`, { body: 'x' } as object)).status).toBe(404);
+    expect((await refused(stranger, 'PATCH', `/notes/${colleaguesNote}`, { body: 'x' } as object)).status).toBe(404);
+    const mine = await sendOk(owner, 'POST', '/notes', { leadId, body: 'Will be deleted' }, 201);
+    await sendOk(owner, 'DELETE', `/notes/${mine.id}`, undefined, 204);
+    expect((await refused(owner, 'PATCH', `/notes/${mine.id}`, { body: 'x' } as object)).status).toBe(404);
+    const stored = await database.system
+      .selectFrom('activities')
+      .select('body')
+      .where('id', '=', colleaguesNote)
+      .executeTakeFirstOrThrow();
+    expect(stored.body).toBe("Rahul's note");
+  });
+
+  it('answers 400 for no words, too many, fields it does not know and an id that is not an id, and 401 when nobody is signed in', async () => {
+    const owner = await signUpAndSignIn();
+    const { leadId } = await addContactAndLead(owner, 'Priya Menon');
+    const note = await sendOk(owner, 'POST', '/notes', { leadId, body: 'Words' }, 201);
+    for (const payload of [{ body: '  ' }, { body: 'x'.repeat(2001) }, { body: 'x', leadId: randomUUID() }, {}]) {
+      expect(
+        (await refused(owner, 'PATCH', `/notes/${note.id}`, payload as object)).status,
+        JSON.stringify(payload),
+      ).toBe(400);
+    }
+    expect((await refused(owner, 'PATCH', '/notes/not-an-id', { body: 'x' } as object)).status).toBe(400);
+    const stranger = createPretendBrowser(app);
+    expect((await stranger.send('PATCH', `/api/v1/notes/${note.id}`, { body: 'x' })).statusCode).toBe(401);
+  });
+
+  it('lets the own-leads-only role change its own note while the lead is its own, and answers 404 once it is not', async () => {
+    const owner = await signUpAndSignIn();
+    const { leadId } = await addContactAndLead(owner, 'Priya Menon');
+    const note = await sendOk(owner, 'POST', '/notes', { leadId, body: 'First words' }, 201);
+    await setRole(owner, 'staff_own');
+    await sendOk(owner, 'PATCH', `/notes/${note.id}`, { body: 'Second words' });
+    await database.system.updateTable('leads').set({ owner_user_id: null }).where('id', '=', leadId).execute();
+    expect((await refused(owner, 'PATCH', `/notes/${note.id}`, { body: 'Third words' } as object)).status).toBe(404);
+  });
+});
+
+describe('DELETE /api/v1/notes/{id}', () => {
+  it('lets a manager delete any note (soft): it leaves every timeline, the row stays, one log line and one event are written', async () => {
+    const owner = await signUpAndSignIn();
+    const { leadId, contactId } = await addContactAndLead(owner, 'Priya Menon');
+    const colleaguesNote = await addColleagueNote(owner, leadId, contactId);
+    await sendOk(owner, 'DELETE', `/notes/${colleaguesNote}`, undefined, 204);
+    expect((await sendOk(owner, 'GET', `/activities?lead_id=${leadId}`)).total).toBe(0);
+    expect((await sendOk(owner, 'GET', `/activities?contact_id=${contactId}`)).total).toBe(0);
+    const stored = await database.system
+      .selectFrom('activities')
+      .select('deleted_at')
+      .where('id', '=', colleaguesNote)
+      .executeTakeFirstOrThrow();
+    expect(stored.deleted_at).not.toBeNull();
+    const logs = await database.system
+      .selectFrom('activity_log')
+      .select('kind')
+      .where('record_id', '=', colleaguesNote)
+      .execute();
+    expect(logs.map((log) => log.kind)).toEqual(['activities.note_deleted']);
+    const events = await database.system
+      .selectFrom('domain_events')
+      .select('name')
+      .where('account_id', '=', owner.businessId)
+      .where('name', '=', 'note.deleted')
+      .execute();
+    expect(events).toHaveLength(1);
+  });
+
+  it('answers 404 for an unknown note, a deleted one and another business’s note, 403 to staff, and 401 when nobody is signed in', async () => {
+    const owner = await signUpAndSignIn();
+    const stranger = await signUpAndSignIn();
+    const { leadId } = await addContactAndLead(owner, 'Priya Menon');
+    const note = await sendOk(owner, 'POST', '/notes', { leadId, body: 'Words' }, 201);
+    const response = async (person: Person, id: string) =>
+      (await person.browser.send('DELETE', `/api/v1/notes/${id}`)).statusCode;
+    expect(await response(owner, randomUUID())).toBe(404);
+    expect(await response(stranger, note.id)).toBe(404);
+    await setRole(owner, 'staff');
+    expect(await response(owner, note.id)).toBe(403);
+    await setRole(owner, 'manager');
+    expect(await response(owner, note.id)).toBe(204);
+    expect(await response(owner, note.id)).toBe(404);
+    expect((await createPretendBrowser(app).send('DELETE', `/api/v1/notes/${note.id}`)).statusCode).toBe(401);
+    expect(await response(owner, 'not-an-id')).toBe(400);
   });
 });

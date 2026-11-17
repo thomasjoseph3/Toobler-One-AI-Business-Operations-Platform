@@ -33,6 +33,10 @@ export function useLeadNotes(leadId: string): {
   isSaving: boolean;
   /** Sends the typed note. Returns true when it was saved. */
   saveNote: () => Promise<boolean>;
+  /** Changes the words of one note (`PATCH /notes/{id}`). Returns the problem in words, or null when it worked. */
+  editNote: (noteId: string, text: string) => Promise<string | null>;
+  /** Deletes one note (`DELETE /notes/{id}`, managers). Returns the problem in words, or null when it worked. */
+  deleteNote: (noteId: string) => Promise<string | null>;
 } {
   const resource = useApiResource<ActivitiesListResponse>(`/activities?lead_id=${leadId}&limit=100`);
   const kept = useKeptData(resource.state);
@@ -66,6 +70,30 @@ export function useLeadNotes(leadId: string): {
     }
   };
 
+  // Changes one note's words, checking them first; the notes load again after it worked
+  const editNote = async (noteId: string, text: string): Promise<string | null> => {
+    const problemKey = checkNote(text);
+    if (problemKey !== null) return t(problemKey);
+    try {
+      await apiRequest('PATCH', `/notes/${noteId}`, { body: text.trim() });
+      resource.reload();
+      return null;
+    } catch (error) {
+      return describeNoteProblem(error);
+    }
+  };
+
+  // Deletes one note; the notes load again after it worked
+  const deleteNote = async (noteId: string): Promise<string | null> => {
+    try {
+      await apiRequest('DELETE', `/notes/${noteId}`);
+      resource.reload();
+      return null;
+    } catch (error) {
+      return describeNoteProblem(error);
+    }
+  };
+
   return {
     state: resource.state,
     data: kept.data,
@@ -77,5 +105,7 @@ export function useLeadNotes(leadId: string): {
     noteProblem,
     isSaving,
     saveNote,
+    editNote,
+    deleteNote,
   };
 }

@@ -226,13 +226,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
         }
-        if (path === '/activities' || path === '/notes') {
+        if (path === '/activities' || path === '/notes' || path.startsWith('/notes/')) {
           const notesAnswer = answerNotesCall(pretendApi.notes, {
             method: request.method(),
             path,
             search: new URL(request.url()).search,
             body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
             userName: profileFor(pretendApi).user.name,
+            userId: profileFor(pretendApi).user.id,
+            role: pretendApi.role,
           });
           if (notesAnswer) return route.fulfill(json(notesAnswer.status, notesAnswer.body));
         }

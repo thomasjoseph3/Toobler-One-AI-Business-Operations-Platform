@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity } from '@toobler-one/shared';
-import { checkNote, describeWriterName, describeWriterRole, formatTimeAgo, initialsOf, sortNotes } from './notes-state';
+import {
+  canDeleteNote,
+  canEditNote,
+  checkNote,
+  describeWriterName,
+  describeWriterRole,
+  formatTimeAgo,
+  initialsOf,
+  sortNotes,
+} from './notes-state';
 
 const note = (id: string, createdAt: string): Activity => ({
   id,
@@ -67,5 +76,19 @@ describe('checkNote', () => {
     expect(checkNote('   ')).toBe('notes.needText');
     expect(checkNote('x'.repeat(2001))).toBe('notes.tooLong');
     expect(checkNote('Prefers a ground floor room')).toBeNull();
+  });
+});
+
+describe('who may change a note', () => {
+  it('lets only the writer change the words, and only a manager delete', () => {
+    const mine = note('n', '2026-11-17T10:00:00Z');
+    expect(canEditNote(mine, 'u')).toBe(true);
+    expect(canEditNote(mine, 'someone-else')).toBe(false);
+    expect(canEditNote({ ...mine, writtenBy: { kind: 'agent', userId: null, name: 'Aria', role: null } }, 'u')).toBe(
+      false,
+    );
+    expect(canDeleteNote('manager')).toBe(true);
+    expect(canDeleteNote('staff')).toBe(false);
+    expect(canDeleteNote('staff_own')).toBe(false);
   });
 });

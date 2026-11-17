@@ -73,3 +73,14 @@ export const activitiesListResponseSchema = z.object({
   limit: z.number().int(),
 });
 export type ActivitiesListResponse = z.infer<typeof activitiesListResponseSchema>;
+
+/** The address part naming a note. */
+export const noteIdParamsSchema = z.object({ id: z.uuid() });
+
+/** What the writer sends to change a note: the new words. Anything else in the body is refused (the writer, the lead and the time never change). */
+export const updateNoteRequestSchema = z
+  .object({
+    body: z.string().trim().min(1, 'Write the note first').max(MAX_NOTE_LENGTH, 'That note is too long'),
+  })
+  .strict();
+export type UpdateNoteRequest = z.infer<typeof updateNoteRequestSchema>;

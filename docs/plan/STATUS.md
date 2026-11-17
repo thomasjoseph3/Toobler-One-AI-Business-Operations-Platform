@@ -28,10 +28,10 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F19 | The AI agent (text) and Test the agent | approved | [brief](../features/F19-ai-agent-and-test-the-agent.md) | 2026-11-16 |
 | F20 | Website chat | approved | [brief](../features/F20-website-chat.md) | 2026-11-16 |
 | F31 | Setup wizard and fill from website | approved | [brief](../features/F31-setup-wizard.md) | 2026-11-17 |
+| F07 | Timeline and notes | in_progress | [brief](../features/F07-timeline-and-notes.md) | |
+| F08 | Tasks and reminders | planned | | |
 | F02 | Team, roles, teams and the activity log | planned | | |
 | F05 | Companies | planned | | |
-| F07 | Timeline and notes | planned | | |
-| F08 | Tasks and reminders | planned | | |
 | F09 | Custom fields | planned | | |
 | F10 | Lead scoring and the Filtered tab | planned | | |
 | F11 | Views, filters, search and lists | planned | | |

@@ -5,11 +5,13 @@ import {
   activitySchema,
   createNoteRequestSchema,
   listActivitiesQuerySchema,
+  noteIdParamsSchema,
+  updateNoteRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createActivitiesService } from '../services/activities.service';
 
-/** Registers /api/v1/notes (add a note) and /api/v1/activities (a lead's or a person's timeline). More routes arrive with the later slices. */
+/** Registers /api/v1/notes (add a note), /notes/{id} (change your own note, delete a note) and /api/v1/activities (a lead's or a person's timeline). */
 export function activitiesRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const activitiesService = createActivitiesService({ database: app.kernel.database });
@@ -35,6 +37,30 @@ export function activitiesRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return activitiesService.listActivities(request.principal, request.query);
+    },
+  );
+
+  // For any signed-in, verified person, but only the writer of the note may change it (the service answers 403 to anyone else).
+  typedApp.patch(
+    '/notes/:id',
+    {
+      config: { access: 'staff' },
+      schema: { params: noteIdParamsSchema, body: updateNoteRequestSchema, response: { 200: activitySchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return activitiesService.updateNote(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // For managers only (the guard answers 403 to staff). A soft delete: the note disappears, its row is kept.
+  typedApp.delete(
+    '/notes/:id',
+    { config: { access: 'manager' }, schema: { params: noteIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await activitiesService.deleteNote(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }

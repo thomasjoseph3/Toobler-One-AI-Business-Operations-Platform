@@ -68,3 +68,13 @@ export function checkNote(noteText: string): MessageKey | null {
   if (noteText.trim().length > MAX_NOTE_LENGTH) return 'notes.tooLong';
   return null;
 }
+
+/** True when the signed-in person wrote this note, so they may change its words (only the writer may; a manager may delete, not change). */
+export function canEditNote(note: Activity, signedInUserId: string): boolean {
+  return note.writtenBy.kind === 'user' && note.writtenBy.userId === signedInUserId;
+}
+
+/** True when the person's role may delete a note: managers only (the API would refuse anyone else). */
+export function canDeleteNote(role: string): boolean {
+  return role === 'manager';
+}

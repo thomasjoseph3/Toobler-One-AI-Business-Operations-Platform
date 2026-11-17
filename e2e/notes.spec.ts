@@ -70,3 +70,80 @@ test.describe('Notes: on the lead page', () => {
     expect(pretendApi.notes.postedNotes).toEqual([{ leadId: 'lead-0', body: 'Called back, will confirm Friday' }]);
   });
 });
+
+test.describe('Notes: changing and deleting', () => {
+  test('the writer edits their own note in place, and it says Edited', async ({ page, pretendApi }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row icons are for tablets and desktops');
+    await page.goto('/leads');
+    const row = page.getByRole('row', { name: /Priya Menon 0/ });
+    await row.hover();
+    await row.getByRole('button', { name: 'Notes for Priya Menon 0' }).click();
+    const panel = page.getByRole('dialog', { name: 'Notes' });
+    await panel.getByPlaceholder('Enter here').fill('My own note');
+    await panel.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(panel).toContainText('My own note');
+    // Maya's note belongs to someone else: no Edit under it, one Edit under mine
+    await expect(panel.getByRole('button', { name: 'Edit' })).toHaveCount(1);
+    await panel.getByRole('button', { name: 'Edit' }).click();
+    await panel.getByLabel('Change the note').fill('My own note, changed');
+    await panel.getByRole('button', { name: 'Save changes' }).click();
+    await expect(panel).toContainText('My own note, changed');
+    await expect(panel).toContainText('Edited');
+    expect(pretendApi.notes.editedNotes).toEqual([{ noteId: 'note-2', body: 'My own note, changed' }]);
+  });
+
+  test('Cancel throws an edit away, and an empty note cannot be saved', async ({ page, pretendApi }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row icons are for tablets and desktops');
+    await page.goto('/leads');
+    const row = page.getByRole('row', { name: /Priya Menon 0/ });
+    await row.hover();
+    await row.getByRole('button', { name: 'Notes for Priya Menon 0' }).click();
+    const panel = page.getByRole('dialog', { name: 'Notes' });
+    await panel.getByPlaceholder('Enter here').fill('Keep me');
+    await panel.getByRole('button', { name: 'Save', exact: true }).click();
+    await panel.getByRole('button', { name: 'Edit' }).click();
+    await panel.getByLabel('Change the note').fill('   ');
+    await expect(panel.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+    await panel.getByLabel('Change the note').fill('Thrown away');
+    await panel.getByRole('button', { name: 'Cancel' }).first().click();
+    await expect(panel).toContainText('Keep me');
+    expect(pretendApi.notes.editedNotes).toEqual([]);
+  });
+
+  test('a manager deletes any note after Are you sure? naming the writer; Cancel keeps it', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/leads/lead-0');
+    await expect(page.getByText('Great insights on the project')).toBeVisible();
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete the note by Maya Chen?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByText('Great insights on the project')).toBeVisible();
+    expect(pretendApi.notes.deletedNoteIds).toEqual([]);
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Delete the note by Maya Chen?' })
+      .getByRole('button', { name: 'Delete note' })
+      .click();
+    await expect(page.getByText('Great insights on the project')).toHaveCount(0);
+    expect(pretendApi.notes.deletedNoteIds).toEqual(['note-1']);
+  });
+
+  test('staff see no Delete, and a refused change is said in plain words', async ({ page, pretendApi }) => {
+    pretendApi.role = 'staff';
+    await page.goto('/leads/lead-0');
+    await expect(page.getByText('Great insights on the project')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0);
+    pretendApi.role = 'manager';
+    await page.reload();
+    pretendApi.notes.refusal = { status: 404, code: 'NOT_FOUND', message: 'That note was not found.' };
+    await page.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page
+      .getByRole('dialog', { name: 'Delete the note by Maya Chen?' })
+      .getByRole('button', { name: 'Delete note' })
+      .click();
+    await expect(page.getByText('This lead no longer exists.')).toBeVisible();
+  });
+});

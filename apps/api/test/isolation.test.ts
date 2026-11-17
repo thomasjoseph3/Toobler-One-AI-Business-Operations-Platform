@@ -66,6 +66,7 @@ interface BusinessAData {
   contactId: string;
   leadId: string;
   ticketId: string;
+  noteId: string;
   stageId: string;
   offeringId: string;
   offerId: string;
@@ -223,6 +224,8 @@ beforeAll(async () => {
       is_test: true,
     })
     .execute();
+  // A has a note on its lead, which B must not be able to read, change or delete
+  const noteOfA = await sendOk(businessA, 'POST', '/notes', { leadId: lead.id, body: 'A private note' }, 201);
   dataOfA = {
     conversationId: conversationOfA,
     testChatId: testChatOfA,
@@ -230,6 +233,7 @@ beforeAll(async () => {
     contactId: contact.id,
     leadId: lead.id,
     ticketId: ticket.id,
+    noteId: noteOfA.id,
     stageId: stage.id,
     offeringId: offering.id,
     offerId: offer.id,
@@ -628,6 +632,18 @@ const attempts: Attempt[] = [
     route: 'GET /api/v1/activities',
     what: "read A's lead's timeline",
     request: () => ({ method: 'GET', url: `/activities?lead_id=${dataOfA.leadId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/notes/{id}',
+    what: "change A's note",
+    request: () => ({ method: 'PATCH', url: `/notes/${dataOfA.noteId}`, payload: { body: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/notes/{id}',
+    what: "delete A's note",
+    request: () => ({ method: 'DELETE', url: `/notes/${dataOfA.noteId}` }),
     expectedStatus: 404,
   },
   {

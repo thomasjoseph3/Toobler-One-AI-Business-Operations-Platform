@@ -120,3 +120,73 @@ export async function listActivities(
     .execute();
   return { items: rows.map(toActivityRow), total: Number(totalRow.total) };
 }
+
+/** What the service needs to decide whether a note may be changed: its lead, who wrote it, and its words. */
+export interface NoteForChange {
+  id: string;
+  leadId: string | null;
+  byUserId: string | null;
+  body: string | null;
+}
+
+/**
+ * Locks one live note of the business (so two changes at the same moment take turns) and gives what is needed to decide. Undefined for an
+ * unknown id, a deleted note, another business's note, or an activity that is not a note.
+ */
+export async function lockNoteForChange(db: Db, accountId: string, noteId: string): Promise<NoteForChange | undefined> {
+  const row = await db
+    .selectFrom('activities')
+    .select(['id', 'lead_id', 'by_user_id', 'body'])
+    .where('account_id', '=', accountId)
+    .where('id', '=', noteId)
+    .where('kind', '=', 'note')
+    .where('deleted_at', 'is', null)
+    .forUpdate()
+    .executeTakeFirst();
+  return row ? { id: row.id, leadId: row.lead_id, byUserId: row.by_user_id, body: row.body } : undefined;
+}
+
+/** Changes a note's words and marks it edited now. Returns the note as it is after the change. */
+export async function updateNoteBody(
+  db: Db,
+  options: { accountId: string; noteId: string; body: string; actor: Actor },
+): Promise<ActivityRow> {
+  const row = await db
+    .updateTable('activities')
+    .set({
+      body: options.body,
+      edited_at: new Date(),
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.noteId)
+    .returning(ACTIVITY_COLUMNS)
+    .executeTakeFirstOrThrow();
+  return toActivityRow(row);
+}
+
+/** Deletes a note the soft way: it disappears from every timeline, its row is kept. */
+export async function softDeleteNote(
+  db: Db,
+  options: { accountId: string; noteId: string; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('activities')
+    .set({ deleted_at: new Date(), updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.noteId)
+    .execute();
+}
+
+/** One live note of the business with all its columns, or undefined. */
+export async function findNoteById(db: Db, accountId: string, noteId: string): Promise<ActivityRow | undefined> {
+  const row = await db
+    .selectFrom('activities')
+    .select(ACTIVITY_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', '=', noteId)
+    .where('kind', '=', 'note')
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  return row ? toActivityRow(row) : undefined;
+}
