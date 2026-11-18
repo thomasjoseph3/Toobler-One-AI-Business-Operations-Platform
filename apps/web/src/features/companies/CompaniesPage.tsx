@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import type { CompaniesListResponse } from '@toobler-one/shared';
 import {
   Alert,
   Button,
+  buttonClasses,
   Card,
   CompaniesIcon,
   EmptyState,
@@ -138,6 +139,9 @@ export function CompaniesPage() {
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link to="/companies/duplicates" className={buttonClasses('secondary', 'compact')}>
+            {t('duplicates.link')}
+          </Link>
           {isManager ? <ExportButton request={buildCompaniesExportRequest(view)} /> : null}
           <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} onClick={openForm}>
             {t('companies.add')}

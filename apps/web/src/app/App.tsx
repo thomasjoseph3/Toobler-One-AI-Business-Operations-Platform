@@ -12,6 +12,7 @@ import { ContactsPage } from '../features/contacts/ContactsPage';
 import { FilteredPage } from '../features/leads/FilteredPage';
 import { ExportPage } from '../features/exports/ExportPage';
 import { ImportPage } from '../features/imports/ImportPage';
+import { DuplicatesPage } from '../features/duplicates/DuplicatesPage';
 import { ListPage } from '../features/lists/ListPage';
 import { ListsPage } from '../features/lists/ListsPage';
 import { LeadPage } from '../features/leads/LeadPage';
@@ -77,6 +78,8 @@ export function App() {
                 <Route path="/leads/filtered" element={<FilteredPage />} />
                 <Route path="/leads/:leadId" element={<LeadPage />} />
                 <Route path="/contacts/import" element={<ImportPage />} />
+                <Route path="/contacts/duplicates" element={<DuplicatesPage object="contact" />} />
+                <Route path="/companies/duplicates" element={<DuplicatesPage object="company" />} />
                 <Route path="/exports/:exportId" element={<ExportPage />} />
                 <Route path="/contacts/lists" element={<ListsPage />} />
                 <Route path="/contacts/lists/:listId" element={<ListPage />} />

@@ -7,6 +7,7 @@ Run these from the project folder (`lead-engine-good`). Use `nvm use` first so N
 | Command                    | What it does                                                                  |
 | -------------------------- | ----------------------------------------------------------------------------- |
 | `npm run setup`            | First-time setup: creates your `.env` with a fresh secret and installs what is needed |
+| `npm run duplicates:detect -- --email <manager email>` | Runs the nightly duplicate search now for one business (then open Contacts → Possible duplicates) |
 | `npm run db:up`            | Starts the local test database (Docker)                                       |
 | `npm run db:down`          | Stops the local test database                                                 |
 | `npm run dev`              | Starts the API (port 4000) and the web app (port 3000), restarting on every change |

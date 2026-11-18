@@ -3,6 +3,7 @@ import { answerFaqsCall, startingFaqs, type PretendFaqs } from './pretend-faqs';
 import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
 import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
+import { answerDuplicatesCall, startingDuplicates, type PretendDuplicates } from './pretend-duplicates';
 import { answerImportsCall, startingImports, type PretendImports } from './pretend-imports';
 import { answerTasksCall, startingTasks, type PretendTasks } from './pretend-tasks';
 import {
@@ -79,6 +80,8 @@ export interface PretendApi {
   temperatureChanges: Array<{ leadId: string; temperature: string }>;
   /** Imports and exports of contacts, companies and leads. */
   imports: PretendImports;
+  /** Possible duplicates of contacts and companies. */
+  duplicates: PretendDuplicates;
   /** Contact lists: what is saved, what the page sent, and ways to make the list or the save fail. */
   lists: {
     items: Array<Record<string, unknown>>;
@@ -262,6 +265,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         leadEdits: {},
         temperatureChanges: [],
         imports: startingImports(),
+        duplicates: startingDuplicates(),
         lists: {
           items: [],
           created: [],
@@ -569,6 +573,14 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        if (path.startsWith('/duplicates')) {
+          const duplicatesAnswer = answerDuplicatesCall(pretendApi.duplicates, {
+            method: request.method(),
+            path,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+          });
+          if (duplicatesAnswer) return route.fulfill(json(duplicatesAnswer.status, duplicatesAnswer.body));
+        }
         if (path.startsWith('/imports') || path.startsWith('/exports')) {
           const importsAnswer = answerImportsCall(pretendApi.imports, {
             method: request.method(),

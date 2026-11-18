@@ -93,6 +93,9 @@ export function ContactsToolbar({
             <ExportButton request={buildContactsExportRequest(view)} />
           </>
         ) : null}
+        <Link to="/contacts/duplicates" className={buttonClasses('secondary', 'compact')}>
+          {t('duplicates.link')}
+        </Link>
         <Link to="/contacts/lists" className={buttonClasses('secondary', 'compact')}>
           {t('lists.link')}
         </Link>

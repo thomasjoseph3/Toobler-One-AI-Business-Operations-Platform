@@ -17,7 +17,10 @@ export async function findContactsForDuplicateCheck(
 }
 
 /** The live contacts among these ids, in full. A deleted or merged-away contact and another business's contact are simply missing. */
-export async function findContactsByIds(transaction: Db, options: { accountId: string; contactIds: string[] }): Promise<Contact[]> {
+export async function findContactsByIds(
+  transaction: Db,
+  options: { accountId: string; contactIds: string[] },
+): Promise<Contact[]> {
   return contactsRepository.findContactsByIds(transaction, options.accountId, options.contactIds);
 }
 
