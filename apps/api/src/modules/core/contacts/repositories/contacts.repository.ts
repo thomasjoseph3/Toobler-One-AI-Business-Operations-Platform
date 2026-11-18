@@ -446,3 +446,95 @@ export async function insertImportedContactIfFree(
     .executeTakeFirst();
   return Number(result.numInsertedOrUpdatedRows ?? 0) > 0;
 }
+
+/** What the duplicate finder compares: every live contact's id, name, phone and email. */
+export async function listContactsForMatching(
+  db: Db,
+  accountId: string,
+): Promise<Array<{ id: string; name: string | null; phone: string | null; email: string | null }>> {
+  return db
+    .selectFrom('contacts')
+    .select(['id', 'name', 'phone', 'email'])
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}
+
+/** The values the kept contact ends up with after a merge. */
+export interface MergedContactValues {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  language: string | null;
+  lifecycleStage: LifecycleStage;
+  companyId: string | null;
+  /** Custom answers where the merged-away contact's answer wins; every other answer comes from the kept contact, then fills the gaps from the merged-away one. */
+  customKeysFromMergedAway: string[];
+}
+
+/**
+ * Merges one live contact into another: the merged-away contact is marked deleted and points at the kept one (its row stays, so both originals
+ * are kept), then the kept contact takes the chosen values and the combined custom answers. The merged-away contact goes first, so its phone and
+ * email are free for the kept contact to take. Returns false when either contact is gone.
+ */
+export async function mergeContactInto(
+  db: Db,
+  options: { accountId: string; keptId: string; mergedAwayId: string; values: MergedContactValues; actor: Actor },
+): Promise<boolean> {
+  const { accountId, keptId, mergedAwayId, values } = options;
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  const customRows = await db
+    .selectFrom('contacts')
+    .select(['id', 'custom'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', [keptId, mergedAwayId])
+    .where('deleted_at', 'is', null)
+    .execute();
+  const keptCustom = customRows.find((row) => row.id === keptId)?.custom;
+  const mergedAwayCustom = customRows.find((row) => row.id === mergedAwayId)?.custom;
+  if (keptCustom === undefined || mergedAwayCustom === undefined) return false;
+
+  await db
+    .updateTable('contacts')
+    .set({ deleted_at: new Date(), merged_into_id: keptId, updated_by: actorStamp })
+    .where('account_id', '=', accountId)
+    .where('id', '=', mergedAwayId)
+    .execute();
+
+  // The kept contact's answers win, the merged-away contact fills what is missing, and the chosen keys take the merged-away contact's answer
+  const combinedCustom: Record<string, unknown> = { ...mergedAwayCustom, ...keptCustom };
+  for (const key of values.customKeysFromMergedAway) {
+    if (key in mergedAwayCustom) combinedCustom[key] = mergedAwayCustom[key];
+  }
+  await db
+    .updateTable('contacts')
+    .set({
+      name: values.name,
+      phone: values.phone,
+      email: values.email,
+      language: values.language,
+      lifecycle_stage: values.lifecycleStage,
+      company_id: values.companyId,
+      custom: JSON.stringify(combinedCustom),
+      updated_by: actorStamp,
+    })
+    .where('account_id', '=', accountId)
+    .where('id', '=', keptId)
+    .execute();
+  return true;
+}
+
+/** Moves every live contact of one company to another company (the merge of two companies). Returns how many contacts moved. */
+export async function moveCompanyOfContacts(
+  db: Db,
+  options: { accountId: string; fromCompanyId: string; toCompanyId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('contacts')
+    .set({ company_id: options.toCompanyId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('company_id', '=', options.fromCompanyId)
+    .returning('id')
+    .execute();
+  return rows.length;
+}

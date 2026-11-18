@@ -6,6 +6,8 @@ import type { Database } from '../src/kernel/database';
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
 import { createSignedInPerson, type SignedInPerson } from './support/auth';
 import { createUnansweredQuestionsService } from '../src/modules/core/knowledge';
+import { createContextFactory } from '../src/kernel/context';
+import { detectDuplicatesForBusiness } from '../src/modules/core/duplicates';
 import { openTestDatabase } from './support/harness';
 
 // The shared isolation suite (docs/SECURITY.md, BACKEND.md): one place that proves business B can never reach business A's
@@ -105,6 +107,7 @@ interface BusinessAData {
   listId: string;
   importId: string;
   exportId: string;
+  duplicateId: string;
   secretWords: string;
 }
 
@@ -284,6 +287,20 @@ beforeAll(async () => {
   );
   // A has an export of its contacts; B must never read or download it
   const exportOfA = await sendOk(businessA, 'POST', '/exports', { object: 'contact' }, 202);
+  // A has two contacts that look like one person (a possible duplicate with secret words); B must never see or decide the pair
+  const similarPhone = uniqueUaeNumber();
+  await sendOk(businessA, 'POST', '/contacts', { name: `Twin ${secretWords}`, phone: similarPhone }, 201);
+  await sendOk(
+    businessA,
+    'POST',
+    '/contacts',
+    { name: `Twin ${secretWords}`, phone: `${similarPhone.slice(0, -1)}${(Number(similarPhone.slice(-1)) + 1) % 10}` },
+    201,
+  );
+  await detectDuplicatesForBusiness(
+    createContextFactory(database)(businessA.profile.business.id, { kind: 'system', id: 'test' }),
+  );
+  const duplicateOfA = (await sendOk(businessA, 'GET', '/duplicates?object=contact')).items[0];
   // A has a company with a secret name; B must never see it
   const companyOfA = await sendOk(
     businessA,
@@ -333,6 +350,7 @@ beforeAll(async () => {
     listId: listOfA.id,
     importId: importOfA.id,
     exportId: exportOfA.id,
+    duplicateId: duplicateOfA.id,
     secretWords,
   };
 
@@ -982,6 +1000,24 @@ const attempts: Attempt[] = [
     expectedStatus: 202,
   },
   {
+    route: 'GET /api/v1/duplicates',
+    what: "list the possible duplicates (B sees only its own; the leak scan below proves none of A's show)",
+    request: () => ({ method: 'GET', url: '/duplicates?object=contact' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/duplicates/{id}/merge',
+    what: "merge A's pair of contacts",
+    request: () => ({ method: 'POST', url: `/duplicates/${dataOfA.duplicateId}/merge`, payload: { keep: 'a' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/duplicates/{id}/dismiss',
+    what: 'say "Not the same" about A\'s pair',
+    request: () => ({ method: 'POST', url: `/duplicates/${dataOfA.duplicateId}/dismiss` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/fields/reorder',
     what: "reorder with A's field id (B's own fields do not include it)",
     request: () => ({ method: 'POST', url: '/fields/reorder', payload: { object: 'lead', ids: [dataOfA.fieldId] } }),
@@ -1169,6 +1205,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/leads', url: '/leads?view=board' },
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
   { route: 'GET /api/v1/lists', url: '/lists' },
+  { route: 'GET /api/v1/duplicates', url: '/duplicates?object=contact' },
   { route: 'GET /api/v1/views', url: '/views?object=lead' },
   { route: 'GET /api/v1/search', url: '/search?q=Contact' },
   { route: 'GET /api/v1/conversations', url: '/conversations?filtered=true&limit=100' },

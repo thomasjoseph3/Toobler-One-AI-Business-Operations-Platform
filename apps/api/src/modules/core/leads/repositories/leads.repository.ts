@@ -668,3 +668,31 @@ export async function addConversationFactsToLead(
     .where('deleted_at', 'is', null)
     .execute();
 }
+
+/** Moves every lead (open, closed and deleted) of one contact to another contact (the merge of two contacts). The caller has checked that they do not both have an open lead. Returns how many rows moved. */
+export async function moveLeadsToContact(
+  db: Db,
+  options: { accountId: string; fromContactId: string; toContactId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('leads')
+    .set({ contact_id: options.toContactId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('contact_id', '=', options.fromContactId)
+    .returning('id')
+    .execute();
+  return rows.length;
+}
+
+/** Whether the contact has a lead that is open (not closed and not deleted). */
+export async function contactHasOpenLead(db: Db, accountId: string, contactId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('leads')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('contact_id', '=', contactId)
+    .where('closed_at', 'is', null)
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  return row !== undefined;
+}

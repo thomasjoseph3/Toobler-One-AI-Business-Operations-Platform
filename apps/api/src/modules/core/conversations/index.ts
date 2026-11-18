@@ -9,3 +9,5 @@ export { createConversationClassifier } from './services/conversation-classifier
 export { refuseOwnLeadsOnlyRole } from './services/conversation-reader.service';
 // The setup wizard asks whether the business has tried its agent in "Test the agent" before it may go live.
 export { hasTriedTheAgent } from './services/test-chat-facts.service';
+// The duplicates module (F13) moves a merged-away contact's conversations to the kept contact.
+export { moveConversationsToContact } from './services/contact-merge.service';

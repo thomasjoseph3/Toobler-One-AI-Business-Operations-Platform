@@ -22,3 +22,5 @@ export { scoreLeadFromConversation } from './services/lead-scoring.service';
 export type { ConversationFactsForScoring } from './services/lead-scoring.service';
 // The exports module (F12) writes the leads a list shows as a CSV file.
 export { findLeadsForExport } from './services/leads.service';
+// The duplicates module (F13) moves a merged-away contact's leads to the kept contact, and checks that both do not have an open lead.
+export { moveLeadsToContact, contactHasOpenLead } from './services/contact-merge.service';

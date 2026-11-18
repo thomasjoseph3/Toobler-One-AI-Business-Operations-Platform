@@ -323,6 +323,8 @@ export interface ContactsTable {
   custom: ColumnType<Record<string, unknown>, string | undefined, string>;
   /** When an import made this contact (F12). */
   imported_at: Date | null;
+  /** When this contact was merged into another (F13): the one it was merged into. Only a deleted contact has one. */
+  merged_into_id: Generated<string | null>;
   deleted_at: Generated<Date | null>;
   created_by: Json | null;
   updated_by: Json | null;
@@ -343,7 +345,27 @@ export interface CompaniesTable {
   owner_user_id: string | null;
   /** Answers to the business's custom company fields, by field key (F09). */
   custom: ColumnType<Record<string, unknown>, string | undefined, string>;
+  /** When this company was merged into another (F13): the one it was merged into. Only a deleted company has one. */
+  merged_into_id: Generated<string | null>;
   deleted_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** Two contacts, or two companies, that look like the same one (F13). Fenced by account_id. Never deleted. */
+export interface DuplicateSuggestionsTable {
+  id: string;
+  account_id: string;
+  object: 'contact' | 'company';
+  /** The smaller of the two ids. They point at contacts or at companies, depending on `object`. */
+  a_id: string;
+  b_id: string;
+  reasons: string[];
+  status: Generated<'open' | 'dismissed' | 'merged'>;
+  decided_by: Json | null;
+  decided_at: Date | null;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;
@@ -953,6 +975,7 @@ export interface DB {
   imports: ImportsTable;
   exports: ExportsTable;
   contact_list_members: ContactListMembersTable;
+  duplicate_suggestions: DuplicateSuggestionsTable;
   assignment_rules: AssignmentRulesTable;
   assignment_rule_people: AssignmentRulePeopleTable;
   leads: LeadsTable;

@@ -13,6 +13,7 @@ import views from './core/views/module';
 import lists from './core/lists/module';
 import imports from './core/imports/module';
 import exportsModule from './core/exports/module';
+import duplicates from './core/duplicates/module';
 import conversations from './core/conversations/module';
 import knowledge from './core/knowledge/module';
 import offerings from './core/offerings/module';
@@ -41,6 +42,7 @@ export const modules: readonly ModuleManifest[] = [
   lists,
   imports,
   exportsModule,
+  duplicates,
   conversations,
   knowledge,
   offerings,

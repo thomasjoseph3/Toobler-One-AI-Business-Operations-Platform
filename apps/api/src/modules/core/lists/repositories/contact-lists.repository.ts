@@ -172,3 +172,38 @@ export async function deleteContactList(db: Db, accountId: string, listId: strin
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/**
+ * Puts the lists of one contact on another contact (the merge of two contacts): every list the first is in, the second is in too (a list
+ * the second is already in is left alone), then the first leaves all its lists. Returns how many lists the first was in.
+ */
+export async function moveListMembershipsToContact(
+  db: Db,
+  options: { accountId: string; fromContactId: string; toContactId: string; actor: Actor },
+): Promise<number> {
+  const memberships = await db
+    .selectFrom('contact_list_members')
+    .select('list_id')
+    .where('account_id', '=', options.accountId)
+    .where('contact_id', '=', options.fromContactId)
+    .execute();
+  if (memberships.length === 0) return 0;
+  await db
+    .insertInto('contact_list_members')
+    .values(
+      memberships.map((membership) => ({
+        account_id: options.accountId,
+        list_id: membership.list_id,
+        contact_id: options.toContactId,
+        added_by: { kind: options.actor.kind, id: options.actor.id },
+      })),
+    )
+    .onConflict((conflict) => conflict.columns(['list_id', 'contact_id']).doNothing())
+    .execute();
+  await db
+    .deleteFrom('contact_list_members')
+    .where('account_id', '=', options.accountId)
+    .where('contact_id', '=', options.fromContactId)
+    .execute();
+  return memberships.length;
+}

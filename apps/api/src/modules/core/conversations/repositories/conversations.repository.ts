@@ -398,3 +398,18 @@ export async function isConversationFiltered(db: Db, accountId: string, conversa
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** Moves every conversation of one contact to another contact (the merge of two contacts). Returns how many rows moved. */
+export async function moveConversationsToContact(
+  db: Db,
+  options: { accountId: string; fromContactId: string; toContactId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('conversations')
+    .set({ contact_id: options.toContactId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('contact_id', '=', options.fromContactId)
+    .returning('id')
+    .execute();
+  return rows.length;
+}

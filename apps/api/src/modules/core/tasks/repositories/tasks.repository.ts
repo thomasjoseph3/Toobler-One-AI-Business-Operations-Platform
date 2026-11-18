@@ -387,3 +387,18 @@ export async function findEarliestOpenDueByLead(
   }
   return earliest;
 }
+
+/** Moves every task (done, open and deleted) of one contact to another contact (the merge of two contacts). Returns how many moved. */
+export async function moveTasksToContact(
+  db: Db,
+  options: { accountId: string; fromContactId: string; toContactId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('tasks')
+    .set({ contact_id: options.toContactId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('contact_id', '=', options.fromContactId)
+    .returning('id')
+    .execute();
+  return rows.length;
+}

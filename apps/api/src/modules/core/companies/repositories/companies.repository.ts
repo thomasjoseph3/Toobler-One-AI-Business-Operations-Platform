@@ -321,3 +321,90 @@ export async function findCompanyNamesByIds(
     .execute();
   return new Map(rows.map((row) => [row.id, row.name]));
 }
+
+/** What the duplicate finder compares: every live company's id, name and phone. */
+export async function listCompaniesForMatching(
+  db: Db,
+  accountId: string,
+): Promise<Array<{ id: string; name: string; phone: string | null }>> {
+  return db
+    .selectFrom('companies')
+    .select(['id', 'name', 'phone'])
+    .where('account_id', '=', accountId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}
+
+/** The live companies among these ids. A deleted or merged-away company and another business's company are left out. */
+export async function findCompaniesByIds(db: Db, accountId: string, companyIds: string[]): Promise<CompanyRow[]> {
+  if (companyIds.length === 0) return [];
+  const rows = await db
+    .selectFrom('companies')
+    .select(COMPANY_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', 'in', companyIds)
+    .where('deleted_at', 'is', null)
+    .execute();
+  return rows.map(toCompanyRow);
+}
+
+/** The values the kept company ends up with after a merge. */
+export interface MergedCompanyValues {
+  name: string;
+  domain: string | null;
+  phone: string | null;
+  city: string | null;
+  ownerUserId: string | null;
+  /** Custom answers where the merged-away company's answer wins; the rest come from the kept company, then fill the gaps from the merged-away one. */
+  customKeysFromMergedAway: string[];
+}
+
+/**
+ * Merges one live company into another: the merged-away company is marked deleted and points at the kept one (its row stays), then the kept company
+ * takes the chosen values. The merged-away company goes first, so its name and domain are free for the kept company to take. Returns false when
+ * either company is gone.
+ */
+export async function mergeCompanyInto(
+  db: Db,
+  options: { accountId: string; keptId: string; mergedAwayId: string; values: MergedCompanyValues; actor: Actor },
+): Promise<boolean> {
+  const { accountId, keptId, mergedAwayId, values } = options;
+  const actorStamp = { kind: options.actor.kind, id: options.actor.id };
+  const customRows = await db
+    .selectFrom('companies')
+    .select(['id', 'custom'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', [keptId, mergedAwayId])
+    .where('deleted_at', 'is', null)
+    .execute();
+  const keptCustom = customRows.find((row) => row.id === keptId)?.custom;
+  const mergedAwayCustom = customRows.find((row) => row.id === mergedAwayId)?.custom;
+  if (keptCustom === undefined || mergedAwayCustom === undefined) return false;
+
+  await db
+    .updateTable('companies')
+    .set({ deleted_at: new Date(), merged_into_id: keptId, updated_by: actorStamp })
+    .where('account_id', '=', accountId)
+    .where('id', '=', mergedAwayId)
+    .execute();
+
+  const combinedCustom: Record<string, unknown> = { ...mergedAwayCustom, ...keptCustom };
+  for (const key of values.customKeysFromMergedAway) {
+    if (key in mergedAwayCustom) combinedCustom[key] = mergedAwayCustom[key];
+  }
+  await db
+    .updateTable('companies')
+    .set({
+      name: values.name,
+      domain: values.domain,
+      phone: values.phone,
+      city: values.city,
+      owner_user_id: values.ownerUserId,
+      custom: JSON.stringify(combinedCustom),
+      updated_by: actorStamp,
+    })
+    .where('account_id', '=', accountId)
+    .where('id', '=', keptId)
+    .execute();
+  return true;
+}

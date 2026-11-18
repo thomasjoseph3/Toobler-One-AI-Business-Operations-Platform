@@ -267,3 +267,18 @@ export async function handOverOpenTickets(
     .execute();
   return rows.length;
 }
+
+/** Moves every ticket of one contact to another contact (the merge of two contacts). Returns how many rows moved. */
+export async function moveTicketsToContact(
+  db: Db,
+  options: { accountId: string; fromContactId: string; toContactId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('tickets')
+    .set({ contact_id: options.toContactId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('contact_id', '=', options.fromContactId)
+    .returning('id')
+    .execute();
+  return rows.length;
+}

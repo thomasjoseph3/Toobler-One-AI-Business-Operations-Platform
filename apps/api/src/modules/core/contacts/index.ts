@@ -27,3 +27,11 @@ export { applyImportedContact, previewImportedContact } from './services/contact
 export type { ImportApplied, ImportPreview, SkippedImport } from './services/contact-import.service';
 // The exports module (F12) writes the contacts a list shows as a CSV file.
 export { findContactsForExport } from './services/contact-export.service';
+// The duplicates module (F13) finds contacts that look like one person and merges two of them.
+export {
+  findContactsForDuplicateCheck,
+  findContactsByIds,
+  mergeContactInto,
+  moveContactsToCompany,
+} from './services/contact-merge.service';
+export type { MergedContactValues } from './services/contact-merge.service';
