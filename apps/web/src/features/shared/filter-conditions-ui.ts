@@ -19,6 +19,11 @@ const TEMPERATURE_FIELD: FilterableField = {
   options: ['hot', 'warm', 'cold', 'unscored'],
 };
 
+/** What a list of contacts or companies can be filtered on: the business's own fields for it, in their order. */
+export function listFilterableCustomFields(definitions: readonly FieldDefinition[]): FilterableField[] {
+  return customFieldsToFilterable(definitions);
+}
+
 /** What a lead can be filtered on: the temperature, then the business's own lead fields in their order. The temperature's name is written in the person's words. */
 export function listFilterableLeadFields(definitions: readonly FieldDefinition[]): FilterableField[] {
   return [{ ...TEMPERATURE_FIELD, label: t('leads.filter.temperature') }, ...customFieldsToFilterable(definitions)];

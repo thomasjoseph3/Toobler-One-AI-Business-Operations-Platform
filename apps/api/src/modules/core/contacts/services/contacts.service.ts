@@ -16,7 +16,9 @@ import type { Principal } from '../../../../kernel/http/guard';
 import { parsePhone } from '../../../../kernel/phone';
 import { readSearchText } from '../helpers/contact-search';
 import { computeLifecycleStage } from '../helpers/lifecycle';
-import { mergeCustomAnswers, sameCustomAnswers } from '../../fields';
+import { customFieldsToFilterable } from '@toobler-one/shared';
+import { readFilterRequest } from '../../../../kernel/filters/read-filter-request';
+import { findFieldDefinitions, mergeCustomAnswers, sameCustomAnswers } from '../../fields';
 import { checkContactCustomAnswers, hideRemovedContactAnswers } from './contact-custom-values.service';
 import * as contactsRepository from '../repositories/contacts.repository';
 import type { ContactChanges } from '../repositories/contacts.repository';
@@ -263,9 +265,12 @@ export function createContactsService({ database }: { database: Database }) {
       query: ListContactsQuery,
     ): Promise<ContactsListResponse> {
       const { items, total } = await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const definitions = await findFieldDefinitions(transaction, principal.accountId, 'contact');
+        const conditions = readFilterRequest(query.filters, customFieldsToFilterable(definitions));
         const page = await contactsRepository.listContacts(transaction, principal.accountId, {
           search: readSearchText(query.q),
           lifecycleStage: query.lifecycleStage,
+          conditions,
           limit: query.limit,
           offset: (query.page - 1) * query.limit,
         });

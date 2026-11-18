@@ -26,6 +26,8 @@ function builtInCondition(column: string, condition: CheckedFilterCondition): Ra
       return sql<boolean>`${columnRef} = ${text}`;
     case 'is_not':
       return sql<boolean>`${columnRef} is distinct from ${text}`;
+    case 'contains':
+      return sql<boolean>`${columnRef} ilike ${`%${escapeLikePattern(text)}%`}`;
     case 'is_empty':
       return sql<boolean>`${columnRef} is null`;
     case 'is_not_empty':

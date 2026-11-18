@@ -24,6 +24,8 @@ import {
   findContactsOfCompany,
   setContactCompany,
 } from '../../contacts';
+import { customFieldsToFilterable } from '@toobler-one/shared';
+import { readFilterRequest } from '../../../../kernel/filters/read-filter-request';
 import { checkCustomAnswers, findFieldDefinitions, mergeCustomAnswers, sameCustomAnswers } from '../../fields';
 import { findLeadsOfContacts, findLeadTotalsForContacts } from '../../leads';
 import { makeCompanyNameKey } from '../helpers/company-name';
@@ -384,9 +386,12 @@ export function createCompaniesService({ database }: { database: Database }) {
       query: ListCompaniesQuery,
     ): Promise<CompaniesListResponse> {
       const { items, total } = await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const definitions = await findFieldDefinitions(transaction, principal.accountId, 'company');
+        const conditions = readFilterRequest(query.filters, customFieldsToFilterable(definitions));
         const found = await companiesRepository.listCompanies(transaction, principal.accountId, {
           searchPattern: makeSearchPattern(query.q),
           domain: query.domain,
+          conditions,
           limit: query.limit,
           offset: (query.page - 1) * query.limit,
         });

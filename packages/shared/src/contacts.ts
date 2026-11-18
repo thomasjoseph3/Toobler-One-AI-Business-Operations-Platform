@@ -54,6 +54,8 @@ export type CreateContactRequest = z.infer<typeof createContactRequestSchema>;
 export const listContactsQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   lifecycleStage: lifecycleStageSchema.optional(),
+  /** More conditions (F11 filter engine on the business's own fields): a JSON list, at most 4000 characters. Every condition must hold. */
+  filters: z.string().max(4000).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
 });

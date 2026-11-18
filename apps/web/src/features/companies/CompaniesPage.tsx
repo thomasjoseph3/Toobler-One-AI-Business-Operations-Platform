@@ -14,6 +14,10 @@ import {
   TextField,
 } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
+import { ConditionsEditor } from '../shared/ConditionsEditor';
+import { listFilterableCustomFields } from '../shared/filter-conditions-ui';
+import { ListFilterPopover } from '../shared/ListFilterPopover';
 import { formatMessage, t } from '../../app/i18n';
 import { describeShownRange } from '../leads/lead-display';
 import { CompaniesTable, CompanyCards } from './CompaniesList';
@@ -48,6 +52,7 @@ export function CompaniesPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = readCompaniesView(searchParams);
+  const filterableFields = listFilterableCustomFields(useFieldDefinitions('company'));
   const companiesResource = useApiResource<CompaniesListResponse>(buildCompaniesPath(view));
   const [typedSearch, setTypedSearch] = useState(view.searchText);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -60,11 +65,12 @@ export function CompaniesPage() {
   useEffect(() => {
     if (typedSearch.trim() === view.searchText.trim()) return;
     const timer = setTimeout(
-      () => setSearchParams(writeCompaniesView({ page: 1, searchText: typedSearch })),
+      () =>
+        setSearchParams(writeCompaniesView({ ...DEFAULT_COMPANIES_VIEW, ...view, page: 1, searchText: typedSearch })),
       SEARCH_DELAY_MILLISECONDS,
     );
     return () => clearTimeout(timer);
-  }, [typedSearch, view.searchText, setSearchParams]);
+  }, [typedSearch, view, setSearchParams]);
 
   const changeView = (changes: Partial<CompaniesView>) => setSearchParams(writeCompaniesView({ ...view, ...changes }));
   const openForm = () => {
@@ -93,17 +99,38 @@ export function CompaniesPage() {
         </Alert>
       ) : null}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="w-full min-w-0 md:w-72">
-          <TextField
-            label={t('companies.search')}
-            type="search"
-            size="compact"
-            isLabelHidden
-            value={typedSearch}
-            onChange={(event) => setTypedSearch(event.target.value)}
-            autoComplete="off"
-            placeholder={t('companies.search')}
-          />
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:w-auto">
+          <div className="w-full min-w-0 md:w-72">
+            <TextField
+              label={t('companies.search')}
+              type="search"
+              size="compact"
+              isLabelHidden
+              value={typedSearch}
+              onChange={(event) => setTypedSearch(event.target.value)}
+              autoComplete="off"
+              placeholder={t('companies.search')}
+            />
+          </div>
+          {/* Only when the business has company fields of its own to filter on */}
+          {filterableFields.length > 0 ? (
+            <ListFilterPopover panelLabel={t('companies.filter.title')} activeFilterCount={view.conditions.length}>
+              <ConditionsEditor
+                key={JSON.stringify(view.conditions)}
+                fields={filterableFields}
+                applied={view.conditions}
+                onApply={(conditions) => changeView({ conditions, page: 1 })}
+              />
+              <Button
+                variant="tertiary"
+                size="compact"
+                disabled={view.conditions.length === 0}
+                onClick={() => changeView({ conditions: [], page: 1 })}
+              >
+                {t('leads.filter.clear')}
+              </Button>
+            </ListFilterPopover>
+          ) : null}
         </div>
         <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} onClick={openForm}>
           {t('companies.add')}

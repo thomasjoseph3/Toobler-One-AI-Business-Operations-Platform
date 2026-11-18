@@ -1,4 +1,5 @@
-import type { Contact, LifecycleStage } from '@toobler-one/shared';
+import type { CheckedFilterCondition, Contact, LifecycleStage } from '@toobler-one/shared';
+import { conditionsToSql } from '../../../../kernel/filters/conditions-to-sql';
 import { sql } from 'kysely';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
@@ -149,12 +150,21 @@ export async function findContactIdByEmail(db: Db, accountId: string, email: str
 export async function listContacts(
   db: Db,
   accountId: string,
-  options: { search: ContactSearch | null; lifecycleStage: LifecycleStage | undefined; limit: number; offset: number },
+  options: {
+    search: ContactSearch | null;
+    lifecycleStage: LifecycleStage | undefined;
+    /** Filter-engine conditions that already passed the shared check; every one must hold. */
+    conditions?: readonly CheckedFilterCondition[];
+    limit: number;
+    offset: number;
+  },
 ): Promise<{ items: Contact[]; total: number }> {
   /** The filters shared by the page query and the count query. */
   const filtered = () => {
     let query = db.selectFrom('contacts').where('account_id', '=', accountId).where('deleted_at', 'is', null);
     if (options.lifecycleStage) query = query.where('lifecycle_stage', '=', options.lifecycleStage);
+    const conditionSql = conditionsToSql(options.conditions ?? [], { customColumn: 'custom', builtInColumns: {} });
+    if (conditionSql) query = query.where(conditionSql);
     const search = options.search;
     if (search?.kind === 'phone') {
       query = query.where('phone_key', 'like', `%${search.digits}%`);

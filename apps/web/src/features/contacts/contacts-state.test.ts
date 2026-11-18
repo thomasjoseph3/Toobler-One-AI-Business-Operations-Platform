@@ -20,6 +20,7 @@ describe('the contacts view in the web address', () => {
     expect(readContactsView(new URLSearchParams('q=priya&stage=customer&page=3'))).toEqual({
       searchText: 'priya',
       lifecycleStage: 'customer',
+      conditions: [],
       page: 3,
     });
     expect(readContactsView(new URLSearchParams('stage=nonsense&page=-2'))).toEqual(DEFAULT_CONTACTS_VIEW);
@@ -27,19 +28,24 @@ describe('the contacts view in the web address', () => {
 
   it('writes only what is not the default', () => {
     expect(writeContactsView(DEFAULT_CONTACTS_VIEW).toString()).toBe('');
-    expect(writeContactsView({ searchText: ' priya ', lifecycleStage: 'lead', page: 2 }).toString()).toBe(
-      'q=priya&stage=lead&page=2',
-    );
+    expect(
+      writeContactsView({
+        ...DEFAULT_CONTACTS_VIEW,
+        searchText: ' priya ',
+        lifecycleStage: 'lead',
+        page: 2,
+      }).toString(),
+    ).toBe('q=priya&stage=lead&page=2');
   });
 
   it('builds the API address and knows when a filter is on', () => {
     expect(buildContactsPath(DEFAULT_CONTACTS_VIEW)).toBe('/contacts?page=1&limit=25');
-    expect(buildContactsPath({ searchText: 'a b', lifecycleStage: 'not_a_fit', page: 2 })).toBe(
-      '/contacts?q=a+b&lifecycleStage=not_a_fit&page=2&limit=25',
-    );
+    expect(
+      buildContactsPath({ ...DEFAULT_CONTACTS_VIEW, searchText: 'a b', lifecycleStage: 'not_a_fit', page: 2 }),
+    ).toBe('/contacts?q=a+b&lifecycleStage=not_a_fit&page=2&limit=25');
     expect(isContactsViewFiltered(DEFAULT_CONTACTS_VIEW)).toBe(false);
     expect(countActiveContactFilters(DEFAULT_CONTACTS_VIEW)).toBe(0);
-    expect(countActiveContactFilters({ searchText: 'a', lifecycleStage: 'lead', page: 1 })).toBe(2);
+    expect(countActiveContactFilters({ ...DEFAULT_CONTACTS_VIEW, searchText: 'a', lifecycleStage: 'lead' })).toBe(2);
     expect(isContactsViewFiltered({ ...DEFAULT_CONTACTS_VIEW, searchText: 'x' })).toBe(true);
   });
 });
@@ -110,5 +116,15 @@ describe('the Edit contact form', () => {
     expect(checkContactForm({ name: '', phone: '1', email: '', language: 'eng' }).language).toBe(
       'contacts.form.languageInvalid',
     );
+  });
+
+  it('keeps the extra conditions in the address and the API address, and counts them as filters', () => {
+    const conditions = [{ field: 'custom.car', operator: 'is' as const, value: 'Swift' }];
+    const view = { ...DEFAULT_CONTACTS_VIEW, conditions };
+    expect(readContactsView(writeContactsView(view)).conditions).toEqual(conditions);
+    expect(buildContactsPath(view)).toContain('filters=');
+    expect(countActiveContactFilters(view)).toBe(1);
+    expect(isContactsViewFiltered(view)).toBe(true);
+    expect(readContactsView(new URLSearchParams({ filters: 'oops' })).conditions).toEqual([]);
   });
 });

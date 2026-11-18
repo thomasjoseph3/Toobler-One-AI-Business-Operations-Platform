@@ -9,13 +9,8 @@ import type {
   SetLeadTemperatureRequest,
   UpdateLeadRequest,
 } from '@toobler-one/shared';
-import {
-  checkFilterConditions,
-  customFieldsToFilterable,
-  parseFiltersText,
-  type CheckedFilterCondition,
-  type FilterableField,
-} from '@toobler-one/shared';
+import { customFieldsToFilterable, type CheckedFilterCondition, type FilterableField } from '@toobler-one/shared';
+import { readFilterRequest } from '../../../../kernel/filters/read-filter-request';
 import type { AssignLeadRequest } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
@@ -55,8 +50,8 @@ const TEMPERATURE_FILTERABLE: FilterableField = {
 };
 
 /**
- * Reads the `filters` of a lead list request: the text must be a list of conditions, and every condition must make sense for its field (the temperature, or
- * one of the business's live lead fields). Throws 400 INVALID_FILTERS with the first problem in words. No filters means no conditions.
+ * Reads the `filters` of a lead list request: the temperature or one of the business's live lead fields (the shared filter reader checks them).
+ * Throws 400 INVALID_FILTERS with the first problem in words.
  */
 async function readLeadFilterConditions(
   transaction: Db,
@@ -64,17 +59,8 @@ async function readLeadFilterConditions(
   filtersText: string | undefined,
 ): Promise<CheckedFilterCondition[]> {
   if (filtersText === undefined || filtersText.trim() === '') return [];
-  const parsed = parseFiltersText(filtersText);
-  if ('problem' in parsed) throw new ApiError(400, 'INVALID_FILTERS', parsed.problem);
-  if (parsed.conditions.length === 0) return [];
   const definitions = await findFieldDefinitions(transaction, accountId, 'lead');
-  const { checked, problems } = checkFilterConditions(parsed.conditions, [
-    TEMPERATURE_FILTERABLE,
-    ...customFieldsToFilterable(definitions),
-  ]);
-  const firstProblem = problems[0];
-  if (firstProblem) throw new ApiError(400, 'INVALID_FILTERS', firstProblem.message, { problems });
-  return checked;
+  return readFilterRequest(filtersText, [TEMPERATURE_FILTERABLE, ...customFieldsToFilterable(definitions)]);
 }
 
 /** The most leads one board column carries; the column says how many more there are. */

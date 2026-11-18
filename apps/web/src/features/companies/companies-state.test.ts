@@ -12,15 +12,23 @@ import { describeCompanySaveProblem } from './company-problem';
 
 describe('the Companies list view', () => {
   it('reads the search and page from the address, and falls back to the default', () => {
-    expect(readCompaniesView(new URLSearchParams('q=infosys&page=3'))).toEqual({ searchText: 'infosys', page: 3 });
+    expect(readCompaniesView(new URLSearchParams('q=infosys&page=3'))).toEqual({
+      ...DEFAULT_COMPANIES_VIEW,
+      searchText: 'infosys',
+      page: 3,
+    });
     expect(readCompaniesView(new URLSearchParams('page=-2&q='))).toEqual(DEFAULT_COMPANIES_VIEW);
     expect(readCompaniesView(new URLSearchParams('page=abc'))).toEqual(DEFAULT_COMPANIES_VIEW);
   });
 
   it('writes only what is not the default, and builds the API address', () => {
     expect(writeCompaniesView(DEFAULT_COMPANIES_VIEW).toString()).toBe('');
-    expect(writeCompaniesView({ searchText: ' infosys ', page: 2 }).toString()).toBe('q=infosys&page=2');
-    expect(buildCompaniesPath({ searchText: 'infosys hr', page: 2 })).toBe('/companies?q=infosys+hr&page=2&limit=25');
+    expect(writeCompaniesView({ ...DEFAULT_COMPANIES_VIEW, searchText: ' infosys ', page: 2 }).toString()).toBe(
+      'q=infosys&page=2',
+    );
+    expect(buildCompaniesPath({ ...DEFAULT_COMPANIES_VIEW, searchText: 'infosys hr', page: 2 })).toBe(
+      '/companies?q=infosys+hr&page=2&limit=25',
+    );
   });
 });
 
@@ -95,5 +103,13 @@ describe('changing a company', () => {
         company,
       ),
     ).toEqual({ name: 'Infosys Finance', domain: null, city: 'Goa' });
+  });
+
+  it('keeps the extra conditions in the address and in the API address', () => {
+    const conditions = [{ field: 'custom.size', operator: 'is' as const, value: 'Large' }];
+    const view = { ...DEFAULT_COMPANIES_VIEW, conditions };
+    expect(readCompaniesView(writeCompaniesView(view)).conditions).toEqual(conditions);
+    expect(buildCompaniesPath(view)).toContain('filters=');
+    expect(readCompaniesView(new URLSearchParams({ filters: 'oops' })).conditions).toEqual([]);
   });
 });

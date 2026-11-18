@@ -15,8 +15,8 @@ import {
 } from '@toobler-one/ui';
 import { Link } from 'react-router';
 import { useFieldDefinitions } from '../fields/use-field-definitions';
-import { ConditionsEditor } from './ConditionsEditor';
-import { listFilterableLeadFields } from './filter-conditions-ui';
+import { ConditionsEditor } from '../shared/ConditionsEditor';
+import { listFilterableLeadFields } from '../shared/filter-conditions-ui';
 import { formatMessage, t } from '../../app/i18n';
 import {
   countActiveFilters,

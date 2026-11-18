@@ -1,4 +1,6 @@
 import { sql } from 'kysely';
+import type { CheckedFilterCondition } from '@toobler-one/shared';
+import { conditionsToSql } from '../../../../kernel/filters/conditions-to-sql';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 
@@ -120,12 +122,21 @@ export async function findCompanyIdByDomain(db: Db, accountId: string, domain: s
 export async function listCompanies(
   db: Db,
   accountId: string,
-  options: { searchPattern: string | undefined; domain: string | undefined; limit: number; offset: number },
+  options: {
+    searchPattern: string | undefined;
+    domain: string | undefined;
+    /** Filter-engine conditions that already passed the shared check; every one must hold. */
+    conditions?: readonly CheckedFilterCondition[];
+    limit: number;
+    offset: number;
+  },
 ): Promise<{ items: CompanyRow[]; total: number }> {
   /** The filters shared by the page query and the count query. */
   const filtered = () => {
     let query = db.selectFrom('companies').where('account_id', '=', accountId).where('deleted_at', 'is', null);
     if (options.domain) query = query.where('domain', '=', options.domain);
+    const conditionSql = conditionsToSql(options.conditions ?? [], { customColumn: 'custom', builtInColumns: {} });
+    if (conditionSql) query = query.where(conditionSql);
     const pattern = options.searchPattern;
     if (pattern) {
       query = query.where((expression) =>

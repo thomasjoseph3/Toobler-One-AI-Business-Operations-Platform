@@ -200,6 +200,7 @@ const englishMessages = {
   'leads.row.notesCount': 'Notes for {name}: {count}',
   'leads.row.more': 'More actions for {name}',
   'leads.filter.title': 'Filter leads',
+  'companies.filter.title': 'Filter companies',
   'leads.filter.status': 'Show',
   'leads.filter.temperature': 'Temperature',
   'leads.filter.conditions': 'More filters',

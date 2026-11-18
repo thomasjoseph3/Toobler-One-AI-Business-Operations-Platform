@@ -1,5 +1,8 @@
 import { Button, PlusIcon, SelectField, TextField } from '@toobler-one/ui';
 import { t } from '../../app/i18n';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
+import { ConditionsEditor } from '../shared/ConditionsEditor';
+import { listFilterableCustomFields } from '../shared/filter-conditions-ui';
 import { ListFilterPopover } from '../shared/ListFilterPopover';
 import { countActiveContactFilters, LIFECYCLE_CHOICES, readContactsView, type ContactsView } from './contacts-view';
 
@@ -28,6 +31,7 @@ export function ContactsToolbar({
   onAddContact,
 }: ContactsToolbarProps) {
   const activeFilterCount = countActiveContactFilters(view);
+  const filterableFields = listFilterableCustomFields(useFieldDefinitions('contact'));
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -57,6 +61,15 @@ export function ContactsToolbar({
               ...LIFECYCLE_CHOICES.map((choice) => ({ value: choice.stage, label: t(choice.labelKey) })),
             ]}
           />
+          {/* Only when the business has fields of its own to filter on; keyed so the rows start again from what is applied */}
+          {filterableFields.length > 0 ? (
+            <ConditionsEditor
+              key={JSON.stringify(view.conditions)}
+              fields={filterableFields}
+              applied={view.conditions}
+              onApply={(conditions) => onChangeView({ conditions })}
+            />
+          ) : null}
           <Button variant="tertiary" size="compact" disabled={activeFilterCount === 0} onClick={onClearFilters}>
             {t('leads.filter.clear')}
           </Button>
