@@ -46,3 +46,44 @@ export const createListRequestSchema = z
     path: ['fromView'],
   });
 export type CreateListRequest = z.infer<typeof createListRequestSchema>;
+
+/** The address part naming a list. */
+export const listIdParamsSchema = z.object({ id: z.uuid() });
+
+/** The address parts naming a list and one contact in it. */
+export const listMemberParamsSchema = z.object({ id: z.uuid(), contactId: z.uuid() });
+
+/** The contacts to add to a list (at least one, at most 500). A contact already in the list is left as it is. */
+export const addListMembersRequestSchema = z
+  .object({ contactIds: z.array(z.uuid()).min(1).max(MAX_CONTACT_IDS_PER_REQUEST) })
+  .strict();
+export type AddListMembersRequest = z.infer<typeof addListMembersRequestSchema>;
+
+/** How many were newly added (not counting ones already in the list), and the list as it is now. */
+export const addListMembersResponseSchema = z.object({ added: z.number().int(), list: contactListSchema });
+export type AddListMembersResponse = z.infer<typeof addListMembersResponseSchema>;
+
+export const listMembersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+});
+export type ListMembersQuery = z.infer<typeof listMembersQuerySchema>;
+
+/** One person in a list, as the list page shows them. */
+export const listMemberSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  addedAt: z.string(),
+});
+
+/** One page of a list's people (live contacts only), most recently added first, with the list itself. */
+export const listMembersResponseSchema = z.object({
+  list: contactListSchema,
+  items: z.array(listMemberSchema),
+  total: z.number().int(),
+  page: z.number().int(),
+  limit: z.number().int(),
+});
+export type ListMembersResponse = z.infer<typeof listMembersResponseSchema>;

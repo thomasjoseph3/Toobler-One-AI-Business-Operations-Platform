@@ -65,7 +65,11 @@ export function ListsPage() {
         <TableBody>
           {resource.state.data.items.map((list) => (
             <TableRow key={list.id}>
-              <TableCell className="text-text-primary [overflow-wrap:anywhere]">{list.name}</TableCell>
+              <TableCell className="text-text-primary [overflow-wrap:anywhere]">
+                <Link to={`/contacts/lists/${list.id}`} className="text-link hover:text-link-hover hover:underline">
+                  {list.name}
+                </Link>
+              </TableCell>
               <TableCell>{formatMessage('lists.members', { count: list.memberCount })}</TableCell>
             </TableRow>
           ))}

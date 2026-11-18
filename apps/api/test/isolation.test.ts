@@ -82,6 +82,7 @@ interface BusinessAData {
   companyId: string;
   fieldId: string;
   viewId: string;
+  listId: string;
   secretWords: string;
 }
 
@@ -250,6 +251,8 @@ beforeAll(async () => {
   );
   // A has a saved view with a secret name; B must never see it
   const viewOfA = await sendOk(businessA, 'POST', '/views', { object: 'lead', name: `View ${secretWords}` }, 201);
+  // A has a contact list with a secret name; B must never see it
+  const listOfA = await sendOk(businessA, 'POST', '/lists', { name: `List ${secretWords}` }, 201);
   // A has a company with a secret name; B must never see it
   const companyOfA = await sendOk(
     businessA,
@@ -296,6 +299,7 @@ beforeAll(async () => {
     companyId: companyOfA.id,
     fieldId: fieldOfA.id,
     viewId: viewOfA.id,
+    listId: listOfA.id,
     secretWords,
   };
 
@@ -877,6 +881,22 @@ const attempts: Attempt[] = [
       method: 'POST',
       url: '/lists',
       payload: { name: 'Isolation list', contactIds: [dataOfA.contactId] },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/lists/{id}/members',
+    what: "read the people of A's list",
+    request: () => ({ method: 'GET', url: `/lists/${dataOfA.listId}/members` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/lists/{id}/members',
+    what: "add people to A's list",
+    request: () => ({
+      method: 'POST',
+      url: `/lists/${dataOfA.listId}/members`,
+      payload: { contactIds: [dataOfA.contactId] },
     }),
     expectedStatus: 404,
   },

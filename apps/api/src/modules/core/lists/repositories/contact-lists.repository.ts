@@ -91,3 +91,58 @@ export async function addMembers(
     .execute();
   return inserted.length;
 }
+
+/** A person in a list, with when they were added. */
+export interface ListMemberRow {
+  contactId: string;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  addedAt: Date;
+}
+
+/** One page of a list's live contacts, most recently added first. Deleted contacts are left out. */
+export async function listMembers(
+  db: Db,
+  options: { accountId: string; listId: string; limit: number; offset: number },
+): Promise<{ rows: ListMemberRow[]; total: number }> {
+  const base = () =>
+    db
+      .selectFrom('contact_list_members as member')
+      .innerJoin('contacts as contact', 'contact.id', 'member.contact_id')
+      .where('member.account_id', '=', options.accountId)
+      .where('member.list_id', '=', options.listId)
+      .where('contact.deleted_at', 'is', null);
+  const rows = await base()
+    .select(['contact.id', 'contact.name', 'contact.phone', 'contact.email', 'member.added_at'])
+    .orderBy('member.added_at', 'desc')
+    .orderBy('contact.id')
+    .limit(options.limit)
+    .offset(options.offset)
+    .execute();
+  const count = await base()
+    .select((expression) => expression.fn.countAll<string>().as('total'))
+    .executeTakeFirstOrThrow();
+  return {
+    rows: rows.map((row) => ({
+      contactId: row.id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      addedAt: row.added_at,
+    })),
+    total: Number(count.total),
+  };
+}
+
+/** Takes the list's row for update, so two requests that add people at the same moment take turns and the size limit holds. Returns false when there is no such list. */
+export async function lockContactList(db: Db, accountId: string, listId: string): Promise<boolean> {
+  const row = await db
+    .selectFrom('contact_lists')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('id', '=', listId)
+    .forUpdate()
+    .executeTakeFirst();
+  return row !== undefined;
+}

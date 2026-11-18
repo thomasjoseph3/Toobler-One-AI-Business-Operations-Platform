@@ -82,6 +82,10 @@ export interface PretendApi {
     created: Array<Record<string, unknown>>;
     refusal: { status: number; code: string; message: string } | null;
     listFails: boolean;
+    /** The people in each list (the contact ids), what the page sent to add, and a way to make adding fail. */
+    members: Record<string, string[]>;
+    addedMembers: Array<{ listId: string; contactIds: string[] }>;
+    addRefusal: { status: number; code: string; message: string } | null;
   };
   /** Saved views of the Leads list: what is saved, what the page sent, and a way to make saving fail. */
   views: {
@@ -252,7 +256,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         patchedLeads: [],
         leadEdits: {},
         temperatureChanges: [],
-        lists: { items: [], created: [], refusal: null, listFails: false },
+        lists: {
+          items: [],
+          created: [],
+          refusal: null,
+          listFails: false,
+          members: {},
+          addedMembers: [],
+          addRefusal: null,
+        },
         views: { items: [], created: [], patched: [], deletedIds: [], refusal: null },
         search: {
           queries: [],
@@ -549,6 +561,31 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        const listMembersMatch = /^\/lists\/([^/]+)\/members$/.exec(path);
+        if (listMembersMatch) {
+          const listId = listMembersMatch[1]!;
+          const list = pretendApi.lists.items.find((item) => item.id === listId);
+          if (!list)
+            return route.fulfill(json(404, { error: { code: 'NOT_FOUND', message: 'That list does not exist.' } }));
+          const members = pretendApi.lists.members[listId] ?? [];
+          if (request.method() === 'POST') {
+            if (pretendApi.lists.addRefusal) {
+              const { status, code, message } = pretendApi.lists.addRefusal;
+              return route.fulfill(json(status, { error: { code, message } }));
+            }
+            const { contactIds } = request.postDataJSON() as { contactIds: string[] };
+            pretendApi.lists.addedMembers.push({ listId, contactIds });
+            const added = contactIds.filter((contactId) => !members.includes(contactId));
+            pretendApi.lists.members[listId] = [...members, ...added];
+            list.memberCount = pretendApi.lists.members[listId]!.length;
+            return route.fulfill(json(200, { added: added.length, list }));
+          }
+          const items = members.flatMap((contactId) => {
+            const contact = PRETEND_CONTACTS.find((candidate) => candidate.id === contactId);
+            return contact ? [{ ...contact, addedAt: '2026-11-18T10:00:00.000Z' }] : [];
+          });
+          return route.fulfill(json(200, { list, items, total: items.length, page: 1, limit: 25 }));
+        }
         if (path === '/lists' && request.method() === 'GET') {
           if (pretendApi.lists.listFails) {
             return route.fulfill(json(500, { error: { code: 'SERVER_ERROR', message: 'Something went wrong.' } }));

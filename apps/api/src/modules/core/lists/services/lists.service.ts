@@ -1,12 +1,16 @@
 import {
   MAX_LIST_MEMBERS,
+  type AddListMembersRequest,
+  type AddListMembersResponse,
   type ContactList,
+  type ListMembersQuery,
+  type ListMembersResponse,
   type ContactListsResponse,
   type CreateListRequest,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
-import type { Database } from '../../../../kernel/database';
+import type { Database, Db } from '../../../../kernel/database';
 import { ApiError, conflict, notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
@@ -90,5 +94,90 @@ export function createListsService({ database }: { database: Database }) {
         throw error;
       }
     },
+
+    /** One page of a list's people (live contacts only), most recently added first, with the list. An unknown list and another business's list are 404. */
+    async listMembers(
+      principal: Pick<Principal, 'accountId'>,
+      listId: string,
+      query: ListMembersQuery,
+    ): Promise<ListMembersResponse> {
+      const accountId = principal.accountId;
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const list = await contactListsRepository.findContactListById(transaction, accountId, listId);
+        if (!list) throw notFound('That list');
+        const { rows, total } = await contactListsRepository.listMembers(transaction, {
+          accountId,
+          listId,
+          limit: query.limit,
+          offset: (query.page - 1) * query.limit,
+        });
+        return {
+          list: toContactList(list),
+          items: rows.map((row) => ({
+            id: row.contactId,
+            name: row.name,
+            phone: row.phone,
+            email: row.email,
+            addedAt: row.addedAt.toISOString(),
+          })),
+          total,
+          page: query.page,
+          limit: query.limit,
+        };
+      });
+    },
+
+    /**
+     * Puts more contacts in a list. A contact already in it is left as it is (and not counted as added). A contact that is not a live contact of the
+     * business is 404 and nothing is saved; an unknown list is 404; a list that would pass 5000 contacts is 409 LIST_FULL. Two requests at the same moment
+     * take turns, so the limit always holds. Answers with how many were added and the list as it is now.
+     */
+    async addMembers(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      listId: string,
+      request: AddListMembersRequest,
+    ): Promise<AddListMembersResponse> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        if (!(await contactListsRepository.lockContactList(transaction, accountId, listId)))
+          throw notFound('That list');
+        const uniqueIds = [...new Set(request.contactIds)];
+        const live = new Set(await findLiveContactIds(transaction, { accountId, contactIds: uniqueIds }));
+        if (uniqueIds.some((contactId) => !live.has(contactId))) throw notFound('One of those contacts');
+
+        const before = await contactListsRepository.findContactListById(transaction, accountId, listId);
+        if (!before) throw notFound('That list');
+        const added = await contactListsRepository.addMembers(transaction, {
+          accountId,
+          listId,
+          contactIds: uniqueIds,
+          actor,
+        });
+        // Some of them may already be in the list, so the size is checked after adding; the error undoes the adding (the whole request is one transaction)
+        if (before.memberCount + added > MAX_LIST_MEMBERS) {
+          throw conflict('LIST_FULL', `A list holds at most ${MAX_LIST_MEMBERS} contacts.`);
+        }
+        return finishAdding(transaction, { accountId, listId, added, actor });
+      });
+    },
   };
+}
+
+/** Writes the activity line (when anyone was added) and reads the list again for the answer. */
+async function finishAdding(
+  transaction: Db,
+  options: { accountId: string; listId: string; added: number; actor: Actor },
+): Promise<AddListMembersResponse> {
+  if (options.added > 0) {
+    await writeActivityLog(transaction, {
+      accountId: options.accountId,
+      actor: options.actor,
+      kind: 'lists.members_added',
+      details: { recordType: 'list', recordId: options.listId, fields: ['members'] },
+    });
+  }
+  const list = await contactListsRepository.findContactListById(transaction, options.accountId, options.listId);
+  if (!list) throw notFound('That list');
+  return { added: options.added, list: toContactList(list) };
 }

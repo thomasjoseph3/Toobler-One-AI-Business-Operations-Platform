@@ -62,3 +62,40 @@ test.describe('Contact lists', () => {
     await expect(page.getByText('No lists yet')).toBeVisible();
   });
 });
+
+test.describe('One contact list', () => {
+  const diwali = { id: 'list-1', name: 'Diwali offer 2026', memberCount: 0, createdAt: '2026-11-18T10:00:00.000Z' };
+
+  test('opens from the Lists page, finds a person, adds them, and says when they are already in', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.lists.items = [{ ...diwali }];
+    await page.goto('/contacts/lists');
+    await page.getByRole('link', { name: 'Diwali offer 2026' }).click();
+    await expect(page).toHaveURL(/\/contacts\/lists\/list-1$/);
+    await expect(page.getByRole('heading', { name: 'Diwali offer 2026', level: 2 })).toBeVisible();
+    await expect(page.getByText('Nobody is in this list yet')).toBeVisible();
+
+    await page.getByLabel('Find a person to add').fill('priya');
+    await page.getByRole('button', { name: 'Add Priya Menon to the list' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Priya Menon was added to the list.' })).toBeVisible();
+    expect(pretendApi.lists.addedMembers).toEqual([{ listId: 'list-1', contactIds: ['contact-priya'] }]);
+    await expect(page.getByRole('cell', { name: 'Priya Menon' })).toBeVisible();
+
+    await page.getByLabel('Find a person to add').fill('priya');
+    await page.getByRole('button', { name: 'Add Priya Menon to the list' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'already in the list' })).toBeVisible();
+  });
+
+  test('says plainly when the list no longer exists, and when adding is refused', async ({ page, pretendApi }) => {
+    await page.goto('/contacts/lists/list-missing');
+    await expect(page.getByText('That list does not exist')).toBeVisible();
+    pretendApi.lists.items = [{ ...diwali }];
+    pretendApi.lists.addRefusal = { status: 409, code: 'LIST_FULL', message: 'A list holds at most 5000 contacts.' };
+    await page.goto('/contacts/lists/list-1');
+    await page.getByLabel('Find a person to add').fill('priya');
+    await page.getByRole('button', { name: 'Add Priya Menon to the list' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'at most 5000' })).toBeVisible();
+  });
+});
