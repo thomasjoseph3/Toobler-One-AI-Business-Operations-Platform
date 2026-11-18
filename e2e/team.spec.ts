@@ -121,6 +121,33 @@ test.describe('Settings: Team', () => {
     await expect(page.getByText('Removed', { exact: true })).toHaveCount(0);
   });
 
+  test('sends a waiting invitation again and offers its new link', async ({ page, pretendApi }) => {
+    await page.goto('/settings/team');
+    await page.getByRole('button', { name: 'More actions for the invitation to Meera Pillai' }).click();
+    await page.getByRole('button', { name: 'Send again' }).click();
+    await expect(page.getByText('Invitation sent to meera@example.com. The link works for 48 hours.')).toBeVisible();
+    await expect(
+      page.getByText('http://localhost:3000/accept-invitation?token=resent123456789abcdefghij'),
+    ).toBeVisible();
+    expect(pretendApi.team.resentInvitationIds).toEqual(['invitation-1']);
+  });
+
+  test('asks before cancelling an invitation, naming the person', async ({ page, pretendApi }) => {
+    await page.goto('/settings/team');
+    await page.getByRole('button', { name: 'More actions for the invitation to Meera Pillai' }).click();
+    await page.getByRole('button', { name: 'Cancel invitation' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Cancel the invitation to Meera Pillai?' });
+    await dialog.getByRole('button', { name: 'Keep it' }).click();
+    expect(pretendApi.team.cancelledInvitationIds).toEqual([]);
+
+    await page.getByRole('button', { name: 'More actions for the invitation to Meera Pillai' }).click();
+    await page.getByRole('button', { name: 'Cancel invitation' }).click();
+    await dialog.getByRole('button', { name: 'Cancel invitation' }).click();
+    await expect(page.getByText('The invitation to Meera Pillai was cancelled.')).toBeVisible();
+    expect(pretendApi.team.cancelledInvitationIds).toEqual(['invitation-1']);
+    await expect(page.getByText('No invitations are waiting.')).toBeVisible();
+  });
+
   test('says in the API’s words when a change is refused', async ({ page, pretendApi }) => {
     pretendApi.team.refusal = {
       status: 409,

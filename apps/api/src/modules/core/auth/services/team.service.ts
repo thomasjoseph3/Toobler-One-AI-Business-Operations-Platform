@@ -65,7 +65,91 @@ export function createTeamService({
   mail: MailSender;
   logger: FastifyBaseLogger;
 }) {
+  /** Emails an invitation link. A failed send is logged (never with the address or the link) and answered with false, so the manager can still copy the link. */
+  async function sendInvitationEmail(details: {
+    to: string;
+    personName: string;
+    businessName: string;
+    invitedByName: string;
+    link: string;
+  }): Promise<boolean> {
+    try {
+      await mail.send(buildInvitationEmail({ ...details, hours: INVITATION_HOURS }));
+      return true;
+    } catch (error) {
+      logger.error({ reason: error instanceof Error ? error.name : 'unknown' }, 'could not send the invitation email');
+      return false;
+    }
+  }
+
   return {
+    /**
+     * Cancels an invitation that has not been accepted: its link stops working at once, and the email can be invited again. An unknown,
+     * used or already cancelled invitation, and another business's, answer 404.
+     */
+    async cancelInvitation(principal: Pick<Principal, 'accountId' | 'userId'>, invitationId: string): Promise<void> {
+      await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const invitation = await invitationsRepository.findOpenInvitationForUpdate(
+          transaction,
+          principal.accountId,
+          invitationId,
+        );
+        if (!invitation) throw notFound('That invitation');
+        await invitationsRepository.cancelInvitation(transaction, principal.accountId, invitationId);
+        await writeActivityLog(transaction, {
+          accountId: principal.accountId,
+          actor: { kind: 'user', id: principal.userId },
+          kind: 'team.invitation_cancelled',
+          details: { recordType: 'invitation', recordId: invitationId },
+        });
+      });
+    },
+
+    /**
+     * Sends an invitation again with a NEW link (the old link stops working) that works for 48 hours from now; also the way to revive an expired
+     * invitation. Answers like inviting does: the link (shown only now) and whether the email went out. An unknown, used or cancelled invitation, and
+     * another business's, answer 404.
+     */
+    async resendInvitation(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      invitationId: string,
+    ): Promise<InvitationCreated> {
+      const rawToken = generateSecret();
+      const renewed = await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const invitation = await invitationsRepository.findOpenInvitationForUpdate(
+          transaction,
+          principal.accountId,
+          invitationId,
+        );
+        if (!invitation) throw notFound('That invitation');
+        const business = await accountsRepository.findAccountById(transaction, principal.accountId);
+        const sender = await usersRepository.findPersonProfileById(transaction, principal.userId);
+        if (!business || !sender) throw notFound('Your account');
+        const renewedInvitation = await invitationsRepository.renewInvitation(transaction, {
+          accountId: principal.accountId,
+          invitationId,
+          tokenHash: hashSecret(rawToken),
+          hours: INVITATION_HOURS,
+        });
+        await writeActivityLog(transaction, {
+          accountId: principal.accountId,
+          actor: { kind: 'user', id: principal.userId },
+          kind: 'team.invitation_resent',
+          details: { recordType: 'invitation', recordId: invitationId },
+        });
+        return { invitation: renewedInvitation, businessName: business.name, invitedByName: sender.name };
+      });
+      const link = `${config.webUrl}/accept-invitation?token=${rawToken}`;
+      const emailSent = await sendInvitationEmail({
+        to: renewed.invitation.email,
+        personName: renewed.invitation.name,
+        businessName: renewed.businessName,
+        invitedByName: renewed.invitedByName,
+        link,
+      });
+      return { invitation: describeInvitation(renewed.invitation), link, emailSent };
+    },
+
     /**
      * Changes a person's role (it takes effect on their very next request, since the role is read from the database every time) and/or adds a
      * removed person back. The business always keeps at least one active manager: demoting the last one answers 409 LAST_MANAGER. A removed person's
@@ -263,25 +347,13 @@ export function createTeamService({
 
       // The link opens a page in the web app; that page sends the token to the accept route. Opening the link changes nothing.
       const link = `${config.webUrl}/accept-invitation?token=${rawToken}`;
-      let emailSent = true;
-      try {
-        await mail.send(
-          buildInvitationEmail({
-            to: request.email,
-            personName: request.name,
-            businessName: created.businessName,
-            invitedByName: created.invitedByName,
-            link,
-            hours: INVITATION_HOURS,
-          }),
-        );
-      } catch (error) {
-        emailSent = false;
-        logger.error(
-          { reason: error instanceof Error ? error.name : 'unknown' },
-          'could not send the invitation email',
-        );
-      }
+      const emailSent = await sendInvitationEmail({
+        to: request.email,
+        personName: request.name,
+        businessName: created.businessName,
+        invitedByName: created.invitedByName,
+        link,
+      });
       return { invitation: describeInvitation(created.invitation), link, emailSent };
     },
   };

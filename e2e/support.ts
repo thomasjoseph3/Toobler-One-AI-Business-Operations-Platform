@@ -238,6 +238,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           path === '/team' ||
           path.startsWith('/team/members/') ||
           path === '/team/invitations' ||
+          path.startsWith('/team/invitations/') ||
           path === '/auth/invitations/preview' ||
           path === '/auth/accept-invitation'
         ) {

@@ -100,3 +100,6 @@ export type UpdateTeamMemberRequest = z.infer<typeof updateTeamMemberRequestSche
 /** `DELETE /team/members/{id}?hand_over_to=`: who takes over the removed person's open leads, tasks and tickets (the manager removing them when left out). */
 export const removeTeamMemberQuerySchema = z.object({ hand_over_to: z.uuid().optional() });
 export type RemoveTeamMemberQuery = z.infer<typeof removeTeamMemberQuerySchema>;
+
+/** The id of an invitation in an address. */
+export const invitationIdParamsSchema = z.object({ id: z.uuid() });

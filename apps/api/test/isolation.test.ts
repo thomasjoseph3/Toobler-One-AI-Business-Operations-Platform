@@ -77,6 +77,7 @@ interface BusinessAData {
   /** A's reading of its website (the setup wizard). */
   prefillRunId: string;
   userId: string;
+  invitationId: string;
   secretWords: string;
 }
 
@@ -236,7 +237,7 @@ beforeAll(async () => {
     201,
   );
   // A has invited a person; B must never see the invitation
-  await sendOk(
+  const invitationOfA = await sendOk(
     businessA,
     'POST',
     '/team/invitations',
@@ -260,6 +261,7 @@ beforeAll(async () => {
     unansweredQuestionId: unansweredQuestion?.id ?? '',
     prefillRunId: prefillRun.id,
     userId: businessA.profile.user.id,
+    invitationId: invitationOfA.invitation.id,
     secretWords,
   };
 
@@ -714,6 +716,18 @@ const attempts: Attempt[] = [
     route: 'DELETE /api/v1/team/members/{id}',
     what: "remove A's owner",
     request: () => ({ method: 'DELETE', url: `/team/members/${dataOfA.userId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/team/invitations/{id}',
+    what: "cancel A's invitation",
+    request: () => ({ method: 'DELETE', url: `/team/invitations/${dataOfA.invitationId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/team/invitations/{id}/resend',
+    what: "send A's invitation again (it would hand B a working link into A's business)",
+    request: () => ({ method: 'POST', url: `/team/invitations/${dataOfA.invitationId}/resend` }),
     expectedStatus: 404,
   },
   {

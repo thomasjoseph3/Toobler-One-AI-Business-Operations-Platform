@@ -17,6 +17,9 @@ export interface PretendTeam {
   /** What the page sent to change a person (role or add back), and the removals (with who takes over). */
   patchedMembers: Array<{ memberId: string; body: Record<string, unknown> }>;
   removedMembers: Array<{ memberId: string; handOverTo: string | null }>;
+  /** The invitations the page cancelled or sent again. */
+  cancelledInvitationIds: string[];
+  resentInvitationIds: string[];
   acceptedInvitations: Array<{ token: string; passwordLength: number }>;
 }
 
@@ -64,6 +67,8 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
     fails: false,
     patchedMembers: [],
     removedMembers: [],
+    cancelledInvitationIds: [],
+    resentInvitationIds: [],
     acceptedInvitations: [],
   };
 }
@@ -132,6 +137,32 @@ export function answerTeamCall(
       });
       member['status'] = 'disabled';
       return { status: 204 };
+    }
+    return undefined;
+  }
+  const invitationMatch = /^\/team\/invitations\/([\w-]+)(\/resend)?$/u.exec(call.path);
+  if (invitationMatch) {
+    if (call.role !== 'manager')
+      return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
+    const invitation = state.invitations.find((candidate) => candidate['id'] === invitationMatch[1]);
+    if (!invitation)
+      return { status: 404, body: { error: { code: 'NOT_FOUND', message: "That invitation wasn't found." } } };
+    if (call.method === 'DELETE' && !invitationMatch[2]) {
+      state.cancelledInvitationIds.push(String(invitation['id']));
+      state.invitations = state.invitations.filter((candidate) => candidate !== invitation);
+      return { status: 204 };
+    }
+    if (call.method === 'POST' && invitationMatch[2]) {
+      state.resentInvitationIds.push(String(invitation['id']));
+      invitation['isExpired'] = false;
+      return {
+        status: 200,
+        body: {
+          invitation,
+          link: 'http://localhost:3000/accept-invitation?token=resent123456789abcdefghij',
+          emailSent: state.emailWorks,
+        },
+      };
     }
     return undefined;
   }

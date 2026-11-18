@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   Dialog,
   ErrorState,
   LoadingState,
@@ -45,20 +46,23 @@ function MemberRow({ member, isYou, menu }: { member: TeamMember; isYou: boolean
 }
 
 /** One invitation that is still waiting: who it is for, the role, and until when the link works. */
-function InvitationRow({ invitation }: { invitation: Invitation }) {
+function InvitationRow({ invitation, menu }: { invitation: Invitation; menu: ReactNode }) {
   return (
-    <li className="flex flex-col gap-1 border-b border-border-default py-3 last:border-b-0">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-label-md text-text-primary">{invitation.name}</h3>
-        <Badge tone="neutral">{describeRole(invitation.role)}</Badge>
-        {invitation.isExpired ? <Badge tone="warning">{t('team.invitations.expired')}</Badge> : null}
+    <li className="flex items-start justify-between gap-2 border-b border-border-default py-3 last:border-b-0">
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-label-md text-text-primary">{invitation.name}</h3>
+          <Badge tone="neutral">{describeRole(invitation.role)}</Badge>
+          {invitation.isExpired ? <Badge tone="warning">{t('team.invitations.expired')}</Badge> : null}
+        </div>
+        <p className="text-body-md text-text-secondary">{invitation.email}</p>
+        {invitation.isExpired ? null : (
+          <p className="text-label-sm text-text-secondary">
+            {formatMessage('team.invitations.expires', { date: formatTeamDate(invitation.expiresAt) })}
+          </p>
+        )}
       </div>
-      <p className="text-body-md text-text-secondary">{invitation.email}</p>
-      {invitation.isExpired ? null : (
-        <p className="text-label-sm text-text-secondary">
-          {formatMessage('team.invitations.expires', { date: formatTeamDate(invitation.expiresAt) })}
-        </p>
-      )}
+      {menu}
     </li>
   );
 }
@@ -80,6 +84,8 @@ export function TeamPage() {
   const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
   const [handOverToUserId, setHandOverToUserId] = useState('');
   const [isRemoving, setIsRemoving] = useState(false);
+  const [invitationToCancel, setInvitationToCancel] = useState<Invitation | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
   if (sessionState.status !== 'signedIn') return null;
@@ -128,6 +134,53 @@ export function TeamPage() {
     setMemberToRemove(null);
     resource.reload();
   };
+
+  // Sends an invitation again with a new link, and shows the new link like a fresh invitation
+  const resendInvitation = async (invitation: Invitation) => {
+    setProblem(null);
+    try {
+      const created = await apiRequest<InvitationCreated>('POST', `/team/invitations/${invitation.id}/resend`);
+      setNotice(null);
+      setLinkWasCopied(false);
+      setJustInvited(created);
+    } catch (error) {
+      setProblem(describeTeamProblem(error));
+    }
+    resource.reload();
+  };
+
+  // Cancels the invitation the manager said yes to
+  const confirmCancelInvitation = async () => {
+    if (invitationToCancel === null) return;
+    setIsCancelling(true);
+    setProblem(null);
+    try {
+      await apiRequest('DELETE', `/team/invitations/${invitationToCancel.id}`);
+      setNotice(formatMessage('team.changed.cancelled', { name: invitationToCancel.name }));
+    } catch (error) {
+      setProblem(describeTeamProblem(error));
+    }
+    setIsCancelling(false);
+    setInvitationToCancel(null);
+    resource.reload();
+  };
+
+  // The "…" menu of one waiting invitation: send it again, or cancel it
+  const invitationMenuFor = (invitation: Invitation): ReactNode => (
+    <ActionMenu
+      triggerLabel={formatMessage('team.invitationMenu.label', { name: invitation.name })}
+      panelLabel={t('team.invitationMenu.panel')}
+      items={[
+        { id: 'resend', label: t('team.invitationMenu.resend'), onSelect: () => void resendInvitation(invitation) },
+        {
+          id: 'cancel',
+          label: t('team.invitationMenu.cancel'),
+          tone: 'danger',
+          onSelect: () => setInvitationToCancel(invitation),
+        },
+      ]}
+    />
+  );
 
   // The "…" menu of one person: change role, remove, or add back (nothing for yourself: someone else removes you)
   const menuFor = (member: TeamMember): ReactNode => {
@@ -233,10 +286,24 @@ export function TeamPage() {
         ) : null}
         <ul>
           {invitations.map((invitation) => (
-            <InvitationRow key={invitation.id} invitation={invitation} />
+            <InvitationRow key={invitation.id} invitation={invitation} menu={invitationMenuFor(invitation)} />
           ))}
         </ul>
       </Card>
+      <ConfirmDialog
+        isOpen={invitationToCancel !== null}
+        title={invitationToCancel ? formatMessage('team.cancel.title', { name: invitationToCancel.name }) : ''}
+        description={
+          invitationToCancel ? formatMessage('team.cancel.description', { email: invitationToCancel.email }) : ''
+        }
+        confirmLabel={t('team.cancel.confirm')}
+        cancelLabel={t('team.cancel.keep')}
+        closeLabel={t('team.remove.close')}
+        tone="danger"
+        isConfirming={isCancelling}
+        onConfirm={() => void confirmCancelInvitation()}
+        onCancel={() => setInvitationToCancel(null)}
+      />
       <Dialog
         isOpen={memberToRemove !== null}
         onClose={() => setMemberToRemove(null)}

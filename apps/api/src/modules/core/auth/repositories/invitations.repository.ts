@@ -181,3 +181,58 @@ export async function markInvitationAccepted(db: Db, tokenHash: string): Promise
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** An invitation that is still open, found by its id and locked until the transaction ends. Undefined for an unknown id, a used or cancelled invitation, and another business's. */
+export async function findOpenInvitationForUpdate(
+  db: Db,
+  accountId: string,
+  invitationId: string,
+): Promise<{ id: string; name: string; email: string } | undefined> {
+  return db
+    .selectFrom('invitations')
+    .select(['id', 'name', 'email'])
+    .where('account_id', '=', accountId)
+    .where('id', '=', invitationId)
+    .where('accepted_at', 'is', null)
+    .where('cancelled_at', 'is', null)
+    .forUpdate()
+    .executeTakeFirst();
+}
+
+/** Gives an open invitation a new link (as its hash) that works for `hours` from now; the old link stops working. Returns the invitation as the Team screen shows it. */
+export async function renewInvitation(
+  db: Db,
+  options: { accountId: string; invitationId: string; tokenHash: string; hours: number },
+): Promise<InvitationRow> {
+  const row = await db
+    .updateTable('invitations')
+    .set({
+      token_hash: options.tokenHash,
+      expires_at: sql<Date>`now() + ${options.hours} * interval '1 hour'`,
+      updated_at: sql`now()`,
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.invitationId)
+    .returning([
+      'id',
+      'name',
+      'email',
+      'mobile_e164',
+      'role',
+      'created_at',
+      'expires_at',
+      sql<boolean>`expires_at < now()`.as('is_expired'),
+    ])
+    .executeTakeFirstOrThrow();
+  return toInvitationRow(row);
+}
+
+/** Cancels an open invitation: its link stops working and the email can be invited again. */
+export async function cancelInvitation(db: Db, accountId: string, invitationId: string): Promise<void> {
+  await db
+    .updateTable('invitations')
+    .set({ cancelled_at: sql`now()`, updated_at: sql`now()` })
+    .where('account_id', '=', accountId)
+    .where('id', '=', invitationId)
+    .execute();
+}
