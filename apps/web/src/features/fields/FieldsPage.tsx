@@ -5,6 +5,7 @@ import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useKeptData } from '../knowledge/use-kept-resource';
+import { moveId } from '../what-you-sell/list-helpers';
 import { SettingsTabs } from '../settings/SettingsTabs';
 import { FieldFormPanel } from './FieldFormPanel';
 import { describeFieldProblem, describeFieldType, FIELD_OBJECT_CHOICES } from './fields-state';
@@ -22,8 +23,29 @@ export function FieldsPage() {
   const [fieldBeingChanged, setFieldBeingChanged] = useState<FieldDefinition | null>(null);
   const [fieldToRemove, setFieldToRemove] = useState<FieldDefinition | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [removeProblem, setRemoveProblem] = useState<string | null>(null);
+
+  // Moves one field a place up or down by sending the whole new order for this tab's object, then reloads the list
+  async function moveField(field: FieldDefinition, direction: 'up' | 'down') {
+    if (!data.data) return;
+    const orderedIds = moveId(
+      data.data.items.filter((candidate) => candidate.object === field.object).map((candidate) => candidate.id),
+      field.id,
+      direction,
+    );
+    setIsMoving(true);
+    setRemoveProblem(null);
+    try {
+      await apiRequest('POST', '/fields/reorder', { object: field.object, ids: orderedIds });
+      resource.reload();
+    } catch (error) {
+      setRemoveProblem(describeFieldProblem(error));
+    } finally {
+      setIsMoving(false);
+    }
+  }
 
   // Removes the field the person confirmed, then reloads the list; says what went wrong when it fails
   async function confirmRemove() {
@@ -81,7 +103,7 @@ export function FieldsPage() {
       <Card>
         {fieldsOfObject.length === 0 ? <p className="text-body-md text-text-secondary">{t('fields.empty')}</p> : null}
         <ul>
-          {fieldsOfObject.map((field) => (
+          {fieldsOfObject.map((field, position) => (
             <li key={field.id} className="flex flex-col gap-1 border-b border-border-default py-3 last:border-b-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-label-md text-text-primary">{field.label}</h3>
@@ -94,7 +116,25 @@ export function FieldsPage() {
                   {formatMessage('fields.options', { options: field.options.join(', ') })}
                 </p>
               ) : null}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="tertiary"
+                  size="compact"
+                  disabled={isMoving || position === 0}
+                  aria-label={formatMessage('fields.moveUp', { label: field.label })}
+                  onClick={() => void moveField(field, 'up')}
+                >
+                  ↑
+                </Button>
+                <Button
+                  variant="tertiary"
+                  size="compact"
+                  disabled={isMoving || position === fieldsOfObject.length - 1}
+                  aria-label={formatMessage('fields.moveDown', { label: field.label })}
+                  onClick={() => void moveField(field, 'down')}
+                >
+                  ↓
+                </Button>
                 <Button
                   size="compact"
                   aria-label={formatMessage('fields.change', { label: field.label })}

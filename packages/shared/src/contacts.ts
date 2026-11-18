@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { customValuesInputSchema, customValuesSchema } from './custom-fields';
 
 // The shape of contacts between the API and the web app.
 
@@ -19,6 +20,8 @@ export const contactSchema = z.object({
   lifecycleStage: lifecycleStageSchema,
   /** The company the contact belongs to (F05), or null. The company's name comes from `GET /companies/{id}`. */
   companyId: z.string().nullable(),
+  /** The answers to the business's custom contact fields (F09), by field key; only live fields. */
+  custom: customValuesSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -42,6 +45,7 @@ export const createContactRequestSchema = z
         .regex(/^[a-z]{2}$/, 'Use a two-letter code like en')
         .optional(),
     ),
+    custom: customValuesInputSchema.optional(),
   })
   .strict();
 export type CreateContactRequest = z.infer<typeof createContactRequestSchema>;
@@ -90,6 +94,8 @@ export const updateContactRequestSchema = z
         .optional(),
     ),
     notAFit: z.boolean().optional(),
+    /** Answers to custom fields; only the keys sent change (null removes one). */
+    custom: customValuesInputSchema.optional(),
   })
   .strict();
 export type UpdateContactRequest = z.infer<typeof updateContactRequestSchema>;

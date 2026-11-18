@@ -117,6 +117,27 @@ test.describe('Settings: Fields', () => {
     await expect(page.getByRole('heading', { name: 'Birthday', level: 3 })).toHaveCount(0);
   });
 
+  test('moves a field down, sending the whole new order of that tab', async ({ page, pretendApi }) => {
+    pretendApi.fields.fields.push({
+      id: 'field-3',
+      object: 'lead',
+      key: 'budget',
+      label: 'Budget',
+      type: 'number',
+      options: [],
+      aiAsks: false,
+      requiredForWon: false,
+    });
+    await page.goto('/settings/fields');
+    await page.getByRole('button', { name: 'Leads' }).click();
+    // The first field cannot move up, the last cannot move down
+    await expect(page.getByRole('button', { name: 'Move Car model up' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Move Budget down' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Move Car model down' }).click();
+    await expect.poll(() => pretendApi.fields.reorders).toEqual([{ object: 'lead', ids: ['field-3', 'field-1'] }]);
+    await expect(page.getByRole('heading', { level: 3 }).first()).toHaveText('Budget');
+  });
+
   test('shows an error with a retry when the fields cannot be loaded', async ({ page, pretendApi }) => {
     pretendApi.fields.fails = true;
     await page.goto('/settings/fields');

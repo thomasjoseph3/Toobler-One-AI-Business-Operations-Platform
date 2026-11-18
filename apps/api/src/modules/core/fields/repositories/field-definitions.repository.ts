@@ -181,3 +181,23 @@ export async function archiveFieldDefinition(
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** Gives the object's live fields the places 0, 1, 2 ... in the order of these ids. The caller has already checked the ids are exactly the live fields. */
+export async function setFieldSortOrder(
+  db: Db,
+  accountId: string,
+  object: FieldObject,
+  orderedFieldIds: string[],
+  actor: Actor,
+): Promise<void> {
+  for (const [place, fieldId] of orderedFieldIds.entries()) {
+    await db
+      .updateTable('field_definitions')
+      .set({ sort: place, updated_by: { kind: actor.kind, id: actor.id }, updated_at: new Date() })
+      .where('account_id', '=', accountId)
+      .where('object', '=', object)
+      .where('id', '=', fieldId)
+      .where('archived_at', 'is', null)
+      .execute();
+  }
+}

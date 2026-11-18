@@ -6,6 +6,7 @@ import {
   type FieldDefinition,
   type FieldsListResponse,
   type ListFieldsQuery,
+  type ReorderFieldsRequest,
   MAX_DROPDOWN_OPTIONS,
   type UpdateFieldRequest,
 } from '@toobler-one/shared';
@@ -166,6 +167,43 @@ export function createFieldsService({ database }: { database: Database }) {
           kind: 'fields.deleted',
           details: { recordType: 'field', recordId: fieldId },
         });
+      });
+    },
+
+    /**
+     * Puts an object's fields in a new order. The ids must be exactly the object's live fields, each once (otherwise 409 FIELDS_CHANGED: the list on
+     * the person's screen is out of date). Answers with the object's fields in the new order.
+     */
+    async reorderFields(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      request: ReorderFieldsRequest,
+    ): Promise<FieldsListResponse> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const liveFields = await fieldDefinitionsRepository.listFieldDefinitions(
+          transaction,
+          accountId,
+          request.object,
+        );
+        const liveIds = new Set(liveFields.map((field) => field.id));
+        const sentIds = new Set(request.ids);
+        const sameFields =
+          sentIds.size === request.ids.length &&
+          sentIds.size === liveIds.size &&
+          request.ids.every((fieldId) => liveIds.has(fieldId));
+        if (!sameFields) {
+          throw conflict('FIELDS_CHANGED', 'The fields have changed. Reload the page and try again.');
+        }
+        await fieldDefinitionsRepository.setFieldSortOrder(transaction, accountId, request.object, request.ids, actor);
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'fields.reordered',
+          details: { recordType: 'field', recordId: request.ids[0] ?? '' },
+        });
+        const items = await fieldDefinitionsRepository.listFieldDefinitions(transaction, accountId, request.object);
+        return { items };
       });
     },
   };

@@ -16,6 +16,12 @@ import type { Principal } from '../../../../kernel/http/guard';
 import { parsePhone } from '../../../../kernel/phone';
 import { readSearchText } from '../helpers/contact-search';
 import { computeLifecycleStage } from '../helpers/lifecycle';
+import {
+  checkContactCustomAnswers,
+  hideRemovedFieldAnswers,
+  mergeCustomAnswers,
+  sameCustomAnswers,
+} from './contact-custom-values.service';
 import * as contactsRepository from '../repositories/contacts.repository';
 import type { ContactChanges } from '../repositories/contacts.repository';
 
@@ -66,6 +72,7 @@ export function createContactsService({ database }: { database: Database }) {
             const existingId = await contactsRepository.findContactIdByEmail(transaction, accountId, request.email);
             if (existingId) throw contactExists(existingId);
           }
+          const customValues = await checkContactCustomAnswers(transaction, accountId, request.custom ?? {});
           const contact = await contactsRepository.insertContact(transaction, {
             id: uuidv7(),
             accountId,
@@ -73,6 +80,7 @@ export function createContactsService({ database }: { database: Database }) {
             phone: phone?.e164 ?? null,
             email: request.email ?? null,
             language: request.language ?? null,
+            custom: mergeCustomAnswers({}, customValues) as Contact['custom'],
             actor,
           });
           await writeActivityLog(transaction, {
@@ -93,7 +101,7 @@ export function createContactsService({ database }: { database: Database }) {
             eventName: 'contact.created',
             payload: { contactId: contact.id },
           });
-          return contact;
+          return (await hideRemovedFieldAnswers(transaction, accountId, [contact]))[0] ?? contact;
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -114,9 +122,11 @@ export function createContactsService({ database }: { database: Database }) {
 
     /** One contact of the business. A deleted contact, an unknown id and another business's contact all answer 404. */
     async getContact(principal: Pick<Principal, 'accountId'>, contactId: string): Promise<Contact> {
-      const contact = await database.runInAccountTransaction(principal.accountId, (transaction) =>
-        contactsRepository.findContactById(transaction, principal.accountId, contactId),
-      );
+      const contact = await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const found = await contactsRepository.findContactById(transaction, principal.accountId, contactId);
+        if (!found) return undefined;
+        return (await hideRemovedFieldAnswers(transaction, principal.accountId, [found]))[0];
+      });
       if (!contact) throw notFound('That contact');
       return contact;
     },
@@ -163,8 +173,14 @@ export function createContactsService({ database }: { database: Database }) {
             // leads module set the stage its leads give (lead, customer, repeat customer) a moment later.
             changes.lifecycleStage = computeLifecycleStage({ markedNotAFit: false, openLeads: 0, wonLeads: 0 });
           }
+          if (request.custom !== undefined) {
+            const customValues = await checkContactCustomAnswers(transaction, accountId, request.custom);
+            const mergedAnswers = mergeCustomAnswers(current.custom, customValues);
+            if (!sameCustomAnswers(mergedAnswers, current.custom)) changes.custom = mergedAnswers;
+          }
           const changedFields = Object.keys(changes); // the names of the fields that really change
-          if (changedFields.length === 0) return current;
+          if (changedFields.length === 0)
+            return (await hideRemovedFieldAnswers(transaction, accountId, [current]))[0] ?? current;
 
           const phoneAfter = 'phone' in changes ? changes.phone : current.phone;
           const emailAfter = 'email' in changes ? changes.email : current.email;
@@ -202,7 +218,7 @@ export function createContactsService({ database }: { database: Database }) {
               payload: { contactId },
             });
           }
-          return updated;
+          return (await hideRemovedFieldAnswers(transaction, accountId, [updated]))[0] ?? updated;
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -250,14 +266,18 @@ export function createContactsService({ database }: { database: Database }) {
       principal: Pick<Principal, 'accountId'>,
       query: ListContactsQuery,
     ): Promise<ContactsListResponse> {
-      const { items, total } = await database.runInAccountTransaction(principal.accountId, (transaction) =>
-        contactsRepository.listContacts(transaction, principal.accountId, {
+      const { items, total } = await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const page = await contactsRepository.listContacts(transaction, principal.accountId, {
           search: readSearchText(query.q),
           lifecycleStage: query.lifecycleStage,
           limit: query.limit,
           offset: (query.page - 1) * query.limit,
-        }),
-      );
+        });
+        return {
+          items: await hideRemovedFieldAnswers(transaction, principal.accountId, page.items),
+          total: page.total,
+        };
+      });
       return { items, total, page: query.page, limit: query.limit };
     },
   };

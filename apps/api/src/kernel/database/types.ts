@@ -319,6 +319,8 @@ export interface ContactsTable {
   lifecycle_stage: Generated<'new' | 'lead' | 'customer' | 'repeat_customer' | 'not_a_fit'>;
   /** The company the contact belongs to (F05); at most one. */
   company_id: Generated<string | null>;
+  /** Answers to the business's custom contact fields, by field key (F09). Kept for removed fields too, hidden. */
+  custom: ColumnType<Record<string, unknown>, string | undefined, string>;
   deleted_at: Generated<Date | null>;
   created_by: Json | null;
   updated_by: Json | null;

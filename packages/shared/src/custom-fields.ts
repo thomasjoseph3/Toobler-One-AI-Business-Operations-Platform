@@ -119,6 +119,22 @@ export type UpdateFieldRequest = z.infer<typeof updateFieldRequestSchema>;
 /** `PATCH /fields/{id}` and `DELETE /fields/{id}`: which field. */
 export const fieldIdParamsSchema = z.object({ id: z.uuid() });
 
+/** What a manager sends to put an object's fields in a new order: every live field of that object, once each, in the order to show them. */
+export const reorderFieldsRequestSchema = z
+  .object({ object: fieldObjectSchema, ids: z.array(z.uuid()).min(1).max(MAX_FIELDS_PER_OBJECT) })
+  .strict();
+export type ReorderFieldsRequest = z.infer<typeof reorderFieldsRequestSchema>;
+
+/** The answers saved on a record: a field's key and its answer. Sent when adding or changing a record (an empty answer or null removes the key). */
+export const customValuesInputSchema = z.record(
+  z.string().max(60),
+  z.union([z.string().max(1000), z.number(), z.boolean(), z.null()]),
+);
+export type CustomValuesInput = z.infer<typeof customValuesInputSchema>;
+
+/** The answers a record holds, as the API shows them (only for live fields). */
+export const customValuesSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]));
+
 /** `GET /fields?object=`: which object's fields (all three when left out). */
 export const listFieldsQuerySchema = z.object({ object: fieldObjectSchema.optional() });
 export type ListFieldsQuery = z.infer<typeof listFieldsQuerySchema>;

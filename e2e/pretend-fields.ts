@@ -8,6 +8,8 @@ export interface PretendFields {
   fields: Array<Record<string, unknown>>;
   /** What the page sent to change a field, by field id. */
   patchedFields: Array<{ id: string; body: Record<string, unknown> }>;
+  /** What the page sent to reorder fields. */
+  reorders: Array<{ object: string; ids: string[] }>;
   /** The ids of the fields the page removed. */
   removedFieldIds: string[];
   /** What the page sent to add a field. */
@@ -45,6 +47,7 @@ export function startingFields(): PretendFields {
     ],
     patchedFields: [],
     removedFieldIds: [],
+    reorders: [],
     postedFields: [],
     refusal: null,
     fails: false,
@@ -81,6 +84,17 @@ export function answerFieldsCall(
     state.patchedFields.push({ id: String(field['id']), body: call.body ?? {} });
     Object.assign(field, call.body ?? {});
     return { status: 200, body: field };
+  }
+  if (call.path === '/fields/reorder' && call.method === 'POST') {
+    if (call.role !== 'manager')
+      return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
+    const object = String(call.body?.['object']);
+    const ids = (call.body?.['ids'] ?? []) as string[];
+    state.reorders.push({ object, ids });
+    const ofObject = state.fields.filter((field) => field['object'] === object);
+    const others = state.fields.filter((field) => field['object'] !== object);
+    state.fields = [...ids.map((id) => ofObject.find((field) => field['id'] === id)!), ...others];
+    return { status: 200, body: { items: state.fields.filter((field) => field['object'] === object) } };
   }
   if (call.path !== '/fields') return undefined;
   if (call.method === 'GET') {

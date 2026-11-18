@@ -25,6 +25,8 @@ import { findLifecycleLabelKey, findLifecycleTagTone } from './contacts-view';
 import { describeContactSaveProblem } from './contact-problem';
 import { ContactNotesCard } from '../notes/ContactNotesCard';
 import { ContactCompanyCard } from '../companies/ContactCompanyCard';
+import { describeAnswer } from '../fields/custom-answers';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { EditContactPanel } from './EditContactPanel';
 
 /** One small label and value in the details card. */
@@ -48,6 +50,7 @@ export function ContactPage() {
   const navigate = useNavigate();
   const { sessionState } = useSession();
   const contactResource = useApiResource<Contact>(`/contacts/${contactId}`);
+  const fieldDefinitions = useFieldDefinitions('contact');
   const [isEditOpen, setIsEditOpen] = useState(false);
   // A counter so each opening of the panel starts from what the contact has now
   const [editOpenCount, setEditOpenCount] = useState(0);
@@ -211,6 +214,11 @@ export function ContactPage() {
             <Row label={t('contacts.column.phone')}>{contact.phone ?? t('contacts.none')}</Row>
             <Row label={t('contacts.column.email')}>{contact.email ?? t('contacts.none')}</Row>
             <Row label={t('contacts.form.language')}>{contact.language ?? t('contacts.none')}</Row>
+            {fieldDefinitions.map((definition) => (
+              <Row key={definition.id} label={definition.label}>
+                {describeAnswer(definition, contact.custom[definition.key])}
+              </Row>
+            ))}
             <Row label={t('contactPage.details.added')}>{formatMoment(contact.createdAt, timeZone)}</Row>
             <Row label={t('contactPage.details.updated')}>{formatMoment(contact.updatedAt, timeZone)}</Row>
           </dl>

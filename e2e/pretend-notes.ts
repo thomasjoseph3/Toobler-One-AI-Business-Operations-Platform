@@ -11,6 +11,10 @@ export interface PretendNotes {
   /** What the page sent to change a note's words, and which notes it deleted. */
   editedNotes: Array<{ noteId: string; body: string }>;
   deletedNoteIds: string[];
+  /** What the page sent to change a contact (`PATCH /contacts/{id}`), by contact id. */
+  patchedContacts: Array<{ contactId: string; body: Record<string, unknown> }>;
+  /** The custom answers each contact has, by contact id (a contact not listed has the starting ones). */
+  contactAnswers: Record<string, Record<string, unknown>>;
   /** When set, the next note is refused with this status and code. */
   refusal: { status: number; code: string; message: string } | null;
 }
@@ -18,6 +22,8 @@ export interface PretendNotes {
 /** One existing note, written an hour ago by a colleague. */
 export function startingNotes(): PretendNotes {
   return {
+    patchedContacts: [],
+    contactAnswers: {},
     notes: [
       {
         id: 'note-1',
@@ -88,8 +94,18 @@ export function answerNotesCall(
   }
   // A person's own page (the contact the notes belong to)
   const contactMatch = /^\/contacts\/(contact-\d+)$/.exec(call.path);
-  if (contactMatch && call.method === 'GET') {
+  if (contactMatch && (call.method === 'GET' || call.method === 'PATCH')) {
     const index = contactMatch[1]!.replace('contact-', '');
+    if (call.method === 'PATCH') {
+      const sent = call.body ?? {};
+      state.patchedContacts.push({ contactId: contactMatch[1]!, body: sent });
+      const answers = { ...(state.contactAnswers[contactMatch[1]!] ?? { birthday: '1990-05-04' }) };
+      for (const [key, value] of Object.entries((sent['custom'] ?? {}) as Record<string, unknown>)) {
+        if (value === null) delete answers[key];
+        else answers[key] = value;
+      }
+      state.contactAnswers[contactMatch[1]!] = answers;
+    }
     return {
       status: 200,
       body: {
@@ -99,6 +115,7 @@ export function answerNotesCall(
         email: 'person0@example.com',
         language: null,
         lifecycleStage: 'lead',
+        custom: state.contactAnswers[contactMatch[1]!] ?? { birthday: '1990-05-04' },
         createdAt: '2026-11-10T08:00:00.000Z',
         updatedAt: '2026-11-16T09:30:00.000Z',
       },

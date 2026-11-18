@@ -5,7 +5,7 @@ import { buildTestApp, unsafeRequestHeaders } from './support/app';
 import { openTestDatabase } from './support/harness';
 import { addTeamMember, signUpOwner } from './support/team';
 
-// F09 slices 1 and 2: adding, listing, changing and removing custom fields. Whole stories by real people, plus the usual refusals and the fence between businesses.
+// F09 slices 1 and 2: adding, listing, changing, removing and reordering custom fields. Whole stories by real people, plus the usual refusals and the fence between businesses.
 
 let database: Database;
 let app: FastifyInstance;
@@ -338,5 +338,62 @@ describe('DELETE /api/v1/fields/{id}', () => {
       .where('kind', '=', 'fields.deleted')
       .executeTakeFirstOrThrow();
     expect(JSON.stringify(line)).not.toContain('Secret Words');
+  });
+});
+
+describe('POST /api/v1/fields/reorder', () => {
+  it('puts an object’s fields in the order sent, and leaves other objects alone', async () => {
+    const owner = await signUpOwner(app, database);
+    const alpha = await owner.ok('POST', '/fields', { object: 'lead', label: 'Alpha', type: 'text' }, 201);
+    const beta = await owner.ok('POST', '/fields', { object: 'lead', label: 'Beta', type: 'text' }, 201);
+    const gamma = await owner.ok('POST', '/fields', { object: 'lead', label: 'Gamma', type: 'text' }, 201);
+    await owner.ok('POST', '/fields', { object: 'contact', label: 'Delta', type: 'text' }, 201);
+    const answer = await owner.ok(
+      'POST',
+      '/fields/reorder',
+      { object: 'lead', ids: [gamma.id, alpha.id, beta.id] },
+      200,
+    );
+    expect(answer.items.map((field: { label: string }) => field.label)).toEqual(['Gamma', 'Alpha', 'Beta']);
+    expect((await owner.ok('GET', '/fields?object=lead')).items.map((field: { label: string }) => field.label)).toEqual(
+      ['Gamma', 'Alpha', 'Beta'],
+    );
+    expect((await owner.ok('GET', '/fields?object=contact')).items).toHaveLength(1);
+    // A field added afterwards goes last
+    await owner.ok('POST', '/fields', { object: 'lead', label: 'Omega', type: 'text' }, 201);
+    expect((await owner.ok('GET', '/fields?object=lead')).items.at(-1).label).toBe('Omega');
+  });
+
+  it('refuses ids that are not exactly the live fields (409), another business’s ids included', async () => {
+    const owner = await signUpOwner(app, database);
+    const stranger = await signUpOwner(app, database);
+    const first = await owner.ok('POST', '/fields', { object: 'lead', label: 'One', type: 'text' }, 201);
+    const second = await owner.ok('POST', '/fields', { object: 'lead', label: 'Two', type: 'text' }, 201);
+    const strangersField = await stranger.ok('POST', '/fields', { object: 'lead', label: 'Theirs', type: 'text' }, 201);
+    expect(await owner.refused('POST', '/fields/reorder', { object: 'lead', ids: [first.id] }, 409)).toBe(
+      'FIELDS_CHANGED',
+    );
+    await owner.refused('POST', '/fields/reorder', { object: 'lead', ids: [first.id, first.id] }, 409);
+    await owner.refused('POST', '/fields/reorder', { object: 'lead', ids: [first.id, strangersField.id] }, 409);
+    await owner.refused('POST', '/fields/reorder', { object: 'contact', ids: [first.id, second.id] }, 409);
+    expect((await stranger.ok('GET', '/fields')).items).toHaveLength(1);
+  });
+
+  it('refuses a bad request (400), staff (403) and no sign-in (401)', async () => {
+    const owner = await signUpOwner(app, database);
+    const staff = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const field = await owner.ok('POST', '/fields', { object: 'lead', label: 'One', type: 'text' }, 201);
+    await owner.refused('POST', '/fields/reorder', { object: 'lead', ids: [] }, 400);
+    await owner.refused('POST', '/fields/reorder', { object: 'lead', ids: ['nope'] }, 400);
+    await owner.refused('POST', '/fields/reorder', { ids: [field.id] }, 400);
+    await owner.refused('POST', '/fields/reorder', { object: 'lead', ids: [field.id], extra: 1 }, 400);
+    await staff.refused('POST', '/fields/reorder', { object: 'lead', ids: [field.id] }, 403);
+    const nobody = await app.inject({
+      method: 'POST',
+      url: '/api/v1/fields/reorder',
+      headers: unsafeRequestHeaders,
+      payload: { object: 'lead', ids: [field.id] },
+    });
+    expect(nobody.statusCode).toBe(401);
   });
 });

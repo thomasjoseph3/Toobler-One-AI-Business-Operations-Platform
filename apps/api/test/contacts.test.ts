@@ -61,7 +61,18 @@ describe('POST /api/v1/contacts', () => {
     });
     expect(response.json().id).toMatch(/^[0-9a-f-]{36}$/);
     expect(Object.keys(response.json()).sort()).toEqual(
-      ['companyId', 'createdAt', 'email', 'id', 'language', 'lifecycleStage', 'name', 'phone', 'updatedAt'].sort(),
+      [
+        'companyId',
+        'createdAt',
+        'custom',
+        'email',
+        'id',
+        'language',
+        'lifecycleStage',
+        'name',
+        'phone',
+        'updatedAt',
+      ].sort(),
     );
   });
 

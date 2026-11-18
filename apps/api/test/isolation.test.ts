@@ -843,6 +843,12 @@ const attempts: Attempt[] = [
     expectedStatus: 201,
   },
   {
+    route: 'POST /api/v1/fields/reorder',
+    what: "reorder with A's field id (B's own fields do not include it)",
+    request: () => ({ method: 'POST', url: '/fields/reorder', payload: { object: 'lead', ids: [dataOfA.fieldId] } }),
+    expectedStatus: 409,
+  },
+  {
     route: 'PATCH /api/v1/fields/{id}',
     what: "change A's field",
     request: () => ({ method: 'PATCH', url: `/fields/${dataOfA.fieldId}`, payload: { label: 'Hacked' } }),

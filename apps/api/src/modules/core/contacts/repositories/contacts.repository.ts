@@ -15,9 +15,20 @@ const CONTACT_COLUMNS = [
   'language',
   'lifecycle_stage',
   'company_id',
+  'custom',
   'created_at',
   'updated_at',
 ] as const;
+
+/** Keeps only the answers that are text, numbers or yes/no (a damaged row never breaks a screen). Hiding removed fields happens in the service. */
+function toCustomValues(stored: unknown): Contact['custom'] {
+  const answers: Contact['custom'] = {};
+  if (typeof stored !== 'object' || stored === null) return answers;
+  for (const [key, value] of Object.entries(stored)) {
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') answers[key] = value;
+  }
+  return answers;
+}
 
 /** Turns a database row into the Contact the API answers with. */
 function toContact(row: {
@@ -28,6 +39,7 @@ function toContact(row: {
   language: string | null;
   lifecycle_stage: LifecycleStage;
   company_id: string | null;
+  custom: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
 }): Contact {
@@ -39,6 +51,7 @@ function toContact(row: {
     language: row.language,
     lifecycleStage: row.lifecycle_stage,
     companyId: row.company_id,
+    custom: toCustomValues(row.custom),
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -54,6 +67,7 @@ export async function insertContact(
     phone: string | null;
     email: string | null;
     language: string | null;
+    custom: Contact['custom'];
     actor: Actor;
   },
 ): Promise<Contact> {
@@ -67,6 +81,7 @@ export async function insertContact(
       phone: contact.phone,
       email: contact.email,
       language: contact.language,
+      custom: JSON.stringify(contact.custom),
       created_by: actorStamp,
       updated_by: actorStamp,
     })
@@ -198,6 +213,8 @@ export interface ContactChanges {
   email?: string | null;
   language?: string | null;
   lifecycleStage?: LifecycleStage;
+  /** The whole new set of answers (the service merges what was sent into what is stored). */
+  custom?: Record<string, unknown>;
 }
 
 /** Changes the listed fields of a live contact, stamps who did it, and returns the contact. Undefined if there is no such live contact. */
@@ -216,6 +233,7 @@ export async function updateContact(
       ...(changes.email !== undefined ? { email: changes.email } : {}),
       ...(changes.language !== undefined ? { language: changes.language } : {}),
       ...(changes.lifecycleStage !== undefined ? { lifecycle_stage: changes.lifecycleStage } : {}),
+      ...(changes.custom !== undefined ? { custom: JSON.stringify(changes.custom) } : {}),
       updated_by: { kind: actor.kind, id: actor.id },
     })
     .where('account_id', '=', accountId)

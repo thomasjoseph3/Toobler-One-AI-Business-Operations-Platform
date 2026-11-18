@@ -1,3 +1,3 @@
 // The public face of the fields module: the only file other modules may import from it.
-// (Later slices: the contacts, companies and leads modules read a business's field definitions to check the custom values they save.)
-export {};
+// The contacts, companies and leads modules read a business's live field definitions to check the custom values they save.
+export { findFieldDefinitions } from './services/field-definitions-lookup.service';

@@ -7,6 +7,7 @@ import {
   fieldDefinitionSchema,
   fieldsListResponseSchema,
   listFieldsQuerySchema,
+  reorderFieldsRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createFieldsService } from '../services/fields.service';
@@ -40,6 +41,19 @@ export function fieldsRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const field = await fieldsService.createField(request.principal, request.body);
       return reply.code(201).send(field);
+    },
+  );
+
+  // Managers only: the fields of one object in a new order (every live field, once each).
+  typedApp.post(
+    '/fields/reorder',
+    {
+      config: { access: 'manager' },
+      schema: { body: reorderFieldsRequestSchema, response: { 200: fieldsListResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return fieldsService.reorderFields(request.principal, request.body);
     },
   );
 
