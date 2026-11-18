@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { customValuesInputSchema, customValuesSchema } from './custom-fields';
 import { stageKindSchema } from './pipeline';
 
 // The shape of leads between the API and the web app.
@@ -58,6 +59,8 @@ export const leadSchema = z.object({
   lastActivityAt: z.string(),
   lostReason: z.string().nullable(),
   closedAt: z.string().nullable(),
+  /** The answers to the business's custom lead fields (F09), by field key; only live fields. */
+  custom: customValuesSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -80,6 +83,7 @@ export const createLeadRequestSchema = z
     callbackAt: z.preprocess(blankToNothing, z.iso.datetime({ offset: true }).optional()),
     ownerUserId: z.uuid().optional(),
     offeringId: z.uuid().optional(),
+    custom: customValuesInputSchema.optional(),
   })
   .strict()
   .refine((lead) => !lead.dateFrom || !lead.dateTo || lead.dateTo >= lead.dateFrom, {
@@ -157,6 +161,8 @@ export const updateLeadRequestSchema = z
     callbackAt: z.preprocess(clearIfBlank, z.iso.datetime({ offset: true }).nullable().optional()),
     /** The offering the lead is about; null takes it away. Changing it does not hand the lead to someone else. */
     offeringId: z.uuid().nullable().optional(),
+    /** Answers to custom fields; only the keys sent change (null removes one). */
+    custom: customValuesInputSchema.optional(),
   })
   .strict();
 export type UpdateLeadRequest = z.infer<typeof updateLeadRequestSchema>;

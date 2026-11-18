@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { customValuesInputSchema, customValuesSchema } from './custom-fields';
 
 // Companies between the API and the web app: a firm, school, family or group that contacts belong to ("Infosys HR").
 
@@ -96,6 +97,8 @@ export const companySchema = z.object({
   openLeads: z.number().int(),
   /** The combined budget of its contacts' won leads, in paise. Worked out by the API. */
   wonValuePaise: z.number().int(),
+  /** The answers to the business's custom company fields (F09), by field key; only live fields. */
+  custom: customValuesSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -112,6 +115,7 @@ export const createCompanyRequestSchema = z
     phone: z.preprocess(blankToNothing, z.string().trim().max(40).optional()),
     city: z.preprocess(blankToNothing, z.string().trim().max(80).optional()),
     ownerUserId: z.uuid().optional(),
+    custom: customValuesInputSchema.optional(),
   })
   .strict();
 export type CreateCompanyRequest = z.infer<typeof createCompanyRequestSchema>;
@@ -187,6 +191,8 @@ export const updateCompanyRequestSchema = z
     phone: z.preprocess(clearIfBlank, z.string().trim().max(40).nullable().optional()),
     city: z.preprocess(clearIfBlank, z.string().trim().max(80).nullable().optional()),
     ownerUserId: z.uuid().nullable().optional(),
+    /** Answers to custom fields; only the keys sent change (null removes one). */
+    custom: customValuesInputSchema.optional(),
   })
   .strict()
   .refine((request) => Object.values(request).some((value) => value !== undefined), {

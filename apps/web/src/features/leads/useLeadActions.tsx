@@ -73,7 +73,9 @@ export function useLeadActions({
         onChanged();
         return t('leads.error.gone');
       }
-      if (error.status === 409 || error.code === 'VALIDATION_ERROR') return error.message;
+      if (error.status === 409 || error.code === 'VALIDATION_ERROR' || error.code === 'REQUIRED_FIELDS_MISSING') {
+        return error.message;
+      }
     }
     return t('leads.error.unknown');
   };

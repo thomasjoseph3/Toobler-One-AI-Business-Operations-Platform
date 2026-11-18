@@ -146,6 +146,7 @@ const aLead = (changes: Partial<Lead> = {}): Lead => ({
   lastActivityAt: '2026-11-13T09:00:00.000Z',
   lostReason: null,
   closedAt: null,
+  custom: {},
   createdAt: '2026-11-13T09:00:00.000Z',
   updatedAt: '2026-11-13T09:00:00.000Z',
   ...changes,

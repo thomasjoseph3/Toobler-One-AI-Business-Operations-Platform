@@ -4,6 +4,9 @@ import { Alert, Button, SidePanel, TextField } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
 import { t, type MessageKey } from '../../app/i18n';
 import { LeadDetailsFormFields } from './LeadDetailsFormFields';
+import { buildCustomRequest, type CustomAnswerTexts } from '../fields/custom-answers';
+import { CustomFieldInputs } from '../fields/CustomFieldInputs';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { findLeadDisplayName } from './lead-display';
 import {
   buildContactRequest,
@@ -163,6 +166,8 @@ export function CreateLeadPanel({ isOpen, onClose, timeZone, onCreated }: Create
   // A person added by this form whose lead then failed: a second try reuses them instead of adding them again
   const [addedPerson, setAddedPerson] = useState<Pick<Contact, 'id' | 'name' | 'phone' | 'email'> | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [customTexts, setCustomTexts] = useState<CustomAnswerTexts>({});
+  const definitions = useFieldDefinitions('lead');
 
   const changeFields = (changes: Partial<LeadFormFields>) => setFields((current) => ({ ...current, ...changes }));
   const choosePerson = (person: Pick<Contact, 'id' | 'name' | 'phone' | 'email'> | null) => {
@@ -185,7 +190,11 @@ export function CreateLeadPanel({ isOpen, onClose, timeZone, onCreated }: Create
         person = await apiRequest<Contact>('POST', '/contacts', buildContactRequest(fields));
         setAddedPerson(person);
       }
-      await apiRequest('POST', '/leads', buildLeadRequest(fields, person.id, timeZone));
+      const custom = buildCustomRequest(definitions, customTexts);
+      await apiRequest('POST', '/leads', {
+        ...buildLeadRequest(fields, person.id, timeZone),
+        ...(custom ? { custom } : {}),
+      });
       onCreated(findLeadDisplayName(person));
     } catch (error) {
       const code = error instanceof ApiRequestError ? error.code : '';
@@ -242,6 +251,11 @@ export function CreateLeadPanel({ isOpen, onClose, timeZone, onCreated }: Create
             {t('leadForm.details.heading')}
           </h3>
           <LeadDetailsFormFields fields={fields} problems={problems} onChange={changeFields} />
+          <CustomFieldInputs
+            definitions={definitions}
+            texts={customTexts}
+            onChange={(key, text) => setCustomTexts((current) => ({ ...current, [key]: text }))}
+          />
           <p className="text-body-xs text-text-secondary">{t('leadForm.ownerNote')}</p>
         </section>
       </form>

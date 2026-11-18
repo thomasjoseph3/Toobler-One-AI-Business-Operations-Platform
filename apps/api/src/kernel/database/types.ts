@@ -339,6 +339,8 @@ export interface CompaniesTable {
   phone: string | null;
   city: string | null;
   owner_user_id: string | null;
+  /** Answers to the business's custom company fields, by field key (F09). */
+  custom: ColumnType<Record<string, unknown>, string | undefined, string>;
   deleted_at: Generated<Date | null>;
   created_by: Json | null;
   updated_by: Json | null;
@@ -447,6 +449,8 @@ export interface LeadsTable {
   last_activity_at: Generated<Date>;
   lost_reason: string | null;
   closed_at: Date | null;
+  /** Answers to the business's custom lead fields, by field key (F09). */
+  custom: ColumnType<Record<string, unknown>, string | undefined, string>;
   deleted_at: Generated<Date | null>;
   created_by: Json | null;
   updated_by: Json | null;

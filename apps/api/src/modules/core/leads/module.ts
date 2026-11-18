@@ -14,7 +14,7 @@ export default defineModule({
   kind: 'core',
   // Shows who a lead is for, and keeps a contact's lifecycle stage in step with its leads, through the contacts module; shows which
   // offering a lead is about and who looks after it (for sharing out by offering), through the offerings module
-  requires: ['core.contacts', 'core.offerings'],
+  requires: ['core.contacts', 'core.offerings', 'core.fields'],
   // When staff take the "not a fit" mark off a contact, its stage is worked out again from its leads
   // ...and when a person is removed from the team, their open leads go to the person the manager chose
   events: {

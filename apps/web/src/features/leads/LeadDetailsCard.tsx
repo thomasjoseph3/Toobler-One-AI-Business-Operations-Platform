@@ -12,6 +12,9 @@ import {
   type LeadFormProblems,
 } from './lead-form';
 import { LeadDetailsFormFields } from './LeadDetailsFormFields';
+import { answersToTexts, buildCustomRequest, describeAnswer, type CustomAnswerTexts } from '../fields/custom-answers';
+import { CustomFieldInputs } from '../fields/CustomFieldInputs';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
 
 /** One line of the facts list: a small label and the value, or "Not set". */
 function Fact({ label, children }: { label: string; children: ReactNode }) {
@@ -52,10 +55,15 @@ export function LeadDetailsCard({ lead, timeZone, onSaved }: LeadDetailsCardProp
   const [problems, setProblems] = useState<LeadFormProblems>({});
   const [formProblem, setFormProblem] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
+  // Only what the person typed into the custom boxes; every other box shows what the lead has saved
+  const [customEdits, setCustomEdits] = useState<CustomAnswerTexts>({});
+  const definitions = useFieldDefinitions('lead');
+  const customTexts = { ...answersToTexts(definitions, lead.custom), ...customEdits };
 
   // Opens the form with the lead's current details
   const startEditing = () => {
     setFields(leadToDetailsFields(lead, timeZone));
+    setCustomEdits({});
     setProblems({});
     setFormProblem(undefined);
     setIsEditing(true);
@@ -68,7 +76,8 @@ export function LeadDetailsCard({ lead, timeZone, onSaved }: LeadDetailsCardProp
     const foundProblems = checkLeadDetails(fields, timeZone);
     setProblems(foundProblems);
     if (Object.keys(foundProblems).length > 0) return;
-    const changes = buildLeadChanges(lead, fields, timeZone);
+    const custom = buildCustomRequest(definitions, customTexts, lead.custom);
+    const changes = { ...buildLeadChanges(lead, fields, timeZone), ...(custom ? { custom } : {}) };
     if (Object.keys(changes).length === 0) {
       setIsEditing(false);
       return;
@@ -97,6 +106,11 @@ export function LeadDetailsCard({ lead, timeZone, onSaved }: LeadDetailsCardProp
             problems={problems}
             onChange={(changes) => setFields((current) => ({ ...current, ...changes }))}
             showPromise
+          />
+          <CustomFieldInputs
+            definitions={definitions}
+            texts={customTexts}
+            onChange={(key, text) => setCustomEdits((current) => ({ ...current, [key]: text }))}
           />
           <div className="flex justify-end gap-2">
             <Button onClick={() => setIsEditing(false)}>{t('leadForm.cancel')}</Button>
@@ -128,6 +142,11 @@ export function LeadDetailsCard({ lead, timeZone, onSaved }: LeadDetailsCardProp
         <div className="sm:col-span-2">
           <Fact label={t('leadPage.details.promise')}>{lead.promise}</Fact>
         </div>
+        {definitions.map((definition) => (
+          <Fact key={definition.id} label={definition.label}>
+            {describeAnswer(definition, lead.custom[definition.key])}
+          </Fact>
+        ))}
       </dl>
     </Card>
   );

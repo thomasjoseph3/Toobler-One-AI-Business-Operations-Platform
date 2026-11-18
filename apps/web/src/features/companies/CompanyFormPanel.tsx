@@ -12,6 +12,9 @@ import {
   type CompanyFormFields,
   type CompanyFormProblems,
 } from './company-form';
+import { buildCustomRequest, answersToTexts, type CustomAnswerTexts } from '../fields/custom-answers';
+import { CustomFieldInputs } from '../fields/CustomFieldInputs';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { describeCompanySaveProblem } from './company-problem';
 
 const FORM_ID = 'company-form';
@@ -36,6 +39,10 @@ export function CompanyFormPanel({ isOpen, onClose, editingCompany, onSaved }: C
   const [problems, setProblems] = useState<CompanyFormProblems>({});
   const [formProblem, setFormProblem] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
+  // Only what the person typed into the custom boxes; every other box shows what the company has saved
+  const [customEdits, setCustomEdits] = useState<CustomAnswerTexts>({});
+  const definitions = useFieldDefinitions('company');
+  const customTexts = { ...answersToTexts(definitions, editingCompany?.custom ?? {}), ...customEdits };
   const changeFields = (changes: Partial<CompanyFormFields>) => setFields((current) => ({ ...current, ...changes }));
 
   // Checks the form, sends it, and says what went wrong in plain words
@@ -48,12 +55,17 @@ export function CompanyFormPanel({ isOpen, onClose, editingCompany, onSaved }: C
     setIsSaving(true);
     try {
       if (editingCompany) {
-        const changes = buildUpdateCompanyRequest(fields, editingCompany);
+        const custom = buildCustomRequest(definitions, customTexts, editingCompany.custom);
+        const changes = { ...buildUpdateCompanyRequest(fields, editingCompany), ...(custom ? { custom } : {}) };
         // Nothing changed: no need to ask the API
         if (Object.keys(changes).length > 0)
           await apiRequest<Company>('PATCH', `/companies/${editingCompany.id}`, changes);
       } else {
-        await apiRequest<Company>('POST', '/companies', buildCreateCompanyRequest(fields));
+        const custom = buildCustomRequest(definitions, customTexts);
+        await apiRequest<Company>('POST', '/companies', {
+          ...buildCreateCompanyRequest(fields),
+          ...(custom ? { custom } : {}),
+        });
       }
       onSaved(fields.name.trim());
     } catch (error) {
@@ -116,6 +128,11 @@ export function CompanyFormPanel({ isOpen, onClose, editingCompany, onSaved }: C
           onChange={(event) => changeFields({ city: event.target.value })}
           maxLength={80}
           autoComplete="off"
+        />
+        <CustomFieldInputs
+          definitions={definitions}
+          texts={customTexts}
+          onChange={(key, text) => setCustomEdits((current) => ({ ...current, [key]: text }))}
         />
         {editingCompany ? null : <p className="text-body-xs text-text-secondary">{t('companies.form.ownerNote')}</p>}
       </form>

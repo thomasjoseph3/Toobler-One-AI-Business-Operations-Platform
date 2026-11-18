@@ -16,12 +16,8 @@ import type { Principal } from '../../../../kernel/http/guard';
 import { parsePhone } from '../../../../kernel/phone';
 import { readSearchText } from '../helpers/contact-search';
 import { computeLifecycleStage } from '../helpers/lifecycle';
-import {
-  checkContactCustomAnswers,
-  hideRemovedFieldAnswers,
-  mergeCustomAnswers,
-  sameCustomAnswers,
-} from './contact-custom-values.service';
+import { mergeCustomAnswers, sameCustomAnswers } from '../../fields';
+import { checkContactCustomAnswers, hideRemovedContactAnswers } from './contact-custom-values.service';
 import * as contactsRepository from '../repositories/contacts.repository';
 import type { ContactChanges } from '../repositories/contacts.repository';
 
@@ -101,7 +97,7 @@ export function createContactsService({ database }: { database: Database }) {
             eventName: 'contact.created',
             payload: { contactId: contact.id },
           });
-          return (await hideRemovedFieldAnswers(transaction, accountId, [contact]))[0] ?? contact;
+          return (await hideRemovedContactAnswers(transaction, accountId, [contact]))[0] ?? contact;
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -125,7 +121,7 @@ export function createContactsService({ database }: { database: Database }) {
       const contact = await database.runInAccountTransaction(principal.accountId, async (transaction) => {
         const found = await contactsRepository.findContactById(transaction, principal.accountId, contactId);
         if (!found) return undefined;
-        return (await hideRemovedFieldAnswers(transaction, principal.accountId, [found]))[0];
+        return (await hideRemovedContactAnswers(transaction, principal.accountId, [found]))[0];
       });
       if (!contact) throw notFound('That contact');
       return contact;
@@ -180,7 +176,7 @@ export function createContactsService({ database }: { database: Database }) {
           }
           const changedFields = Object.keys(changes); // the names of the fields that really change
           if (changedFields.length === 0)
-            return (await hideRemovedFieldAnswers(transaction, accountId, [current]))[0] ?? current;
+            return (await hideRemovedContactAnswers(transaction, accountId, [current]))[0] ?? current;
 
           const phoneAfter = 'phone' in changes ? changes.phone : current.phone;
           const emailAfter = 'email' in changes ? changes.email : current.email;
@@ -218,7 +214,7 @@ export function createContactsService({ database }: { database: Database }) {
               payload: { contactId },
             });
           }
-          return (await hideRemovedFieldAnswers(transaction, accountId, [updated]))[0] ?? updated;
+          return (await hideRemovedContactAnswers(transaction, accountId, [updated]))[0] ?? updated;
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
@@ -274,7 +270,7 @@ export function createContactsService({ database }: { database: Database }) {
           offset: (query.page - 1) * query.limit,
         });
         return {
-          items: await hideRemovedFieldAnswers(transaction, principal.accountId, page.items),
+          items: await hideRemovedContactAnswers(transaction, principal.accountId, page.items),
           total: page.total,
         };
       });

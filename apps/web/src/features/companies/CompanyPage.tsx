@@ -15,6 +15,8 @@ import {
 } from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
+import { describeAnswer } from '../fields/custom-answers';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { findLifecycleLabelKey, findLifecycleTagTone } from '../contacts/contacts-view';
@@ -51,6 +53,7 @@ export function CompanyPage() {
   const { sessionState } = useSession();
   const navigate = useNavigate();
   const companyResource = useApiResource<CompanyDetail>(`/companies/${companyId}`);
+  const fieldDefinitions = useFieldDefinitions('company');
   const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -182,6 +185,11 @@ export function CompanyPage() {
           <Row label={t('companyPage.phone')}>{company.phone ?? t('contacts.none')}</Row>
           <Row label={t('companyPage.city')}>{company.city ?? t('contacts.none')}</Row>
           <Row label={t('companies.column.owner')}>{company.owner?.name ?? t('companies.noOwner')}</Row>
+          {fieldDefinitions.map((definition) => (
+            <Row key={definition.id} label={definition.label}>
+              {describeAnswer(definition, company.custom[definition.key])}
+            </Row>
+          ))}
           <Row label={t('companies.column.contacts')}>{company.contactCount}</Row>
           <Row label={t('companies.column.openLeads')}>{company.openLeads}</Row>
           <Row label={t('companies.column.wonValue')}>

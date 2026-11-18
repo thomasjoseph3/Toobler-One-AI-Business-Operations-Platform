@@ -17,6 +17,13 @@ import { publishEvent } from '../../../../kernel/events/publish';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { applyLeadFactsToContact, findContactSummaries } from '../../contacts';
+import {
+  checkCustomAnswers,
+  findFieldDefinitions,
+  findMissingRequiredLeadFields,
+  mergeCustomAnswers,
+  sameCustomAnswers,
+} from '../../fields';
 import { findOfferingForLead, findOfferingSummaries } from '../../offerings';
 import type { ContactSummary } from '../../contacts';
 import type { OfferingSummary } from '../../offerings';
@@ -42,6 +49,8 @@ const isDatabaseError = (error: unknown, code: string) =>
 interface LeadRelations {
   contactsById: Map<string, ContactSummary>;
   offeringsById: Map<string, OfferingSummary>;
+  /** The keys of the business's live lead fields: answers of removed fields are never shown. */
+  liveFieldKeys: ReadonlySet<string>;
 }
 
 /** Turns a database row plus the person and offering it is about into the Lead the API answers with. */
@@ -67,9 +76,21 @@ function toLead(row: LeadRow, related: LeadRelations): Lead {
     lastActivityAt: row.lastActivityAt.toISOString(),
     lostReason: row.lostReason,
     closedAt: row.closedAt?.toISOString() ?? null,
+    custom: showLiveAnswers(row.custom, related.liveFieldKeys),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/** The stored answers, only for fields that are still live, and only plain answers (text, number, yes/no). */
+function showLiveAnswers(stored: Record<string, unknown>, liveKeys: ReadonlySet<string>): Lead['custom'] {
+  const answers: Lead['custom'] = {};
+  for (const [key, value] of Object.entries(stored)) {
+    if (liveKeys.has(key) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')) {
+      answers[key] = value;
+    }
+  }
+  return answers;
 }
 
 /**
@@ -86,7 +107,9 @@ async function loadRelatedForLeads(transaction: Db, accountId: string, rows: Lea
   const offeringIds = [...new Set(rows.flatMap((row) => (row.offeringId ? [row.offeringId] : [])))];
   const contacts = await findContactSummaries(transaction, { accountId, contactIds });
   const offerings = await findOfferingSummaries(transaction, { accountId, offeringIds });
+  const liveFieldKeys = new Set((await findFieldDefinitions(transaction, accountId, 'lead')).map((field) => field.key));
   return {
+    liveFieldKeys,
     contactsById: new Map(contacts.map((summary) => [summary.id, summary])),
     offeringsById: new Map(offerings.map((summary) => [summary.id, summary])),
   };
@@ -172,6 +195,7 @@ export function createLeadsService({ database }: { database: Database }) {
               }));
           }
 
+          const customValues = await checkCustomAnswers(transaction, accountId, 'lead', request.custom ?? {});
           const leadId = uuidv7();
           await leadsRepository.insertLead(transaction, {
             id: leadId,
@@ -187,6 +211,7 @@ export function createLeadsService({ database }: { database: Database }) {
             callbackAt: request.callbackAt ? new Date(request.callbackAt) : null,
             ownerUserId,
             offeringId: offering?.id ?? null,
+            custom: mergeCustomAnswers({}, customValues),
             actor,
           });
 
@@ -306,6 +331,11 @@ export function createLeadsService({ database }: { database: Database }) {
           }
           changes.offeringId = request.offeringId;
         }
+        if (request.custom !== undefined) {
+          const customValues = await checkCustomAnswers(transaction, accountId, 'lead', request.custom);
+          const mergedAnswers = mergeCustomAnswers(current.custom, customValues);
+          if (!sameCustomAnswers(mergedAnswers, current.custom)) changes.custom = mergedAnswers;
+        }
         const changedFields = Object.keys(changes); // the names of the fields that really change
         if (changedFields.length === 0)
           return toLead(current, await loadRelatedForLeads(transaction, accountId, [current]));
@@ -376,6 +406,19 @@ export function createLeadsService({ database }: { database: Database }) {
             lostReason = label;
           } else if (request.lostReason !== undefined) {
             throw new ApiError(400, 'LOST_REASON_NOT_ALLOWED', 'A reason is only for moving a lead to Lost.');
+          }
+
+          // Rule F09: a field marked "Required before Won" must have an answer before the lead is marked Won
+          if (targetStage.kind === 'won') {
+            const missingFields = await findMissingRequiredLeadFields(transaction, accountId, current.custom);
+            if (missingFields.length > 0) {
+              throw new ApiError(
+                400,
+                'REQUIRED_FIELDS_MISSING',
+                `Fill in ${missingFields.join(', ')} before marking this lead Won.`,
+                { fields: missingFields },
+              );
+            }
           }
 
           const fromStage = await pipelineRepository.findStageById(transaction, accountId, current.stageId);

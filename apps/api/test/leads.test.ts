@@ -124,6 +124,7 @@ describe('POST /api/v1/leads', () => {
         'budgetPaise',
         'callbackAt',
         'closedAt',
+        'custom',
         'contact',
         'contactId',
         'createdAt',

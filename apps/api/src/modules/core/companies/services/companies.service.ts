@@ -24,6 +24,7 @@ import {
   findContactsOfCompany,
   setContactCompany,
 } from '../../contacts';
+import { checkCustomAnswers, findFieldDefinitions, mergeCustomAnswers, sameCustomAnswers } from '../../fields';
 import { findLeadsOfContacts, findLeadTotalsForContacts } from '../../leads';
 import { makeCompanyNameKey } from '../helpers/company-name';
 import * as companiesRepository from '../repositories/companies.repository';
@@ -53,6 +54,7 @@ export async function describeCompanies(
   rows: CompanyRow[],
   visibleToUserId?: string,
 ): Promise<Company[]> {
+  const liveKeys = new Set((await findFieldDefinitions(transaction, accountId, 'company')).map((field) => field.key));
   const links = await findContactCompanyLinks(transaction, { accountId, companyIds: rows.map((row) => row.id) });
   const totals = await findLeadTotalsForContacts(transaction, {
     accountId,
@@ -78,10 +80,22 @@ export async function describeCompanies(
       contactCount: contactIds.length,
       openLeads: companyTotals.reduce((sum, total) => sum + total.openLeads, 0),
       wonValuePaise: companyTotals.reduce((sum, total) => sum + total.wonValuePaise, 0),
+      custom: showLiveAnswers(row.custom, liveKeys),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };
   });
+}
+
+/** The stored answers, only for fields that are still live, and only plain answers (text, number, yes/no). */
+function showLiveAnswers(stored: Record<string, unknown>, liveKeys: ReadonlySet<string>): Company['custom'] {
+  const answers: Company['custom'] = {};
+  for (const [key, value] of Object.entries(stored)) {
+    if (liveKeys.has(key) && (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean')) {
+      answers[key] = value;
+    }
+  }
+  return answers;
 }
 
 /** Turns a typed search into an "contains" pattern for the database, with the special characters escaped. */
@@ -138,6 +152,7 @@ export function createCompaniesService({ database }: { database: Database }) {
             const sameDomain = await companiesRepository.findCompanyIdByDomain(transaction, accountId, request.domain);
             if (sameDomain) throw domainExists(sameDomain);
           }
+          const customValues = await checkCustomAnswers(transaction, accountId, 'company', request.custom ?? {});
           const row = await companiesRepository.insertCompany(transaction, {
             id: uuidv7(),
             accountId,
@@ -146,6 +161,7 @@ export function createCompaniesService({ database }: { database: Database }) {
             phone: phone?.e164 ?? null,
             city: request.city ?? null,
             ownerUserId: request.ownerUserId ?? principal.userId,
+            custom: mergeCustomAnswers({}, customValues),
             actor,
           });
           await writeActivityLog(transaction, {
@@ -222,10 +238,15 @@ export function createCompaniesService({ database }: { database: Database }) {
             const sameDomain = await companiesRepository.findCompanyIdByDomain(transaction, accountId, changes.domain);
             if (sameDomain && sameDomain !== companyId) throw domainExists(sameDomain);
           }
+          if (request.custom !== undefined) {
+            const customValues = await checkCustomAnswers(transaction, accountId, 'company', request.custom);
+            const mergedAnswers = mergeCustomAnswers(before.custom, customValues);
+            if (!sameCustomAnswers(mergedAnswers, before.custom)) changes.custom = mergedAnswers;
+          }
           const row = await companiesRepository.updateCompany(transaction, accountId, companyId, changes, actor);
           if (!row) throw notFound('That company');
-          const changedFields = (Object.keys(changes) as Array<keyof CompanyChanges>).filter(
-            (field) => before[field] !== row[field],
+          const changedFields = (Object.keys(changes) as Array<keyof CompanyChanges>).filter((field) =>
+            field === 'custom' ? !sameCustomAnswers(before.custom, row.custom) : before[field] !== row[field],
           );
           if (changedFields.length > 0) {
             await writeActivityLog(transaction, {

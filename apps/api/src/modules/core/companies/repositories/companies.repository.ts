@@ -5,7 +5,17 @@ import type { Db } from '../../../../kernel/database';
 // only ever sees companies that are not deleted. Run each inside the business's fence.
 
 /** The columns every read returns. */
-const COMPANY_COLUMNS = ['id', 'name', 'domain', 'phone', 'city', 'owner_user_id', 'created_at', 'updated_at'] as const;
+const COMPANY_COLUMNS = [
+  'id',
+  'name',
+  'domain',
+  'phone',
+  'city',
+  'owner_user_id',
+  'custom',
+  'created_at',
+  'updated_at',
+] as const;
 
 /** A company as stored (the numbers about its people are added by the service). */
 export interface CompanyRow {
@@ -15,6 +25,8 @@ export interface CompanyRow {
   phone: string | null;
   city: string | null;
   ownerUserId: string | null;
+  /** The stored answers to custom fields, removed fields' answers included (the service hides those). */
+  custom: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +39,7 @@ function toCompanyRow(row: {
   phone: string | null;
   city: string | null;
   owner_user_id: string | null;
+  custom: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
 }): CompanyRow {
@@ -37,6 +50,7 @@ function toCompanyRow(row: {
     phone: row.phone,
     city: row.city,
     ownerUserId: row.owner_user_id,
+    custom: row.custom,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -53,6 +67,7 @@ export async function insertCompany(
     phone: string | null;
     city: string | null;
     ownerUserId: string | null;
+    custom: Record<string, unknown>;
     actor: Actor;
   },
 ): Promise<CompanyRow> {
@@ -67,6 +82,7 @@ export async function insertCompany(
       phone: company.phone,
       city: company.city,
       owner_user_id: company.ownerUserId,
+      custom: JSON.stringify(company.custom),
       created_by: actorStamp,
       updated_by: actorStamp,
     })
@@ -170,6 +186,8 @@ export interface CompanyChanges {
   phone?: string | null;
   city?: string | null;
   ownerUserId?: string | null;
+  /** The whole new set of answers (the service merges what was sent into what is stored). */
+  custom?: Record<string, unknown>;
 }
 
 /**
@@ -191,6 +209,7 @@ export async function updateCompany(
       ...(changes.phone !== undefined ? { phone: changes.phone } : {}),
       ...(changes.city !== undefined ? { city: changes.city } : {}),
       ...(changes.ownerUserId !== undefined ? { owner_user_id: changes.ownerUserId } : {}),
+      ...(changes.custom !== undefined ? { custom: JSON.stringify(changes.custom) } : {}),
       updated_by: { kind: actor.kind, id: actor.id },
     })
     .where('account_id', '=', accountId)

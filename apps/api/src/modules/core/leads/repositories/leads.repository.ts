@@ -60,6 +60,8 @@ export interface LeadRow {
   lastActivityAt: Date;
   lostReason: string | null;
   closedAt: Date | null;
+  /** The stored answers to custom fields, removed fields' answers included (the service hides those). */
+  custom: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -115,6 +117,7 @@ const LEAD_COLUMNS = [
   'lead.last_activity_at',
   'lead.lost_reason',
   'lead.closed_at',
+  'lead.custom',
   'lead.created_at',
   'lead.updated_at',
 ] as const;
@@ -140,6 +143,7 @@ function toLeadRow(row: {
   last_activity_at: Date;
   lost_reason: string | null;
   closed_at: Date | null;
+  custom: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
 }): LeadRow {
@@ -163,6 +167,7 @@ function toLeadRow(row: {
     lastActivityAt: row.last_activity_at,
     lostReason: row.lost_reason,
     closedAt: row.closed_at,
+    custom: row.custom,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -187,6 +192,8 @@ export async function insertLead(
     offeringId: string | null;
     /** The channel the lead first came in on; leads added by hand are `manual`. */
     firstChannel?: LeadRow['firstChannel'];
+    /** The answers to custom fields, already checked (left out: none). */
+    custom?: Record<string, unknown>;
     actor: Actor;
   },
 ): Promise<void> {
@@ -208,6 +215,7 @@ export async function insertLead(
       owner_user_id: lead.ownerUserId,
       offering_id: lead.offeringId,
       first_channel: lead.firstChannel ?? 'manual',
+      custom: JSON.stringify(lead.custom ?? {}),
       created_by: actorStamp,
       updated_by: actorStamp,
     })
@@ -355,6 +363,8 @@ export interface LeadDetailChanges {
   promise?: string | null;
   callbackAt?: Date | null;
   offeringId?: string | null;
+  /** The whole new set of answers (the service merges what was sent into what is stored). */
+  custom?: Record<string, unknown>;
 }
 
 /** Changes the listed details of a live lead and stamps who did it. "Last activity" is left alone: editing is not contact with the customer. */
@@ -374,6 +384,7 @@ export async function updateLeadDetails(
       ...(changes.promise !== undefined ? { promise: changes.promise } : {}),
       ...(changes.callbackAt !== undefined ? { callback_at: changes.callbackAt } : {}),
       ...(changes.offeringId !== undefined ? { offering_id: changes.offeringId } : {}),
+      ...(changes.custom !== undefined ? { custom: JSON.stringify(changes.custom) } : {}),
       updated_by: { kind: options.actor.kind, id: options.actor.id },
     })
     .where('account_id', '=', options.accountId)
