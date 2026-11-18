@@ -252,6 +252,8 @@ export function createTeamService({
           changes: { status: 'disabled' },
           changedBy: principal.userId,
         });
+        // A removed person is no longer in any team
+        await teamsRepository.removePersonFromAllTeams(transaction, principal.accountId, memberId);
         await writeActivityLog(transaction, {
           accountId: principal.accountId,
           actor: { kind: 'user', id: principal.userId },

@@ -1,4 +1,4 @@
-import type { CreateTeamRequest, Team, TeamsResponse } from '@toobler-one/shared';
+import type { CreateTeamRequest, Team, TeamsResponse, UpdateTeamRequest } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Database } from '../../../../kernel/database';
 import { conflict, notFound } from '../../../../kernel/errors';
@@ -15,6 +15,73 @@ const nameTaken = () => conflict('TEAM_NAME_TAKEN', 'You already have a team wit
  */
 export function createTeamsService({ database }: { database: Database }) {
   return {
+    /**
+     * Renames a team and/or replaces its people (the list sent is the whole list). People must be active people of this business (404 otherwise).
+     * An unknown team, or another business's, answers 404; a name already used by another team answers 409.
+     */
+    async updateTeam(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      teamId: string,
+      request: UpdateTeamRequest,
+    ): Promise<Team> {
+      try {
+        return await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+          const team = await teamsRepository.findTeamForUpdate(transaction, principal.accountId, teamId);
+          if (!team) throw notFound('That team');
+          const changedFields: string[] = [];
+          if (request.name !== undefined && request.name !== team.name) {
+            await teamsRepository.renameTeam(transaction, {
+              accountId: principal.accountId,
+              teamId,
+              name: request.name,
+              changedBy: principal.userId,
+            });
+            changedFields.push('name');
+          }
+          if (request.memberIds !== undefined) {
+            const memberIds = [...new Set(request.memberIds)];
+            const activeCount = await teamsRepository.countActivePeople(transaction, principal.accountId, memberIds);
+            if (activeCount !== memberIds.length) throw notFound('One of the people');
+            await teamsRepository.replaceTeamMembers(transaction, {
+              accountId: principal.accountId,
+              teamId,
+              userIds: memberIds,
+              changedBy: principal.userId,
+            });
+            changedFields.push('members');
+          }
+          if (changedFields.length > 0) {
+            await writeActivityLog(transaction, {
+              accountId: principal.accountId,
+              actor: { kind: 'user', id: principal.userId },
+              kind: 'teams.updated',
+              details: { recordType: 'team', recordId: teamId, fields: changedFields },
+            });
+          }
+          const teams = await teamsRepository.listTeams(transaction, principal.accountId);
+          return teams.find((candidate) => candidate.id === teamId) as Team;
+        });
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === '23505') throw nameTaken();
+        throw error;
+      }
+    },
+
+    /** Removes a team for good. The people in it stay in the business. An unknown team, or another business's, answers 404. */
+    async deleteTeam(principal: Pick<Principal, 'accountId' | 'userId'>, teamId: string): Promise<void> {
+      await database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const team = await teamsRepository.findTeamForUpdate(transaction, principal.accountId, teamId);
+        if (!team) throw notFound('That team');
+        await teamsRepository.deleteTeam(transaction, principal.accountId, teamId);
+        await writeActivityLog(transaction, {
+          accountId: principal.accountId,
+          actor: { kind: 'user', id: principal.userId },
+          kind: 'teams.deleted',
+          details: { recordType: 'team', recordId: teamId },
+        });
+      });
+    },
+
     /** Every team of the business by name, with the people in it. */
     async listTeams(principal: Pick<Principal, 'accountId'>): Promise<TeamsResponse> {
       const items = await database.runInAccountTransaction(principal.accountId, (transaction) =>

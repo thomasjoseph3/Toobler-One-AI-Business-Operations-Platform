@@ -2,9 +2,10 @@ import { useState, type FormEvent } from 'react';
 import type { Team, TeamMember } from '@toobler-one/shared';
 import { Alert, Button, Checkbox, SidePanel, TextField } from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
-import { t } from '../../app/i18n';
+import { formatMessage, t } from '../../app/i18n';
 import {
   buildEmptyTeamForm,
+  buildTeamFormFromTeam,
   checkTeamForm,
   describeTeamProblem,
   toggleTeamMember,
@@ -18,6 +19,8 @@ export interface TeamFormPanelProps {
   onClose: () => void;
   /** The people who can be put in a team (the people still working in the business). */
   people: ReadonlyArray<Pick<TeamMember, 'id' | 'name'>>;
+  /** When given, the form changes this team (`PATCH /teams/{id}`) instead of adding one. */
+  editingTeam?: Team;
   /** Called after the team was saved, with its name for the confirmation. */
   onSaved: (teamName: string) => void;
 }
@@ -26,8 +29,10 @@ export interface TeamFormPanelProps {
  * The Add team form in a side panel: a name and a tick-list of people. It checks on the device first, then sends `POST /teams`. Everything
  * typed stays when something goes wrong, and the API's own words are shown for a refusal (a name already used).
  */
-export function TeamFormPanel({ isOpen, onClose, people, onSaved }: TeamFormPanelProps) {
-  const [fields, setFields] = useState<TeamFormFields>(buildEmptyTeamForm);
+export function TeamFormPanel({ isOpen, onClose, people, editingTeam, onSaved }: TeamFormPanelProps) {
+  const [fields, setFields] = useState<TeamFormFields>(() =>
+    editingTeam ? buildTeamFormFromTeam(editingTeam) : buildEmptyTeamForm(),
+  );
   const [nameProblem, setNameProblem] = useState<string | undefined>();
   const [formProblem, setFormProblem] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
@@ -41,7 +46,9 @@ export function TeamFormPanel({ isOpen, onClose, people, onSaved }: TeamFormPane
     if (problemKey) return;
     setIsSaving(true);
     try {
-      await apiRequest<Team>('POST', '/teams', { name: fields.name.trim(), memberIds: fields.memberIds });
+      const body = { name: fields.name.trim(), memberIds: fields.memberIds };
+      if (editingTeam) await apiRequest<Team>('PATCH', `/teams/${editingTeam.id}`, body);
+      else await apiRequest<Team>('POST', '/teams', body);
       onSaved(fields.name.trim());
     } catch (error) {
       setFormProblem(describeTeamProblem(error));
@@ -53,13 +60,13 @@ export function TeamFormPanel({ isOpen, onClose, people, onSaved }: TeamFormPane
     <SidePanel
       isOpen={isOpen}
       onClose={onClose}
-      title={t('teams.form.title')}
+      title={editingTeam ? formatMessage('teams.edit.title', { name: editingTeam.name }) : t('teams.form.title')}
       closeLabel={t('teams.form.close')}
       footer={
         <>
           <Button onClick={onClose}>{t('teams.form.cancel')}</Button>
           <Button type="submit" form={FORM_ID} variant="primary" isLoading={isSaving}>
-            {t('teams.form.submit')}
+            {editingTeam ? t('teams.edit.submit') : t('teams.form.submit')}
           </Button>
         </>
       }

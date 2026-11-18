@@ -127,3 +127,18 @@ export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
 /** `GET /teams`: every team of the business, by name. */
 export const teamsResponseSchema = z.object({ items: z.array(teamSchema) });
 export type TeamsResponse = z.infer<typeof teamsResponseSchema>;
+
+/** The id of a team in an address. */
+export const teamIdParamsSchema = z.object({ id: z.uuid() });
+
+/** `PATCH /teams/{id}`: a new name and/or the full list of people in the team (the list replaces the old one). At least one. */
+export const updateTeamRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(MAX_TEAM_NAME_LENGTH),
+    memberIds: z.array(z.uuid()).max(100),
+  })
+  .partial()
+  .refine((request) => request.name !== undefined || request.memberIds !== undefined, {
+    message: 'Send a name or a list of people.',
+  });
+export type UpdateTeamRequest = z.infer<typeof updateTeamRequestSchema>;

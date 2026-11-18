@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import type { Team, TeamResponse, TeamsResponse } from '@toobler-one/shared';
-import { Alert, Button, Card, ErrorState, LoadingState } from '@toobler-one/ui';
+import { ActionMenu, Alert, Button, Card, ConfirmDialog, ErrorState, LoadingState } from '@toobler-one/ui';
+import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useKeptData } from '../knowledge/use-kept-resource';
 import { SettingsTabs } from '../settings/SettingsTabs';
 import { TeamFormPanel } from './TeamFormPanel';
-import { describeTeamMembers } from './team-state';
+import { describeTeamMembers, describeTeamProblem } from './team-state';
 
 /**
  * Settings → Teams (managers only): the business's teams with the people in each, and an Add team button that opens the form. Loading, error
@@ -19,6 +20,27 @@ export function TeamsPage() {
   const peopleData = useKeptData(peopleResource.state);
   const [isAdding, setIsAdding] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [teamToEdit, setTeamToEdit] = useState<Team | null>(null);
+  const [teamToDelete, setTeamToDelete] = useState<Team | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Deletes the team the manager said yes to
+  const confirmDelete = async () => {
+    if (teamToDelete === null) return;
+    setIsDeleting(true);
+    setProblem(null);
+    try {
+      await apiRequest('DELETE', `/teams/${teamToDelete.id}`);
+      setNotice(formatMessage('teams.deleted', { name: teamToDelete.name }));
+    } catch (error) {
+      setProblem(describeTeamProblem(error));
+    }
+    setIsDeleting(false);
+    setTeamToDelete(null);
+    teamsResource.reload();
+    peopleResource.reload();
+  };
 
   if (teamsData.isFirstLoad || peopleData.isFirstLoad) return <LoadingState label={t('teams.loading')} />;
   if (teamsData.hasFailed || teamsData.data === null || peopleData.data === null) {
@@ -55,6 +77,7 @@ export function TeamsPage() {
         </Button>
       </div>
       {notice ? <Alert tone="success">{notice}</Alert> : null}
+      {problem ? <Alert tone="error">{problem}</Alert> : null}
       <Card aria-labelledby="teams-list">
         <h2 id="teams-list" className="text-heading-sm mb-1 text-text-primary">
           {t('teams.title')}
@@ -62,13 +85,57 @@ export function TeamsPage() {
         {teams.length === 0 ? <p className="text-body-md text-text-secondary">{t('teams.empty')}</p> : null}
         <ul>
           {teams.map((team) => (
-            <li key={team.id} className="flex flex-col gap-1 border-b border-border-default py-3 last:border-b-0">
-              <h3 className="text-label-md text-text-primary">{team.name}</h3>
-              <p className="text-body-md text-text-secondary">{describeTeamMembers(team.members)}</p>
+            <li
+              key={team.id}
+              className="flex items-start justify-between gap-2 border-b border-border-default py-3 last:border-b-0"
+            >
+              <div className="flex min-w-0 flex-col gap-1">
+                <h3 className="text-label-md text-text-primary">{team.name}</h3>
+                <p className="text-body-md text-text-secondary">{describeTeamMembers(team.members)}</p>
+              </div>
+              <ActionMenu
+                triggerLabel={formatMessage('teams.menu.label', { name: team.name })}
+                panelLabel={t('teams.menu.panel')}
+                items={[
+                  { id: 'edit', label: t('teams.menu.edit'), onSelect: () => setTeamToEdit(team) },
+                  {
+                    id: 'delete',
+                    label: t('teams.menu.delete'),
+                    tone: 'danger',
+                    onSelect: () => setTeamToDelete(team),
+                  },
+                ]}
+              />
             </li>
           ))}
         </ul>
       </Card>
+      <ConfirmDialog
+        isOpen={teamToDelete !== null}
+        title={teamToDelete ? formatMessage('teams.delete.title', { name: teamToDelete.name }) : ''}
+        description={t('teams.delete.description')}
+        confirmLabel={t('teams.delete.confirm')}
+        cancelLabel={t('teams.delete.keep')}
+        closeLabel={t('teams.form.close')}
+        tone="danger"
+        isConfirming={isDeleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setTeamToDelete(null)}
+      />
+      {teamToEdit ? (
+        <TeamFormPanel
+          isOpen
+          onClose={() => setTeamToEdit(null)}
+          people={activePeople}
+          editingTeam={teamToEdit}
+          onSaved={(teamName) => {
+            setTeamToEdit(null);
+            setNotice(formatMessage('teams.saved', { name: teamName }));
+            teamsResource.reload();
+            peopleResource.reload();
+          }}
+        />
+      ) : null}
       {isAdding ? (
         <TeamFormPanel
           isOpen

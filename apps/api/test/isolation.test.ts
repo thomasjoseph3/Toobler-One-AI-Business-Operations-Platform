@@ -78,6 +78,7 @@ interface BusinessAData {
   prefillRunId: string;
   userId: string;
   invitationId: string;
+  teamId: string;
   secretWords: string;
 }
 
@@ -237,7 +238,7 @@ beforeAll(async () => {
     201,
   );
   // A has a team with a secret name; B must never see it
-  await sendOk(
+  const teamOfA = await sendOk(
     businessA,
     'POST',
     '/teams',
@@ -270,6 +271,7 @@ beforeAll(async () => {
     prefillRunId: prefillRun.id,
     userId: businessA.profile.user.id,
     invitationId: invitationOfA.invitation.id,
+    teamId: teamOfA.id,
     secretWords,
   };
 
@@ -748,6 +750,18 @@ const attempts: Attempt[] = [
     route: 'POST /api/v1/teams',
     what: "add a team with A's owner in it",
     request: () => ({ method: 'POST', url: '/teams', payload: { name: 'Hijack', memberIds: [dataOfA.userId] } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/teams/{id}',
+    what: "rename A's team",
+    request: () => ({ method: 'PATCH', url: `/teams/${dataOfA.teamId}`, payload: { name: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/teams/{id}',
+    what: "delete A's team",
+    request: () => ({ method: 'DELETE', url: `/teams/${dataOfA.teamId}` }),
     expectedStatus: 404,
   },
   {

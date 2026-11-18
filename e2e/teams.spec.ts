@@ -32,6 +32,40 @@ test.describe('Settings: Teams', () => {
     await expect(page.getByRole('region', { name: 'Teams' }).getByRole('heading', { name: 'Weekends' })).toBeVisible();
   });
 
+  test('changes a team: renames it and replaces its people', async ({ page, pretendApi }) => {
+    await page.goto('/settings/teams');
+    await page.getByRole('button', { name: 'More actions for the team Front office' }).click();
+    await page.getByRole('button', { name: 'Change the team' }).click();
+    await expect(page.getByLabel('Team name')).toHaveValue('Front office');
+    await expect(page.getByLabel('Rahul Das')).toBeChecked();
+    await page.getByLabel('Team name').fill('Reception');
+    await page.getByLabel('Rahul Das').uncheck();
+    await page.getByLabel('Anita Nair').check();
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('The team Reception was saved.')).toBeVisible();
+    expect(pretendApi.team.patchedTeams).toEqual([
+      { teamId: 'team-1', body: { name: 'Reception', memberIds: ['0191f0a0-0000-7000-8000-000000000001'] } },
+    ]);
+    await expect(page.getByRole('region', { name: 'Teams' }).getByRole('heading', { name: 'Reception' })).toBeVisible();
+  });
+
+  test('asks "Are you sure?" naming the team before deleting it', async ({ page, pretendApi }) => {
+    await page.goto('/settings/teams');
+    await page.getByRole('button', { name: 'More actions for the team Front office' }).click();
+    await page.getByRole('button', { name: 'Delete the team' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete the team Front office?' });
+    await expect(dialog.getByText('The people in it stay in your business.')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Keep it' }).click();
+    expect(pretendApi.team.deletedTeamIds).toEqual([]);
+
+    await page.getByRole('button', { name: 'More actions for the team Front office' }).click();
+    await page.getByRole('button', { name: 'Delete the team' }).click();
+    await dialog.getByRole('button', { name: 'Delete team' }).click();
+    await expect(page.getByText('The team Front office was deleted.')).toBeVisible();
+    expect(pretendApi.team.deletedTeamIds).toEqual(['team-1']);
+    await expect(page.getByText('You have no teams yet.')).toBeVisible();
+  });
+
   test('asks for a name, and shows the API’s words when the name is already used, keeping what was typed', async ({
     page,
     pretendApi,

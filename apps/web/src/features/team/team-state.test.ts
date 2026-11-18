@@ -3,6 +3,7 @@ import { ApiRequestError } from '../../api/client';
 import {
   buildEmptyInviteForm,
   buildEmptyTeamForm,
+  buildTeamFormFromTeam,
   buildInviteRequest,
   checkAcceptPassword,
   checkInviteForm,
@@ -108,6 +109,13 @@ describe('the team form', () => {
     expect(buildEmptyTeamForm()).toEqual({ name: '', memberIds: [] });
     expect(checkTeamForm({ name: '   ', memberIds: [] })).toBe('teams.form.problem.name');
     expect(checkTeamForm({ name: 'Sales', memberIds: [] })).toBeUndefined();
+  });
+
+  it('fills the form from an existing team', () => {
+    expect(buildTeamFormFromTeam({ name: 'Sales', members: [{ userId: 'rahul' }, { userId: 'meera' }] })).toEqual({
+      name: 'Sales',
+      memberIds: ['rahul', 'meera'],
+    });
   });
 
   it('ticks and unticks people, keeping the order', () => {

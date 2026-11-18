@@ -10,6 +10,9 @@ export interface PretendTeam {
   teams: Array<{ id: string; name: string; members: Array<{ userId: string; name: string }> }>;
   /** What the page sent to add a team. */
   postedTeams: Array<Record<string, unknown>>;
+  /** What the page sent to change a team, and which teams it deleted. */
+  patchedTeams: Array<{ teamId: string; body: Record<string, unknown> }>;
+  deletedTeamIds: string[];
   /** What the page sent to invite someone. */
   postedInvitations: Array<Record<string, unknown>>;
   /** When set, the next invitation is refused with this status, code and message. */
@@ -69,6 +72,8 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
     ],
     teams: [{ id: 'team-1', name: 'Front office', members: [{ userId: 'member-staff-1', name: 'Rahul Das' }] }],
     postedTeams: [],
+    patchedTeams: [],
+    deletedTeamIds: [],
     postedInvitations: [],
     refusal: null,
     emailWorks: true,
@@ -171,6 +176,35 @@ export function answerTeamCall(
           emailSent: state.emailWorks,
         },
       };
+    }
+    return undefined;
+  }
+  const teamMatch = /^\/teams\/([\w-]+)$/u.exec(call.path);
+  if (teamMatch) {
+    if (call.role !== 'manager')
+      return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
+    const team = state.teams.find((candidate) => candidate.id === teamMatch[1]);
+    if (!team) return { status: 404, body: { error: { code: 'NOT_FOUND', message: "That team wasn't found." } } };
+    if (state.refusal) {
+      const { status, code, message } = state.refusal;
+      state.refusal = null;
+      return { status, body: { error: { code, message } } };
+    }
+    if (call.method === 'PATCH') {
+      state.patchedTeams.push({ teamId: team.id, body: call.body ?? {} });
+      if (typeof call.body?.['name'] === 'string') team.name = call.body['name'];
+      if (Array.isArray(call.body?.['memberIds'])) {
+        const memberIds = call.body['memberIds'] as string[];
+        team.members = state.members
+          .filter((member) => memberIds.includes(String(member['id'])))
+          .map((member) => ({ userId: String(member['id']), name: String(member['name']) }));
+      }
+      return { status: 200, body: team };
+    }
+    if (call.method === 'DELETE') {
+      state.deletedTeamIds.push(team.id);
+      state.teams = state.teams.filter((candidate) => candidate !== team);
+      return { status: 204 };
     }
     return undefined;
   }

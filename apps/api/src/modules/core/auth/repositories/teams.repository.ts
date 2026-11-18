@@ -107,3 +107,59 @@ export async function countActivePeople(db: Db, accountId: string, userIds: stri
     .execute();
   return rows.length;
 }
+
+/** A team found by id and locked until the transaction ends. Undefined for an unknown id and for another business's team. */
+export async function findTeamForUpdate(
+  db: Db,
+  accountId: string,
+  teamId: string,
+): Promise<{ id: string; name: string } | undefined> {
+  return db
+    .selectFrom('teams')
+    .select(['id', 'name'])
+    .where('account_id', '=', accountId)
+    .where('id', '=', teamId)
+    .forUpdate()
+    .executeTakeFirst();
+}
+
+/** Gives a team a new name and stamps who did it. Throws a unique-violation (23505) when another team already has the name. */
+export async function renameTeam(
+  db: Db,
+  options: { accountId: string; teamId: string; name: string; changedBy: string },
+): Promise<void> {
+  await db
+    .updateTable('teams')
+    .set({ name: options.name, updated_by: { kind: 'user', id: options.changedBy } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.teamId)
+    .execute();
+}
+
+/** Replaces the people of a team with exactly these. */
+export async function replaceTeamMembers(
+  db: Db,
+  options: { accountId: string; teamId: string; userIds: string[]; changedBy: string },
+): Promise<void> {
+  await db
+    .deleteFrom('team_members')
+    .where('account_id', '=', options.accountId)
+    .where('team_id', '=', options.teamId)
+    .execute();
+  await addTeamMembers(db, {
+    accountId: options.accountId,
+    teamId: options.teamId,
+    userIds: options.userIds,
+    addedBy: options.changedBy,
+  });
+}
+
+/** Removes a team for good (its people are not touched; their team rows go with it). */
+export async function deleteTeam(db: Db, accountId: string, teamId: string): Promise<void> {
+  await db.deleteFrom('teams').where('account_id', '=', accountId).where('id', '=', teamId).execute();
+}
+
+/** Takes a person out of every team (when they are removed from the business). */
+export async function removePersonFromAllTeams(db: Db, accountId: string, userId: string): Promise<void> {
+  await db.deleteFrom('team_members').where('account_id', '=', accountId).where('user_id', '=', userId).execute();
+}

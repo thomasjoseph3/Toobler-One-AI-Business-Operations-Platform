@@ -133,6 +133,14 @@ export function buildEmptyTeamForm(): TeamFormFields {
   return { name: '', memberIds: [] };
 }
 
+/** The team form filled in with an existing team, for changing it. */
+export function buildTeamFormFromTeam(team: {
+  name: string;
+  members: ReadonlyArray<{ userId: string }>;
+}): TeamFormFields {
+  return { name: team.name, memberIds: team.members.map((member) => member.userId) };
+}
+
 /** Checks the team form on the device first; returns the key of a message for the name, or undefined when it is fine. The API checks again (and refuses a name already used). */
 export function checkTeamForm(fields: TeamFormFields): MessageKey | undefined {
   if (fields.name.trim().length === 0) return 'teams.form.problem.name';

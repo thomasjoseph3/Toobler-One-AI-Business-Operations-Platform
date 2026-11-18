@@ -125,3 +125,116 @@ describe('GET /api/v1/teams', () => {
     expect(nobody.statusCode).toBe(401);
   });
 });
+
+describe('PATCH /api/v1/teams/{id}', () => {
+  it('renames a team and replaces its people with exactly the list sent', async () => {
+    const owner = await signUpOwner(app, database);
+    const rahul = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const meera = await addTeamMember(app, database, owner, { name: 'Meera Pillai', role: 'staff' });
+    const team = await owner.ok('POST', '/teams', { name: 'Sales', memberIds: [rahul.userId] }, 201);
+
+    const changed = await owner.ok('PATCH', `/teams/${team.id}`, { name: 'Weekend sales', memberIds: [meera.userId] });
+    expect(changed.name).toBe('Weekend sales');
+    expect(changed.members).toEqual([{ userId: meera.userId, name: 'Meera Pillai' }]);
+
+    // A name alone keeps the people; a list alone keeps the name
+    expect((await owner.ok('PATCH', `/teams/${team.id}`, { name: 'Sales' })).members).toHaveLength(1);
+    const emptied = await owner.ok('PATCH', `/teams/${team.id}`, { memberIds: [] });
+    expect(emptied).toMatchObject({ name: 'Sales', members: [] });
+  });
+
+  it('refuses another team’s name (409), but allows keeping or re-capitalising its own', async () => {
+    const owner = await signUpOwner(app, database);
+    await owner.ok('POST', '/teams', { name: 'Sales' }, 201);
+    const second = await owner.ok('POST', '/teams', { name: 'Support' }, 201);
+    expect(await owner.refused('PATCH', `/teams/${second.id}`, { name: 'sales' }, 409)).toBe('TEAM_NAME_TAKEN');
+    await owner.ok('PATCH', `/teams/${second.id}`, { name: 'SUPPORT' });
+    await owner.ok('PATCH', `/teams/${second.id}`, { name: 'SUPPORT' });
+  });
+
+  it('refuses a person who is unknown, removed or from another business (404) and changes nothing', async () => {
+    const owner = await signUpOwner(app, database);
+    const stranger = await signUpOwner(app, database);
+    const rahul = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const team = await owner.ok('POST', '/teams', { name: 'Sales', memberIds: [rahul.userId] }, 201);
+    for (const memberId of [randomUUID(), stranger.userId]) {
+      expect(await owner.refused('PATCH', `/teams/${team.id}`, { name: 'Renamed', memberIds: [memberId] }, 404)).toBe(
+        'NOT_FOUND',
+      );
+    }
+    const after = (await owner.ok('GET', '/teams')).items[0];
+    expect(after).toMatchObject({ name: 'Sales' });
+    expect(after.members).toHaveLength(1);
+  });
+
+  it('answers 404 for an unknown team and another business’s team, 400 for a bad request, 403 for staff, 401 for nobody', async () => {
+    const owner = await signUpOwner(app, database);
+    const stranger = await signUpOwner(app, database);
+    const staff = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const team = await owner.ok('POST', '/teams', { name: 'Sales' }, 201);
+    const strangersTeam = await stranger.ok('POST', '/teams', { name: 'Sales' }, 201);
+    await owner.refused('PATCH', `/teams/${randomUUID()}`, { name: 'X' }, 404);
+    await owner.refused('PATCH', `/teams/${strangersTeam.id}`, { name: 'Hijacked' }, 404);
+    expect((await stranger.ok('GET', '/teams')).items[0].name).toBe('Sales');
+    await owner.refused('PATCH', `/teams/${team.id}`, {}, 400);
+    await owner.refused('PATCH', `/teams/${team.id}`, { name: '' }, 400);
+    await owner.refused('PATCH', '/teams/not-an-id', { name: 'X' }, 400);
+    await staff.refused('PATCH', `/teams/${team.id}`, { name: 'X' }, 403);
+    const nobody = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/teams/${team.id}`,
+      headers: unsafeRequestHeaders,
+      payload: { name: 'X' },
+    });
+    expect(nobody.statusCode).toBe(401);
+  });
+});
+
+describe('DELETE /api/v1/teams/{id}', () => {
+  it('removes the team and leaves its people in the business', async () => {
+    const owner = await signUpOwner(app, database);
+    const rahul = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const team = await owner.ok('POST', '/teams', { name: 'Sales', memberIds: [rahul.userId] }, 201);
+    await owner.ok('DELETE', `/teams/${team.id}`, undefined, 204);
+
+    expect((await owner.ok('GET', '/teams')).items).toEqual([]);
+    const people = await owner.ok('GET', '/team');
+    expect(people.members.find((member: { id: string }) => member.id === rahul.userId).teams).toEqual([]);
+    const rows = await database.system
+      .selectFrom('team_members')
+      .select('user_id')
+      .where('team_id', '=', team.id)
+      .execute();
+    expect(rows).toEqual([]);
+    // The name can be used again
+    await owner.ok('POST', '/teams', { name: 'Sales' }, 201);
+  });
+
+  it('answers 404 for a second delete, an unknown team and another business’s team; 403 for staff; 401 for nobody', async () => {
+    const owner = await signUpOwner(app, database);
+    const stranger = await signUpOwner(app, database);
+    const staff = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const team = await owner.ok('POST', '/teams', { name: 'Sales' }, 201);
+    const strangersTeam = await stranger.ok('POST', '/teams', { name: 'Sales' }, 201);
+    await staff.refused('DELETE', `/teams/${team.id}`, undefined, 403);
+    await owner.refused('DELETE', `/teams/${strangersTeam.id}`, undefined, 404);
+    expect((await stranger.ok('GET', '/teams')).items).toHaveLength(1);
+    await owner.ok('DELETE', `/teams/${team.id}`, undefined, 204);
+    await owner.refused('DELETE', `/teams/${team.id}`, undefined, 404);
+    await owner.refused('DELETE', `/teams/${randomUUID()}`, undefined, 404);
+    const nobody = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/teams/${team.id}`,
+      headers: unsafeRequestHeaders,
+    });
+    expect(nobody.statusCode).toBe(401);
+  });
+
+  it('a person who is removed from the business leaves their teams', async () => {
+    const owner = await signUpOwner(app, database);
+    const rahul = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    await owner.ok('POST', '/teams', { name: 'Sales', memberIds: [rahul.userId] }, 201);
+    await owner.ok('DELETE', `/team/members/${rahul.userId}`, undefined, 204);
+    expect((await owner.ok('GET', '/teams')).items[0].members).toEqual([]);
+  });
+});
