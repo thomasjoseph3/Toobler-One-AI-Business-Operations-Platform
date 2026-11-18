@@ -1255,6 +1255,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/search', url: '/knowledge/search?q=question%20answer%20does%20it%20work' },
   { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
   { route: 'GET /api/v1/me', url: '/me' },
+  { route: 'GET /api/v1/today', url: '/today?scope=team' },
 ];
 
 /**
@@ -1290,6 +1291,8 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/today':
+    "covered by the list check (GET /today?scope=team shows none of A's data); the business comes from the session",
   'POST /api/v1/imports':
     'the file lands in the caller’s own business only and names no other record (the business comes from the session); managers only, tested in imports.test.ts',
   'GET /api/v1/lists': 'covered by the list check, and by lists.test.ts',

@@ -24,3 +24,6 @@ export type { ConversationFactsForScoring } from './services/lead-scoring.servic
 export { findLeadsForExport } from './services/leads.service';
 // The duplicates module (F13) moves a merged-away contact's leads to the kept contact, and checks that both do not have an open lead.
 export { moveLeadsToContact, contactHasOpenLead } from './services/contact-merge.service';
+// The Today module (F22) reads the leads that feed its sections (open, or created/closed this week).
+export { findLeadsForToday } from './services/lead-today.service';
+export type { LeadForTodayRow } from './services/lead-today.service';

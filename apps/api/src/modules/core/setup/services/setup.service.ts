@@ -74,6 +74,12 @@ export function createSetupService({ database }: { database: Database }) {
     /** The steps with their status, the percent done, what still stops the business going live, and whether it is live. */
     getSetup: readSetup,
 
+    /** How many setup steps are still to do (not done, not skipped), for the Today page's manager nudge (F22). */
+    async countUnfinishedSteps(principal: Pick<Principal, 'accountId' | 'industryId'>): Promise<number> {
+      const setup = await readSetup(principal);
+      return setup.steps.filter((step) => step.status === 'todo').length;
+    },
+
     /**
      * Marks one step done, skipped or todo. A step the system checks itself answers 400 STEP_CHECKED_BY_SYSTEM. Marking a step
      * the way it already is changes nothing and writes no log line. Answers with the whole setup picture.

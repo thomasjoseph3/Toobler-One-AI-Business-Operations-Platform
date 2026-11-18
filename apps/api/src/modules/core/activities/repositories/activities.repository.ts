@@ -134,6 +134,31 @@ export async function listActivities(
   return { items: rows.map(toActivityRow), total: Number(totalRow.total) };
 }
 
+/**
+ * For each of the given leads, the first time staff touched it: the earliest note or stage change (deleted ones left
+ * out). A lead nobody has touched is missing from the map. Used by the Today page (F22) to decide "not yet contacted"
+ * and the "time to first reply" average. Run inside the business's own transaction.
+ */
+export async function findFirstTouchTimesForLeads(
+  db: Db,
+  options: { accountId: string; leadIds: readonly string[] },
+): Promise<Map<string, Date>> {
+  if (options.leadIds.length === 0) return new Map();
+  const rows = await db
+    .selectFrom('activities')
+    .select(['lead_id', sql<Date>`min(created_at)`.as('first_touch')])
+    .where('account_id', '=', options.accountId)
+    .where('deleted_at', 'is', null)
+    .where('lead_id', 'in', [...options.leadIds])
+    // A "touch" is a staff note or a stage move; "lead_created" is not staff reaching out.
+    .where('kind', 'in', ['note', 'stage_changed'])
+    .groupBy('lead_id')
+    .execute();
+  const firstTouchByLead = new Map<string, Date>();
+  for (const row of rows) if (row.lead_id) firstTouchByLead.set(row.lead_id, row.first_touch);
+  return firstTouchByLead;
+}
+
 /** What the service needs to decide whether a note may be changed: its lead, who wrote it, and its words. */
 export interface NoteForChange {
   id: string;
