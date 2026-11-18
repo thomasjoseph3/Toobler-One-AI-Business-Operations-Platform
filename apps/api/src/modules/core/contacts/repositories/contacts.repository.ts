@@ -14,6 +14,7 @@ const CONTACT_COLUMNS = [
   'email',
   'language',
   'lifecycle_stage',
+  'company_id',
   'created_at',
   'updated_at',
 ] as const;
@@ -26,6 +27,7 @@ function toContact(row: {
   email: string | null;
   language: string | null;
   lifecycle_stage: LifecycleStage;
+  company_id: string | null;
   created_at: Date;
   updated_at: Date;
 }): Contact {
@@ -36,6 +38,7 @@ function toContact(row: {
     email: row.email,
     language: row.language,
     lifecycleStage: row.lifecycle_stage,
+    companyId: row.company_id,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -250,4 +253,21 @@ export async function findContactsByIds(db: Db, accountId: string, contactIds: s
     .where('deleted_at', 'is', null)
     .execute();
   return rows.map(toContact);
+}
+
+/** Which contacts belong to which of these companies (live contacts only). Run it inside the business's fence. */
+export async function findContactCompanyLinks(
+  db: Db,
+  accountId: string,
+  companyIds: string[],
+): Promise<Array<{ contactId: string; companyId: string }>> {
+  if (companyIds.length === 0) return [];
+  const rows = await db
+    .selectFrom('contacts')
+    .select(['id', 'company_id'])
+    .where('account_id', '=', accountId)
+    .where('company_id', 'in', companyIds)
+    .where('deleted_at', 'is', null)
+    .execute();
+  return rows.flatMap((row) => (row.company_id === null ? [] : [{ contactId: row.id, companyId: row.company_id }]));
 }

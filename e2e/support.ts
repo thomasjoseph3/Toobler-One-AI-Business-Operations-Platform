@@ -4,6 +4,7 @@ import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from '.
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
 import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
 import { answerTasksCall, startingTasks, type PretendTasks } from './pretend-tasks';
+import { answerCompaniesCall, startingCompanies, type PretendCompanies } from './pretend-companies';
 import { answerTeamCall, startingTeam, type PretendTeam } from './pretend-team';
 import { answerSettingsCall, startingSettings, type PretendSettings } from './pretend-settings';
 import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
@@ -91,6 +92,8 @@ export interface PretendApi {
   tasks: PretendTasks;
   /** The team (Settings → Team): people, invitations. */
   team: PretendTeam;
+  /** Companies (the Companies page and the Add company form). */
+  companies: PretendCompanies;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -221,6 +224,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         settings: startingSettings(),
         notes: startingNotes(),
         tasks: startingTasks(PRETEND_PROFILE.user.id, PRETEND_PROFILE.user.name),
+        companies: startingCompanies(),
         team: startingTeam(PRETEND_PROFILE.user.id, PRETEND_PROFILE.user.name, PRETEND_PROFILE.user.email),
       };
       await page.route('**/api/v1/**', async (route) => {
@@ -260,6 +264,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
               teamAnswer.body === undefined ? { status: teamAnswer.status } : json(teamAnswer.status, teamAnswer.body),
             );
           }
+        }
+        if (path === '/companies') {
+          const companiesAnswer = answerCompaniesCall(pretendApi.companies, {
+            method: request.method(),
+            path,
+            search: new URL(request.url()).search,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+          });
+          if (companiesAnswer) return route.fulfill(json(companiesAnswer.status, companiesAnswer.body));
         }
         if (path === '/tasks' || path.startsWith('/tasks/')) {
           const profile = profileFor(pretendApi);

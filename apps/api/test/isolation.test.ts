@@ -237,6 +237,14 @@ beforeAll(async () => {
     { leadId: lead.id, title: 'A private task', dueAt: '2030-01-01T10:00:00Z' },
     201,
   );
+  // A has a company with a secret name; B must never see it
+  await sendOk(
+    businessA,
+    'POST',
+    '/companies',
+    { name: `Company ${secretWords}`, domain: `${secretWords}.example` },
+    201,
+  );
   // A has a team with a secret name; B must never see it
   const teamOfA = await sendOk(
     businessA,
@@ -769,6 +777,18 @@ const attempts: Attempt[] = [
     what: "read the activity log filtered to A's owner (B must see only its own lines, never A's)",
     request: () => ({ method: 'GET', url: `/audit-log?person=${dataOfA.userId}` }),
     expectedStatus: 200,
+  },
+  {
+    route: 'GET /api/v1/companies',
+    what: "search the companies for A's secret name and A's domain (B must see none of A's)",
+    request: () => ({ method: 'GET', url: `/companies?q=${dataOfA.secretWords}` }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/companies',
+    what: "add a company with A's owner as its owner",
+    request: () => ({ method: 'POST', url: '/companies', payload: { name: 'Hijack', ownerUserId: dataOfA.userId } }),
+    expectedStatus: 404,
   },
   {
     route: 'POST /api/v1/team/invitations',

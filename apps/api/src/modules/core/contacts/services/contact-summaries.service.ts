@@ -25,3 +25,14 @@ export async function findContactSummaries(
     email: contact.email,
   }));
 }
+
+/**
+ * Which live contacts belong to which of these companies. Used by the companies module (through this module's index.ts) to count a company's
+ * people and to find their leads. Run it inside the business's own transaction.
+ */
+export async function findContactCompanyLinks(
+  transaction: Db,
+  options: { accountId: string; companyIds: string[] },
+): Promise<Array<{ contactId: string; companyId: string }>> {
+  return contactsRepository.findContactCompanyLinks(transaction, options.accountId, options.companyIds);
+}

@@ -14,6 +14,7 @@ import { LeadsPage } from '../features/leads/LeadsPage';
 import { ModulesPage } from '../features/settings/ModulesPage';
 import { SettingsAiPage } from '../features/settings/SettingsAiPage';
 import { AcceptInvitationPage } from '../pages/AcceptInvitationPage';
+import { CompaniesPage } from '../features/companies/CompaniesPage';
 import { ActivityPage } from '../features/team/ActivityPage';
 import { TeamPage } from '../features/team/TeamPage';
 import { TeamsPage } from '../features/team/TeamsPage';
@@ -42,6 +43,7 @@ function pageFor(item: NavigationItem) {
   if (item.id === 'contacts') return <ContactsPage />;
   if (item.id === 'tickets') return <TicketsPage />;
   if (item.id === 'tasks') return <TasksPage />;
+  if (item.id === 'companies') return <CompaniesPage />;
   if (item.id === 'knowledge') return <KnowledgePage />;
   if (item.id === 'setup') return <SetupPage />;
   if (item.id === 'channels') return <ChannelsPage />;

@@ -483,3 +483,32 @@ export async function handOverOpenLeads(
     .execute();
   return rows.length;
 }
+
+/** For each of these contacts: how many open leads and how many won leads they have, and the combined budget of the won ones in paise (deleted leads do not count). Contacts with no leads are left out. */
+export async function summariseLeadsOfContacts(
+  db: Db,
+  accountId: string,
+  contactIds: string[],
+): Promise<Array<{ contactId: string; openLeads: number; wonLeads: number; wonValuePaise: number }>> {
+  if (contactIds.length === 0) return [];
+  const rows = await db
+    .selectFrom('leads as lead')
+    .innerJoin('pipeline_stages as stage', 'stage.id', 'lead.stage_id')
+    .select([
+      'lead.contact_id',
+      sql<string>`count(*) filter (where stage.kind = 'open')`.as('open_leads'),
+      sql<string>`count(*) filter (where stage.kind = 'won')`.as('won_leads'),
+      sql<string>`coalesce(sum(lead.budget_paise) filter (where stage.kind = 'won'), 0)`.as('won_value'),
+    ])
+    .where('lead.account_id', '=', accountId)
+    .where('lead.contact_id', 'in', contactIds)
+    .where('lead.deleted_at', 'is', null)
+    .groupBy('lead.contact_id')
+    .execute();
+  return rows.map((row) => ({
+    contactId: row.contact_id,
+    openLeads: Number(row.open_leads),
+    wonLeads: Number(row.won_leads),
+    wonValuePaise: Number(row.won_value),
+  }));
+}

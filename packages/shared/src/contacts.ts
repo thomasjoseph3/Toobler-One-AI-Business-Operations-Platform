@@ -17,6 +17,8 @@ export const contactSchema = z.object({
   email: z.string().nullable(),
   language: z.string().nullable(),
   lifecycleStage: lifecycleStageSchema,
+  /** The company the contact belongs to (F05), or null. The company's name comes from `GET /companies/{id}`. */
+  companyId: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

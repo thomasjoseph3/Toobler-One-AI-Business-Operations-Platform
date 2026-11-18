@@ -74,6 +74,7 @@ describe('the Edit contact form', () => {
     email: null,
     language: 'en',
     lifecycleStage: 'new',
+    companyId: null,
     createdAt: '',
     updatedAt: '',
   };
