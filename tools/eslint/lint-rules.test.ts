@@ -243,5 +243,7 @@ describe('project lint configuration', () => {
       result.messages.map((message) => `${path.relative(repositoryRoot, result.filePath)}: ${message.message}`),
     );
     expect(problems).toEqual([]);
-  });
+    // Linting the whole API source grows slower as the codebase grows and is slower still on a cold or slower
+    // machine (it ran in ~8s here), so this one test gets a generous budget well above the 5s default.
+  }, 30_000);
 });
