@@ -26,6 +26,7 @@ import {
   findOwnerLabel,
   findStageTagTone,
   formatCallbackDate,
+  pickNextActivityAt,
 } from './lead-display';
 
 export interface LeadsTableProps {
@@ -45,12 +46,14 @@ export interface LeadsTableProps {
   onCreateTask: (lead: Lead, displayName: string) => void;
   /** How many notes each lead has (a lead missing here has none shown): a lead with notes shows the orange notes icon all the time. */
   noteCounts: Readonly<Record<string, number>>;
+  /** When each lead's earliest open task is due (null or missing: none): with the callback it makes the date in the Next activity column. */
+  nextTaskDates: Readonly<Record<string, string | null>>;
 }
 
-/** The small green chip with the callback date (Figma "Next activity"); the calendar icon and the date both show. */
+/** The chip with the next activity's date (Figma "Next activity": lavender, with the calendar icon and the date written like "Nov 22"). */
 function CallbackChip({ date }: { date: string }) {
   return (
-    <span className="text-label-xs inline-flex items-center gap-1 rounded-sm bg-success-bg px-2 py-1 text-success">
+    <span className="text-label-xs inline-flex items-center gap-1 rounded-sm bg-card-header-lavender px-2 py-1 whitespace-nowrap text-info">
       <CalendarIcon size={14} />
       {date}
     </span>
@@ -70,6 +73,7 @@ export function LeadsTable({
   onOpenNotes,
   onCreateTask,
   noteCounts,
+  nextTaskDates,
 }: LeadsTableProps) {
   const areAllSelected = leads.length > 0 && leads.every((lead) => selectedLeadIds.has(lead.id));
   return (
@@ -103,7 +107,10 @@ export function LeadsTable({
       <TableBody>
         {leads.map((lead) => {
           const displayName = findLeadDisplayName(lead.contact);
-          const callbackDate = formatCallbackDate(lead.callbackAt, timeZone);
+          const callbackDate = formatCallbackDate(
+            pickNextActivityAt(lead.callbackAt, nextTaskDates[lead.id]),
+            timeZone,
+          );
           const noteCount = noteCounts[lead.id] ?? 0;
           return (
             <TableRow key={lead.id} isSelected={selectedLeadIds.has(lead.id)}>
@@ -117,8 +124,8 @@ export function LeadsTable({
                   />
                 </div>
               </TableCell>
-              <TableCell className="w-28 !px-1 whitespace-nowrap">
-                {/* Next activity (Figma: right after the select box): the callback date, and the quick actions when the row is hovered or focused */}
+              <TableCell className="w-40 min-w-40 !px-1 whitespace-nowrap">
+                {/* Next activity (Figma: right after the select box): the date chip and, next to it, the notes icon, always showing; the quick actions show when the row is hovered or focused */}
                 <div className="flex items-center gap-1">
                   {callbackDate ? <CallbackChip date={callbackDate} /> : null}
                   {noteCount > 0 ? (
@@ -128,7 +135,7 @@ export function LeadsTable({
                       aria-label={formatMessage('leads.row.notesCount', { name: displayName, count: noteCount })}
                       title={formatMessage('leads.row.notesCount', { name: displayName, count: noteCount })}
                       onClick={() => onOpenNotes(lead, displayName)}
-                      className="inline-flex size-7 items-center justify-center rounded-sm bg-warning-bg text-warning hover:opacity-80"
+                      className="inline-flex size-7 items-center justify-center rounded-sm bg-card-header-peach text-warning hover:opacity-80"
                     >
                       <AddNoteIcon size={16} />
                     </button>
@@ -165,7 +172,9 @@ export function LeadsTable({
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
-                  <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
+                  {lead.temperature === 'unscored' ? null : (
+                    <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
+                  )}
                 </div>
               </TableCell>
               <TableCell>{findChannelLabel(lead.firstChannel)}</TableCell>
@@ -186,11 +195,15 @@ export function LeadCards({
   signedInUserId,
   timeZone,
   renderRowMenu,
-}: Pick<LeadsTableProps, 'leads' | 'openStageIdsInOrder' | 'signedInUserId' | 'timeZone' | 'renderRowMenu'>) {
+  nextTaskDates,
+}: Pick<
+  LeadsTableProps,
+  'leads' | 'openStageIdsInOrder' | 'signedInUserId' | 'timeZone' | 'renderRowMenu' | 'nextTaskDates'
+>) {
   return (
     <ul className="flex flex-col gap-3">
       {leads.map((lead) => {
-        const callbackDate = formatCallbackDate(lead.callbackAt, timeZone);
+        const callbackDate = formatCallbackDate(pickNextActivityAt(lead.callbackAt, nextTaskDates[lead.id]), timeZone);
         return (
           <li key={lead.id}>
             <Card isCompact className="flex flex-col gap-2">
@@ -200,7 +213,9 @@ export function LeadCards({
                 </p>
                 <div className="flex shrink-0 items-center gap-1">
                   <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
-                  <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
+                  {lead.temperature === 'unscored' ? null : (
+                    <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
+                  )}
                   {renderRowMenu(lead, findLeadDisplayName(lead.contact))}
                 </div>
               </div>

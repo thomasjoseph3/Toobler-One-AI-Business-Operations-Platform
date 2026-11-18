@@ -3,7 +3,10 @@ import { expect, PRETEND_PROFILE, PRETEND_STAGE_IDS, test } from './support';
 test.describe('Leads list', () => {
   test('shows the open leads with the display rules: name, phone or email as the name, tags, owner, callback date', async ({
     page,
+    pretendApi,
   }, testInfo) => {
+    // No open task, so the date shown is the booked callback
+    pretendApi.tasks.tasks = [];
     await page.goto('/leads');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Leads');
     const isPhone = testInfo.project.name === 'phone';
@@ -17,7 +20,7 @@ test.describe('Leads list', () => {
     await expect(list.getByText('Contacted', { exact: true })).toBeVisible();
     await expect(list.getByText('Quoted', { exact: true })).toBeVisible();
     // On a phone the source and owner share one line ("WhatsApp · You"), so these check the words, not whole cells
-    for (const words of ['You', 'Team member', 'Unassigned', 'WhatsApp', 'Web chat', '22 Nov']) {
+    for (const words of ['You', 'Team member', 'Unassigned', 'WhatsApp', 'Web chat', 'Nov 22']) {
       await expect(list).toContainText(words);
     }
     await expect(page.getByText('Showing 1–3 of 3 open leads').locator('visible=true')).toBeVisible();
@@ -213,5 +216,29 @@ test.describe('Leads list', () => {
     await expect(page.getByText('Priya Menon 0', { exact: true }).locator('visible=true')).toBeVisible();
     const windowScrolls = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
     expect(windowScrolls).toBe(true);
+  });
+
+  test('the Next activity date and the notes icon are always showing, side by side, without hovering (Figma)', async ({
+    page,
+    pretendApi,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The Next activity column is for tablets and desktops');
+    pretendApi.tasks.tasks = [];
+    await page.goto('/leads');
+    // Lead 0 has a callback date and notes: both show with the pointer nowhere near the row
+    await page.getByRole('heading', { level: 1 }).hover();
+    const cell = page
+      .getByRole('row', { name: /Priya Menon 0/ })
+      .getByRole('cell')
+      .nth(1);
+    const chip = cell.getByText('Nov 22');
+    const notesIcon = cell.getByRole('button', { name: /notes/i });
+    await expect(chip).toBeVisible();
+    await expect(notesIcon).toBeVisible();
+    // The icon is right after the date, on the same line
+    const chipBox = (await chip.boundingBox())!;
+    const iconBox = (await notesIcon.boundingBox())!;
+    expect(iconBox.x).toBeGreaterThan(chipBox.x + chipBox.width - 1);
+    expect(Math.abs(iconBox.y + iconBox.height / 2 - (chipBox.y + chipBox.height / 2))).toBeLessThan(8);
   });
 });

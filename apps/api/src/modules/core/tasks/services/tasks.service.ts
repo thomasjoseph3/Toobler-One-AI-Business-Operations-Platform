@@ -1,6 +1,7 @@
 import type {
   CreateTaskRequest,
   ListTasksQuery,
+  NextDueResponse,
   Task,
   TasksListResponse,
   UpdateTaskRequest,
@@ -16,7 +17,7 @@ import { findBusinessIdentity, findPeopleSummaries } from '../../auth';
 import type { PersonSummary } from '../../auth';
 import { findContactSummaries } from '../../contacts';
 import type { ContactSummary } from '../../contacts';
-import { findLeadReference } from '../../leads';
+import { findLeadReference, findVisibleLeadIds } from '../../leads';
 import { bucketOfTask, startOfNextDayInZone } from '../helpers/day-bounds';
 import * as tasksRepository from '../repositories/tasks.repository';
 import type { TaskRow } from '../repositories/tasks.repository';
@@ -168,6 +169,30 @@ export function createTasksService({ database }: { database: Database }) {
      * `owner=me` or a person's id narrows to one person's tasks; `lead_id` / `contact_id` to one lead or one person (a person's includes
      * all their leads). The "own leads only" role always gets only the tasks it owns, and may not ask for a whole person.
      */
+    /**
+     * For each asked-about lead, when its earliest open task is due (null when it has none): the date in the "Next activity" column of the Leads list.
+     * The "own leads only" role gets a date only for the leads it owns; any other lead answers null, so asking tells nothing. Done and deleted tasks do not count.
+     */
+    async getNextDueDates(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
+      leadIds: string[],
+    ): Promise<NextDueResponse> {
+      const accountId = principal.accountId;
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const visibleLeadIds = await findVisibleLeadIds(transaction, {
+          accountId,
+          leadIds,
+          ...(principal.role === 'staff_own' ? { visibleToUserId: principal.userId } : {}),
+        });
+        const earliestByLead = await tasksRepository.findEarliestOpenDueByLead(transaction, accountId, visibleLeadIds);
+        return {
+          dates: Object.fromEntries(
+            leadIds.map((leadId) => [leadId, earliestByLead.get(leadId)?.toISOString() ?? null]),
+          ),
+        };
+      });
+    },
+
     async listTasks(
       principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       query: ListTasksQuery,

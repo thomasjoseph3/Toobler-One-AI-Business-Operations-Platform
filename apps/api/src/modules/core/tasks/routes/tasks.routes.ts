@@ -3,6 +3,8 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   createTaskRequestSchema,
   listTasksQuerySchema,
+  nextDueQuerySchema,
+  nextDueResponseSchema,
   taskIdParamsSchema,
   taskSchema,
   tasksListResponseSchema,
@@ -24,6 +26,20 @@ export function tasksRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const task = await tasksService.createTask(request.principal, request.body);
       return reply.code(201).send(task);
+    },
+  );
+
+  // For any signed-in, verified person. A plain read for the Leads list: the due date of each asked-about lead's earliest open task. Registered before
+  // /tasks/:id so the word "next-due" is never mistaken for an id.
+  typedApp.get(
+    '/tasks/next-due',
+    {
+      config: { access: 'staff' },
+      schema: { querystring: nextDueQuerySchema, response: { 200: nextDueResponseSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return tasksService.getNextDueDates(request.principal, request.query.lead_ids);
     },
   );
 

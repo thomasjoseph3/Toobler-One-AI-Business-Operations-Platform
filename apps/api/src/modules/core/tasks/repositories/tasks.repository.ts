@@ -364,3 +364,26 @@ export async function handOverOpenTasks(
     .execute();
   return rows.length;
 }
+
+/** For each of these leads: when its earliest open (not done, not deleted) task is due. A lead with no open task is left out of the answer. */
+export async function findEarliestOpenDueByLead(
+  db: Db,
+  accountId: string,
+  leadIds: string[],
+): Promise<Map<string, Date>> {
+  if (leadIds.length === 0) return new Map();
+  const rows = await db
+    .selectFrom('tasks')
+    .select(['lead_id', (expression) => expression.fn.min('due_at').as('next_due_at')])
+    .where('account_id', '=', accountId)
+    .where('lead_id', 'in', leadIds)
+    .where('deleted_at', 'is', null)
+    .where('done_at', 'is', null)
+    .groupBy('lead_id')
+    .execute();
+  const earliest = new Map<string, Date>();
+  for (const row of rows) {
+    if (row.lead_id !== null && row.next_due_at !== null) earliest.set(row.lead_id, new Date(row.next_due_at));
+  }
+  return earliest;
+}

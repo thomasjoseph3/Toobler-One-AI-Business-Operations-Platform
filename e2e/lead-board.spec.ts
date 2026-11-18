@@ -33,7 +33,7 @@ test.describe('the Pipeline board', () => {
     await expect(newColumn).toContainText('WhatsApp'); // the source
     await expect(newColumn).toContainText('+919847010000'); // the phone
     await expect(newColumn).toContainText('Owner: You');
-    await expect(newColumn).toContainText('22 Nov'); // the callback date chip
+    await expect(newColumn).toContainText('Nov 22'); // the callback date chip
     // A stage with nothing in it says so
     await expect(board.getByRole('listitem', { name: 'Won' })).toContainText('No leads here yet');
     await expect(board.getByRole('listitem', { name: 'Lost' })).toContainText('No leads here yet');

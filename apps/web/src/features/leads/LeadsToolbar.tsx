@@ -1,6 +1,7 @@
 import type { PipelineStage } from '@toobler-one/shared';
 import {
   Button,
+  buttonClasses,
   ExportIcon,
   FilterIcon,
   ImportIcon,
@@ -193,10 +194,7 @@ export function LeadsToolbar({ view, stages, onChangeView, onCreateLead, onSaveV
           </Popover>
         )}
         {/* The conversations that were filtered out (spam, wrong numbers, silent calls) are kept on their own page */}
-        <Link
-          to="/leads/filtered"
-          className="text-body-md-semibold inline-flex h-8 items-center rounded-md border border-border-default px-3 text-text-primary hover:bg-hover"
-        >
+        <Link to="/leads/filtered" className={buttonClasses('secondary', 'compact')}>
           {t('filtered.link')}
         </Link>
         <Button size="compact" onClick={onSaveView}>

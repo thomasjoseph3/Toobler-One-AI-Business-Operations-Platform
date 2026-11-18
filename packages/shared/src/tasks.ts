@@ -109,3 +109,19 @@ export const updateTaskRequestSchema = z
     message: 'Send at least one thing to change',
   });
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
+
+/** The leads to ask the next due date of: their ids, separated by commas (`lead_ids=a,b,c`), at most 100 (the size of a list page). */
+export const nextDueQuerySchema = z.object({
+  lead_ids: z
+    .string()
+    .transform((text) => text.split(',').filter((id) => id.trim() !== ''))
+    .pipe(z.array(z.uuid()).min(1).max(100)),
+});
+export type NextDueQuery = z.infer<typeof nextDueQuerySchema>;
+
+/**
+ * For each asked-about lead: when its earliest open task is due (a UTC moment), or null when it has none (and for a lead the person cannot see).
+ * It is the date in the "Next activity" column of the Leads list.
+ */
+export const nextDueResponseSchema = z.object({ dates: z.record(z.string(), z.string().nullable()) });
+export type NextDueResponse = z.infer<typeof nextDueResponseSchema>;

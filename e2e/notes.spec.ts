@@ -45,8 +45,9 @@ test.describe('Notes: the Notes panel on the Leads list', () => {
     await expect(panel.getByPlaceholder('Enter here')).toHaveValue('Will not be saved');
   });
 
-  test('has Next activity as the first column, right after the select box', async ({ page }, testInfo) => {
+  test('has Next activity as the first column, right after the select box', async ({ page, pretendApi }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'The table is for tablets and desktops');
+    pretendApi.tasks.tasks = [];
     await page.goto('/leads');
     const headers = page.getByRole('table').getByRole('columnheader');
     await expect(headers.nth(1)).toHaveText('Next activity');
@@ -56,7 +57,7 @@ test.describe('Notes: the Notes panel on the Leads list', () => {
         .getByRole('row', { name: /Priya Menon 0/ })
         .getByRole('cell')
         .nth(1),
-    ).toContainText('22 Nov');
+    ).toContainText('Nov 22');
   });
 });
 

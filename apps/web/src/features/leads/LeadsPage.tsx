@@ -19,6 +19,7 @@ import { moveLeadInColumns } from './board-move';
 import { describeShownRange } from './lead-display';
 import { CreateLeadPanel } from './CreateLeadPanel';
 import { useNoteCounts } from '../notes/useNoteCounts';
+import { useNextTaskDates } from '../tasks/useNextTaskDates';
 import { NotesPanel } from '../notes/NotesPanel';
 import { TaskFormPanel } from '../tasks/TaskFormPanel';
 import { LeadsBoard } from './LeadsBoard';
@@ -84,6 +85,8 @@ export function LeadsPage() {
   const listedLeadIds =
     leadsData.data !== null && leadsData.data.view === 'list' ? leadsData.data.items.map((lead) => lead.id) : [];
   const noteCounts = useNoteCounts(listedLeadIds);
+  // When each lead's next task is due, for the date in the Next activity column (asked again after a task is added)
+  const nextTaskDates = useNextTaskDates(listedLeadIds);
   const stages = pipelineData.data?.stages ?? [];
   // The saved views for the tabs (none while they load or if they could not be loaded: the list itself still works)
   const savedViews = viewsResource.state.status === 'ready' ? viewsResource.state.data.items : [];
@@ -232,6 +235,7 @@ export function LeadsPage() {
           forLead={taskLead}
           onCreated={(title) => {
             setTaskLead(null);
+            nextTaskDates.reload();
             actions.showNotice({ tone: 'success', text: formatMessage('tasks.created', { title }) });
           }}
         />
@@ -406,6 +410,7 @@ export function LeadsPage() {
           signedInUserId={user.id}
           timeZone={business.timeZone}
           renderRowMenu={actions.renderRowMenu}
+          nextTaskDates={nextTaskDates.dates}
         />
         <div className="mt-3 overflow-hidden rounded-lg border border-border-default">{footer}</div>
       </div>
@@ -422,6 +427,7 @@ export function LeadsPage() {
           onOpenNotes={(lead, displayName) => setNotesLead({ id: lead.id, displayName })}
           onCreateTask={(lead, displayName) => setTaskLead({ id: lead.id, displayName })}
           noteCounts={noteCounts.counts}
+          nextTaskDates={nextTaskDates.dates}
         />
         {footer}
       </Card>

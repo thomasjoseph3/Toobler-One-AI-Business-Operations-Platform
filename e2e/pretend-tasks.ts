@@ -71,6 +71,20 @@ export function answerTasksCall(
     userId: string;
   },
 ): PretendAnswer | undefined {
+  // When each asked-about lead's earliest open task is due (the date in the Leads list's Next activity column)
+  if (call.path === '/tasks/next-due' && call.method === 'GET') {
+    const leadIds = (new URLSearchParams(call.search).get('lead_ids') ?? '').split(',').filter((id) => id !== '');
+    const dates = Object.fromEntries(
+      leadIds.map((askedLeadId) => {
+        const due = state.tasks
+          .filter((task) => task['leadId'] === askedLeadId && task['bucket'] !== 'done')
+          .map((task) => String(task['dueAt']))
+          .sort();
+        return [askedLeadId, due[0] ?? null];
+      }),
+    );
+    return { status: 200, body: { dates } };
+  }
   const idMatch = /^\/tasks\/([\w-]+)$/u.exec(call.path);
   if (idMatch) return answerOneTaskCall(state, idMatch[1]!, call);
   if (call.path !== '/tasks') return undefined;

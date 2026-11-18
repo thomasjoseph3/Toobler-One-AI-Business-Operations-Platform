@@ -735,6 +735,12 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'GET /api/v1/tasks/next-due',
+    what: "ask when A's lead's next task is due (B is told 'none', never the date)",
+    request: () => ({ method: 'GET', url: `/tasks/next-due?lead_ids=${dataOfA.leadId}` }),
+    expectedStatus: 200,
+  },
+  {
     route: 'PATCH /api/v1/tasks/{id}',
     what: "tick off A's task",
     request: () => ({ method: 'PATCH', url: `/tasks/${dataOfA.taskId}`, payload: { done: true } }),

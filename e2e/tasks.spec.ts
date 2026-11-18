@@ -225,6 +225,28 @@ test.describe('Tasks on a lead', () => {
     expect(pretendApi.tasks.postedTasks[0]).toMatchObject({ leadId: 'lead-0', title: 'Send the rates' });
   });
 
+  test('a task added from the row shows its date in the Next activity column at once, with no hovering, and the notes icon sits next to it', async ({
+    page,
+  }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The row icons are for tablets and desktops');
+    await page.goto('/leads');
+    // Lead 1 has no callback and no notes: nothing shows until a task is added
+    const row = page.getByRole('row', { name: /\+919847010001/ });
+    const nextActivityCell = row.getByRole('cell').nth(1);
+    await expect(nextActivityCell).not.toContainText('Nov');
+    await row.hover();
+    await row.getByRole('button', { name: /Add something to do for/ }).click();
+    await page.getByRole('button', { name: 'Create Task' }).click();
+    const panel = page.getByRole('dialog', { name: /Add task for/ });
+    await panel.getByLabel('What needs doing?').fill('Send the rates');
+    await panel.getByLabel('Due').first().fill('2026-12-05');
+    await panel.getByRole('button', { name: 'Add task', exact: true }).click();
+    await expect(page.getByText('Task added: Send the rates')).toBeVisible();
+    // Move the pointer away: the date is still there (it is not a hover thing)
+    await page.getByRole('heading', { level: 1 }).hover();
+    await expect(nextActivityCell).toContainText('Dec 5');
+  });
+
   test('the lead page lists the lead’s tasks and adds one (this is how a phone adds a task)', async ({
     page,
     pretendApi,

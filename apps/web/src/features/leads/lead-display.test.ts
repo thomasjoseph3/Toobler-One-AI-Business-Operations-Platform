@@ -7,6 +7,7 @@ import {
   findStageTagTone,
   formatBudget,
   formatCallbackDate,
+  pickNextActivityAt,
   formatLeadDate,
   formatMoment,
   toWhatsappDigits,
@@ -71,8 +72,8 @@ describe('findStageTagTone', () => {
 describe('formatCallbackDate', () => {
   it('shows the day and month in the business time zone', () => {
     // 22 Nov 21:00 UTC is already 23 Nov in India (UTC+5:30)
-    expect(formatCallbackDate('2026-11-22T21:00:00.000Z', 'Asia/Kolkata')).toBe('23 Nov');
-    expect(formatCallbackDate('2026-11-22T21:00:00.000Z', 'UTC')).toBe('22 Nov');
+    expect(formatCallbackDate('2026-11-22T21:00:00.000Z', 'Asia/Kolkata')).toBe('Nov 23');
+    expect(formatCallbackDate('2026-11-22T21:00:00.000Z', 'UTC')).toBe('Nov 22');
   });
   it('is empty when there is no callback', () => {
     expect(formatCallbackDate(null, 'Asia/Kolkata')).toBeNull();
@@ -119,5 +120,16 @@ describe('toWhatsappDigits', () => {
   it('keeps only the digits of an international number', () => {
     expect(toWhatsappDigits('+919847011201')).toBe('919847011201');
     expect(toWhatsappDigits('+91 98470-11201')).toBe('919847011201');
+  });
+});
+
+describe('pickNextActivityAt', () => {
+  it('takes the earlier of the callback and the next task, whichever exists', () => {
+    expect(pickNextActivityAt('2026-11-25T10:00:00.000Z', '2026-11-22T09:00:00.000Z')).toBe('2026-11-22T09:00:00.000Z');
+    expect(pickNextActivityAt('2026-11-20T10:00:00.000Z', '2026-11-22T09:00:00.000Z')).toBe('2026-11-20T10:00:00.000Z');
+    expect(pickNextActivityAt(null, '2026-11-22T09:00:00.000Z')).toBe('2026-11-22T09:00:00.000Z');
+    expect(pickNextActivityAt('2026-11-20T10:00:00.000Z', null)).toBe('2026-11-20T10:00:00.000Z');
+    expect(pickNextActivityAt('2026-11-20T10:00:00.000Z', undefined)).toBe('2026-11-20T10:00:00.000Z');
+    expect(pickNextActivityAt(null, null)).toBeNull();
   });
 });

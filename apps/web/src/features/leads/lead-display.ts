@@ -53,10 +53,20 @@ export function findStageTagTone(
   return OPEN_STAGE_TONES[position] ?? 'neutral';
 }
 
-/** The callback date as "22 Nov" in the business's time zone, or null when the lead has no callback booked. */
+/** The date as "Nov 22" (month first, as the designer's Next activity chip writes it) in the business's time zone, or null when there is none. */
 export function formatCallbackDate(callbackAt: string | null, timeZone: string): string | null {
   if (callbackAt === null) return null;
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }).format(new Date(callbackAt));
+  return new Intl.DateTimeFormat('en-US', { day: 'numeric', month: 'short', timeZone }).format(new Date(callbackAt));
+}
+
+/**
+ * The moment of a lead's next activity: the earlier of its booked callback and the due time of its earliest open task, or null when it has neither.
+ * Both are UTC moments written as text, so the earlier one is found by comparing them as moments.
+ */
+export function pickNextActivityAt(callbackAt: string | null, nextTaskDueAt: string | null | undefined): string | null {
+  if (callbackAt === null) return nextTaskDueAt ?? null;
+  if (nextTaskDueAt === null || nextTaskDueAt === undefined) return callbackAt;
+  return new Date(nextTaskDueAt).getTime() < new Date(callbackAt).getTime() ? nextTaskDueAt : callbackAt;
 }
 
 /** The range of leads on this page as "26–50" (what the footer says is shown). Never goes past the total. */
