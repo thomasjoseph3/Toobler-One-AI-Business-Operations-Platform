@@ -39,7 +39,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F13 | Duplicates and merging | approved | [brief](../features/F13-duplicates-and-merging.md) | 2026-11-18 |
 | F21 | Inbox, staff takeover and live updates | approved | [brief](../features/F21-inbox-and-takeover.md) | 2026-11-18 |
 | F22 | Today page | approved | [brief](../features/F22-today-page.md) | 2026-11-19 |
-| F23 | Staff alerts and the morning summary | planned | | |
+| F23 | Staff alerts and the morning summary | in_progress | [brief](../features/F23-staff-alerts.md) | |
 | F24 | Privacy and support access | planned | | |
 | F25 | WhatsApp | planned | | |
 | F26 | Email | planned | | |
