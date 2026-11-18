@@ -589,10 +589,11 @@ describe('GET /api/v1/conversations?filtered=true and POST /conversations/{id}/u
     expect(second.items).toHaveLength(1);
   });
 
-  it('refuses a list without filtered=true (400), the "own leads only" role (403), and shows only the business’s own (isolation)', async () => {
+  it('keeps the Filtered list apart from the inbox, refuses the "own leads only" role (403), and shows only the business’s own (isolation)', async () => {
     const { accountId, manager } = await newBusiness();
     await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('spam'));
-    expect((await send(manager, 'GET', '/conversations')).statusCode).toBe(400);
+    // Without filtered=true this is the inbox (F21): the spam conversation is not in it
+    expect((await send(manager, 'GET', '/conversations')).json().total).toBe(0);
     expect((await send(manager, 'GET', '/conversations?filtered=false')).statusCode).toBe(400);
     const other = await newBusiness();
     expect((await send(other.manager, 'GET', '/conversations?filtered=true')).json().total).toBe(0);

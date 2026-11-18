@@ -112,7 +112,8 @@ textarea:focus-visible {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.chat-bubble-agent {
+.chat-bubble-agent,
+.chat-bubble-staff {
   background: var(--chat-surface);
   border: 1px solid var(--chat-border);
 }

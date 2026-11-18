@@ -4,6 +4,7 @@ import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from '.
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
 import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
 import { answerDuplicatesCall, startingDuplicates, type PretendDuplicates } from './pretend-duplicates';
+import { answerInboxCall, startingInbox, type PretendInbox } from './pretend-inbox';
 import { answerImportsCall, startingImports, type PretendImports } from './pretend-imports';
 import { answerTasksCall, startingTasks, type PretendTasks } from './pretend-tasks';
 import {
@@ -82,6 +83,8 @@ export interface PretendApi {
   imports: PretendImports;
   /** Possible duplicates of contacts and companies. */
   duplicates: PretendDuplicates;
+  /** The inbox, staff takeover and the live updates stream. */
+  inbox: PretendInbox;
   /** Contact lists: what is saved, what the page sent, and ways to make the list or the save fail. */
   lists: {
     items: Array<Record<string, unknown>>;
@@ -266,6 +269,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         temperatureChanges: [],
         imports: startingImports(),
         duplicates: startingDuplicates(),
+        inbox: startingInbox(),
         lists: {
           items: [],
           created: [],
@@ -720,6 +724,22 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           pretendApi.search.queries.push(typed);
           const nothing = { contacts: [], companies: [], leads: [] };
           return route.fulfill(json(200, typed.toLowerCase().includes('menon') ? pretendApi.search.results : nothing));
+        }
+        if (path.startsWith('/conversations') || path === '/events' || path === '/conversation-types') {
+          const inboxAnswer = answerInboxCall(pretendApi.inbox, {
+            method: request.method(),
+            path,
+            search: new URL(request.url()).searchParams,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+          });
+          if (inboxAnswer?.stream !== undefined) {
+            return route.fulfill({
+              status: 200,
+              headers: { 'content-type': 'text/event-stream' },
+              body: inboxAnswer.stream,
+            });
+          }
+          if (inboxAnswer) return route.fulfill(json(inboxAnswer.status, inboxAnswer.body));
         }
         if (path === '/conversations' && request.method() === 'GET') {
           if (pretendApi.filtered.listFails) {

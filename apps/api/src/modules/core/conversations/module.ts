@@ -5,6 +5,7 @@ import { createConversationFinaliser } from './services/conversation-finaliser.s
 import { blockListRoutes } from './routes/block-list.routes';
 import { conversationTypesRoutes } from './routes/conversation-types.routes';
 import { conversationsRoutes } from './routes/conversations.routes';
+import { createConversationInboxService } from './services/conversation-inbox.service';
 
 /**
  * Conversations: how every conversation, on any channel, is sorted into a type and what happens next (a lead, a ticket, a log
@@ -41,6 +42,27 @@ export default defineModule({
             ? { emailHeaders: emailHeaders as Record<string, string> }
             : {}),
         });
+      },
+    },
+    {
+      // Runs by itself every 5 minutes. It has no business of its own: it queues one clean-up for each business that has a hold that ran out.
+      name: 'conversations.release_expired_holds',
+      schedule: '*/5 * * * *',
+      run: async (job) => {
+        const inboxService = createConversationInboxService({ database: job.services.database });
+        for (const accountId of await inboxService.findBusinessesWithExpiredHolds()) {
+          await job.enqueueJob('conversations.release_expired_holds_for_business', { accountId });
+        }
+      },
+    },
+    {
+      // One business: the holds that ran out (two hours without a person's reply) go back to the AI. Safe to run twice.
+      name: 'conversations.release_expired_holds_for_business',
+      run: async (job) => {
+        if (!job.accountContext) throw new Error('This job needs a business');
+        const inboxService = createConversationInboxService({ database: job.services.database });
+        const released = await inboxService.releaseExpiredHoldsOfBusiness(job.accountContext.accountId);
+        if (released > 0) job.logger.info({ released }, 'conversations went back to the AI');
       },
     },
   ],

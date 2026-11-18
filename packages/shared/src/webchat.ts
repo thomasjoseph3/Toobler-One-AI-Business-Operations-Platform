@@ -94,7 +94,10 @@ export type WidgetMessageRequest = z.infer<typeof widgetMessageRequestSchema>;
 
 /** The agent's reply, and the token that proves this browser owns the chat (keep it and send it with the next message). */
 export const widgetMessageResponseSchema = z.object({
-  reply: z.string(),
+  /** The agent's reply, or null while a person has taken the chat over (the AI says nothing then; the person's replies arrive through the chat read). */
+  reply: z.string().nullable(),
+  /** True while a person of the business holds this chat. */
+  heldByPerson: z.boolean(),
   visitorToken: z.string(),
   /** True when this message began a new chat (the first message, or the earlier chat had ended). */
   newChat: z.boolean(),
@@ -103,7 +106,11 @@ export type WidgetMessageResponse = z.infer<typeof widgetMessageResponseSchema>;
 
 /** The chat so far, for a visitor coming back to it (after a page reload). */
 export const widgetChatSchema = z.object({
-  messages: z.array(z.object({ sender: z.enum(['customer', 'agent']), body: z.string(), createdAt: z.string() })),
+  messages: z.array(
+    z.object({ sender: z.enum(['customer', 'agent', 'staff']), body: z.string(), createdAt: z.string() }),
+  ),
+  /** True while a person of the business holds this chat (the AI is silent). */
+  heldByPerson: z.boolean(),
   /** True when the chat has ended: the browser should show it as finished and start a new one with the next message. */
   ended: z.boolean(),
 });

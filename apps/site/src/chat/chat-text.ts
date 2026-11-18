@@ -21,6 +21,8 @@ export const CHAT_TEXT = {
   offline: 'You seem to be offline. Please check your connection and try again.',
   youSaid: 'You',
   assistantSaid: 'Assistant',
+  teamMemberSaid: 'Team member',
+  teamMemberJoined: 'A member of our team has joined this chat.',
 } as const;
 
 /** The longest message the chat service accepts (the same number as the API's limit). It is written here, not imported from the shared package, so the window does not carry the whole validation library. */

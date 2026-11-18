@@ -149,7 +149,7 @@ export function widgetPublicRoutes(app: FastifyInstance) {
   typedApp.get(
     '/public/widget/:key/messages',
     {
-      config: { access: 'public', ...routeLimit(app, 'widgetConfig') },
+      config: { access: 'public', ...routeLimit(app, 'widgetPoll') },
       schema: { params: widgetKeyParamsSchema, response: { 200: widgetChatSchema } },
     },
     async (request, reply) => {

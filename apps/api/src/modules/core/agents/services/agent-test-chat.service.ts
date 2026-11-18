@@ -65,7 +65,7 @@ export function createAgentTestChatService(input: {
         throw badRequest('This test chat is long enough. Start a new one.');
       }
 
-      const { conversationId, turn } = await savedTurns.answerAndSave({
+      const saved = await savedTurns.answerAndSave({
         accountId,
         conversationId: request.conversationId ?? null,
         startConversation: { channel: 'webchat', isTest: true, actor },
@@ -78,6 +78,9 @@ export function createAgentTestChatService(input: {
         channel: 'webchat',
         actor,
       });
+      const { conversationId, turn } = saved;
+      // A test chat is never held by a person (staff cannot take over a test chat), so the agent always answers
+      if (turn === null) throw new Error('A test chat cannot be held by a person.');
 
       return {
         conversationId,

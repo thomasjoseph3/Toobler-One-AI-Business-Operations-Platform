@@ -9,6 +9,8 @@ export interface ConversationMessageRow {
   id: string;
   sender: MessageSender;
   body: string;
+  /** The person who wrote a staff message. */
+  byUserId: string | null;
   createdAt: Date;
 }
 
@@ -25,6 +27,10 @@ export async function insertMessageIfNew(
     sender: MessageSender;
     body: string;
     channelMessageId: string | null;
+    /** The person who wrote it, for a staff message. */
+    byUserId?: string | null;
+    /** When it was written. Left out, the database uses the start of the transaction. */
+    createdAt?: Date;
   },
 ): Promise<boolean> {
   const result = await db
@@ -36,6 +42,8 @@ export async function insertMessageIfNew(
       sender: message.sender,
       body: message.body,
       channel_message_id: message.channelMessageId,
+      by_user_id: message.byUserId ?? null,
+      ...(message.createdAt ? { created_at: message.createdAt } : {}),
     })
     .onConflict((conflict) => conflict.doNothing())
     .executeTakeFirst();
@@ -50,13 +58,19 @@ export async function listMessagesOfConversation(
 ): Promise<ConversationMessageRow[]> {
   const rows = await db
     .selectFrom('conversation_messages')
-    .select(['id', 'sender', 'body', 'created_at'])
+    .select(['id', 'sender', 'body', 'by_user_id', 'created_at'])
     .where('account_id', '=', accountId)
     .where('conversation_id', '=', conversationId)
     .orderBy('created_at')
     .orderBy('id')
     .execute();
-  return rows.map((row) => ({ id: row.id, sender: row.sender, body: row.body, createdAt: row.created_at }));
+  return rows.map((row) => ({
+    id: row.id,
+    sender: row.sender,
+    body: row.body,
+    byUserId: row.by_user_id,
+    createdAt: row.created_at,
+  }));
 }
 
 /** True when the business has a "Test the agent" chat in which the agent has answered at least once. */

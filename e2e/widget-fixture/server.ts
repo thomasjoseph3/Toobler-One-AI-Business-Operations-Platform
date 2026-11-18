@@ -111,7 +111,7 @@ const service = createServer(async (request, response) => {
 
   if (part === 'messages' && request.method === 'GET') {
     if (!knownChat) return sendJson(response, 401, { error: { code: 'VISITOR_TOKEN_INVALID', message: 'No' } });
-    return sendJson(response, 200, { messages: knownChat.messages, ended: knownChat.ended });
+    return sendJson(response, 200, { messages: knownChat.messages, ended: knownChat.ended, heldByPerson: false });
   }
   if (part === 'messages' && request.method === 'POST') {
     const { message } = await readJson(request);
@@ -132,7 +132,12 @@ const service = createServer(async (request, response) => {
     chat.messages.push({ sender: 'customer', body: message ?? '', createdAt: now });
     const reply = `You said: ${message ?? ''}`;
     chat.messages.push({ sender: 'agent', body: reply, createdAt: now });
-    return sendJson(response, 200, { reply, visitorToken: chatToken, newChat: !knownChat || knownChat.ended });
+    return sendJson(response, 200, {
+      reply,
+      heldByPerson: false,
+      visitorToken: chatToken,
+      newChat: !knownChat || knownChat.ended,
+    });
   }
   if (part === 'end' && request.method === 'POST') {
     if (!knownChat) return sendJson(response, 401, { error: { code: 'VISITOR_TOKEN_INVALID', message: 'No' } });

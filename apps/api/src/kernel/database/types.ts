@@ -642,6 +642,11 @@ export interface ConversationsTable {
   status: Generated<'open' | 'sorted'>;
   ended_at: Date | null;
   sorted_at: Date | null;
+  /** The person holding the conversation (the AI does not reply while it is held), F21. Set together with `held_until`. */
+  held_by_user_id: Generated<string | null>;
+  held_until: Generated<Date | null>;
+  /** When staff marked it done; a new customer message clears it. */
+  done_at: Generated<Date | null>;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;
@@ -709,6 +714,8 @@ export interface ConversationMessagesTable {
   sender: 'customer' | 'agent' | 'staff' | 'system';
   body: string;
   channel_message_id: string | null;
+  /** The person who wrote a `staff` message (F21); empty for every other sender. */
+  by_user_id: string | null;
   created_at: Generated<Date>;
 }
 

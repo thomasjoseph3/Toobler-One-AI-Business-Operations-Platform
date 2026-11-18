@@ -11,6 +11,8 @@ import { TasksPage } from '../features/tasks/TasksPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { FilteredPage } from '../features/leads/FilteredPage';
 import { ExportPage } from '../features/exports/ExportPage';
+import { ConversationPage } from '../features/inbox/ConversationPage';
+import { InboxPage } from '../features/inbox/InboxPage';
 import { ImportPage } from '../features/imports/ImportPage';
 import { DuplicatesPage } from '../features/duplicates/DuplicatesPage';
 import { ListPage } from '../features/lists/ListPage';
@@ -48,6 +50,7 @@ const UiGallery = import.meta.env.DEV
 /** The page for one menu entry: its real screen when it has one, otherwise the "not built yet" page. */
 function pageFor(item: NavigationItem) {
   if (item.id === 'leads') return <LeadsPage />;
+  if (item.id === 'inbox') return <InboxPage />;
   if (item.id === 'contacts') return <ContactsPage />;
   if (item.id === 'tickets') return <TicketsPage />;
   if (item.id === 'tasks') return <TasksPage />;
@@ -75,6 +78,7 @@ export function App() {
                 {NAVIGATION_ITEMS.map((item) => (
                   <Route key={item.id} path={item.path} element={pageFor(item)} />
                 ))}
+                <Route path="/inbox/:conversationId" element={<ConversationPage />} />
                 <Route path="/leads/filtered" element={<FilteredPage />} />
                 <Route path="/leads/:leadId" element={<LeadPage />} />
                 <Route path="/contacts/import" element={<ImportPage />} />

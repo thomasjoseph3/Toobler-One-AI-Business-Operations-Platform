@@ -32,6 +32,8 @@ export const ROUTE_LIMITS = {
   setupChat: { max: 60, timeWindow: '1 hour' },
   // The bubble on a website asks for its look once per page view (and the browser's preflight asks first)
   widgetConfig: { max: 60, timeWindow: '1 minute' },
+  // An open chat window asks for new messages every few seconds (so a person's reply shows up); many bubbles can sit behind one address
+  widgetPoll: { max: 600, timeWindow: '1 minute' },
   // Each visitor message makes real calls to an AI company (and costs the business a little)
   // The files of the chat widget (small, kept by browsers, but still open to anyone)
   widgetFile: { max: 120, timeWindow: '1 minute' },

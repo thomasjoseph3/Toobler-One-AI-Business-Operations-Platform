@@ -37,7 +37,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F11 | Views, filters, search and lists | approved | [brief](../features/F11-views-filters-search.md) | 2026-11-18 |
 | F12 | Import and export | approved | [brief](../features/F12-import-and-export.md) | 2026-11-18 |
 | F13 | Duplicates and merging | approved | [brief](../features/F13-duplicates-and-merging.md) | 2026-11-18 |
-| F21 | Inbox, staff takeover and live updates | planned | | |
+| F21 | Inbox, staff takeover and live updates | in_review | [brief](../features/F21-inbox-and-takeover.md) | |
 | F22 | Today page | planned | | |
 | F23 | Staff alerts and the morning summary | planned | | |
 | F24 | Privacy and support access | planned | | |

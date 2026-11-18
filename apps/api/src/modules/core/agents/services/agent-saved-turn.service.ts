@@ -19,7 +19,7 @@ export interface SavedTurnInput {
   /** How to start the conversation when there is none yet (its channel, whether it is a test, who started it). */
   startConversation: StartConversationInput;
   /** What was said before (customer and agent only), oldest first. Empty for a new conversation. */
-  earlierMessages: ReadonlyArray<{ sender: 'customer' | 'agent'; body: string }>;
+  earlierMessages: ReadonlyArray<{ sender: 'customer' | 'agent' | 'staff'; body: string }>;
   /** The customer's new message. */
   message: string;
   channel: ConversationChannel;
@@ -29,11 +29,16 @@ export interface SavedTurnInput {
   actor: Actor;
 }
 
-/** What one saved turn gives back: the conversation it was saved in, and everything the agent returned. */
-export interface SavedTurnResult {
-  conversationId: string;
-  turn: AgentTurnResult;
-}
+/**
+ * What one saved turn gives back: the conversation it was saved in, and everything the agent returned. When a person holds the conversation
+ * (staff takeover) the agent says nothing: `turn` is null, `heldByPerson` is true, and only the customer's message was saved.
+ */
+export type SavedTurnResult =
+  | { conversationId: string; turn: AgentTurnResult; heldByPerson: false }
+  | { conversationId: string; turn: null; heldByPerson: true };
+
+/** What the agent is told a team member said, so it does not contradict a promise a person made. */
+const TEAM_MEMBER_PREFIX = '[A team member of the business replied] ';
 
 /**
  * One customer message, answered and written down: the agent answers, then the conversation (started if it is new), both messages and
@@ -48,6 +53,14 @@ export function createAgentSavedTurnService(input: { database: Database; runtime
     /** Answers the customer's message and saves the conversation. Throws when the agent could not answer (nothing is saved then). */
     async answerAndSave(turnInput: SavedTurnInput): Promise<SavedTurnResult> {
       const { accountId } = turnInput;
+      // A person holds this conversation: the AI stays silent. The customer's message is saved and the team sees it.
+      if (turnInput.conversationId && (await conversationRecords.isHeldByPerson(accountId, turnInput.conversationId))) {
+        await conversationRecords.addMessage(accountId, turnInput.conversationId, {
+          sender: 'customer',
+          body: turnInput.message,
+        });
+        return { conversationId: turnInput.conversationId, turn: null, heldByPerson: true };
+      }
       // What the agent remembers from earlier messages. A new conversation has nothing.
       const earlierState = turnInput.conversationId
         ? await database.runInAccountTransaction(accountId, (transaction) =>
@@ -67,7 +80,7 @@ export function createAgentSavedTurnService(input: { database: Database; runtime
         messages: [
           ...turnInput.earlierMessages.slice(-MESSAGES_SHOWN_TO_THE_AGENT).map((message) => ({
             role: message.sender === 'customer' ? ('user' as const) : ('assistant' as const),
-            text: message.body,
+            text: message.sender === 'staff' ? `${TEAM_MEMBER_PREFIX}${message.body}` : message.body,
           })),
           { role: 'user', text: turnInput.message },
         ],
@@ -78,8 +91,16 @@ export function createAgentSavedTurnService(input: { database: Database; runtime
       const conversationId =
         turnInput.conversationId ??
         (await conversationRecords.startConversation(accountId, turnInput.startConversation));
-      await conversationRecords.addMessage(accountId, conversationId, { sender: 'customer', body: turnInput.message });
-      await conversationRecords.addMessage(accountId, conversationId, { sender: 'agent', body: turn.reply });
+      // Saved under the conversation's lock: if a person took the conversation over while the AI was thinking, the reply is thrown away
+      const { agentReplySaved } = await conversationRecords.saveCustomerMessageAndAgentReply(
+        accountId,
+        conversationId,
+        {
+          customerBody: turnInput.message,
+          agentBody: turn.reply,
+        },
+      );
+      if (!agentReplySaved) return { conversationId, turn: null, heldByPerson: true };
       await database.runInAccountTransaction(accountId, (transaction) =>
         conversationFactsRepository.saveConversationState(transaction, {
           accountId,
@@ -89,7 +110,7 @@ export function createAgentSavedTurnService(input: { database: Database; runtime
           actor: turnInput.actor,
         }),
       );
-      return { conversationId, turn };
+      return { conversationId, turn, heldByPerson: false };
     },
   };
 }

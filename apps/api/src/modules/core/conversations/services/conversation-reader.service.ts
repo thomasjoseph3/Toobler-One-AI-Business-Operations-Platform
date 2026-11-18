@@ -2,11 +2,13 @@ import type { ConversationDetail } from '@toobler-one/shared';
 import type { Database, Db } from '../../../../kernel/database';
 import { forbidden, notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
+import { findPeopleSummaries } from '../../auth';
 import { findContactSummaries } from '../../contacts';
 import * as conversationMessagesRepository from '../repositories/conversation-messages.repository';
 import * as conversationOutcomesRepository from '../repositories/conversation-outcomes.repository';
 import * as conversationTypesRepository from '../repositories/conversation-types.repository';
 import * as conversationsRepository from '../repositories/conversations.repository';
+import { isHeldNow } from '../repositories/conversations.repository';
 
 /**
  * Conversations hold what customers wrote, to people who may belong to anyone's leads. The "own leads only" role sees only the leads it
@@ -49,6 +51,15 @@ export async function readConversationDetail(
       : await findContactSummaries(transaction, { accountId, contactIds: [conversation.contactId] });
   const contact = contacts[0];
 
+  // The names of the person holding it and of the people who wrote staff messages
+  const holderIsCurrent = isHeldNow(conversation, new Date());
+  const personIds = [
+    ...(holderIsCurrent && conversation.heldByUserId ? [conversation.heldByUserId] : []),
+    ...messages.flatMap((message) => (message.byUserId ? [message.byUserId] : [])),
+  ];
+  const people = await findPeopleSummaries(transaction, { accountId, userIds: personIds });
+  const nameOf = (userId: string) => people.find((person) => person.id === userId)?.name ?? null;
+
   return {
     id: conversation.id,
     channel: conversation.channel,
@@ -68,12 +79,19 @@ export async function readConversationDetail(
           }
         : null,
     needsPerson: conversation.needsPerson,
+    heldBy:
+      holderIsCurrent && conversation.heldByUserId
+        ? { userId: conversation.heldByUserId, name: nameOf(conversation.heldByUserId) }
+        : null,
+    heldUntil: holderIsCurrent ? (conversation.heldUntil?.toISOString() ?? null) : null,
+    doneAt: conversation.doneAt?.toISOString() ?? null,
     endedAt: conversation.endedAt?.toISOString() ?? null,
     sortedAt: conversation.sortedAt?.toISOString() ?? null,
     createdAt: conversation.createdAt.toISOString(),
     messages: messages.map((message) => ({
       id: message.id,
       sender: message.sender,
+      byUser: message.byUserId ? { id: message.byUserId, name: nameOf(message.byUserId) } : null,
       body: message.body,
       createdAt: message.createdAt.toISOString(),
     })),

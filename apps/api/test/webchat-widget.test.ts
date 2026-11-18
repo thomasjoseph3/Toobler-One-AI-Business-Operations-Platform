@@ -542,3 +542,49 @@ describe('the limits on the public chat routes', () => {
     expect(lastStatus).toBe(429);
   });
 });
+
+describe('a person takes over a web chat (F21)', () => {
+  it("keeps the agent silent while held, shows the visitor the person's reply, and lets the agent answer again after a hand-back", async () => {
+    const { person, accountId, key } = await newBusinessWithChat();
+    let timesTheAgentWasAsked = 0;
+    script = () => {
+      timesTheAgentWasAsked += 1;
+      return { answer: 'The agent answers.' };
+    };
+    const first = (await asVisitor(key, 'POST', 'messages', { payload: { message: 'Do you have a hall?' } })).json();
+    expect(first).toMatchObject({ reply: 'The agent answers.', heldByPerson: false });
+    const conversationId = (await conversationsOf(accountId))[0]?.id as string;
+
+    expect((await asStaff(person, 'POST', `/conversations/${conversationId}/takeover`)).statusCode).toBe(200);
+    const whileHeld = await asVisitor(key, 'POST', 'messages', {
+      token: first.visitorToken,
+      payload: { message: 'Hello? Anyone?' },
+    });
+    expect(whileHeld.statusCode, whileHeld.body).toBe(200);
+    expect(whileHeld.json()).toMatchObject({ reply: null, heldByPerson: true, newChat: false });
+    expect(timesTheAgentWasAsked).toBe(1);
+
+    const reply = await asStaff(person, 'POST', `/conversations/${conversationId}/reply`, {
+      body: 'Yes, for up to 200 guests.',
+    });
+    expect(reply.statusCode, reply.body).toBe(201);
+    const read = await asVisitor(key, 'GET', 'messages', { token: first.visitorToken });
+    expect(read.statusCode).toBe(200);
+    expect(read.json().heldByPerson).toBe(true);
+    expect(read.json().messages.map((message: { sender: string }) => message.sender)).toEqual([
+      'customer',
+      'agent',
+      'customer',
+      'staff',
+    ]);
+    expect(read.json().messages.at(-1)).toMatchObject({ sender: 'staff', body: 'Yes, for up to 200 guests.' });
+
+    await asStaff(person, 'POST', `/conversations/${conversationId}/handback`);
+    const afterHandBack = await asVisitor(key, 'POST', 'messages', {
+      token: first.visitorToken,
+      payload: { message: 'Thanks' },
+    });
+    expect(afterHandBack.json()).toMatchObject({ reply: 'The agent answers.', heldByPerson: false });
+    expect(timesTheAgentWasAsked).toBe(2);
+  });
+});

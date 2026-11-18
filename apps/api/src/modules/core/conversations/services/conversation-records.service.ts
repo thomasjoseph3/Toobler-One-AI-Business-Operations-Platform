@@ -1,7 +1,8 @@
 import type { ConversationChannel } from '@toobler-one/shared';
 import type { Actor } from '../../../../kernel/context';
-import type { Database } from '../../../../kernel/database';
+import type { Database, Db } from '../../../../kernel/database';
 import { badRequest, notFound } from '../../../../kernel/errors';
+import { publishEvent } from '../../../../kernel/events/publish';
 import { uuidv7 } from '../../../../kernel/ids';
 import * as conversationMessagesRepository from '../repositories/conversation-messages.repository';
 import type { MessageSender } from '../repositories/conversation-messages.repository';
@@ -59,6 +60,14 @@ export function createConversationRecordsService({ database }: { database: Datab
           isTest: input.isTest ?? false,
           actor: input.actor ?? ENGINE_ACTOR,
         });
+        // A test chat is not a real conversation: the inbox and the live screens never hear about it
+        if (!(input.isTest ?? false)) {
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'conversation.started',
+            payload: { conversationId },
+          });
+        }
       });
       return conversationId;
     },
@@ -124,20 +133,20 @@ export function createConversationRecordsService({ database }: { database: Datab
       });
     },
 
-    /** What the customer and the agent said in a conversation, oldest first (staff messages and system notes are left out). */
+    /** What the customer, the agent and the team said in a conversation, oldest first (system notes are left out). */
     async readChatMessages(
       accountId: string,
       conversationId: string,
-    ): Promise<Array<{ sender: 'customer' | 'agent'; body: string; createdAt: Date }>> {
+    ): Promise<Array<{ sender: 'customer' | 'agent' | 'staff'; body: string; createdAt: Date }>> {
       return database.runInAccountTransaction(accountId, async (transaction) => {
         const messages = await conversationMessagesRepository.listMessagesOfConversation(
           transaction,
           accountId,
           conversationId,
         );
-        const chatMessages: Array<{ sender: 'customer' | 'agent'; body: string; createdAt: Date }> = [];
+        const chatMessages: Array<{ sender: 'customer' | 'agent' | 'staff'; body: string; createdAt: Date }> = [];
         for (const message of messages) {
-          if (message.sender === 'customer' || message.sender === 'agent') {
+          if (message.sender === 'customer' || message.sender === 'agent' || message.sender === 'staff') {
             chatMessages.push({ sender: message.sender, body: message.body, createdAt: message.createdAt });
           }
         }
@@ -188,16 +197,20 @@ export function createConversationRecordsService({ database }: { database: Datab
       );
     },
 
-    /** Notes that a conversation has ended (only the first time: one that already ended keeps its time). */
+    /** Notes that a conversation has ended (only the first time: one that already ended keeps its time). Ending also ends any hold on it. */
     async markEnded(accountId: string, conversationId: string): Promise<void> {
-      await database.runInAccountTransaction(accountId, (transaction) =>
-        conversationsRepository.markConversationEnded(transaction, {
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+        const wasEnded = await conversationsRepository.markConversationEnded(transaction, {
           accountId,
           conversationId,
           endedAt: new Date(),
           actor: ENGINE_ACTOR,
-        }),
-      );
+        });
+        if (wasEnded && conversation && !conversation.isTest) {
+          await publishEvent(transaction, { accountId, eventName: 'conversation.ended', payload: { conversationId } });
+        }
+      });
     },
 
     /**
@@ -210,15 +223,102 @@ export function createConversationRecordsService({ database }: { database: Datab
       return database.runInAccountTransaction(accountId, async (transaction) => {
         const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
         if (!conversation) throw notFound('That conversation');
-        return conversationMessagesRepository.insertMessageIfNew(transaction, {
-          id: uuidv7(),
+        return writeMessageAndAnnounce(transaction, conversation, {
           accountId,
-          conversationId,
           sender: input.sender,
           body,
           channelMessageId: input.channelMessageId ?? null,
         });
       });
     },
+
+    /**
+     * Saves one customer message and, unless a person holds the conversation, the agent's reply to it: the customer's message is always
+     * saved; the reply only when nobody holds the conversation. The check and the saving happen under the conversation's row lock, so a
+     * person who takes the conversation over while the AI is thinking wins: the AI's reply is thrown away. Answers whether the reply was
+     * saved (false means a person holds the conversation and the AI must stay silent).
+     */
+    async saveCustomerMessageAndAgentReply(
+      accountId: string,
+      conversationId: string,
+      input: { customerBody: string; agentBody: string },
+    ): Promise<{ agentReplySaved: boolean }> {
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.lockConversationById(transaction, accountId, conversationId);
+        if (!conversation) throw notFound('That conversation');
+        // Both messages are saved in one transaction, so they would share a time and could sort the wrong way round: the reply is one millisecond later
+        const customerWrittenAt = new Date();
+        await writeMessageAndAnnounce(transaction, conversation, {
+          accountId,
+          sender: 'customer',
+          body: input.customerBody,
+          channelMessageId: null,
+          createdAt: customerWrittenAt,
+        });
+        if (conversationsRepository.isHeldNow(conversation, new Date())) return { agentReplySaved: false };
+        await writeMessageAndAnnounce(transaction, conversation, {
+          accountId,
+          sender: 'agent',
+          body: input.agentBody,
+          channelMessageId: null,
+          createdAt: new Date(customerWrittenAt.getTime() + 1),
+        });
+        return { agentReplySaved: true };
+      });
+    },
+
+    /** Whether a person holds the conversation right now (false for an unknown conversation). The agent asks this before thinking. */
+    async isHeldByPerson(accountId: string, conversationId: string): Promise<boolean> {
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+        return conversation !== undefined && conversationsRepository.isHeldNow(conversation, new Date());
+      });
+    },
   };
 }
+
+/**
+ * Writes one message in the caller's transaction, tells the live screens (never for a test chat), and, when the CUSTOMER wrote, reopens a
+ * conversation that staff had marked done. Answers whether the message was added (false for a repeat of a channel message).
+ */
+async function writeMessageAndAnnounce(
+  transaction: Db,
+  conversation: conversationsRepository.ConversationRow,
+  message: {
+    id?: string;
+    accountId: string;
+    sender: MessageSender;
+    body: string;
+    channelMessageId: string | null;
+    byUserId?: string | null;
+    createdAt?: Date;
+  },
+): Promise<boolean> {
+  const wasAdded = await conversationMessagesRepository.insertMessageIfNew(transaction, {
+    id: message.id ?? uuidv7(),
+    accountId: message.accountId,
+    conversationId: conversation.id,
+    sender: message.sender,
+    body: message.body,
+    channelMessageId: message.channelMessageId,
+    byUserId: message.byUserId ?? null,
+    ...(message.createdAt ? { createdAt: message.createdAt } : {}),
+  });
+  if (!wasAdded || conversation.isTest) return wasAdded;
+  if (message.sender === 'customer' && conversation.doneAt !== null) {
+    await conversationsRepository.setConversationDoneAt(transaction, {
+      accountId: message.accountId,
+      conversationId: conversation.id,
+      doneAt: null,
+      actor: ENGINE_ACTOR,
+    });
+  }
+  await publishEvent(transaction, {
+    accountId: message.accountId,
+    eventName: 'conversation.message',
+    payload: { conversationId: conversation.id, sender: message.sender },
+  });
+  return wasAdded;
+}
+
+export { writeMessageAndAnnounce };

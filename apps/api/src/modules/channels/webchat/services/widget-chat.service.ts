@@ -136,6 +136,7 @@ export function createWidgetChatService(input: {
           createdAt: message.createdAt.toISOString(),
         })),
         ended: chat.ended,
+        heldByPerson: !chat.ended && (await conversationRecords.isHeldByPerson(options.widget.accountId, chat.id)),
       };
     },
 
@@ -220,17 +221,21 @@ export function createWidgetChatService(input: {
         throw error;
       }
 
-      // When the visitor has given a phone number or an email, the conversation is linked to them, so the sorting can make the contact
-      const contact = readVisitorContact(saved.turn.state.details, widget.defaultCountry as CountryCode);
-      if (contact.phoneKey !== undefined || contact.email !== undefined) {
-        await conversationRecords.linkVisitorContact(accountId, saved.conversationId, {
-          ...contact,
-          actor: MODULE_ACTOR,
-        });
+      // When the visitor has given a phone number or an email, the conversation is linked to them, so the sorting can make the contact.
+      // (While a person holds the chat the agent learns nothing, so there is nothing to link.)
+      if (saved.turn !== null) {
+        const contact = readVisitorContact(saved.turn.state.details, widget.defaultCountry as CountryCode);
+        if (contact.phoneKey !== undefined || contact.email !== undefined) {
+          await conversationRecords.linkVisitorContact(accountId, saved.conversationId, {
+            ...contact,
+            actor: MODULE_ACTOR,
+          });
+        }
       }
 
       return {
-        reply: saved.turn.reply,
+        reply: saved.turn?.reply ?? null,
+        heldByPerson: saved.heldByPerson,
         visitorToken: await signVisitorToken({
           appSecret: input.appSecret,
           accountId,

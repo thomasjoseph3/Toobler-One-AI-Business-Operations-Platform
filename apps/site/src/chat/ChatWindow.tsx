@@ -8,9 +8,12 @@ import { endWidgetChat, fetchWidgetChat, fetchWidgetConfig, sendWidgetMessage, W
 /** One line of the conversation as shown. */
 interface ShownMessage {
   id: number;
-  sender: 'customer' | 'agent';
+  sender: 'customer' | 'agent' | 'staff';
   body: string;
 }
+
+/** How often an open chat asks for new messages (so a team member's reply shows up). */
+const ASK_FOR_NEW_MESSAGES_EVERY_MILLISECONDS = 4000;
 
 /** Tells the page around this window (the loader) that the visitor wants the window closed. The window itself never closes. */
 function askToClose(): void {
@@ -28,8 +31,12 @@ export function ChatWindow({ widgetKey }: { widgetKey: string | null }) {
   const [draft, setDraft] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // True while a person of the business has taken the chat over from the AI
+  const [isHeldByPerson, setIsHeldByPerson] = useState(false);
   const nextMessageId = useRef(1);
   const tokenRef = useRef<string | null>(null);
+  // Whether a message is being sent, readable inside the timer above without restarting it
+  const isSendingRef = useRef(false);
   const listEnd = useRef<HTMLDivElement | null>(null);
   const inputBox = useRef<HTMLTextAreaElement | null>(null);
 
@@ -65,6 +72,7 @@ export function ChatWindow({ widgetKey }: { widgetKey: string | null }) {
         }
         tokenRef.current = savedToken;
         setMessages(chat.messages.map((earlier) => makeMessage(earlier.sender, earlier.body)));
+        setIsHeldByPerson(chat.heldByPerson);
       } catch (error) {
         // The server does not know this token any more: start fresh. Any other failure leaves the chat to start fresh too.
         if (error instanceof WidgetApiError && error.status === 401) forgetToken(widgetKey);
@@ -74,6 +82,28 @@ export function ChatWindow({ widgetKey }: { widgetKey: string | null }) {
       isStillWanted = false;
     };
   }, [widgetKey, makeMessage]);
+
+  // While the chat is open, ask for new messages every few seconds: a team member's reply (and the "joined" note) arrive this way
+  useEffect(() => {
+    if (widgetKey === null || config === null) return;
+    const timer = setInterval(() => {
+      const token = tokenRef.current;
+      if (token === null || isSendingRef.current) return;
+      fetchWidgetChat(widgetKey, token)
+        .then((chat) => {
+          if (tokenRef.current !== token || isSendingRef.current) return;
+          setIsHeldByPerson(chat.heldByPerson);
+          // The server's list is the truth: show it when it has something this window does not show yet
+          setMessages((shown) =>
+            chat.messages.length > shown.length
+              ? chat.messages.map((earlier) => makeMessage(earlier.sender, earlier.body))
+              : shown,
+          );
+        })
+        .catch(() => undefined); // a missed ask is tried again a few seconds later
+    }, ASK_FOR_NEW_MESSAGES_EVERY_MILLISECONDS);
+    return () => clearInterval(timer);
+  }, [widgetKey, config, makeMessage]);
 
   // Keep the newest message in view, and the typing box ready
   useEffect(() => {
@@ -98,6 +128,7 @@ export function ChatWindow({ widgetKey }: { widgetKey: string | null }) {
     if (widgetKey === null || text === '' || isSending) return;
     setProblem(null);
     setIsSending(true);
+    isSendingRef.current = true;
     const shownMessage = makeMessage('customer', text);
     setMessages((earlier) => [...earlier, shownMessage]);
     setDraft('');
@@ -113,13 +144,17 @@ export function ChatWindow({ widgetKey }: { widgetKey: string | null }) {
       }
       tokenRef.current = answer.visitorToken;
       saveToken(widgetKey, answer.visitorToken);
-      setMessages((earlier) => [...earlier, makeMessage('agent', answer.reply)]);
+      setIsHeldByPerson(answer.heldByPerson);
+      // While a person holds the chat the AI says nothing: the reply is null and the team member answers in their own time
+      const aiReply = answer.reply;
+      if (aiReply !== null) setMessages((earlier) => [...earlier, makeMessage('agent', aiReply)]);
     } catch (error) {
       // Nothing was saved, so the message is given back to be sent again
       setMessages((earlier) => earlier.filter((message) => message.id !== shownMessage.id));
       setDraft(text);
       setProblem(describeSendError(error));
     } finally {
+      isSendingRef.current = false;
       setIsSending(false);
       inputBox.current?.focus();
     }
@@ -135,6 +170,7 @@ export function ChatWindow({ widgetKey }: { widgetKey: string | null }) {
     tokenRef.current = null;
     forgetToken(widgetKey);
     setMessages([]);
+    setIsHeldByPerson(false);
     setProblem(null);
     try {
       await endWidgetChat(widgetKey, token);
@@ -204,13 +240,19 @@ export function ChatWindow({ widgetKey }: { widgetKey: string | null }) {
           <div key={message.id} className={`chat-row chat-row-${message.sender}`}>
             <p className={`chat-bubble chat-bubble-${message.sender}`}>
               <span className="chat-sr-only">
-                {message.sender === 'customer' ? CHAT_TEXT.youSaid : CHAT_TEXT.assistantSaid}:{' '}
+                {message.sender === 'customer'
+                  ? CHAT_TEXT.youSaid
+                  : message.sender === 'staff'
+                    ? CHAT_TEXT.teamMemberSaid
+                    : CHAT_TEXT.assistantSaid}
+                :{' '}
               </span>
               {message.body}
             </p>
           </div>
         ))}
-        {isSending ? <p className="chat-typing">{CHAT_TEXT.typing}</p> : null}
+        {isHeldByPerson ? <p className="chat-typing">{CHAT_TEXT.teamMemberJoined}</p> : null}
+        {isSending && !isHeldByPerson ? <p className="chat-typing">{CHAT_TEXT.typing}</p> : null}
         <div ref={listEnd} />
       </div>
 

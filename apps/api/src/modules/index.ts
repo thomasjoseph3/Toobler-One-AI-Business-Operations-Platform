@@ -15,6 +15,7 @@ import imports from './core/imports/module';
 import exportsModule from './core/exports/module';
 import duplicates from './core/duplicates/module';
 import conversations from './core/conversations/module';
+import liveUpdates from './core/live-updates/module';
 import knowledge from './core/knowledge/module';
 import offerings from './core/offerings/module';
 import industries from './core/industries/module';
@@ -44,6 +45,7 @@ export const modules: readonly ModuleManifest[] = [
   exportsModule,
   duplicates,
   conversations,
+  liveUpdates,
   knowledge,
   offerings,
   ai,

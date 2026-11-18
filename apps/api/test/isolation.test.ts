@@ -674,6 +674,34 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'POST /api/v1/conversations/{id}/takeover',
+    what: "take over A's conversation",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/takeover` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/handback',
+    what: "hand back A's conversation",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/handback` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/done',
+    what: "mark A's conversation done",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/done` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/reply',
+    what: "reply in A's conversation",
+    request: () => ({
+      method: 'POST',
+      url: `/conversations/${dataOfA.conversationId}/reply`,
+      payload: { body: 'Hello from the other business' },
+    }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/conversations/{id}/type',
     what: "change the type of A's conversation",
     request: () => ({
@@ -1206,6 +1234,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
   { route: 'GET /api/v1/lists', url: '/lists' },
   { route: 'GET /api/v1/duplicates', url: '/duplicates?object=contact' },
+  { route: 'GET /api/v1/conversations', url: '/conversations?limit=100' },
   { route: 'GET /api/v1/views', url: '/views?object=lead' },
   { route: 'GET /api/v1/search', url: '/search?q=Contact' },
   { route: 'GET /api/v1/conversations', url: '/conversations?filtered=true&limit=100' },
@@ -1233,6 +1262,8 @@ const listsBReads: Array<{ route: string; url: string }> = [
  * business only from the session, or is global. Adding a route to this list is a decision to be made on purpose.
  */
 const exemptRoutes: Record<string, string> = {
+  'GET /api/v1/events':
+    "an open stream of the caller's own business's events (kinds and ids only); the business comes from the session. Tested with real streams in live-updates.test.ts",
   'POST /api/v1/auth/signup': 'creates a new business; nothing of another business is named',
   'POST /api/v1/auth/login': "checks the caller's own credentials",
   'POST /api/v1/auth/logout': "ends the caller's own session",

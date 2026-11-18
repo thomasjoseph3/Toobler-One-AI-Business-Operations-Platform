@@ -27,6 +27,11 @@ export interface ConversationRow {
   status: 'open' | 'sorted';
   endedAt: Date | null;
   sortedAt: Date | null;
+  /** The person holding the conversation and until when (F21). The caller decides whether a hold that ran out still counts. */
+  heldByUserId: string | null;
+  heldUntil: Date | null;
+  /** When staff marked it done, or null. */
+  doneAt: Date | null;
   createdAt: Date;
 }
 
@@ -48,8 +53,20 @@ function toConversationRow(row: Selectable<ConversationsTable>): ConversationRow
     status: row.status,
     endedAt: row.ended_at,
     sortedAt: row.sorted_at,
+    heldByUserId: row.held_by_user_id,
+    heldUntil: row.held_until,
+    doneAt: row.done_at,
     createdAt: row.created_at,
   };
+}
+
+/** Whether the conversation is held by a person at this moment: someone holds it and the hold has not run out. */
+export function isHeldNow(conversation: Pick<ConversationRow, 'heldByUserId' | 'heldUntil'>, now: Date): boolean {
+  return (
+    conversation.heldByUserId !== null &&
+    conversation.heldUntil !== null &&
+    conversation.heldUntil.getTime() > now.getTime()
+  );
 }
 
 /** Starts a conversation. It begins open, with no type. */
@@ -122,14 +139,22 @@ export async function lockConversationById(
 export async function markConversationEnded(
   db: Db,
   options: { accountId: string; conversationId: string; endedAt: Date; actor: Actor },
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  // Ending a conversation also ends any hold on it: nobody can reply to an ended conversation
+  const rows = await db
     .updateTable('conversations')
-    .set({ ended_at: options.endedAt, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .set({
+      ended_at: options.endedAt,
+      held_by_user_id: null,
+      held_until: null,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
     .where('account_id', '=', options.accountId)
     .where('id', '=', options.conversationId)
     .where('ended_at', 'is', null)
+    .returning('id')
     .execute();
+  return rows.length > 0;
 }
 
 /** SQL for "the last thing said in this chat (or its start, when nothing was said) is older than the given time". */
@@ -412,4 +437,201 @@ export async function moveConversationsToContact(
     .returning('id')
     .execute();
   return rows.length;
+}
+
+// ---- The inbox, staff takeover and done (F21) ----
+
+/** A person takes the conversation over (or extends their hold) until the given time. */
+export async function holdConversation(
+  db: Db,
+  options: { accountId: string; conversationId: string; userId: string; until: Date; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('conversations')
+    .set({
+      held_by_user_id: options.userId,
+      held_until: options.until,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.conversationId)
+    .execute();
+}
+
+/** Ends a hold (hand back, done, ended, or run out). */
+export async function releaseConversationHold(
+  db: Db,
+  options: { accountId: string; conversationId: string; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('conversations')
+    .set({ held_by_user_id: null, held_until: null, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.conversationId)
+    .execute();
+}
+
+/** Marks the conversation done (at the given time) or reopens it (null). */
+export async function setConversationDoneAt(
+  db: Db,
+  options: { accountId: string; conversationId: string; doneAt: Date | null; actor: Actor },
+): Promise<void> {
+  await db
+    .updateTable('conversations')
+    .set({ done_at: options.doneAt, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.conversationId)
+    .execute();
+}
+
+/** The businesses that have a hold that has run out (ids only), for the scheduled clean-up that has no business of its own. */
+export async function listAccountIdsWithExpiredHolds(systemDb: Db, now: Date): Promise<string[]> {
+  const rows = await systemDb
+    .selectFrom('conversations')
+    .select('account_id')
+    .distinct()
+    .where('held_by_user_id', 'is not', null)
+    .where('held_until', '<=', now)
+    .execute();
+  return rows.map((row) => row.account_id);
+}
+
+/** Clears every hold of the business that has run out, and answers the conversations that went back to the AI. */
+export async function releaseExpiredHolds(
+  db: Db,
+  options: { accountId: string; now: Date; actor: Actor },
+): Promise<string[]> {
+  const rows = await db
+    .updateTable('conversations')
+    .set({ held_by_user_id: null, held_until: null, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('held_by_user_id', 'is not', null)
+    .where('held_until', '<=', options.now)
+    .returning('id')
+    .execute();
+  return rows.map((row) => row.id);
+}
+
+/** One row of the inbox as the database gives it. */
+export interface InboxRow {
+  id: string;
+  channel: ConversationChannelWord;
+  contactId: string | null;
+  fromPhoneKey: string | null;
+  fromEmail: string | null;
+  typeKey: string | null;
+  aiUnsure: boolean;
+  needsPerson: boolean;
+  heldByUserId: string | null;
+  heldUntil: Date | null;
+  doneAt: Date | null;
+  endedAt: Date | null;
+  summary: string | null;
+  firstWords: string | null;
+  lastActivityAt: Date;
+  createdAt: Date;
+}
+
+/** What the inbox can be narrowed by. */
+export interface InboxFilters {
+  channel?: ConversationChannelWord | undefined;
+  status?: 'open' | 'done' | undefined;
+  held?: 'me' | 'any' | undefined;
+  needsPerson?: boolean | undefined;
+  /** The person asking, for `held=me`. */
+  userId: string;
+  now: Date;
+}
+
+/** The real conversations an inbox lists: not test chats, and not the ones the rules filtered out or ignored (they have their own tab). */
+function selectInboxConversations(db: Db, accountId: string, filters: InboxFilters) {
+  let query = db
+    .selectFrom('conversations as conversation')
+    .where('conversation.account_id', '=', accountId)
+    .where('conversation.is_test', '=', false)
+    .where((condition) =>
+      condition.not(
+        condition.exists(
+          condition
+            .selectFrom('conversation_outcomes as outcome')
+            .select('outcome.id')
+            .whereRef('outcome.conversation_id', '=', 'conversation.id')
+            .where('outcome.account_id', '=', accountId)
+            .where('outcome.kind', 'in', ['filter', 'ignore'])
+            .where('outcome.superseded_at', 'is', null),
+        ),
+      ),
+    );
+  if (filters.channel) query = query.where('conversation.channel', '=', filters.channel);
+  if (filters.status === 'open') query = query.where('conversation.done_at', 'is', null);
+  if (filters.status === 'done') query = query.where('conversation.done_at', 'is not', null);
+  if (filters.needsPerson) query = query.where('conversation.needs_person', '=', true);
+  if (filters.held) query = query.where('conversation.held_until', '>', filters.now);
+  if (filters.held === 'me') query = query.where('conversation.held_by_user_id', '=', filters.userId);
+  return query;
+}
+
+/** One page of the inbox: needs-a-person first, then the newest activity first; and how many there are in all. */
+export async function listInbox(
+  db: Db,
+  options: { accountId: string; filters: InboxFilters; limit: number; offset: number },
+): Promise<{ rows: InboxRow[]; total: number }> {
+  const { accountId } = options;
+  const lastMessageAt = sql<Date | null>`(select max(message.created_at) from conversation_messages as message where message.account_id = conversation.account_id and message.conversation_id = conversation.id)`;
+  const firstWords = sql<
+    string | null
+  >`(select left(message.body, 160) from conversation_messages as message where message.account_id = conversation.account_id and message.conversation_id = conversation.id and message.sender = 'customer' order by message.created_at, message.id limit 1)`;
+  const summary = sql<
+    string | null
+  >`(select facts.summary from conversation_facts as facts where facts.account_id = conversation.account_id and facts.conversation_id = conversation.id)`;
+  const lastActivity = sql<Date>`coalesce(${lastMessageAt}, conversation.created_at)`;
+  const rows = await selectInboxConversations(db, accountId, options.filters)
+    .select([
+      'conversation.id',
+      'conversation.channel',
+      'conversation.contact_id',
+      'conversation.from_phone_key',
+      'conversation.from_email',
+      'conversation.type_key',
+      'conversation.ai_unsure',
+      'conversation.needs_person',
+      'conversation.held_by_user_id',
+      'conversation.held_until',
+      'conversation.done_at',
+      'conversation.ended_at',
+      'conversation.created_at',
+      summary.as('summary'),
+      firstWords.as('first_words'),
+      lastActivity.as('last_activity_at'),
+    ])
+    .orderBy('conversation.needs_person', 'desc')
+    .orderBy(lastActivity, 'desc')
+    .orderBy('conversation.id', 'desc')
+    .limit(options.limit)
+    .offset(options.offset)
+    .execute();
+  const count = await selectInboxConversations(db, accountId, options.filters)
+    .select((expression) => expression.fn.countAll<string>().as('total'))
+    .executeTakeFirstOrThrow();
+  return {
+    rows: rows.map((row) => ({
+      id: row.id,
+      channel: row.channel,
+      contactId: row.contact_id,
+      fromPhoneKey: row.from_phone_key,
+      fromEmail: row.from_email,
+      typeKey: row.type_key,
+      aiUnsure: row.ai_unsure,
+      needsPerson: row.needs_person,
+      heldByUserId: row.held_by_user_id,
+      heldUntil: row.held_until,
+      doneAt: row.done_at,
+      endedAt: row.ended_at,
+      summary: row.summary,
+      firstWords: row.first_words,
+      lastActivityAt: row.last_activity_at,
+      createdAt: row.created_at,
+    })),
+    total: Number(count.total),
+  };
 }

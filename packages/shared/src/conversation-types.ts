@@ -193,9 +193,12 @@ export const conversationIdParamsSchema = z.object({ id: z.uuid() });
 export const conversationMessageSchema = z.object({
   id: z.string(),
   sender: z.enum(['customer', 'agent', 'staff', 'system']),
+  /** The person who wrote a staff message (their name is null when they no longer work there); null for every other sender. */
+  byUser: z.object({ id: z.string(), name: z.string().nullable() }).nullable(),
   body: z.string(),
   createdAt: z.string(),
 });
+export type ConversationMessage = z.infer<typeof conversationMessageSchema>;
 
 /** What a conversation led to, once per type. */
 export const conversationOutcomeViewSchema = z.object({
@@ -238,6 +241,11 @@ export const conversationDetailSchema = z.object({
     })
     .nullable(),
   needsPerson: z.boolean(),
+  /** The person who has taken the conversation over from the AI, while the hold lasts (an expired hold is shown as no hold). */
+  heldBy: z.object({ userId: z.string(), name: z.string().nullable() }).nullable(),
+  heldUntil: z.string().nullable(),
+  /** When staff marked it done, or null. */
+  doneAt: z.string().nullable(),
   endedAt: z.string().nullable(),
   sortedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -284,3 +292,56 @@ export const filteredConversationsResponseSchema = z.object({
   limit: z.number().int(),
 });
 export type FilteredConversationsResponse = z.infer<typeof filteredConversationsResponseSchema>;
+
+// ---- The inbox, staff takeover and the reply (F21) ----
+
+/**
+ * The inbox: every real conversation, needs-a-person first, then the newest activity first. All filters are optional. (`filtered=true` is the Filtered tab and
+ * is a different list.)
+ */
+export const listInboxQuerySchema = z
+  .object({
+    channel: conversationChannelSchema.optional(),
+    status: z.enum(['open', 'done']).optional(),
+    /** `me`: the conversations I hold; `any`: the ones anyone holds. */
+    held: z.enum(['me', 'any']).optional(),
+    needs_person: z.literal('true').optional(),
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+export type ListInboxQuery = z.infer<typeof listInboxQuerySchema>;
+
+/** One row of the inbox. */
+export const inboxItemSchema = z.object({
+  id: z.string(),
+  channel: conversationChannelSchema,
+  contact: z.object({ id: z.string(), name: z.string().nullable() }).nullable(),
+  fromPhone: z.string().nullable(),
+  fromEmail: z.string().nullable(),
+  /** The AI's summary once there is one, otherwise the start of the customer's first message (up to 160 characters), or null. */
+  preview: z.string().nullable(),
+  /** The type in the business's own word, once sorted. */
+  type: z.object({ key: z.string(), label: z.string() }).nullable(),
+  aiUnsure: z.boolean(),
+  needsPerson: z.boolean(),
+  heldBy: z.object({ userId: z.string(), name: z.string().nullable() }).nullable(),
+  doneAt: z.string().nullable(),
+  ended: z.boolean(),
+  /** When the newest message was written (or the conversation started, when it has none). */
+  lastActivityAt: z.string(),
+  createdAt: z.string(),
+});
+export type InboxItem = z.infer<typeof inboxItemSchema>;
+
+export const inboxResponseSchema = z.object({
+  items: z.array(inboxItemSchema),
+  total: z.number().int(),
+  page: z.number().int(),
+  limit: z.number().int(),
+});
+export type InboxResponse = z.infer<typeof inboxResponseSchema>;
+
+/** A staff reply on the customer's channel. */
+export const replyToConversationRequestSchema = z.object({ body: z.string().trim().min(1).max(2000) }).strict();
+export type ReplyToConversationRequest = z.infer<typeof replyToConversationRequestSchema>;
