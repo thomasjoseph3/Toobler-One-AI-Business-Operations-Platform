@@ -1,6 +1,7 @@
 import type { Contact } from '@toobler-one/shared';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
+import { readSearchText } from '../helpers/contact-search';
 import * as contactsRepository from '../repositories/contacts.repository';
 
 /** The few facts about a contact that another module (leads) shows next to its own records. */
@@ -91,4 +92,24 @@ export async function addCustomAnswersToContactWhereEmpty(
 ): Promise<boolean> {
   if (Object.keys(options.answers).length === 0) return false;
   return contactsRepository.addCustomAnswersWhereEmpty(transaction, options);
+}
+
+/**
+ * The people whose name, email or phone match what was typed in the search box (the same rule as the contacts list: three or more digits are a phone
+ * number, however it was typed), most recently changed first, at most `limit`. Blank text finds nobody. Used by the search module (through this
+ * module's index.ts). Run it inside the business's own transaction.
+ */
+export async function findContactsMatchingText(
+  transaction: Db,
+  options: { accountId: string; text: string; limit: number },
+): Promise<ContactSummary[]> {
+  const search = readSearchText(options.text);
+  if (search === null) return [];
+  const { items } = await contactsRepository.listContacts(transaction, options.accountId, {
+    search,
+    lifecycleStage: undefined,
+    limit: options.limit,
+    offset: 0,
+  });
+  return items.map((contact) => ({ id: contact.id, name: contact.name, phone: contact.phone, email: contact.email }));
 }

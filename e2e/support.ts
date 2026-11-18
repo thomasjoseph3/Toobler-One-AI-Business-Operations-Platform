@@ -76,6 +76,8 @@ export interface PretendApi {
   leadEdits: Record<string, Record<string, unknown>>;
   /** The temperatures the page set by hand with `PATCH /leads/{id}/temperature`. */
   temperatureChanges: Array<{ leadId: string; temperature: string }>;
+  /** The top-bar search: what was searched for, what the pretend API answers, and a way to make it fail. */
+  search: { queries: string[]; results: Record<string, unknown>; fails: boolean };
   /** The Filtered tab: the filtered conversations (a moved one leaves the list), the ones moved, and a way to make the list or the move fail. */
   filtered: {
     items: Array<Record<string, unknown>>;
@@ -234,6 +236,24 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         patchedLeads: [],
         leadEdits: {},
         temperatureChanges: [],
+        search: {
+          queries: [],
+          results: {
+            contacts: [{ id: 'contact-0', name: 'Priya Menon', phone: '+919847010000', email: 'priya@example.com' }],
+            companies: [{ id: 'company-1', name: 'Menon Weddings', domain: 'menon.example', city: 'Kochi' }],
+            leads: [
+              {
+                id: 'lead-0',
+                contactId: 'contact-0',
+                contactName: 'Priya Menon',
+                contactPhone: '+919847010000',
+                stageName: 'New',
+                interest: 'Hall for 200',
+              },
+            ],
+          },
+          fails: false,
+        },
         filtered: {
           items: [
             {
@@ -511,6 +531,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        if (path === '/search' && request.method() === 'GET') {
+          if (pretendApi.search.fails) {
+            return route.fulfill(json(500, { error: { code: 'SERVER_ERROR', message: 'Something went wrong.' } }));
+          }
+          const typed = new URL(request.url()).searchParams.get('q') ?? '';
+          pretendApi.search.queries.push(typed);
+          const nothing = { contacts: [], companies: [], leads: [] };
+          return route.fulfill(json(200, typed.toLowerCase().includes('menon') ? pretendApi.search.results : nothing));
+        }
         if (path === '/conversations' && request.method() === 'GET') {
           if (pretendApi.filtered.listFails) {
             return route.fulfill(json(500, { error: { code: 'SERVER_ERROR', message: 'Something went wrong.' } }));

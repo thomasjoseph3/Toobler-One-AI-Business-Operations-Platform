@@ -9,6 +9,7 @@ export {
   setContactCompany,
   setContactCompanyIfNone,
   addCustomAnswersToContactWhereEmpty,
+  findContactsMatchingText,
 } from './services/contact-summaries.service';
 export type { ContactSummary } from './services/contact-summaries.service';
 // The companies module (F05) counts a company's people and finds their leads, and links and unlinks contacts.

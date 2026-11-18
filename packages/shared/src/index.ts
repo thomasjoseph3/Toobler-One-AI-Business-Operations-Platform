@@ -31,3 +31,4 @@ export * from './team';
 export * from './audit-log';
 export * from './companies';
 export * from './custom-fields';
+export * from './global-search';

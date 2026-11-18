@@ -1029,6 +1029,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/leads', url: '/leads?limit=100' },
   { route: 'GET /api/v1/leads', url: '/leads?view=board' },
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
+  { route: 'GET /api/v1/search', url: '/search?q=Contact' },
   { route: 'GET /api/v1/conversations', url: '/conversations?filtered=true&limit=100' },
   { route: 'GET /api/v1/conversation-types', url: '/conversation-types' },
   { route: 'GET /api/v1/block-list', url: '/block-list' },
@@ -1080,6 +1081,8 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/search':
+    'covered by the list check (a search that matches A’s people finds none of them), and by search.test.ts',
   'GET /api/v1/conversations': 'covered by the list check (the Filtered list shows none of A’s conversations)',
   'GET /api/v1/conversation-types': 'covered by the list check',
   'GET /api/v1/block-list': 'covered by the list check',

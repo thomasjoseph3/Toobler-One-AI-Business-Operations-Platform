@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useLocation } from 'react-router';
 import { BellIcon, SearchIcon } from '@toobler-one/ui';
 import { t } from '../i18n';
 import { NAVIGATION_ITEMS } from '../navigation';
+import { SearchBox } from './SearchBox';
 import { ThemeSwitch } from './ThemeSwitch';
 import { UserMenu } from './UserMenu';
 
@@ -19,29 +21,27 @@ function findPageTitle(pathname: string): string {
 
 /**
  * The 64 px bar across the top (Figma): the page's heading on the left (the one h1 of every page), then search, the theme
- * button and notifications. Search and notifications are drawn as designed but switched off until their features exist
- * (search with views and filters, notifications with staff alerts). On a phone only the heading, the theme button and the
- * account button show.
+ * button and notifications. Search finds contacts, companies and leads (F11); notifications are drawn as designed but switched off until staff alerts exist. On a phone the
+ * heading, a search button (it opens the search box in a row under the bar), the theme button and the account button show.
  */
 export function TopBar() {
   const { pathname } = useLocation();
+  const [isPhoneSearchOpen, setIsPhoneSearchOpen] = useState(false);
   return (
-    <div className="sticky top-0 z-10 flex h-16 items-center justify-between gap-3 border-b border-border-subtle bg-header px-4 md:px-6">
+    <div className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-border-subtle bg-header px-4 md:px-6">
       <h1 className="text-heading-lg min-w-0 truncate text-text-primary">{findPageTitle(pathname)}</h1>
       <div className="flex shrink-0 items-center gap-2">
-        <label
-          title={t('topBar.searchSoon')}
-          className="hidden h-9 w-[240px] items-center gap-2 rounded-md border border-border-default bg-input px-3 md:flex"
+        <SearchBox className="hidden w-[240px] md:block" />
+        {/* On a phone the search box opens in a row under the bar */}
+        <button
+          type="button"
+          aria-label={t('topBar.search')}
+          aria-expanded={isPhoneSearchOpen}
+          onClick={() => setIsPhoneSearchOpen(!isPhoneSearchOpen)}
+          className="inline-flex size-10 items-center justify-center rounded-md text-icon-secondary hover:bg-hover md:hidden"
         >
-          <SearchIcon size={18} className="shrink-0 text-icon-secondary" />
-          <span className="sr-only">{t('topBar.search')}</span>
-          <input
-            type="search"
-            disabled
-            placeholder={`${t('topBar.search')}…`}
-            className="text-body-md min-w-0 flex-1 bg-transparent text-text-primary placeholder:text-text-placeholder disabled:cursor-not-allowed"
-          />
-        </label>
+          <SearchIcon size={20} />
+        </button>
         <ThemeSwitch />
         <button
           type="button"
@@ -56,6 +56,11 @@ export function TopBar() {
           <UserMenu variant="avatar" />
         </div>
       </div>
+      {isPhoneSearchOpen ? (
+        <div className="absolute inset-x-0 top-full border-b border-border-subtle bg-header p-3 md:hidden">
+          <SearchBox className="w-full" />
+        </div>
+      ) : null}
     </div>
   );
 }
