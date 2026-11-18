@@ -1,5 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { assignmentRulesRoutes } from './routes/assignment-rules.routes';
+import { handleFieldValuesPurged } from './services/field-purge-events.service';
 import { handleContactUnmarkedNotAFit, handleTeamMemberRemoved } from './services/lifecycle-events.service';
 import { leadsRoutes } from './routes/leads.routes';
 import { lostReasonsRoutes } from './routes/lost-reasons.routes';
@@ -20,6 +21,7 @@ export default defineModule({
   events: {
     'contact.unmarked_not_a_fit': handleContactUnmarkedNotAFit,
     'team.member_removed': handleTeamMemberRemoved,
+    'field.values_purged': handleFieldValuesPurged,
   },
   routes: (app) => {
     pipelineRoutes(app);

@@ -363,6 +363,8 @@ export interface FieldDefinitionsTable {
   required_for_won: Generated<boolean>;
   sort: number;
   archived_at: Generated<Date | null>;
+  /** When the saved answers of this removed field were deleted for good (30 days after it was removed). */
+  values_purged_at: Generated<Date | null>;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;
@@ -570,6 +572,8 @@ export interface ConversationFactsTable {
   summarised_at: Date | null;
   /** A list of texts the tools gave back lately. Written as JSON text, read back as a list. */
   earlier_tool_results: ColumnType<unknown[], string, string>;
+  /** What the AI heard for the business's custom fields, keyed "contact.car_model". Written as JSON text, read back as an object. */
+  custom_answers: ColumnType<Json, string | undefined, string>;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;

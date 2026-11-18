@@ -115,4 +115,28 @@ describe('buildAgentPrompt', () => {
     expect(withNote.stableSystemText).toContain('THIS CHANNEL\nWhatsApp shows no tables.');
     expect(buildAgentPrompt(input, conversation).stableSystemText).not.toContain('THIS CHANNEL');
   });
+
+  it('lists the business’s own questions in the steady part and the answered ones in the changing part, and nothing when there are none', () => {
+    const carModel = {
+      id: '1',
+      object: 'contact' as const,
+      key: 'car_model',
+      label: 'Car model',
+      type: 'dropdown' as const,
+      options: ['Swift', 'Baleno'],
+      aiAsks: true,
+      requiredForWon: false,
+    };
+    const asking = buildAgentPrompt(
+      { ...input, fieldsToAsk: [carModel], customAnswers: { 'contact.car_model': 'Swift' } },
+      conversation,
+    );
+    expect(asking.stableSystemText).toContain('ALSO ASK');
+    expect(asking.stableSystemText).toContain('- Car model: one of: Swift, Baleno');
+    expect(asking.changingSystemText).toContain('ALREADY ANSWERED');
+    expect(asking.changingSystemText).toContain('Car model');
+    const notAsking = buildAgentPrompt(input, conversation);
+    expect(notAsking.stableSystemText).not.toContain('ALSO ASK');
+    expect(notAsking.changingSystemText).not.toContain('ALREADY ANSWERED');
+  });
 });

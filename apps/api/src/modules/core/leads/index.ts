@@ -15,3 +15,5 @@ export type { LeadReference } from './services/lead-reference.service';
 // The companies module (F05) adds up the open and won leads of a company's people and lists them on the company page.
 export { findLeadsOfContacts, findLeadTotalsForContacts } from './services/lead-totals.service';
 export type { ContactLeadTotals, LeadListEntry } from './services/lead-totals.service';
+// The agents module adds what the AI heard for the business's own lead fields to the lead.
+export { addCustomAnswersToLeadWhereEmpty } from './services/lead-custom-answers.service';

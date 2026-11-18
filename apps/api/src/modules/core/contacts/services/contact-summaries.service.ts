@@ -80,3 +80,15 @@ export async function setContactCompanyIfNone(
 ): Promise<boolean> {
   return contactsRepository.setContactCompanyIfNone(transaction, options);
 }
+
+/**
+ * Adds what the AI heard for the business's custom contact fields to a contact, only for fields it has no answer for yet. The caller has already
+ * checked the answers. Used by the agents module (through this module's index.ts); run it inside the business's own transaction.
+ */
+export async function addCustomAnswersToContactWhereEmpty(
+  transaction: Db,
+  options: { accountId: string; contactId: string; answers: Record<string, unknown>; actor: Actor },
+): Promise<boolean> {
+  if (Object.keys(options.answers).length === 0) return false;
+  return contactsRepository.addCustomAnswersWhereEmpty(transaction, options);
+}

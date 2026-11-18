@@ -1,5 +1,5 @@
-import { sql } from 'kysely';
 import type { StageKind } from '@toobler-one/shared';
+import { sql } from 'kysely';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 
@@ -539,4 +539,47 @@ export async function listLeadsOfContacts(
     .orderBy('lead.id', 'desc')
     .execute();
   return rows.map(toLeadRow);
+}
+
+/**
+ * Deletes one custom field's answer from every lead of the business (the purge of a removed field). Records without that answer are not
+ * touched. Returns how many records changed.
+ */
+export async function removeCustomAnswerKey(
+  db: Db,
+  options: { accountId: string; key: string; actor: Actor },
+): Promise<number> {
+  const result = await db
+    .updateTable('leads')
+    .set({
+      custom: sql<string>`custom - ${options.key}::text`,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where(sql<boolean>`jsonb_exists(custom, ${options.key})`)
+    .executeTakeFirst();
+  return Number(result.numUpdatedRows);
+}
+
+/**
+ * Adds answers to a live lead's custom fields, but only for keys it has no answer for yet (what staff typed is never overridden by what the AI
+ * heard). One statement, so running it twice gives the same result. Returns whether the lead exists.
+ */
+export async function addCustomAnswersWhereEmpty(
+  db: Db,
+  options: { accountId: string; leadId: string; answers: Record<string, unknown>; actor: Actor },
+): Promise<boolean> {
+  const row = await db
+    .updateTable('leads')
+    .set({
+      // "new answers || stored answers": on a key in both, the stored one wins
+      custom: sql<string>`${JSON.stringify(options.answers)}::jsonb || custom`,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.leadId)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
 }

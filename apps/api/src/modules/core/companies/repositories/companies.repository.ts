@@ -1,3 +1,4 @@
+import { sql } from 'kysely';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 
@@ -271,4 +272,24 @@ export async function insertCompanyIfFree(
     .returning('id')
     .executeTakeFirst();
   return row?.id;
+}
+
+/**
+ * Deletes one custom field's answer from every company of the business (the purge of a removed field). Records without that answer are not
+ * touched. Returns how many records changed.
+ */
+export async function removeCustomAnswerKey(
+  db: Db,
+  options: { accountId: string; key: string; actor: Actor },
+): Promise<number> {
+  const result = await db
+    .updateTable('companies')
+    .set({
+      custom: sql<string>`custom - ${options.key}::text`,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where(sql<boolean>`jsonb_exists(custom, ${options.key})`)
+    .executeTakeFirst();
+  return Number(result.numUpdatedRows);
 }

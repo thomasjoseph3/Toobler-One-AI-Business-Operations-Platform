@@ -201,3 +201,35 @@ export async function setFieldSortOrder(
       .execute();
   }
 }
+
+/** The removed fields whose answers are still stored and which were removed before `removedBefore` (so are due to be purged). */
+export async function listFieldsDueForPurge(
+  db: Db,
+  accountId: string,
+  removedBefore: Date,
+): Promise<{ id: string; object: FieldObject; key: string }[]> {
+  return db
+    .selectFrom('field_definitions')
+    .select(['id', 'object', 'key'])
+    .where('account_id', '=', accountId)
+    .where('archived_at', '<', removedBefore)
+    .where('values_purged_at', 'is', null)
+    .orderBy('id')
+    .execute();
+}
+
+/** Marks removed fields as purged: their answers have been deleted. */
+export async function markFieldValuesPurged(
+  db: Db,
+  accountId: string,
+  fieldIds: string[],
+  purgedAt: Date,
+): Promise<void> {
+  if (fieldIds.length === 0) return;
+  await db
+    .updateTable('field_definitions')
+    .set({ values_purged_at: purgedAt })
+    .where('account_id', '=', accountId)
+    .where('id', 'in', fieldIds)
+    .execute();
+}

@@ -1,4 +1,4 @@
-import type { WeeklyHoursValue } from '@toobler-one/shared';
+import type { CustomValue, WeeklyHoursValue } from '@toobler-one/shared';
 import { z } from 'zod';
 import { chooseThePromise, type ChosenPromise, type PromiseSituation } from './choose-promise';
 
@@ -10,6 +10,8 @@ import { chooseThePromise, type ChosenPromise, type PromiseSituation } from './c
 export interface AgentConversationState {
   /** What the customer has told us, by label: "Name", "Phone"... Only what they said. */
   details: Readonly<Record<string, string>>;
+  /** What the customer told us for the business's own custom fields, already checked, by "contact.car_model" (the record, a dot, the field's key). */
+  customAnswers: Readonly<Record<string, CustomValue>>;
   /** What this conversation is, for choosing the promise. */
   situation: PromiseSituation;
   /** The one promise made, or null while none has been. */
@@ -22,6 +24,7 @@ export interface AgentConversationState {
 
 export const EMPTY_AGENT_CONVERSATION_STATE: AgentConversationState = {
   details: {},
+  customAnswers: {},
   situation: 'sale_enquiry',
   promise: null,
   callbackReason: null,

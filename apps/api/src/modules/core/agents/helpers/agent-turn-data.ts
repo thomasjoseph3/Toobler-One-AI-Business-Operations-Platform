@@ -1,4 +1,4 @@
-import type { WeeklyHoursValue } from '@toobler-one/shared';
+import type { FieldDefinition, WeeklyHoursValue } from '@toobler-one/shared';
 import type { BusinessKnowledgeForTheAgent } from '../../knowledge';
 import type { WhatTheAgentMaySee } from '../../offerings';
 import type { AgentConversationState, PromiseContext } from './agent-conversation-state';
@@ -13,6 +13,8 @@ export interface AgentTurnData {
   callbackPromiseMinutes?: number | undefined;
   knowledge: BusinessKnowledgeForTheAgent;
   whatWeSell: WhatTheAgentMaySee;
+  /** The business's own custom fields the AI asks about (at most three, chosen by `chooseFieldsToAsk`). */
+  fieldsToAsk: FieldDefinition[];
   now: Date;
 }
 

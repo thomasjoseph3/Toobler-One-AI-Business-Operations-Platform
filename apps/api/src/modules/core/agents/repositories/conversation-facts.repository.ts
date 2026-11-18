@@ -1,3 +1,4 @@
+import type { CustomValue } from '@toobler-one/shared';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 import type { AgentConversationState } from '../helpers/agent-conversation-state';
@@ -16,6 +17,16 @@ function toDetails(value: unknown): Record<string, string> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
   return Object.fromEntries(
     Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  );
+}
+
+/** Turns the stored custom answers back into answers, ignoring anything that is not a text, number or yes/no. */
+function toCustomAnswers(value: unknown): Record<string, CustomValue> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, CustomValue] =>
+      ['string', 'number', 'boolean'].includes(typeof entry[1]),
+    ),
   );
 }
 
@@ -38,6 +49,7 @@ export async function findConversationState(
       : null;
   return {
     details: toDetails(row.details),
+    customAnswers: toCustomAnswers(row.custom_answers),
     situation: row.situation,
     promise,
     callbackReason: row.callback_reason,
@@ -63,6 +75,7 @@ export async function saveConversationState(
   const actorStamp = { kind: options.actor.kind, id: options.actor.id };
   const values = {
     details: JSON.stringify(state.details),
+    custom_answers: JSON.stringify(state.customAnswers),
     situation: state.situation,
     promise_kind: state.promise?.kind ?? null,
     promise_sentence: state.promise?.sentence ?? null,

@@ -5,6 +5,7 @@ import type { AgentToolContext, AgentToolDefinition } from '../../../../kernel/m
 import type { LlmCallDetails, LlmPrompt, LlmToolCallRecord } from '../../../../providers/llm';
 import type { createAiService } from '../../ai';
 import { findBusinessIdentity } from '../../auth';
+import { findFieldDefinitions } from '../../fields';
 import {
   createKnowledgeSearchService,
   createUnansweredQuestionsService,
@@ -22,11 +23,13 @@ import {
   describeWhatWeSell,
 } from '../helpers/build-agent-prompt';
 import { describeAmountCorrection, findUnbackedAmounts, UNCONFIRMED_AMOUNT_REPLY } from '../helpers/check-amounts';
+import { chooseFieldsToAsk } from '../helpers/choose-fields-to-ask';
 import { isOpenAt } from '../helpers/opening-hours';
 import { makeGetBusinessInfoTool } from './agent-tool-get-business-info.service';
 import { makeListOfferingsTool } from './agent-tool-list-offerings.service';
 import { makeLogUnansweredQuestionTool } from './agent-tool-log-unanswered-question.service';
 import { makeRequestHumanCallbackTool } from './agent-tool-request-human-callback.service';
+import { makeSaveCustomAnswersTool } from './agent-tool-save-custom-answers.service';
 import { makeSaveDetailsTool } from './agent-tool-save-details.service';
 import { makeSearchKnowledgeTool } from './agent-tool-search-knowledge.service';
 
@@ -111,6 +114,10 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies) {
           timeZone: identity.timeZone,
           now: moment,
         }),
+        fieldsToAsk: chooseFieldsToAsk([
+          ...(await findFieldDefinitions(transaction, accountId, 'contact')),
+          ...(await findFieldDefinitions(transaction, accountId, 'lead')),
+        ]),
         now: moment,
       };
     });
@@ -141,6 +148,8 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies) {
           timeZone: data.timeZone,
           isOpenNow: isOpenAt(data.knowledge.weeklyHours, data.now, data.timeZone),
           detailsSoFar: input.state.details,
+          fieldsToAsk: data.fieldsToAsk,
+          customAnswers: input.state.customAnswers,
           channelNote: input.channelNote,
         },
         input.messages,
@@ -153,6 +162,8 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies) {
         makeLogUnansweredQuestionTool({ accountId: input.accountId, tracker, unansweredQuestions }),
         makeSaveDetailsTool({ data, holder, promiseSaidInEarlierMessage }),
         makeRequestHumanCallbackTool({ data, holder, promiseSaidInEarlierMessage }),
+        // Only when the business has questions for the AI to ask: otherwise the model is not given a tool it has no use for
+        ...(data.fieldsToAsk.length > 0 ? [makeSaveCustomAnswersTool({ data, holder })] : []),
       ];
       const extraTools = dependencies.findExtraTools
         ? await dependencies.findExtraTools({

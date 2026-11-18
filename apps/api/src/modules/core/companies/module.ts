@@ -1,5 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { companiesRoutes } from './routes/companies.routes';
+import { handleFieldValuesPurged } from './services/field-purge-events.service';
 import { handleTeamMemberRemoved } from './services/team-events.service';
 
 /**
@@ -12,7 +13,7 @@ export default defineModule({
   // A company's people are contacts and their leads add up on its page (contacts, leads); its owner is a person of the business (auth)
   requires: ['core.auth', 'core.contacts', 'core.leads', 'core.fields'],
   // When a person is removed from the team, the companies they looked after go to the person the manager chose
-  events: { 'team.member_removed': handleTeamMemberRemoved },
+  events: { 'team.member_removed': handleTeamMemberRemoved, 'field.values_purged': handleFieldValuesPurged },
   routes: (app) => {
     companiesRoutes(app);
   },

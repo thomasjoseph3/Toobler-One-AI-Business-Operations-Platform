@@ -1,10 +1,20 @@
+import type { CustomValue } from '@toobler-one/shared';
+import type { Db } from '../../../../kernel/database';
 import type { AccountContext, Actor } from '../../../../kernel/context';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { DomainEvent } from '../../../../kernel/events/events';
 import { publishEvent } from '../../../../kernel/events/publish';
 import { findOrCreateCompanyByName } from '../../companies';
-import { setContactCompanyIfNone } from '../../contacts';
+import { addCustomAnswersToContactWhereEmpty, setContactCompanyIfNone } from '../../contacts';
+import { findFieldDefinitions } from '../../fields';
+import { addCustomAnswersToLeadWhereEmpty } from '../../leads';
+import { splitCustomAnswersByRecord } from '../helpers/agent-custom-answers';
 import * as conversationFactsRepository from '../repositories/conversation-facts.repository';
+
+/** A list of texts from an event's data, ignoring anything that is not text. */
+function toTexts(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
 
 /** Who is stamped on what the AI added: the agent. */
 const AGENT_ACTOR: Actor = { kind: 'agent', id: 'save_details' };
@@ -19,38 +29,101 @@ const AGENT_ACTOR: Actor = { kind: 'agent', id: 'save_details' };
 export async function handleOutcomesApplied(event: DomainEvent, accountContext: AccountContext): Promise<void> {
   const conversationId = event.payload['conversationId'];
   const contactId = event.payload['contactId'];
+  const leadIds = toTexts(event.payload['leadIds']);
   if (typeof conversationId !== 'string' || typeof contactId !== 'string') return;
   const { accountId } = accountContext;
 
   await accountContext.runInAccountTransaction(async (transaction) => {
     const state = await conversationFactsRepository.findConversationState(transaction, accountId, conversationId);
-    const companyName = state?.details['Company'];
-    if (companyName === undefined) return;
-    const company = await findOrCreateCompanyByName(transaction, { accountId, name: companyName, actor: AGENT_ACTOR });
-    if (!company) return;
-    const wasPutIn = await setContactCompanyIfNone(transaction, {
+    if (!state) return;
+    await addCompanyTheCustomerNamed(transaction, { accountId, contactId, companyName: state.details['Company'] });
+    await addCustomAnswers(transaction, { accountId, contactId, leadIds, customAnswers: state.customAnswers });
+  });
+}
+
+/** Finds or makes the company the customer named and puts the contact in it, if the contact has none yet. Does nothing when no company was named. */
+async function addCompanyTheCustomerNamed(
+  transaction: Db,
+  options: { accountId: string; contactId: string; companyName: string | undefined },
+): Promise<void> {
+  const { accountId, contactId, companyName } = options;
+  if (companyName === undefined) return;
+  const company = await findOrCreateCompanyByName(transaction, { accountId, name: companyName, actor: AGENT_ACTOR });
+  if (!company) return;
+  const wasPutIn = await setContactCompanyIfNone(transaction, {
+    accountId,
+    contactId,
+    companyId: company.companyId,
+    actor: AGENT_ACTOR,
+  });
+  if (!wasPutIn) return;
+  // Stamped as the agent (not as the system handler), because the AI is who made the change
+  await writeActivityLog(transaction, {
+    accountId,
+    actor: AGENT_ACTOR,
+    kind: 'contacts.company_changed',
+    details: { recordType: 'contact', recordId: contactId, fields: ['companyId'] },
+  });
+  await publishEvent(transaction, {
+    accountId,
+    eventName: 'contact.company_changed',
+    payload: {
+      contactId,
+      fromCompanyId: null,
+      toCompanyId: company.companyId,
+      by: { kind: AGENT_ACTOR.kind, id: AGENT_ACTOR.id },
+    },
+  });
+}
+
+/**
+ * Adds what the customer answered for the business's own questions to the contact and the lead, for fields they have no answer for yet (what staff
+ * typed is never overridden). A field removed since the customer answered is skipped. The answers themselves are never put in the activity log:
+ * only the field names.
+ */
+async function addCustomAnswers(
+  transaction: Db,
+  options: {
+    accountId: string;
+    contactId: string;
+    leadIds: string[];
+    customAnswers: Readonly<Record<string, CustomValue>>;
+  },
+): Promise<void> {
+  const { accountId, contactId, leadIds } = options;
+  if (Object.keys(options.customAnswers).length === 0) return;
+  const liveContactKeys = (await findFieldDefinitions(transaction, accountId, 'contact')).map((field) => field.key);
+  const liveLeadKeys = (await findFieldDefinitions(transaction, accountId, 'lead')).map((field) => field.key);
+  const answers = splitCustomAnswersByRecord(options.customAnswers, { contact: liveContactKeys, lead: liveLeadKeys });
+
+  if (Object.keys(answers.contact).length > 0) {
+    await addCustomAnswersToContactWhereEmpty(transaction, {
       accountId,
       contactId,
-      companyId: company.companyId,
+      answers: answers.contact,
       actor: AGENT_ACTOR,
     });
-    if (!wasPutIn) return;
-    // Stamped as the agent (not as the system handler), because the AI is who made the change
     await writeActivityLog(transaction, {
       accountId,
       actor: AGENT_ACTOR,
-      kind: 'contacts.company_changed',
-      details: { recordType: 'contact', recordId: contactId, fields: ['companyId'] },
+      kind: 'contacts.custom_answers_added',
+      details: { recordType: 'contact', recordId: contactId, fields: Object.keys(answers.contact) },
     });
-    await publishEvent(transaction, {
+  }
+  // The conversation's lead is the first one it made or found
+  const leadId = leadIds[0];
+  if (leadId !== undefined && Object.keys(answers.lead).length > 0) {
+    await addCustomAnswersToLeadWhereEmpty(transaction, {
       accountId,
-      eventName: 'contact.company_changed',
-      payload: {
-        contactId,
-        fromCompanyId: null,
-        toCompanyId: company.companyId,
-        by: { kind: AGENT_ACTOR.kind, id: AGENT_ACTOR.id },
-      },
+      leadId,
+      answers: answers.lead,
+      actor: AGENT_ACTOR,
     });
-  });
+    await writeActivityLog(transaction, {
+      accountId,
+      actor: AGENT_ACTOR,
+      kind: 'leads.custom_answers_added',
+      details: { recordType: 'lead', recordId: leadId, fields: Object.keys(answers.lead) },
+    });
+  }
 }

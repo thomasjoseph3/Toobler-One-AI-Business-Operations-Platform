@@ -22,8 +22,10 @@ export default defineModule({
     'core.ai',
     'core.contacts',
     'core.companies',
+    'core.leads',
+    'core.fields',
   ],
-  // When a conversation's contact and lead are made, what the AI learned is added to them (so far: the company the customer named)
+  // When a conversation's contact and lead are made, what the AI learned is added to them (the company the customer named, and the answers to the business's own questions)
   events: { 'conversation.outcomes_applied': handleOutcomesApplied },
   jobs: [
     {

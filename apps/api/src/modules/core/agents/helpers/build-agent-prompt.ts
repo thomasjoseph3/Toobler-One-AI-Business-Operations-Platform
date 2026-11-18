@@ -1,3 +1,4 @@
+import type { CustomValue, FieldDefinition } from '@toobler-one/shared';
 import type { LlmPrompt } from '../../../../providers/llm';
 import type { BusinessKnowledgeForTheAgent } from '../../knowledge';
 import type { WhatTheAgentMaySee } from '../../offerings';
@@ -23,6 +24,10 @@ export interface AgentPromptInput {
   timeZone: string;
   isOpenNow: boolean;
   detailsSoFar: DetailsSoFar;
+  /** The business's own questions the agent also asks (at most three). Left out or empty: the agent asks none. */
+  fieldsToAsk?: readonly FieldDefinition[];
+  /** What the customer has already answered for those questions, by "contact.car_model". */
+  customAnswers?: Readonly<Record<string, CustomValue>>;
   /**
    * What is special about the channel this conversation is on (WhatsApp shows no tables; the customer's number is already known). It is
    * written by the channel, so the agent never names a channel. Part of the steady text: a conversation stays on one channel.
@@ -112,6 +117,36 @@ function describeNow(now: Date, timeZone: string): string {
   }).format(now);
 }
 
+/** The business's own extra questions, with the kind of answer each takes, or nothing when it has none. */
+export function describeFieldsToAsk(fieldsToAsk: readonly FieldDefinition[]): string[] {
+  if (fieldsToAsk.length === 0) return [];
+  const lines = fieldsToAsk.map((field) => {
+    const kinds: Record<FieldDefinition['type'], string> = {
+      text: 'words',
+      number: 'a number',
+      date: 'a date (save it as YYYY-MM-DD)',
+      dropdown: `one of: ${field.options.join(', ')}`,
+      yes_no: 'yes or no',
+      phone: 'a phone number',
+      email: 'an email address',
+    };
+    return `- ${field.label}: ${kinds[field.type]}`;
+  });
+  return [
+    `ALSO ASK\nThe business also wants to know these. Once you have the customer's name and phone number, ask them naturally, one at a time, never more than one question per message, and never push if the customer would rather not say. When the customer answers, call save_custom_answers with the name exactly as listed.\n${lines.join('\n')}`,
+  ];
+}
+
+/** The extra questions the customer has answered already, so they are not asked again (nothing when none is answered). */
+function describeAnsweredFields(input: AgentPromptInput): string[] {
+  const answeredLabels = (input.fieldsToAsk ?? [])
+    .filter((field) => input.customAnswers?.[`${field.object}.${field.key}`] !== undefined)
+    .map((field) => field.label);
+  return answeredLabels.length === 0
+    ? []
+    : [`ALSO ASK, ALREADY ANSWERED (do not ask again)\n${answeredLabels.join(', ')}`];
+}
+
 /** The facts the customer has already given, or a line saying there are none yet. */
 function writeDetailsSoFar(detailsSoFar: DetailsSoFar): string {
   const entries = Object.entries(detailsSoFar);
@@ -130,11 +165,13 @@ export function buildAgentPrompt(input: AgentPromptInput, conversation: LlmPromp
     describeSituations(input.knowledge),
     describeWhatWeSell(input.whatWeSell),
     describeOffers(input.whatWeSell),
+    ...describeFieldsToAsk(input.fieldsToAsk ?? []),
     ...(input.channelNote ? [`THIS CHANNEL\n${input.channelNote}`] : []),
   ].join('\n\n');
   const changingSystemText = [
     `RIGHT NOW\nIt is ${describeNow(input.now, input.timeZone)} (${input.timeZone}). The business is ${input.isOpenNow ? 'open' : 'closed'} right now.`,
     writeDetailsSoFar(input.detailsSoFar),
+    ...describeAnsweredFields(input),
   ].join('\n\n');
   return { stableSystemText, changingSystemText, messages: conversation };
 }
