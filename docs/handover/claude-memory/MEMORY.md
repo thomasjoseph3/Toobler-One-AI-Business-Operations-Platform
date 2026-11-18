@@ -38,3 +38,4 @@
 - [Feature as one unit](feature-as-one-unit.md) — 18 Nov 2026: no 2-route slice limit any more; one feature = one unit with all tests
 - [F13 duplicates and merging](f13-duplicates-and-merging.md) — approved 18 Nov 2026 (85906b0); R79; F21 inbox next
 - [F29 web call first, Twilio later](f29-web-call-first-twilio-later.md) — web call now; phone code written but unconnected; port WhatsApp/email from hotel agent
+- [F21 inbox and takeover](f21-inbox-and-takeover.md) — approved 18 Nov 2026; R80; next F22; handover in docs/HANDOVER.md
