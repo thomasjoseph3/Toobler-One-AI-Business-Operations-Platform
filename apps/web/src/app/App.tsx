@@ -8,6 +8,7 @@ import { SetupChatPage } from '../features/setup/SetupChatPage';
 import { TicketPage } from '../features/tickets/TicketPage';
 import { TicketsPage } from '../features/tickets/TicketsPage';
 import { TasksPage } from '../features/tasks/TasksPage';
+import { TodayPage } from '../features/today/TodayPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { FilteredPage } from '../features/leads/FilteredPage';
 import { ExportPage } from '../features/exports/ExportPage';
@@ -49,6 +50,7 @@ const UiGallery = import.meta.env.DEV
 
 /** The page for one menu entry: its real screen when it has one, otherwise the "not built yet" page. */
 function pageFor(item: NavigationItem) {
+  if (item.id === 'today') return <TodayPage />;
   if (item.id === 'leads') return <LeadsPage />;
   if (item.id === 'inbox') return <InboxPage />;
   if (item.id === 'contacts') return <ContactsPage />;
