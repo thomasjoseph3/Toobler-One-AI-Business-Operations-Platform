@@ -664,6 +664,8 @@ const englishMessages = {
   'companyPage.people.takeOutLabel': 'Take {name} out of this company',
   'companyPage.people.added': '{name} is now in this company.',
   'companyPage.people.takenOut': '{name} was taken out of this company.',
+  'companyPage.timeline.title': 'Timeline',
+  'companyPage.timeline.empty': 'Nothing has happened yet with the people in this company.',
   'companyPage.leads.title': 'Leads',
   'companyPage.leads.empty': 'No leads yet from the people in this company.',
   'page.inbox.emptyTitle': 'No conversations yet',

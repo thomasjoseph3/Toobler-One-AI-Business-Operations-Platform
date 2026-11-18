@@ -232,3 +232,24 @@ export async function handOverCompanies(
     .execute();
   return rows.length;
 }
+
+/** Adds a company with only a name, or does nothing when a live company already has the name (ignoring capitals and spaces). Returns the new company's id, or undefined when one already existed. */
+export async function insertCompanyIfFree(
+  db: Db,
+  company: { id: string; accountId: string; name: string; actor: Actor },
+): Promise<string | undefined> {
+  const actorStamp = { kind: company.actor.kind, id: company.actor.id };
+  const row = await db
+    .insertInto('companies')
+    .values({
+      id: company.id,
+      account_id: company.accountId,
+      name: company.name,
+      created_by: actorStamp,
+      updated_by: actorStamp,
+    })
+    .onConflict((conflict) => conflict.columns(['account_id', 'name_key']).where('deleted_at', 'is', null).doNothing())
+    .returning('id')
+    .executeTakeFirst();
+  return row?.id;
+}

@@ -15,7 +15,7 @@ export function makeSaveDetailsTool(input: {
   return {
     name: 'save_details',
     description:
-      'Saves what the customer has told you: name, phone, email, what they want, dates, number of people, budget, best time to call, and whether they are ready to book. Call it whenever you learn something new. Save only what the customer said. It tells you what to say or ask next.',
+      'Saves what the customer has told you: name, phone, email, the company or group they are booking for, what they want, dates, number of people, budget, best time to call, and whether they are ready to book. Call it whenever you learn something new. Save only what the customer said. It tells you what to say or ask next.',
     inputSchema: saveDetailsInputSchema,
     effect: 'writes',
     run: async (toolInput) => {

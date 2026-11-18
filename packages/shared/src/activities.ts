@@ -66,12 +66,13 @@ export const createNoteRequestSchema = z
 export type CreateNoteRequest = z.infer<typeof createNoteRequestSchema>;
 
 /**
- * The timeline of one lead (`lead_id`) or of one person (`contact_id`: every lead of theirs too), newest first. One of the two is
- * needed. `kind` narrows it to one kind or several.
+ * The timeline of one lead (`lead_id`), of one person (`contact_id`: every lead of theirs too) or of one company (`company_id`: all its people
+ * and all their leads), newest first. Exactly one of the three is needed. `kind` narrows it to one kind or several.
  */
 export const listActivitiesQuerySchema = z.object({
   lead_id: z.uuid().optional(),
   contact_id: z.uuid().optional(),
+  company_id: z.uuid().optional(),
   /** One kind, or several separated by commas (`task_created,task_completed`). */
   kind: z
     .string()

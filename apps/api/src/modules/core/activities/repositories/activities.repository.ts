@@ -105,6 +105,8 @@ export async function listActivities(
     accountId: string;
     leadId?: string | undefined;
     contactId?: string | undefined;
+    /** Every activity of any of these people (a company's timeline). An empty list matches nothing. */
+    contactIds?: readonly string[] | undefined;
     kind?: readonly ActivityKind[] | undefined;
     limit: number;
     offset: number;
@@ -113,6 +115,12 @@ export async function listActivities(
   let query = db.selectFrom('activities').where('account_id', '=', options.accountId).where('deleted_at', 'is', null);
   if (options.leadId !== undefined) query = query.where('lead_id', '=', options.leadId);
   if (options.contactId !== undefined) query = query.where('contact_id', '=', options.contactId);
+  if (options.contactIds !== undefined) {
+    query =
+      options.contactIds.length === 0
+        ? query.where(sql<boolean>`false`)
+        : query.where('contact_id', 'in', [...options.contactIds]);
+  }
   if (options.kind !== undefined) query = query.where('kind', 'in', [...options.kind]);
 
   const totalRow = await query.select(sql<string>`count(*)`.as('total')).executeTakeFirstOrThrow();

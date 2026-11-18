@@ -4,7 +4,7 @@ import { ApiRequestError, apiRequest } from '../../api/client';
 import { useApiResource, type LoadState } from '../../api/useApiResource';
 import { t } from '../../app/i18n';
 import { useKeptData } from '../knowledge/use-kept-resource';
-import { buildNoteRequest, buildNotesPath, checkNote, type NotesTarget } from './notes-state';
+import { buildNoteRequest, buildNotesPath, checkNote, type TimelineTarget } from './notes-state';
 
 /** One plain sentence for a failed note. Never a code or a status number. */
 function describeNoteProblem(error: unknown): string {
@@ -24,7 +24,7 @@ function describeNoteProblem(error: unknown): string {
  * ask again.
  */
 export function useNotes(
-  target: NotesTarget,
+  target: TimelineTarget,
   onChanged?: () => void,
   kinds?: readonly ActivityKind[],
 ): {
@@ -56,6 +56,8 @@ export function useNotes(
   };
 
   const saveNote = async (): Promise<boolean> => {
+    // A company's timeline is read only: a note is written on a person or a lead
+    if (target.kind === 'company') return false;
     const problemKey = checkNote(noteText);
     if (problemKey !== null) {
       setNoteProblem(t(problemKey));

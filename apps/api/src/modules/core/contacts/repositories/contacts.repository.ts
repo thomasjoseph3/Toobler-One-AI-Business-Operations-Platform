@@ -316,3 +316,20 @@ export async function clearCompanyOfContacts(
     .execute();
   return rows.length;
 }
+
+/** Puts a live contact in a company only if it is not in one yet, and stamps who did it. Returns whether it was put in. */
+export async function setContactCompanyIfNone(
+  db: Db,
+  options: { accountId: string; contactId: string; companyId: string; actor: Actor },
+): Promise<boolean> {
+  const row = await db
+    .updateTable('contacts')
+    .set({ company_id: options.companyId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.contactId)
+    .where('company_id', 'is', null)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}

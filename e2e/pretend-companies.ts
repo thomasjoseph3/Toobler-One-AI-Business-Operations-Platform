@@ -246,3 +246,28 @@ export function answerCompaniesCall(
   }
   return undefined;
 }
+
+/**
+ * Answers `GET /activities?company_id=`: the notes and news (from the pretend notes) of the people who are in the company now, newest first, narrowed by kind
+ * when asked. 404 for a company the pretend API does not have.
+ */
+export function answerCompanyTimelineCall(
+  state: PretendCompanies,
+  notes: Array<Record<string, unknown>>,
+  search: string,
+): PretendAnswer | undefined {
+  const query = new URLSearchParams(search);
+  const companyId = query.get('company_id');
+  if (companyId === null) return undefined;
+  if (!state.companies.some((company) => company['id'] === companyId)) {
+    return { status: 404, body: { error: { code: 'NOT_FOUND', message: "That company wasn't found." } } };
+  }
+  const peopleIds = (state.people[companyId] ?? []).map((person) => person.id);
+  const kind = query.get('kind');
+  const items = notes.filter(
+    (note) =>
+      peopleIds.includes(String(note['contactId'])) &&
+      (kind === null || kind.split(',').includes(String(note['kind']))),
+  );
+  return { status: 200, body: { items, total: items.length, page: 1, limit: 100 } };
+}

@@ -1,6 +1,7 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { createAiService } from '../ai';
 import { agentTestChatRoutes } from './routes/agent-test-chat.routes';
+import { handleOutcomesApplied } from './services/agent-facts-applier.service';
 import { createConversationSummaryService } from './services/conversation-summary.service';
 
 /**
@@ -12,8 +13,18 @@ export default defineModule({
   id: 'core.agents',
   kind: 'core',
   // It reads the business (auth), what the business told it (knowledge), what it sells (offerings), writes down conversations
-  // (conversations) and asks the AI for replies (ai)
-  requires: ['core.auth', 'core.knowledge', 'core.offerings', 'core.conversations', 'core.ai'],
+  // (conversations) and asks the AI for replies (ai); the company a customer names is saved through contacts and companies
+  requires: [
+    'core.auth',
+    'core.knowledge',
+    'core.offerings',
+    'core.conversations',
+    'core.ai',
+    'core.contacts',
+    'core.companies',
+  ],
+  // When a conversation's contact and lead are made, what the AI learned is added to them (so far: the company the customer named)
+  events: { 'conversation.outcomes_applied': handleOutcomesApplied },
   jobs: [
     {
       // Writes the short summary of one conversation. A channel queues it with the business and the conversation when the conversation

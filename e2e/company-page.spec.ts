@@ -26,6 +26,26 @@ test.describe('Company page', () => {
     await expect(leads.getByText('Contacted', { exact: true })).toBeVisible();
   });
 
+  test('shows the timeline of all its people together, narrowed by the chips', async ({ page, pretendApi }) => {
+    await page.goto('/companies/company-1');
+    const timeline = page.getByRole('region', { name: 'Timeline' });
+    await expect(timeline.getByText('Great insights on the project, looking forward to the next steps!')).toBeVisible();
+    await timeline.getByRole('button', { name: 'Notes', exact: true }).click();
+    await expect(timeline.getByText('Great insights on the project, looking forward to the next steps!')).toBeVisible();
+    expect(pretendApi.notes.notes.length).toBeGreaterThan(1);
+    await timeline.getByRole('button', { name: 'Stage changes' }).click();
+    await expect(timeline.getByText(/Contacted/)).toBeVisible();
+    await expect(timeline.getByText('Great insights on the project, looking forward to the next steps!')).toHaveCount(
+      0,
+    );
+  });
+
+  test('says when nobody in the company has had anything happen yet', async ({ page, pretendApi }) => {
+    pretendApi.companies.people['company-1'] = [];
+    await page.goto('/companies/company-1');
+    await expect(page.getByText('Nothing has happened yet with the people in this company.')).toBeVisible();
+  });
+
   test('takes a person out of the company, and the leads of that person go with them', async ({ page, pretendApi }) => {
     await page.goto('/companies/company-1');
     await page.getByRole('button', { name: 'Take Rahul Das 1 out of this company' }).click();
@@ -121,13 +141,13 @@ test.describe('Changing and deleting a company', () => {
     pretendApi,
   }) => {
     await page.goto('/companies/company-1');
-    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Delete' }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Delete Infosys HR?' });
     await expect(dialog.getByText(/Its people stay/)).toBeVisible();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     expect(pretendApi.companies.deletedCompanyIds).toEqual([]);
 
-    await page.getByRole('button', { name: 'Delete' }).click();
+    await page.getByRole('button', { name: 'Delete' }).first().click();
     await dialog.getByRole('button', { name: 'Delete company' }).click();
     await expect(page).toHaveURL(/\/companies$/);
     await expect(page.getByText('Infosys HR was deleted.')).toBeVisible();

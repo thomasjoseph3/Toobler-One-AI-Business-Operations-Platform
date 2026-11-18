@@ -70,6 +70,9 @@ export const saveDetailsInputSchema = z
     name: SHORT_TEXT.optional().describe("The customer's name, as they gave it"),
     phone: SHORT_TEXT.optional().describe("The customer's phone number, as they typed it"),
     email: SHORT_TEXT.optional().describe("The customer's email address"),
+    company: SHORT_TEXT.optional().describe(
+      'The firm, school or group they are booking or asking for, only if they said it',
+    ),
     interestedIn: SHORT_TEXT.optional().describe('What they want or are asking about'),
     dates: SHORT_TEXT.optional().describe('Any dates they mentioned, as they said them'),
     numberOfPeople: SHORT_TEXT.optional().describe('How many people, as they said it'),
@@ -88,6 +91,7 @@ const DETAIL_LABELS = {
   name: 'Name',
   phone: 'Phone',
   email: 'Email',
+  company: 'Company',
   interestedIn: 'Interested in',
   dates: 'Dates',
   numberOfPeople: 'Number of people',

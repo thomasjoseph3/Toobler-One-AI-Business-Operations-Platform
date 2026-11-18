@@ -14,8 +14,8 @@ import {
 export default defineModule({
   id: 'core.activities',
   kind: 'core',
-  // A note is about a person and usually one of their leads (contacts, leads), and it shows who wrote it (auth)
-  requires: ['core.auth', 'core.contacts', 'core.leads', 'core.tasks'],
+  // A note is about a person and usually one of their leads (contacts, leads), and it shows who wrote it (auth); a company's timeline is its people's (companies)
+  requires: ['core.auth', 'core.contacts', 'core.leads', 'core.tasks', 'core.companies'],
   // The lead's own news goes on its timeline: a new lead, a lead moving to another stage, a task added or ticked off
   events: {
     'lead.created': handleLeadCreated,

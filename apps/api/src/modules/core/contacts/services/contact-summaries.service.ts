@@ -69,3 +69,14 @@ export async function clearCompanyOfContacts(
 ): Promise<number> {
   return contactsRepository.clearCompanyOfContacts(transaction, options);
 }
+
+/**
+ * Puts a contact in a company only if it is not in one yet (what the AI heard never overrides what staff chose). Returns whether it was put in.
+ * Used by the agents module (through this module's index.ts). Run it inside the business's own transaction.
+ */
+export async function setContactCompanyIfNone(
+  transaction: Db,
+  options: { accountId: string; contactId: string; companyId: string; actor: Actor },
+): Promise<boolean> {
+  return contactsRepository.setContactCompanyIfNone(transaction, options);
+}

@@ -42,6 +42,8 @@ Every sign-in is the same screen for every kind of person. What a person can do 
 | --- | --- | --- | --- |
 | Contacts: add, view, edit | Yes | Yes | Yes (contacts are shared; "own contacts only" comes with F02/F11) |
 | Contacts: delete | **Yes** | No | No |
+| Companies: add, change, link contacts | Yes | Yes | Yes (sees only their own leads on a company page, and not its combined timeline) |
+| Companies: delete | **Yes** | No | No |
 | Leads: add, view, edit, move, reassign | All of the business's leads | All of the business's leads | **Only leads they own**; a lead they add is always theirs and they cannot name another owner |
 | Leads: delete | **Yes** | No | No |
 | Pipeline stages and lost reasons | **Change** | View | View (the board shows only their leads) |
@@ -131,6 +133,17 @@ Every route must say who may call it (a route without that declaration does not 
 | PATCH | `/api/v1/teams/:id` | Managers only |
 | DELETE | `/api/v1/teams/:id` | Managers only |
 | GET | `/api/v1/audit-log` | Managers only |
+
+### Companies (F05)
+
+| Method | Address | Who can call it |
+| --- | --- | --- |
+| GET | `/api/v1/companies` | Any signed-in person (every role; the "own leads only" role's numbers count only its own leads) |
+| POST | `/api/v1/companies` | Any signed-in person (every role) |
+| GET | `/api/v1/companies/:id` | Any signed-in person (every role; the "own leads only" role sees only its own leads) |
+| PATCH | `/api/v1/companies/:id` | Any signed-in person (every role) |
+| DELETE | `/api/v1/companies/:id` | Managers only |
+| PUT | `/api/v1/contacts/:id/company` | Any signed-in person (every role) |
 
 ### Contacts (F04)
 

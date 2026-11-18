@@ -31,7 +31,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F07 | Timeline and notes | approved | [brief](../features/F07-timeline-and-notes.md) | 2026-11-17 |
 | F08 | Tasks and reminders | approved | [brief](../features/F08-tasks-and-reminders.md) | 2026-11-17 |
 | F02 | Team, roles, teams and the activity log | approved | [brief](../features/F02-team-and-roles.md) | 2026-11-18 |
-| F05 | Companies | in_progress | [brief](../features/F05-companies.md) | |
+| F05 | Companies | in_review | [brief](../features/F05-companies.md) | |
 | F09 | Custom fields | planned | | |
 | F10 | Lead scoring and the Filtered tab | planned | | |
 | F11 | Views, filters, search and lists | planned | | |

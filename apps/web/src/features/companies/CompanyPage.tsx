@@ -21,6 +21,7 @@ import { findLifecycleLabelKey, findLifecycleTagTone } from '../contacts/contact
 import { formatBudget, findLeadDisplayName } from '../leads/lead-display';
 import { ContactPicker } from '../tickets/ContactPicker';
 import { CompanyFormPanel } from './CompanyFormPanel';
+import { CompanyTimelineCard } from './CompanyTimelineCard';
 import { describeCompanySaveProblem } from './company-problem';
 
 /** One small label and value in the details card. */
@@ -283,6 +284,9 @@ export function CompanyPage() {
             ))}
           </ul>
         </Card>
+      </div>
+      <div className="mt-6">
+        <CompanyTimelineCard companyId={company.id} />
       </div>
       <ConfirmDialog
         isOpen={isDeleteAsked}

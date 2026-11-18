@@ -15,7 +15,8 @@ import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import { findPeopleSummaries } from '../../auth';
 import type { PersonSummary } from '../../auth';
-import { findContactSummaries } from '../../contacts';
+import { findCompanyReference } from '../../companies';
+import { findContactsOfCompany, findContactSummaries } from '../../contacts';
 import { findLeadReference, findVisibleLeadIds } from '../../leads';
 import * as activitiesRepository from '../repositories/activities.repository';
 import type { ActivityRow } from '../repositories/activities.repository';
@@ -204,19 +205,22 @@ export function createActivitiesService({ database }: { database: Database }) {
     },
 
     /**
-     * One lead's timeline (`lead_id`) or one person's (`contact_id`, which includes all their leads), newest first. One of the two is
-     * needed (400 FILTER_NEEDED), not both. An unknown lead or person answers 404.
+     * One lead's timeline (`lead_id`), one person's (`contact_id`, which includes all their leads) or one company's (`company_id`: all its people
+     * and all their leads), newest first. Exactly one is needed (400 FILTER_NEEDED). An unknown lead, person or company answers 404. The "own leads only" role may
+     * read only a lead's timeline (403 for the other two, which would show other people's leads).
      */
     async listActivities(
       principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       query: ListActivitiesQuery,
     ): Promise<ActivitiesListResponse> {
-      if ((query.lead_id === undefined) === (query.contact_id === undefined)) {
-        throw new ApiError(400, 'FILTER_NEEDED', 'Send exactly one of lead_id or contact_id.');
+      const filtersGiven = [query.lead_id, query.contact_id, query.company_id].filter((filter) => filter !== undefined);
+      if (filtersGiven.length !== 1) {
+        throw new ApiError(400, 'FILTER_NEEDED', 'Send exactly one of lead_id, contact_id or company_id.');
       }
-      if (query.contact_id !== undefined && principal.role === 'staff_own') throw forbiddenForOwnLeadsOnly();
+      if (query.lead_id === undefined && principal.role === 'staff_own') throw forbiddenForOwnLeadsOnly();
       const accountId = principal.accountId;
       return database.runInAccountTransaction(accountId, async (transaction) => {
+        let companyContactIds: string[] | undefined;
         if (query.lead_id !== undefined) {
           const lead = await findLeadReference(transaction, {
             accountId,
@@ -224,14 +228,21 @@ export function createActivitiesService({ database }: { database: Database }) {
             ...(principal.role === 'staff_own' ? { visibleToUserId: principal.userId } : {}),
           });
           if (!lead) throw notFound('That lead');
-        } else {
-          const [contact] = await findContactSummaries(transaction, { accountId, contactIds: [query.contact_id!] });
+        } else if (query.contact_id !== undefined) {
+          const [contact] = await findContactSummaries(transaction, { accountId, contactIds: [query.contact_id] });
           if (!contact) throw notFound('That contact');
+        } else if (query.company_id !== undefined) {
+          const company = await findCompanyReference(transaction, { accountId, companyId: query.company_id });
+          if (!company) throw notFound('That company');
+          companyContactIds = (
+            await findContactsOfCompany(transaction, { accountId, companyId: query.company_id })
+          ).map((contact) => contact.id);
         }
         const { items, total } = await activitiesRepository.listActivities(transaction, {
           accountId,
           leadId: query.lead_id,
           contactId: query.contact_id,
+          contactIds: companyContactIds,
           kind: query.kind,
           limit: query.limit,
           offset: (query.page - 1) * query.limit,

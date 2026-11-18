@@ -1,6 +1,7 @@
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 import { findOrCreateContactFromIdentity } from '../../contacts';
+import { publishEvent } from '../../../../kernel/events/publish';
 import { applyLeadFromConversation } from '../../leads';
 import { applyTicketFromConversation } from '../../tickets';
 import { shouldKeepContact } from '../helpers/router';
@@ -74,6 +75,9 @@ export async function applyPendingOutcomes(
   let carriedOut = 0;
   let waiting = 0;
   let aPersonMustLook = false;
+  // The leads and tickets this run made or joined, for the event below (ids only)
+  const leadIds: string[] = [];
+  const ticketIds: string[] = [];
   for (const outcome of pending) {
     const appliedAt = new Date();
     if (outcome.kind === 'lead') {
@@ -96,6 +100,7 @@ export async function applyPendingOutcomes(
         createdRecord: lead.action === 'created',
         appliedAt,
       });
+      leadIds.push(lead.leadId);
     } else if (outcome.kind === 'ticket') {
       if (contactId === null) {
         waiting += 1;
@@ -135,6 +140,7 @@ export async function applyPendingOutcomes(
         createdRecord: ticket.action === 'created',
         appliedAt,
       });
+      ticketIds.push(ticket.ticketId);
     } else {
       // Log, Filtered, ignored, review: there is nothing to make; the type and the outcome are the record
       await conversationOutcomesRepository.markOutcomeApplied(transaction, {
@@ -150,6 +156,14 @@ export async function applyPendingOutcomes(
 
   if (aPersonMustLook) {
     await conversationsRepository.markConversationNeedsPerson(transaction, { accountId, conversationId, actor });
+  }
+  // Tell the other modules what was made (ids only): the agents module then adds what the AI learned to the contact (its company)
+  if (carriedOut > 0) {
+    await publishEvent(transaction, {
+      accountId,
+      eventName: 'conversation.outcomes_applied',
+      payload: { conversationId, contactId, leadIds, ticketIds },
+    });
   }
   return { carriedOut, waiting };
 }

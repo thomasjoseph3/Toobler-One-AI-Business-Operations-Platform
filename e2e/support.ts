@@ -4,7 +4,12 @@ import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from '.
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
 import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
 import { answerTasksCall, startingTasks, type PretendTasks } from './pretend-tasks';
-import { answerCompaniesCall, startingCompanies, type PretendCompanies } from './pretend-companies';
+import {
+  answerCompaniesCall,
+  answerCompanyTimelineCall,
+  startingCompanies,
+  type PretendCompanies,
+} from './pretend-companies';
 import { answerTeamCall, startingTeam, type PretendTeam } from './pretend-team';
 import { answerSettingsCall, startingSettings, type PretendSettings } from './pretend-settings';
 import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
@@ -300,6 +305,14 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
                 : json(tasksAnswer.status, tasksAnswer.body),
             );
           }
+        }
+        if (path === '/activities' && new URL(request.url()).searchParams.has('company_id')) {
+          const timelineAnswer = answerCompanyTimelineCall(
+            pretendApi.companies,
+            pretendApi.notes.notes,
+            new URL(request.url()).search,
+          );
+          if (timelineAnswer) return route.fulfill(json(timelineAnswer.status, timelineAnswer.body));
         }
         if (
           path === '/activities' ||

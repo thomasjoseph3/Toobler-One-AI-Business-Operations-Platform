@@ -79,12 +79,16 @@ export function canDeleteNote(role: string): boolean {
   return role === 'manager';
 }
 
-/** What a set of notes belongs to: one lead, or one person (whose notes include those on all their leads). */
+/** What a set of notes belongs to: one lead, or one person (whose notes include those on all their leads). A note can be written on these. */
 export type NotesTarget = { kind: 'lead'; id: string } | { kind: 'contact'; id: string };
 
+/** What a timeline can be read for: a note target, or one company (all its people's notes and news together, read only). */
+export type TimelineTarget = NotesTarget | { kind: 'company'; id: string };
+
 /** The API address that lists the timeline of a target, newest first (up to 100), narrowed to some kinds when `kinds` are given. */
-export function buildNotesPath(target: NotesTarget, kinds?: readonly ActivityKind[]): string {
-  const filter = target.kind === 'lead' ? `lead_id=${target.id}` : `contact_id=${target.id}`;
+export function buildNotesPath(target: TimelineTarget, kinds?: readonly ActivityKind[]): string {
+  const filterName = target.kind === 'lead' ? 'lead_id' : target.kind === 'contact' ? 'contact_id' : 'company_id';
+  const filter = `${filterName}=${target.id}`;
   return `/activities?${filter}${kinds && kinds.length > 0 ? `&kind=${kinds.join(',')}` : ''}&limit=100`;
 }
 
