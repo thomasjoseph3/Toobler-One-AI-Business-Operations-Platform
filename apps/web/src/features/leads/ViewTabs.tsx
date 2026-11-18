@@ -46,6 +46,11 @@ export function ViewTabs({ savedViews, activeViewId, isPlain }: ViewTabsProps) {
           className={tabClasses(saved.id === activeViewId)}
         >
           {saved.name}
+          {saved.shared ? (
+            <span className="text-label-xs ml-2 rounded-sm bg-hover px-1.5 py-0.5 text-text-secondary">
+              {t('views.sharedWord')}
+            </span>
+          ) : null}
         </Link>
       ))}
     </nav>

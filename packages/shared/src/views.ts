@@ -61,3 +61,24 @@ export const createViewRequestSchema = z
   })
   .strict();
 export type CreateViewRequest = z.infer<typeof createViewRequestSchema>;
+
+/** The address part naming a view. */
+export const viewIdParamsSchema = z.object({ id: z.uuid() });
+
+/**
+ * What a person sends to change a view: its name, whether it is shared with the team (managers only), or what it filters, sorts and shows. Only what is
+ * sent changes. The list, the owner and the business are never changed.
+ */
+export const updateViewRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(60).optional(),
+    shared: z.boolean().optional(),
+    filters: leadViewFiltersSchema.optional(),
+    sort: z
+      .object({ field: leadViewSortFieldSchema, order: z.enum(['asc', 'desc']) })
+      .nullable()
+      .optional(),
+    layout: z.enum(['list', 'pipeline']).optional(),
+  })
+  .strict();
+export type UpdateViewRequest = z.infer<typeof updateViewRequestSchema>;

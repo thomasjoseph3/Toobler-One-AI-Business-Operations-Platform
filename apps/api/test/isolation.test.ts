@@ -81,6 +81,7 @@ interface BusinessAData {
   teamId: string;
   companyId: string;
   fieldId: string;
+  viewId: string;
   secretWords: string;
 }
 
@@ -247,6 +248,8 @@ beforeAll(async () => {
     { object: 'lead', label: `Field ${secretWords}`, type: 'text' },
     201,
   );
+  // A has a saved view with a secret name; B must never see it
+  const viewOfA = await sendOk(businessA, 'POST', '/views', { object: 'lead', name: `View ${secretWords}` }, 201);
   // A has a company with a secret name; B must never see it
   const companyOfA = await sendOk(
     businessA,
@@ -292,6 +295,7 @@ beforeAll(async () => {
     teamId: teamOfA.id,
     companyId: companyOfA.id,
     fieldId: fieldOfA.id,
+    viewId: viewOfA.id,
     secretWords,
   };
 
@@ -876,6 +880,18 @@ const attempts: Attempt[] = [
     route: 'DELETE /api/v1/fields/{id}',
     what: "remove A's field",
     request: () => ({ method: 'DELETE', url: `/fields/${dataOfA.fieldId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/views/{id}',
+    what: "rename A's view",
+    request: () => ({ method: 'PATCH', url: `/views/${dataOfA.viewId}`, payload: { name: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/views/{id}',
+    what: "delete A's view",
+    request: () => ({ method: 'DELETE', url: `/views/${dataOfA.viewId}` }),
     expectedStatus: 404,
   },
   {

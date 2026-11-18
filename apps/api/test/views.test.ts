@@ -120,3 +120,114 @@ describe('POST /views and GET /views', () => {
     expect((await other.ok('GET', '/views?object=lead')).items).toEqual([]);
   });
 });
+
+describe('PATCH /views/{id} and DELETE /views/{id}', () => {
+  it('renames and changes what a view shows, and writes one activity line with field names only', async () => {
+    const owner = await signUpOwner(app, database);
+    const saved = await owner.ok('POST', '/views', { object: 'lead', name: 'Old name' }, 201);
+    const changed = await owner.ok('PATCH', `/views/${saved.id}`, {
+      name: 'New name',
+      filters: { status: 'closed' },
+      sort: { field: 'stage', order: 'asc' },
+      layout: 'pipeline',
+    });
+    expect(changed).toMatchObject({
+      name: 'New name',
+      filters: { status: 'closed' },
+      sort: { field: 'stage', order: 'asc' },
+      layout: 'pipeline',
+    });
+    // The same again changes nothing and logs nothing more
+    await owner.ok('PATCH', `/views/${saved.id}`, { name: 'New name' });
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', owner.businessId)
+      .where('kind', '=', 'views.updated')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(JSON.stringify(lines)).not.toContain('New name');
+  });
+
+  it('clears the sort with null and refuses an empty change, a taken name and extra words', async () => {
+    const owner = await signUpOwner(app, database);
+    const first = await owner.ok(
+      'POST',
+      '/views',
+      { object: 'lead', name: 'First', sort: { field: 'createdAt', order: 'asc' } },
+      201,
+    );
+    await owner.ok('POST', '/views', { object: 'lead', name: 'Second' }, 201);
+    expect((await owner.ok('PATCH', `/views/${first.id}`, { sort: null })).sort).toBeNull();
+    expect(await owner.refused('PATCH', `/views/${first.id}`, {}, 400)).toBe('NOTHING_TO_CHANGE');
+    expect(await owner.refused('PATCH', `/views/${first.id}`, { name: 'second' }, 409)).toBe('VIEW_NAME_TAKEN');
+    await owner.refused('PATCH', `/views/${first.id}`, { name: '   ' }, 400);
+    await owner.refused('PATCH', `/views/${first.id}`, { ownerUserId: owner.userId }, 400);
+    await owner.refused('PATCH', `/views/${first.id}`, { object: 'lead' }, 400);
+  });
+
+  it('lets only a manager share a view, and then colleagues see it as not theirs', async () => {
+    const owner = await signUpOwner(app, database);
+    const colleague = await addTeamMember(app, database, owner, { name: 'Asha', role: 'staff' });
+    const mine = await owner.ok('POST', '/views', { object: 'lead', name: 'Team view' }, 201);
+    expect((await owner.ok('PATCH', `/views/${mine.id}`, { shared: true })).shared).toBe(true);
+    expect((await colleague.ok('GET', '/views?object=lead')).items[0]).toMatchObject({
+      name: 'Team view',
+      isMine: false,
+    });
+
+    const hers = await colleague.ok('POST', '/views', { object: 'lead', name: 'Hers' }, 201);
+    await colleague.refused('PATCH', `/views/${hers.id}`, { shared: true }, 403);
+    await colleague.refused('PATCH', `/views/${hers.id}`, { shared: false }, 403);
+  });
+
+  it('keeps a colleague out: 404 for an unshared view, 403 for a shared one they may not change', async () => {
+    const owner = await signUpOwner(app, database);
+    const colleague = await addTeamMember(app, database, owner, { name: 'Asha', role: 'staff' });
+    const view = await owner.ok('POST', '/views', { object: 'lead', name: 'Private' }, 201);
+    await colleague.refused('PATCH', `/views/${view.id}`, { name: 'Mine now' }, 404);
+    await colleague.refused('DELETE', `/views/${view.id}`, undefined, 404);
+    await owner.ok('PATCH', `/views/${view.id}`, { shared: true });
+    await colleague.refused('PATCH', `/views/${view.id}`, { name: 'Mine now' }, 403);
+    await colleague.refused('DELETE', `/views/${view.id}`, undefined, 403);
+    expect((await owner.ok('GET', '/views?object=lead')).items[0].name).toBe('Private');
+  });
+
+  it('lets another manager stop sharing or delete a shared view, but not change what it shows', async () => {
+    const owner = await signUpOwner(app, database);
+    const otherManager = await addTeamMember(app, database, owner, { name: 'Meera', role: 'manager' });
+    const staff = await addTeamMember(app, database, owner, { name: 'Asha', role: 'staff' });
+    const view = await staff.ok('POST', '/views', { object: 'lead', name: 'Hers' }, 201);
+    // Not shared yet: the manager cannot see it, so it does not exist for them
+    await otherManager.refused('DELETE', `/views/${view.id}`, undefined, 404);
+    await database.system.updateTable('saved_views').set({ shared: true }).where('id', '=', view.id).execute();
+    await otherManager.refused('PATCH', `/views/${view.id}`, { name: 'Renamed by manager' }, 403);
+    expect((await otherManager.ok('PATCH', `/views/${view.id}`, { shared: false })).shared).toBe(false);
+    await database.system.updateTable('saved_views').set({ shared: true }).where('id', '=', view.id).execute();
+    await otherManager.ok('DELETE', `/views/${view.id}`, undefined, 204);
+    expect((await staff.ok('GET', '/views?object=lead')).items).toEqual([]);
+  });
+
+  it('deletes the owner’s own view for good and logs it without its name', async () => {
+    const owner = await signUpOwner(app, database);
+    const saved = await owner.ok('POST', '/views', { object: 'lead', name: 'Delete me' }, 201);
+    await owner.ok('DELETE', `/views/${saved.id}`, undefined, 204);
+    expect((await owner.ok('GET', '/views?object=lead')).items).toEqual([]);
+    await owner.refused('DELETE', `/views/${saved.id}`, undefined, 404);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', owner.businessId)
+      .where('kind', '=', 'views.deleted')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(JSON.stringify(lines)).not.toContain('Delete me');
+  });
+
+  it('answers 404 for an unknown id and 400 for something that is not an id', async () => {
+    const owner = await signUpOwner(app, database);
+    await owner.refused('PATCH', '/views/0194c9a8-0000-7000-8000-000000000000', { name: 'X' }, 404);
+    await owner.refused('DELETE', '/views/0194c9a8-0000-7000-8000-000000000000', undefined, 404);
+    await owner.refused('PATCH', '/views/not-an-id', { name: 'X' }, 400);
+  });
+});

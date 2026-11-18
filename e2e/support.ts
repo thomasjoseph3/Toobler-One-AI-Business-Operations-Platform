@@ -80,6 +80,9 @@ export interface PretendApi {
   views: {
     items: Array<Record<string, unknown>>;
     created: Array<Record<string, unknown>>;
+    /** What the page sent to change a view, and the ids it deleted. */
+    patched: Array<{ viewId: string; body: Record<string, unknown> }>;
+    deletedIds: string[];
     refusal: { status: number; code: string; message: string } | null;
   };
   /** The top-bar search: what was searched for, what the pretend API answers, and a way to make it fail. */
@@ -242,7 +245,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         patchedLeads: [],
         leadEdits: {},
         temperatureChanges: [],
-        views: { items: [], created: [], refusal: null },
+        views: { items: [], created: [], patched: [], deletedIds: [], refusal: null },
         search: {
           queries: [],
           results: {
@@ -540,6 +543,30 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         // One lead, and editing its details
         if (path === '/views' && request.method() === 'GET') {
           return route.fulfill(json(200, { items: pretendApi.views.items }));
+        }
+        const oneViewMatch = /^\/views\/([^/]+)$/.exec(path);
+        if (oneViewMatch && (request.method() === 'PATCH' || request.method() === 'DELETE')) {
+          const viewId = oneViewMatch[1]!;
+          if (pretendApi.views.refusal) {
+            const { status, code, message } = pretendApi.views.refusal;
+            return route.fulfill(json(status, { error: { code, message } }));
+          }
+          if (request.method() === 'DELETE') {
+            pretendApi.views.deletedIds.push(viewId);
+            pretendApi.views.items = pretendApi.views.items.filter((item) => item.id !== viewId);
+            return route.fulfill({ status: 204 });
+          }
+          const body = request.postDataJSON() as Record<string, unknown>;
+          pretendApi.views.patched.push({ viewId, body });
+          pretendApi.views.items = pretendApi.views.items.map((item) =>
+            item.id === viewId ? { ...item, ...body } : item,
+          );
+          return route.fulfill(
+            json(
+              200,
+              pretendApi.views.items.find((item) => item.id === viewId),
+            ),
+          );
         }
         if (path === '/views' && request.method() === 'POST') {
           if (pretendApi.views.refusal) {

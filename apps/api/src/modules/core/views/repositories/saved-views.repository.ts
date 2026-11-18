@@ -123,3 +123,61 @@ export async function insertSavedView(
     .executeTakeFirstOrThrow();
   return toSavedViewRow(row);
 }
+
+/** One view of the business by its id (whoever owns it), or undefined (also for another business's view). The service decides who may see or change it. */
+export async function findSavedViewById(db: Db, accountId: string, viewId: string): Promise<SavedViewRow | undefined> {
+  const row = await db
+    .selectFrom('saved_views')
+    .select(VIEW_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', '=', viewId)
+    .executeTakeFirst();
+  return row === undefined ? undefined : toSavedViewRow(row);
+}
+
+/** Changes the editable parts of a view (only what is given) and returns it, or undefined when there is no such view. Throws a unique-violation (23505) on a name already used by the owner. */
+export async function updateSavedView(
+  db: Db,
+  options: {
+    accountId: string;
+    viewId: string;
+    changes: {
+      name?: string;
+      shared?: boolean;
+      filters?: Record<string, unknown>;
+      sortField?: string | null;
+      sortOrder?: 'asc' | 'desc' | null;
+      layout?: 'list' | 'pipeline';
+    };
+    actor: Actor;
+  },
+): Promise<SavedViewRow | undefined> {
+  const { changes } = options;
+  const row = await db
+    .updateTable('saved_views')
+    .set({
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.shared !== undefined ? { shared: changes.shared } : {}),
+      ...(changes.filters !== undefined ? { filters: JSON.stringify(changes.filters) } : {}),
+      ...(changes.sortField !== undefined ? { sort_field: changes.sortField } : {}),
+      ...(changes.sortOrder !== undefined ? { sort_order: changes.sortOrder } : {}),
+      ...(changes.layout !== undefined ? { layout: changes.layout } : {}),
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.viewId)
+    .returning(VIEW_COLUMNS)
+    .executeTakeFirst();
+  return row === undefined ? undefined : toSavedViewRow(row);
+}
+
+/** Deletes a view for good (a view is only a saved set of words, not history). Returns false when there is no such view. */
+export async function deleteSavedView(db: Db, accountId: string, viewId: string): Promise<boolean> {
+  const row = await db
+    .deleteFrom('saved_views')
+    .where('account_id', '=', accountId)
+    .where('id', '=', viewId)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}

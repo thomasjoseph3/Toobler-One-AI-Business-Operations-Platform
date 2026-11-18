@@ -30,6 +30,7 @@ import { LeadsToolbar } from './LeadsToolbar';
 import { SaveViewDialog } from './SaveViewDialog';
 import { findActiveSavedView, isPlainLeadsView } from './saved-views';
 import { ViewTabs } from './ViewTabs';
+import { maySeeViewActions, ViewActions } from './ViewActions';
 import {
   buildLeadsPath,
   countActiveFilters,
@@ -86,6 +87,7 @@ export function LeadsPage() {
   const stages = pipelineData.data?.stages ?? [];
   // The saved views for the tabs (none while they load or if they could not be loaded: the list itself still works)
   const savedViews = viewsResource.state.status === 'ready' ? viewsResource.state.data.items : [];
+  const activeSavedView = findActiveSavedView(savedViews, view);
   // The board as the person has just changed it, before the server has answered; it is dropped as soon as a newer answer arrives
   const [boardOverride, setBoardOverride] = useState<{ source: LeadsBoardResponse; columns: BoardColumn[] } | null>(
     null,
@@ -179,11 +181,22 @@ export function LeadsPage() {
           {actions.notice.text}
         </Alert>
       ) : null}
-      <ViewTabs
-        savedViews={savedViews}
-        activeViewId={findActiveSavedView(savedViews, view)?.id}
-        isPlain={isPlainLeadsView(view)}
-      />
+      <ViewTabs savedViews={savedViews} activeViewId={activeSavedView?.id} isPlain={isPlainLeadsView(view)} />
+      {activeSavedView && maySeeViewActions(activeSavedView, user.role === 'manager') ? (
+        <ViewActions
+          key={activeSavedView.id}
+          saved={activeSavedView}
+          isManager={user.role === 'manager'}
+          onChanged={(message) => {
+            viewsResource.reload();
+            actions.showNotice({ tone: 'success', text: message });
+          }}
+          onProblem={(message) => {
+            viewsResource.reload();
+            actions.showNotice({ tone: 'error', text: message });
+          }}
+        />
+      ) : null}
       <LeadsToolbar
         view={view}
         stages={stages}

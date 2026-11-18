@@ -95,3 +95,72 @@ test.describe('Saved views of the Leads list', () => {
     expect(result.violations).toEqual([]);
   });
 });
+
+const theView = {
+  id: 'view-1',
+  object: 'lead',
+  name: 'My hot leads',
+  filters: { owner: 'me' },
+  sort: null,
+  layout: 'list',
+  shared: false,
+  isMine: true,
+};
+
+test.describe('Changing and deleting a saved view', () => {
+  test('renames the view the list is showing', async ({ page, pretendApi }) => {
+    pretendApi.views.items = [theView];
+    await page.goto('/leads?owner=me');
+    await page.getByRole('button', { name: 'Rename' }).click();
+    await page.getByLabel('View name').fill('Hot ones');
+    await page.getByRole('button', { name: 'Rename view' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'View renamed.' })).toBeVisible();
+    expect(pretendApi.views.patched).toEqual([{ viewId: 'view-1', body: { name: 'Hot ones' } }]);
+    await expect(page.getByRole('link', { name: 'Hot ones' })).toBeVisible();
+  });
+
+  test('a manager shares the view with the team and stops sharing it', async ({ page, pretendApi }) => {
+    pretendApi.views.items = [theView];
+    await page.goto('/leads?owner=me');
+    await page.getByRole('button', { name: 'Share with the team' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'is shared with the whole team now' })).toBeVisible();
+    await expect(page.getByRole('link', { name: /My hot leads/ }).getByText('Shared with the team')).toBeVisible();
+    await page.getByRole('button', { name: 'Stop sharing' }).click();
+    expect(pretendApi.views.patched.map((entry) => entry.body)).toEqual([{ shared: true }, { shared: false }]);
+  });
+
+  test('asks "Are you sure?" naming the view before deleting, and Cancel keeps it', async ({ page, pretendApi }) => {
+    pretendApi.views.items = [theView];
+    await page.goto('/leads?owner=me');
+    await page.getByRole('button', { name: 'Delete view' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete the view My hot leads?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    expect(pretendApi.views.deletedIds).toEqual([]);
+    await page.getByRole('button', { name: 'Delete view' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Delete view' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'The view My hot leads was deleted.' })).toBeVisible();
+    expect(pretendApi.views.deletedIds).toEqual(['view-1']);
+    await expect(page.getByRole('navigation', { name: 'Saved views of the leads' })).toHaveCount(0);
+  });
+
+  test('offers nothing for a colleague’s shared view that this person may not change', async ({ page, pretendApi }) => {
+    pretendApi.role = 'staff';
+    pretendApi.views.items = [{ ...theView, shared: true, isMine: false }];
+    await page.goto('/leads?owner=me');
+    await expect(page.getByRole('link', { name: /My hot leads/ })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Rename' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Delete view' })).toHaveCount(0);
+  });
+
+  test('says plainly when the change is refused', async ({ page, pretendApi }) => {
+    pretendApi.views.items = [theView];
+    pretendApi.views.refusal = { status: 404, code: 'NOT_FOUND', message: 'That view does not exist.' };
+    await page.goto('/leads?owner=me');
+    await page
+      .getByRole('button', { name: 'Stop sharing' })
+      .or(page.getByRole('button', { name: 'Share with the team' }))
+      .click();
+    await expect(page.getByRole('alert').filter({ hasText: 'no longer exists' })).toBeVisible();
+  });
+});

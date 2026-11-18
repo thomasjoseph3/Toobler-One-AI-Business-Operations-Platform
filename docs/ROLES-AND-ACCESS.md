@@ -265,6 +265,8 @@ Every route must say who may call it (a route without that declaration does not 
 | POST | `/api/v1/conversations/{id}/type` | Any signed-in person, except the "own leads only" role (403) |
 | GET | `/api/v1/views?object=lead` | Any signed-in person (their own views and the ones shared with the team) |
 | POST | `/api/v1/views` | Any signed-in person (the view is their own; sharing comes in slice 3 and is for managers) |
+| PATCH | `/api/v1/views/{id}` | The owner (their own view); only a manager sets `shared`; a manager can also change a shared view of anyone but only share or stop sharing it. Another person's unshared view is 404, a shared view they may not change is 403 |
+| DELETE | `/api/v1/views/{id}` | The owner, or a manager for a shared view. Same 404 and 403 rules |
 | GET | `/api/v1/conversations?filtered=true` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversations/{id}/unfilter` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversation-types/reorder` | Managers only |
