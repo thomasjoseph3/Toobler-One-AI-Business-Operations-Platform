@@ -20,6 +20,7 @@ import { generateSecret, hashSecret } from '../helpers/tokens';
 import * as accountsRepository from '../repositories/accounts.repository';
 import * as invitationsRepository from '../repositories/invitations.repository';
 import * as sessionsRepository from '../repositories/sessions.repository';
+import * as teamsRepository from '../repositories/teams.repository';
 import * as usersRepository from '../repositories/users.repository';
 
 /** How long an emailed invitation works (docs/SECURITY.md: invitations last 48 hours; a manager can send a new one). */
@@ -46,8 +47,11 @@ function describeInvitation(row: invitationsRepository.InvitationRow) {
 }
 
 /** Turns a person row into what the API sends. */
-function describeMember(row: usersRepository.TeamMemberRow): TeamMember {
-  return { ...row, lastSignedInAt: row.lastSignedInAt ? toIso(row.lastSignedInAt) : null };
+function describeMember(
+  row: usersRepository.TeamMemberRow,
+  teamsOfPerson: Array<{ id: string; name: string }> = [],
+): TeamMember {
+  return { ...row, lastSignedInAt: row.lastSignedInAt ? toIso(row.lastSignedInAt) : null, teams: teamsOfPerson };
 }
 
 /**
@@ -186,7 +190,8 @@ export function createTeamService({
           changes.status = 'active';
           changedFields.push('status');
         }
-        if (changedFields.length === 0) return describeMember(member);
+        const teamsOfPerson = (await teamsRepository.listTeamsOfPeople(transaction, principal.accountId)).get(memberId);
+        if (changedFields.length === 0) return describeMember(member, teamsOfPerson);
 
         await usersRepository.changeTeamMember(transaction, {
           accountId: principal.accountId,
@@ -200,7 +205,7 @@ export function createTeamService({
           kind: changes.status ? 'team.member_restored' : 'team.role_changed',
           details: { recordType: 'user', recordId: memberId, fields: changedFields },
         });
-        return describeMember({ ...member, ...changes });
+        return describeMember({ ...member, ...changes }, teamsOfPerson);
       });
     },
 
@@ -272,15 +277,16 @@ export function createTeamService({
 
     /** The people of the business and the invitations still waiting. */
     async listTeam(principal: Pick<Principal, 'accountId'>): Promise<TeamResponse> {
-      const { members, invitations } = await database.runInAccountTransaction(
+      const { members, invitations, teamsByPerson } = await database.runInAccountTransaction(
         principal.accountId,
         async (transaction) => ({
           members: await usersRepository.listTeamMembers(transaction, principal.accountId),
           invitations: await invitationsRepository.listOpenInvitations(transaction, principal.accountId),
+          teamsByPerson: await teamsRepository.listTeamsOfPeople(transaction, principal.accountId),
         }),
       );
       return {
-        members: members.map(describeMember),
+        members: members.map((member) => describeMember(member, teamsByPerson.get(member.id))),
         invitations: invitations.map(describeInvitation),
       };
     },

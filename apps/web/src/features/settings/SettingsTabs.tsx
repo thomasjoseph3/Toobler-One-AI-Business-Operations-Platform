@@ -8,6 +8,7 @@ const TABS: ReadonlyArray<{ path: string; labelKey: MessageKey; managersOnly?: b
   { path: '/settings', labelKey: 'settingsTabs.ai' },
   { path: '/settings/modules', labelKey: 'settingsTabs.modules' },
   { path: '/settings/team', labelKey: 'settingsTabs.team', managersOnly: true },
+  { path: '/settings/teams', labelKey: 'settingsTabs.teams', managersOnly: true },
 ];
 
 /** The row of links at the top of every Settings page. The page you are on is marked, for sight and for screen readers. */

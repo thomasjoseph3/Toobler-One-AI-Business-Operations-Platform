@@ -34,6 +34,11 @@ function MemberRow({ member, isYou, menu }: { member: TeamMember; isYou: boolean
           {member.status === 'disabled' ? <Badge tone="warning">{t('team.members.removed')}</Badge> : null}
         </div>
         <p className="text-body-md text-text-secondary">{member.email}</p>
+        {member.teams.length > 0 ? (
+          <p className="text-label-sm text-text-secondary">
+            {formatMessage('team.members.teams', { names: member.teams.map((team) => team.name).join(', ') })}
+          </p>
+        ) : null}
         <p className="text-label-sm text-text-secondary">
           {member.lastSignedInAt
             ? formatMessage('team.members.lastSignedIn', { date: formatTeamDate(member.lastSignedInAt) })

@@ -121,3 +121,35 @@ export function listHandOverChoices(
     .filter((member) => member.status === 'active' && member.id !== removedMemberId)
     .map((member) => ({ value: member.id, label: member.name }));
 }
+
+/** What the person typed in the team form: the name and which people are ticked. */
+export interface TeamFormFields {
+  name: string;
+  memberIds: string[];
+}
+
+/** A fresh team form: no name, nobody ticked. */
+export function buildEmptyTeamForm(): TeamFormFields {
+  return { name: '', memberIds: [] };
+}
+
+/** Checks the team form on the device first; returns the key of a message for the name, or undefined when it is fine. The API checks again (and refuses a name already used). */
+export function checkTeamForm(fields: TeamFormFields): MessageKey | undefined {
+  if (fields.name.trim().length === 0) return 'teams.form.problem.name';
+  return undefined;
+}
+
+/** Ticks or unticks one person in the form, keeping the order they were ticked in. */
+export function toggleTeamMember(fields: TeamFormFields, userId: string): TeamFormFields {
+  const isTicked = fields.memberIds.includes(userId);
+  return {
+    ...fields,
+    memberIds: isTicked ? fields.memberIds.filter((id) => id !== userId) : [...fields.memberIds, userId],
+  };
+}
+
+/** The words under a team's name: who is in it ("Rahul Das, Meera Pillai"), or that nobody is. */
+export function describeTeamMembers(members: ReadonlyArray<{ name: string }>): string {
+  if (members.length === 0) return t('teams.noMembers');
+  return members.map((member) => member.name).join(', ');
+}

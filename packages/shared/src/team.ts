@@ -26,6 +26,8 @@ export const teamMemberSchema = z.object({
   status: z.enum(['active', 'disabled']),
   /** When they last signed in (UTC, ISO); null when they never have. */
   lastSignedInAt: z.string().nullable(),
+  /** The teams they are in. */
+  teams: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 export type TeamMember = z.infer<typeof teamMemberSchema>;
 
@@ -103,3 +105,25 @@ export type RemoveTeamMemberQuery = z.infer<typeof removeTeamMemberQuerySchema>;
 
 /** The id of an invitation in an address. */
 export const invitationIdParamsSchema = z.object({ id: z.uuid() });
+
+/** The longest team name the API accepts. */
+export const MAX_TEAM_NAME_LENGTH = 60;
+
+/** A team of the business: its name and who is in it. */
+export const teamSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  members: z.array(z.object({ userId: z.string(), name: z.string() })),
+});
+export type Team = z.infer<typeof teamSchema>;
+
+/** `POST /teams`: a name, and (optionally) the people to put in it. Every person must work in the business. */
+export const createTeamRequestSchema = z.object({
+  name: z.string().trim().min(1).max(MAX_TEAM_NAME_LENGTH),
+  memberIds: z.array(z.uuid()).max(100).default([]),
+});
+export type CreateTeamRequest = z.infer<typeof createTeamRequestSchema>;
+
+/** `GET /teams`: every team of the business, by name. */
+export const teamsResponseSchema = z.object({ items: z.array(teamSchema) });
+export type TeamsResponse = z.infer<typeof teamsResponseSchema>;

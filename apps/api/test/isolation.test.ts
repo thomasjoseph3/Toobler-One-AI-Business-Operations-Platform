@@ -236,6 +236,14 @@ beforeAll(async () => {
     { leadId: lead.id, title: 'A private task', dueAt: '2030-01-01T10:00:00Z' },
     201,
   );
+  // A has a team with a secret name; B must never see it
+  await sendOk(
+    businessA,
+    'POST',
+    '/teams',
+    { name: `Team ${secretWords}`, memberIds: [businessA.profile.user.id] },
+    201,
+  );
   // A has invited a person; B must never see the invitation
   const invitationOfA = await sendOk(
     businessA,
@@ -728,6 +736,18 @@ const attempts: Attempt[] = [
     route: 'POST /api/v1/team/invitations/{id}/resend',
     what: "send A's invitation again (it would hand B a working link into A's business)",
     request: () => ({ method: 'POST', url: `/team/invitations/${dataOfA.invitationId}/resend` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/teams',
+    what: "list the teams (B must see only its own, never A's)",
+    request: () => ({ method: 'GET', url: '/teams' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/teams',
+    what: "add a team with A's owner in it",
+    request: () => ({ method: 'POST', url: '/teams', payload: { name: 'Hijack', memberIds: [dataOfA.userId] } }),
     expectedStatus: 404,
   },
   {

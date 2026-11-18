@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { ApiRequestError } from '../../api/client';
 import {
   buildEmptyInviteForm,
+  buildEmptyTeamForm,
   buildInviteRequest,
   checkAcceptPassword,
   checkInviteForm,
+  checkTeamForm,
   describeAcceptProblem,
   describeRole,
+  describeTeamMembers,
   describeTeamProblem,
   listHandOverChoices,
   listOtherRoles,
+  toggleTeamMember,
 } from './team-state';
 
 describe('the Invite form', () => {
@@ -96,5 +100,26 @@ describe('changing a role and removing a person', () => {
       { id: 'c', name: 'Gone', status: 'disabled' as const },
     ];
     expect(listHandOverChoices(members, 'b')).toEqual([{ value: 'a', label: 'Anita' }]);
+  });
+});
+
+describe('the team form', () => {
+  it('starts empty, and asks for a name', () => {
+    expect(buildEmptyTeamForm()).toEqual({ name: '', memberIds: [] });
+    expect(checkTeamForm({ name: '   ', memberIds: [] })).toBe('teams.form.problem.name');
+    expect(checkTeamForm({ name: 'Sales', memberIds: [] })).toBeUndefined();
+  });
+
+  it('ticks and unticks people, keeping the order', () => {
+    let fields = buildEmptyTeamForm();
+    fields = toggleTeamMember(fields, 'rahul');
+    fields = toggleTeamMember(fields, 'meera');
+    expect(fields.memberIds).toEqual(['rahul', 'meera']);
+    expect(toggleTeamMember(fields, 'rahul').memberIds).toEqual(['meera']);
+  });
+
+  it('says who is in a team, or that nobody is', () => {
+    expect(describeTeamMembers([{ name: 'Rahul Das' }, { name: 'Meera Pillai' }])).toBe('Rahul Das, Meera Pillai');
+    expect(describeTeamMembers([])).toBe('Nobody is in this team yet.');
   });
 });

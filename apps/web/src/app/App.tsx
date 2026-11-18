@@ -15,6 +15,7 @@ import { ModulesPage } from '../features/settings/ModulesPage';
 import { SettingsAiPage } from '../features/settings/SettingsAiPage';
 import { AcceptInvitationPage } from '../pages/AcceptInvitationPage';
 import { TeamPage } from '../features/team/TeamPage';
+import { TeamsPage } from '../features/team/TeamsPage';
 import { SetupPage } from '../features/setup/SetupPage';
 import { WhatYouSellPage } from '../features/what-you-sell/WhatYouSellPage';
 import { TestAgentPage } from '../features/test-agent/TestAgentPage';
@@ -72,6 +73,7 @@ export function App() {
                 <Route path="/knowledge/faqs" element={<FaqsPage />} />
                 <Route path="/settings/modules" element={<ModulesPage />} />
                 <Route path="/settings/team" element={<TeamPage />} />
+                <Route path="/settings/teams" element={<TeamsPage />} />
                 {UiGallery ? (
                   <Route
                     path="/dev/ui"

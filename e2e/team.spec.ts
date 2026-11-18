@@ -8,7 +8,7 @@ test.describe('Settings: Team', () => {
   test('lists the people with their roles and the invitations waiting', async ({ page }) => {
     await page.goto('/settings/team');
     await expect(
-      page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Team' }),
+      page.getByRole('navigation', { name: 'Settings sections' }).getByRole('link', { name: 'Team', exact: true }),
     ).toHaveAttribute('aria-current', 'page');
     const people = page.getByRole('region', { name: 'People' });
     await expect(people.getByRole('heading', { name: 'Anita Nair' })).toBeVisible();
@@ -174,7 +174,7 @@ test.describe('Settings: Team', () => {
     await page.goto('/settings');
     const tabs = page.getByRole('navigation', { name: 'Settings sections' });
     await expect(tabs.getByRole('link', { name: 'Modules' })).toBeVisible();
-    await expect(tabs.getByRole('link', { name: 'Team' })).toHaveCount(0);
+    await expect(tabs.getByRole('link', { name: 'Team', exact: true })).toHaveCount(0);
   });
 
   test('has no accessibility violations', async ({ page }) => {

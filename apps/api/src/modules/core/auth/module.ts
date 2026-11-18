@@ -8,6 +8,7 @@ import { createSessionAuthenticator } from './authenticator';
 import { sessionsRoutes } from './routes/sessions.routes';
 import { signUpRoutes } from './routes/sign-up.routes';
 import { teamRoutes } from './routes/team.routes';
+import { teamsRoutes } from './routes/teams.routes';
 
 /**
  * Sign-up, sign-in, sessions and passwords. Built in slices (docs/features/F01-sign-up-and-sign-in.md): each feature
@@ -29,6 +30,7 @@ export default defineModule({
     passwordResetRoutes(app);
     passwordRoutes(app);
     teamRoutes(app);
+    teamsRoutes(app);
     invitationAcceptRoutes(app);
   },
 });

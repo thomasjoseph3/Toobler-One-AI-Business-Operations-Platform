@@ -241,6 +241,26 @@ export interface InvitationsTable {
   updated_at: Generated<Date>;
 }
 
+/** A team of a business ("Sales", "Front office") (F02). Fenced by account_id. */
+export interface TeamsTable {
+  id: string;
+  account_id: string;
+  name: string;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** Who is in which team (F02). Fenced by account_id. */
+export interface TeamMembersTable {
+  account_id: string;
+  team_id: string;
+  user_id: string;
+  created_by: Json | null;
+  created_at: Generated<Date>;
+}
+
 /** Wrong passwords per email typed, for the lockout. Not fenced; closed to the app role instead. */
 export interface LoginAttemptsTable {
   email: string;
@@ -768,6 +788,8 @@ export interface DB {
   sessions: SessionsTable;
   auth_tokens: AuthTokensTable;
   invitations: InvitationsTable;
+  teams: TeamsTable;
+  team_members: TeamMembersTable;
   login_attempts: LoginAttemptsTable;
   account_modules: AccountModulesTable;
   contacts: ContactsTable;

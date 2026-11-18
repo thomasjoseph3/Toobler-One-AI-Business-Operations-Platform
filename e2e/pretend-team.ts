@@ -6,6 +6,10 @@ import type { PretendAnswer } from './pretend-knowledge';
 export interface PretendTeam {
   members: Array<Record<string, unknown>>;
   invitations: Array<Record<string, unknown>>;
+  /** The business's teams, with their people, as the real API sends them. */
+  teams: Array<{ id: string; name: string; members: Array<{ userId: string; name: string }> }>;
+  /** What the page sent to add a team. */
+  postedTeams: Array<Record<string, unknown>>;
   /** What the page sent to invite someone. */
   postedInvitations: Array<Record<string, unknown>>;
   /** When set, the next invitation is refused with this status, code and message. */
@@ -38,6 +42,7 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
         role: 'manager',
         status: 'active',
         lastSignedInAt: '2026-11-17T09:00:00.000Z',
+        teams: [],
       },
       {
         id: 'member-staff-1',
@@ -47,6 +52,7 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
         role: 'staff',
         status: 'active',
         lastSignedInAt: null,
+        teams: [{ id: 'team-1', name: 'Front office' }],
       },
     ],
     invitations: [
@@ -61,6 +67,8 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
         isExpired: false,
       },
     ],
+    teams: [{ id: 'team-1', name: 'Front office', members: [{ userId: 'member-staff-1', name: 'Rahul Das' }] }],
+    postedTeams: [],
     postedInvitations: [],
     refusal: null,
     emailWorks: true,
@@ -163,6 +171,33 @@ export function answerTeamCall(
           emailSent: state.emailWorks,
         },
       };
+    }
+    return undefined;
+  }
+  if (call.path === '/teams') {
+    if (call.method === 'GET') {
+      if (state.fails) return { status: 500, body: { error: { code: 'UNKNOWN_ERROR', message: 'Down.' } } };
+      return { status: 200, body: { items: state.teams } };
+    }
+    if (call.method === 'POST') {
+      if (call.role !== 'manager')
+        return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
+      if (state.refusal) {
+        const { status, code, message } = state.refusal;
+        state.refusal = null;
+        return { status, body: { error: { code, message } } };
+      }
+      state.postedTeams.push(call.body ?? {});
+      const memberIds = (call.body?.['memberIds'] as string[] | undefined) ?? [];
+      const team = {
+        id: `team-new-${state.postedTeams.length}`,
+        name: String(call.body?.['name']),
+        members: state.members
+          .filter((member) => memberIds.includes(String(member['id'])))
+          .map((member) => ({ userId: String(member['id']), name: String(member['name']) })),
+      };
+      state.teams.push(team);
+      return { status: 201, body: team };
     }
     return undefined;
   }
