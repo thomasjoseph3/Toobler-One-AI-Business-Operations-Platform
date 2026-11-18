@@ -234,7 +234,12 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
         }
-        if (path === '/team' || path === '/team/invitations') {
+        if (
+          path === '/team' ||
+          path === '/team/invitations' ||
+          path === '/auth/invitations/preview' ||
+          path === '/auth/accept-invitation'
+        ) {
           const teamAnswer = answerTeamCall(pretendApi.team, {
             method: request.method(),
             path,

@@ -18,6 +18,7 @@ export const ROUTE_LIMITS = {
   resendEmail: { max: 3, timeWindow: '10 minutes' },
   forgotPassword: { max: 3, timeWindow: '10 minutes' },
   resetPassword: { max: 10, timeWindow: '1 minute' },
+  acceptInvitation: { max: 10, timeWindow: '1 minute' },
   changePassword: { max: 5, timeWindow: '10 minutes' },
   // Each test of an AI key makes a real call to the AI company (and may cost a little)
   testAiKey: { max: 10, timeWindow: '1 minute' },

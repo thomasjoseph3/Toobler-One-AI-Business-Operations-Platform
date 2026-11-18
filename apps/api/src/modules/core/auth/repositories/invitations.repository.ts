@@ -104,3 +104,80 @@ export async function listOpenInvitations(db: Db, accountId: string): Promise<In
     .execute();
   return rows.map(toInvitationRow);
 }
+
+/** An open invitation found by its link, with the facts the accept page and the accept step need. */
+export interface OpenInvitationFound {
+  id: string;
+  accountId: string;
+  name: string;
+  email: string;
+  mobileE164: string | null;
+  mobileKey: string | null;
+  role: 'manager' | 'staff' | 'staff_own';
+  invitedBy: string;
+  businessName: string;
+  invitedByName: string;
+}
+
+/**
+ * ACROSS BUSINESSES (runs on the owner connection). The invitation with this link hash, if it is still open: not accepted, not cancelled and not
+ * expired. Does not use it up. Undefined for an unknown, used, cancelled or expired link (the caller must not say which).
+ */
+export async function findOpenInvitationByTokenHash(
+  db: Db,
+  tokenHash: string,
+): Promise<OpenInvitationFound | undefined> {
+  const row = await db
+    .selectFrom('invitations')
+    .innerJoin('accounts', 'accounts.id', 'invitations.account_id')
+    .innerJoin('users', (join) =>
+      join.onRef('users.id', '=', 'invitations.invited_by').onRef('users.account_id', '=', 'invitations.account_id'),
+    )
+    .select([
+      'invitations.id',
+      'invitations.account_id',
+      'invitations.name',
+      'invitations.email',
+      'invitations.mobile_e164',
+      'invitations.mobile_key',
+      'invitations.role',
+      'invitations.invited_by',
+      'accounts.name as business_name',
+      'users.name as invited_by_name',
+    ])
+    .where('invitations.token_hash', '=', tokenHash)
+    .where('invitations.accepted_at', 'is', null)
+    .where('invitations.cancelled_at', 'is', null)
+    .where('invitations.expires_at', '>', sql<Date>`now()`)
+    .executeTakeFirst();
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    accountId: row.account_id,
+    name: row.name,
+    email: row.email,
+    mobileE164: row.mobile_e164,
+    mobileKey: row.mobile_key,
+    role: row.role,
+    invitedBy: row.invited_by,
+    businessName: row.business_name,
+    invitedByName: row.invited_by_name,
+  };
+}
+
+/**
+ * ACROSS BUSINESSES (runs on the owner connection). Uses up the invitation with this link hash: ONE statement that marks it accepted only if it
+ * is still open, so two requests with the same link at the same moment cannot both succeed. Returns undefined when it was not open.
+ */
+export async function markInvitationAccepted(db: Db, tokenHash: string): Promise<boolean> {
+  const row = await db
+    .updateTable('invitations')
+    .set({ accepted_at: sql`now()` })
+    .where('token_hash', '=', tokenHash)
+    .where('accepted_at', 'is', null)
+    .where('cancelled_at', 'is', null)
+    .where('expires_at', '>', sql<Date>`now()`)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}

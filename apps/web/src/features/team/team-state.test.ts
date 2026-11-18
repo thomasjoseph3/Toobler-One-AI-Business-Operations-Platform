@@ -3,7 +3,9 @@ import { ApiRequestError } from '../../api/client';
 import {
   buildEmptyInviteForm,
   buildInviteRequest,
+  checkAcceptPassword,
   checkInviteForm,
+  describeAcceptProblem,
   describeRole,
   describeTeamProblem,
 } from './team-state';
@@ -58,5 +60,23 @@ describe('roles and refusals in words', () => {
       'Something went wrong. Please try again.',
     );
     expect(describeTeamProblem(new ApiRequestError(0, 'NETWORK', 'offline'))).toContain('connect');
+  });
+});
+
+describe('the accept page', () => {
+  it('asks for a password of at least ten characters', () => {
+    expect(checkAcceptPassword('')).toBe('accept.problem.passwordMissing');
+    expect(checkAcceptPassword('short')).toBe('accept.problem.passwordShort');
+    expect(checkAcceptPassword('long-enough-1')).toBeUndefined();
+  });
+
+  it('says a link that cannot be used in its own words, and shows the API’s words for a weak password', () => {
+    expect(describeAcceptProblem(new ApiRequestError(400, 'INVALID_TOKEN', 'x'))).toContain('Ask your manager');
+    expect(describeAcceptProblem(new ApiRequestError(400, 'WEAK_PASSWORD', 'That password is too common.'))).toBe(
+      'That password is too common.',
+    );
+    expect(describeAcceptProblem(new ApiRequestError(500, 'UNKNOWN_ERROR', 'boom'))).toBe(
+      'Something went wrong. Please try again.',
+    );
   });
 });

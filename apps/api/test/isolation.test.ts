@@ -895,6 +895,10 @@ const exemptRoutes: Record<string, string> = {
   'POST /api/v1/auth/forgot-password':
     'answers the same whether the email exists or not (tested in auth-password-reset)',
   'POST /api/v1/auth/reset-password': 'a one-time token tied to one person (tested in auth-password-reset)',
+  'POST /api/v1/auth/invitations/preview':
+    'a one-time token tied to one invitation; unknown, used, cancelled and expired links answer the same (tested in team-accept-invitation)',
+  'POST /api/v1/auth/accept-invitation':
+    'a one-time token tied to one invitation; the new person joins only the business that invited them (tested in team-accept-invitation)',
   'GET /api/v1/health': 'public, no data',
   'GET /api/v1/industries': 'a global list, the same for every business',
   'GET /api/v1/ai/models':

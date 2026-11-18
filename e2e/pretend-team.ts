@@ -13,7 +13,12 @@ export interface PretendTeam {
   /** Whether the email of the next invitation goes out (false = the mail server is down, the link is still given). */
   emailWorks: boolean;
   fails: boolean;
+  /** What the accept page sent (the token and a note of how long the password was; the password itself is never kept). */
+  acceptedInvitations: Array<{ token: string; passwordLength: number }>;
 }
+
+/** The link token the pretend API accepts; any other token is "not valid any more". */
+export const GOOD_INVITATION_TOKEN = 'good-invitation-token-0123456789';
 
 /** The business's people at the start of a test: the signed-in manager and one staff member, and one invitation waiting. */
 export function startingTeam(managerId: string, managerName: string, managerEmail: string): PretendTeam {
@@ -54,6 +59,7 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
     refusal: null,
     emailWorks: true,
     fails: false,
+    acceptedInvitations: [],
   };
 }
 
@@ -62,6 +68,35 @@ export function answerTeamCall(
   state: PretendTeam,
   call: { method: string; path: string; body: Record<string, unknown> | null; role: 'manager' | 'staff' },
 ): PretendAnswer | undefined {
+  if (call.path === '/auth/invitations/preview' || call.path === '/auth/accept-invitation') {
+    const invalid = {
+      status: 400,
+      body: { error: { code: 'INVALID_TOKEN', message: 'This invitation is not valid any more.' } },
+    };
+    if (call.body?.['token'] !== GOOD_INVITATION_TOKEN) return invalid;
+    if (call.path === '/auth/invitations/preview') {
+      return {
+        status: 200,
+        body: {
+          name: 'Hari Kumar',
+          email: 'hari@example.com',
+          role: 'staff_own',
+          businessName: 'Nair Stays',
+          invitedByName: 'Anita Nair',
+        },
+      };
+    }
+    if (state.refusal) {
+      const { status, code, message } = state.refusal;
+      state.refusal = null;
+      return { status, body: { error: { code, message } } };
+    }
+    state.acceptedInvitations.push({
+      token: String(call.body['token']),
+      passwordLength: String(call.body['password']).length,
+    });
+    return { status: 200, body: { ok: true } };
+  }
   if (call.path !== '/team' && call.path !== '/team/invitations') return undefined;
   if (call.role !== 'manager') return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
   if (call.path === '/team' && call.method === 'GET') {

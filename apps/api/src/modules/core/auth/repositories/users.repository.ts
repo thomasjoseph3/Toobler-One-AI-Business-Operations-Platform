@@ -17,8 +17,8 @@ export async function insertUser(
     accountId: string;
     email: string;
     name: string;
-    mobileE164: string;
-    mobileKey: string;
+    mobileE164: string | null;
+    mobileKey: string | null;
     role: 'manager' | 'staff' | 'staff_own';
     createdBy: { kind: string; id: string | null };
   },

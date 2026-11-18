@@ -60,3 +60,24 @@ export const invitationCreatedSchema = z.object({
   emailSent: z.boolean(),
 });
 export type InvitationCreated = z.infer<typeof invitationCreatedSchema>;
+
+/** What the accept page sends first, to show who invited the person (the token from the emailed link). It is in the body, never in the address, so it is not written to logs. */
+export const previewInvitationRequestSchema = z.object({ token: z.string().trim().min(20).max(200) });
+export type PreviewInvitationRequest = z.infer<typeof previewInvitationRequestSchema>;
+
+/** What the accept page shows before the person chooses a password. */
+export const invitationPreviewSchema = z.object({
+  name: z.string(),
+  email: z.string(),
+  role: teamRoleSchema,
+  businessName: z.string(),
+  invitedByName: z.string(),
+});
+export type InvitationPreview = z.infer<typeof invitationPreviewSchema>;
+
+/** What the accept page sends when the person chooses a password: the token from the link and the password. */
+export const acceptInvitationRequestSchema = z.object({
+  token: z.string().trim().min(20).max(200),
+  password: z.string().min(10).max(128),
+});
+export type AcceptInvitationRequest = z.infer<typeof acceptInvitationRequestSchema>;

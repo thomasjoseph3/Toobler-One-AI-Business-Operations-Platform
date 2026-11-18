@@ -22,7 +22,7 @@
 ## Slice plan (at most 2 routes each)
 
 1. `POST /team/invitations`, `GET /team`: Settings → Team (list, invite).
-2. `GET /auth/invitations/{token}`, `POST /auth/accept-invitation`: the accept page.
+2. `POST /auth/invitations/preview` (a POST so the token is never in a logged address), `POST /auth/accept-invitation`: the accept page.
 3. `PATCH /team/members/{id}` (role, pause/add back), `DELETE /team/members/{id}` (remove with hand-over).
 4. `DELETE /team/invitations/{id}` (cancel), `POST /team/invitations/{id}/resend`.
 5. `POST /teams`, `GET /teams` (teams and their members).
@@ -32,3 +32,5 @@
 ## Slice log
 
 **Slice 1 (built):** `POST /team/invitations`, `GET /team` (managers only). Migration `053_invitations.sql` (table `invitations`, only a hash of the link stored, one open invitation per email per business, 48-hour link). Files: `auth/repositories/invitations.repository.ts`, `auth/services/team.service.ts`, `auth/routes/team.routes.ts`, `auth/helpers/invitation-email.ts`, `packages/shared/src/team.ts`. Web: Settings → Team (`features/team/TeamPage.tsx`, `InviteMemberPanel.tsx`, `team-state.ts`); the Team tab shows for managers only. Tests: `team.test.ts` (9), isolation entries, `team-state.test.ts`, `e2e/team.spec.ts` (7 at phone and desktop).
+
+**Slice 2 (built):** `POST /auth/invitations/preview`, `POST /auth/accept-invitation` (public, limited to 10 a minute, listed in `public-routes.ts` with reasons). Files: `auth/services/invitation-accept.service.ts`, `auth/routes/invitation-accept.routes.ts`, `findOpenInvitationByTokenHash` and `markInvitationAccepted` in the invitations repository. One transaction on the owner connection: checks the link, the password and that the email is still free, uses the link up in one statement (two requests at once: one wins), creates the user with the invited role in the inviting business, stores the password hash, counts the email as verified, writes the log line. A refused weak password rolls everything back, so the link still works. Web: `pages/AcceptInvitationPage.tsx` at `/accept-invitation?token=`. Tests: `team-accept-invitation.test.ts` (11), `e2e/accept-invitation.spec.ts` (4 at phone and desktop).

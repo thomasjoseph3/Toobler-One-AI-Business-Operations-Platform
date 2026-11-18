@@ -81,3 +81,28 @@ export function formatTeamDate(isoMoment: string): string {
     new Date(isoMoment),
   );
 }
+
+/** The shortest password the API accepts (the same number as the sign-up form uses). */
+export const MINIMUM_PASSWORD_LENGTH = 10;
+
+/** Checks the password typed on the accept page on the device first; returns the key of a message, or undefined when it is fine. The API checks again (common passwords, the person's own email). */
+export function checkAcceptPassword(password: string): MessageKey | undefined {
+  if (password.length === 0) return 'accept.problem.passwordMissing';
+  if (password.length < MINIMUM_PASSWORD_LENGTH) return 'accept.problem.passwordShort';
+  return undefined;
+}
+
+/** One plain sentence for a failed accept. The API's own words are shown for a weak password (400) or an account that already exists (409); a link that cannot be used has its own sentence. */
+export function describeAcceptProblem(error: unknown): string {
+  if (error instanceof ApiRequestError) {
+    if (error.status === 0) return t('team.problem.network');
+    if (error.code === 'INVALID_TOKEN') return t('accept.invalid.description');
+    if (
+      (error.status === 400 || error.status === 409 || error.status === 429) &&
+      error.message &&
+      error.code !== 'UNKNOWN_ERROR'
+    )
+      return error.message;
+  }
+  return t('team.problem.generic');
+}

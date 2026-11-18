@@ -66,6 +66,22 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
       'to 10 tries a minute.',
   },
   {
+    method: 'POST',
+    path: '/api/v1/auth/invitations/preview',
+    reason:
+      'A person invited to a business opens the emailed link before they have an account. The long random token (in the body, so it is ' +
+      'never written to a log) is the proof; an unknown, used, cancelled or expired token all get the same answer. It shows only the ' +
+      "person's own invited name, email and role, the business name and who invited them. Each address is limited to 10 tries a minute.",
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/accept-invitation',
+    reason:
+      'A person invited to a business has no account yet. The long random token from the emailed link is the proof; it works once and ' +
+      'expires after 48 hours. The new person gets exactly the role the manager chose, in the business that invited them (never from the ' +
+      'request). The password is checked and stored only as an argon2id hash. Each address is limited to 10 tries a minute, and the CSRF check applies.',
+  },
+  {
     method: 'GET',
     path: '/api/v1/public/widget/:key/config',
     reason:

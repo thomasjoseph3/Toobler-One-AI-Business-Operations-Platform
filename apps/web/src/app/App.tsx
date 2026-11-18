@@ -13,6 +13,7 @@ import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
 import { ModulesPage } from '../features/settings/ModulesPage';
 import { SettingsAiPage } from '../features/settings/SettingsAiPage';
+import { AcceptInvitationPage } from '../pages/AcceptInvitationPage';
 import { TeamPage } from '../features/team/TeamPage';
 import { SetupPage } from '../features/setup/SetupPage';
 import { WhatYouSellPage } from '../features/what-you-sell/WhatYouSellPage';
@@ -55,6 +56,7 @@ export function App() {
           <Routes>
             <Route element={<AuthLayout />}>
               <Route path="/sign-in" element={<SignInPage />} />
+              <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
             </Route>
             <Route element={<RequireSignIn />}>
               <Route element={<Shell />}>
