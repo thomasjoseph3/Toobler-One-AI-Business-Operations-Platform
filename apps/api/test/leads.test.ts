@@ -141,6 +141,8 @@ describe('POST /api/v1/leads', () => {
         'promise',
         'stage',
         'temperature',
+        'temperatureReason',
+        'temperatureSetBy',
         'updatedAt',
       ].sort(),
     );

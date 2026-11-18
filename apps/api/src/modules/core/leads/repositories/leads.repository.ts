@@ -47,6 +47,10 @@ export interface LeadRow {
   stageName: string;
   stageKind: StageKind;
   temperature: 'unscored' | 'hot' | 'warm' | 'cold';
+  temperatureReason: string | null;
+  temperatureSetBy: 'rules' | 'manual' | null;
+  askedPrice: boolean;
+  askedToBook: boolean;
   interest: string | null;
   dateFrom: string | null;
   dateTo: string | null;
@@ -104,6 +108,10 @@ const LEAD_COLUMNS = [
   'stage.name as stage_name',
   'stage.kind as stage_kind',
   'lead.temperature',
+  'lead.temperature_reason',
+  'lead.temperature_set_by',
+  'lead.asked_price',
+  'lead.asked_to_book',
   'lead.interest',
   'lead.date_from',
   'lead.date_to',
@@ -130,6 +138,10 @@ function toLeadRow(row: {
   stage_name: string;
   stage_kind: StageKind;
   temperature: LeadRow['temperature'];
+  temperature_reason: string | null;
+  temperature_set_by: LeadRow['temperatureSetBy'];
+  asked_price: boolean;
+  asked_to_book: boolean;
   interest: string | null;
   date_from: string | null;
   date_to: string | null;
@@ -154,6 +166,10 @@ function toLeadRow(row: {
     stageName: row.stage_name,
     stageKind: row.stage_kind,
     temperature: row.temperature,
+    temperatureReason: row.temperature_reason,
+    temperatureSetBy: row.temperature_set_by,
+    askedPrice: row.asked_price,
+    askedToBook: row.asked_to_book,
     interest: row.interest,
     dateFrom: row.date_from,
     dateTo: row.date_to,
@@ -582,4 +598,30 @@ export async function addCustomAnswersWhereEmpty(
     .returning('id')
     .executeTakeFirst();
   return row !== undefined;
+}
+
+/** Sets a live lead's temperature, the reason and who decided it, and stamps who did it. Scoring is not contact with the customer, so "last activity" stays. */
+export async function setLeadTemperature(
+  db: Db,
+  options: {
+    accountId: string;
+    leadId: string;
+    temperature: 'hot' | 'warm' | 'cold';
+    reason: string;
+    setBy: 'rules' | 'manual';
+    actor: Actor;
+  },
+): Promise<void> {
+  await db
+    .updateTable('leads')
+    .set({
+      temperature: options.temperature,
+      temperature_reason: options.reason,
+      temperature_set_by: options.setBy,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.leadId)
+    .where('deleted_at', 'is', null)
+    .execute();
 }

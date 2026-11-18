@@ -74,6 +74,8 @@ export interface PretendApi {
   /** The edits the page sent with `PATCH /leads/{id}`, and what the pretend API holds for a lead after them. */
   patchedLeads: Array<{ leadId: string; body: Record<string, unknown> }>;
   leadEdits: Record<string, Record<string, unknown>>;
+  /** The temperatures the page set by hand with `PATCH /leads/{id}/temperature`. */
+  temperatureChanges: Array<{ leadId: string; temperature: string }>;
   /** Ids of leads that "do not exist" (the page gets a 404 for them). */
   missingLeadIds: string[];
   /** When set, `PATCH /leads/{id}` is refused with this status and code. */
@@ -167,6 +169,8 @@ function pretendLead(index: number) {
     },
     stage: { id: stageIds[shape], name: stageNames[shape], kind: 'open' },
     temperature: 'unscored',
+    temperatureReason: null,
+    temperatureSetBy: null,
     interest: null,
     dateFrom: null,
     dateTo: null,
@@ -222,6 +226,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         leadActionRefusal: null,
         patchedLeads: [],
         leadEdits: {},
+        temperatureChanges: [],
         missingLeadIds: [],
         leadEditRefusal: null,
         knowledge: startingKnowledge(),
@@ -472,6 +477,21 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        const temperatureMatch = /^\/leads\/(lead-(\d+))\/temperature$/.exec(path);
+        if (temperatureMatch && request.method() === 'PATCH') {
+          const leadId = temperatureMatch[1]!;
+          const body = request.postDataJSON() as { temperature: string };
+          pretendApi.temperatureChanges.push({ leadId, temperature: body.temperature });
+          pretendApi.leadEdits[leadId] = {
+            ...(pretendApi.leadEdits[leadId] ?? {}),
+            temperature: body.temperature,
+            temperatureReason: 'Set by hand',
+            temperatureSetBy: 'manual',
+          };
+          return route.fulfill(
+            json(200, { ...pretendLead(Number(temperatureMatch[2])), ...pretendApi.leadEdits[leadId] }),
+          );
+        }
         const oneLeadMatch = /^\/leads\/(lead-(\d+))$/.exec(path);
         if (oneLeadMatch && (request.method() === 'GET' || request.method() === 'PATCH')) {
           const leadId = oneLeadMatch[1]!;

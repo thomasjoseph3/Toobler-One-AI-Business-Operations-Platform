@@ -187,4 +187,15 @@ test.describe("a lead's own page", () => {
     await page.getByRole('link', { name: 'Back to leads' }).last().click();
     await expect(page).toHaveURL(/\/leads$/);
   });
+
+  test('shows the temperature with an icon and a word, and sets it by hand', async ({ page, pretendApi }) => {
+    await page.goto('/leads/lead-0');
+    const about = page.getByRole('heading', { name: 'About this lead' }).locator('..');
+    await expect(about).toContainText('Not scored');
+    await expect(about).toContainText('Not scored yet');
+    await about.getByLabel('Set temperature').selectOption('hot');
+    await expect(about).toContainText('Hot');
+    await expect(about).toContainText('Set by hand');
+    expect(pretendApi.temperatureChanges).toEqual([{ leadId: 'lead-0', temperature: 'hot' }]);
+  });
 });

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Lead } from '@toobler-one/shared';
+import { TemperatureTag } from './TemperatureTag';
 import {
   ActionMenu,
   ActivityIcon,
@@ -162,7 +163,10 @@ export function LeadsTable({
               <TableCell className="[overflow-wrap:anywhere]">{lead.contact?.email}</TableCell>
               <TableCell className="whitespace-nowrap">{lead.contact?.phone}</TableCell>
               <TableCell>
-                <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
+                <div className="flex flex-wrap gap-1">
+                  <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
+                  <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
+                </div>
               </TableCell>
               <TableCell>{findChannelLabel(lead.firstChannel)}</TableCell>
               <TableCell>{findOwnerLabel(lead.ownerUserId, signedInUserId)}</TableCell>
@@ -196,6 +200,7 @@ export function LeadCards({
                 </p>
                 <div className="flex shrink-0 items-center gap-1">
                   <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
+                  <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
                   {renderRowMenu(lead, findLeadDisplayName(lead.contact))}
                 </div>
               </div>

@@ -366,6 +366,12 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'PATCH /api/v1/leads/{id}/temperature',
+    what: "set the temperature of A's lead",
+    request: () => ({ method: 'PATCH', url: `/leads/${dataOfA.leadId}/temperature`, payload: { temperature: 'hot' } }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/leads',
     what: "add a lead for A's contact",
     request: () => ({ method: 'POST', url: '/leads', payload: { contactId: dataOfA.contactId } }),

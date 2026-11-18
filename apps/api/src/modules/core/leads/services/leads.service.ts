@@ -6,6 +6,7 @@ import type {
   LeadsListResponse,
   ListLeadsQuery,
   MoveLeadRequest,
+  SetLeadTemperatureRequest,
   UpdateLeadRequest,
 } from '@toobler-one/shared';
 import type { AssignLeadRequest } from '@toobler-one/shared';
@@ -62,6 +63,8 @@ function toLead(row: LeadRow, related: LeadRelations): Lead {
     contact: related.contactsById.get(row.contactId) ?? null,
     stage: { id: row.stageId, name: row.stageName, kind: row.stageKind },
     temperature: row.temperature,
+    temperatureReason: row.temperatureReason,
+    temperatureSetBy: row.temperatureSetBy,
     interest: row.interest,
     dateFrom: row.dateFrom,
     dateTo: row.dateTo,
@@ -550,6 +553,48 @@ export function createLeadsService({ database }: { database: Database }) {
         if (isDatabaseError(error, FOREIGN_KEY_VIOLATION)) throw notFound('That person');
         throw error;
       }
+    },
+
+    /**
+     * Sets a lead's temperature by hand (hot, warm or cold). It stays until the lead's next conversation is scored by the rules. Asking for the
+     * temperature the lead already has by hand changes nothing and writes no log line. Another business's lead (or one the "own leads only" role
+     * does not own) answers 404.
+     */
+    async setTemperature(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
+      leadId: string,
+      request: SetLeadTemperatureRequest,
+    ): Promise<Lead> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const visibleToUserId = ownLeadsOnlyUserId(principal);
+        if (!(await leadsRepository.lockLeadForUpdate(transaction, accountId, leadId, visibleToUserId))) {
+          throw notFound('That lead');
+        }
+        const current = await leadsRepository.findLeadById(transaction, accountId, leadId, visibleToUserId);
+        if (!current) throw notFound('That lead');
+        if (current.temperature === request.temperature && current.temperatureSetBy === 'manual') {
+          return toLead(current, await loadRelatedForLeads(transaction, accountId, [current]));
+        }
+
+        await leadsRepository.setLeadTemperature(transaction, {
+          accountId,
+          leadId,
+          temperature: request.temperature,
+          reason: 'Set by hand',
+          setBy: 'manual',
+          actor,
+        });
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'leads.temperature_changed',
+          details: { recordType: 'lead', recordId: leadId, fields: ['temperature'] },
+        });
+        return readLead(transaction, accountId, leadId);
+      });
     },
 
     /**

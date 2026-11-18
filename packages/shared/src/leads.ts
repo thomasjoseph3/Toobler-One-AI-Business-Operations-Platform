@@ -22,6 +22,10 @@ export const calendarDateSchema = z
 export const leadTemperatureSchema = z.enum(['unscored', 'hot', 'warm', 'cold']);
 export type LeadTemperature = z.infer<typeof leadTemperatureSchema>;
 
+/** What staff send to set a lead's temperature by hand. Only hot, warm or cold: a person cannot set "unscored". */
+export const setLeadTemperatureRequestSchema = z.object({ temperature: z.enum(['hot', 'warm', 'cold']) }).strict();
+export type SetLeadTemperatureRequest = z.infer<typeof setLeadTemperatureRequestSchema>;
+
 /** How the enquiry first reached the business. Leads added by staff by hand are `manual`. */
 export const leadChannelSchema = z.enum(['manual', 'web_chat', 'whatsapp', 'email', 'phone']);
 export type LeadChannel = z.infer<typeof leadChannelSchema>;
@@ -42,6 +46,10 @@ export const leadSchema = z.object({
   contact: leadContactSchema.nullable(),
   stage: z.object({ id: z.string(), name: z.string(), kind: stageKindSchema }),
   temperature: leadTemperatureSchema,
+  /** Why the lead has this temperature, in a short sentence ("Dates 12–15 Dec and asked the price"), or null while it is unscored. */
+  temperatureReason: z.string().nullable(),
+  /** Who decided it: the rules, or a person by hand (which stays until the lead's next conversation scores it again). Null while unscored. */
+  temperatureSetBy: z.enum(['rules', 'manual']).nullable(),
   /** What the person wants, in their words. */
   interest: z.string().nullable(),
   /** Plain dates like 2026-12-20. */

@@ -436,6 +436,13 @@ export interface LeadsTable {
   contact_id: string;
   stage_id: string;
   temperature: Generated<'unscored' | 'hot' | 'warm' | 'cold'>;
+  /** Why the lead has this temperature (F10). */
+  temperature_reason: Generated<string | null>;
+  /** Who decided the temperature: the rules, or a person by hand. */
+  temperature_set_by: Generated<'rules' | 'manual' | null>;
+  /** The facts the score is made from. */
+  asked_price: Generated<boolean>;
+  asked_to_book: Generated<boolean>;
   interest: string | null;
   date_from: string | null;
   date_to: string | null;

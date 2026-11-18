@@ -145,8 +145,8 @@ Besides endpoints, the AI agents use **tools**. These are listed at the end, wit
 | Method | Address | What it does | Who |
 | --- | --- | --- | --- |
 | PATCH | `/leads/{id}/temperature` | Set hot, warm or cold by hand | Staff |
-| GET | `/leads?filtered=true` | The Filtered list | Staff |
-| POST | `/leads/{id}/unfilter` | Move back onto the board | Staff |
+| GET | `/conversations?filtered=true` | The Filtered list (conversations, not leads: decision R76) | Staff |
+| POST | `/conversations/{id}/unfilter` | Move back onto the board (decision R76) | Staff |
 
 ### Views, filters and search
 

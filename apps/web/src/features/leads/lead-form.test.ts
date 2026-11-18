@@ -133,6 +133,8 @@ const aLead = (changes: Partial<Lead> = {}): Lead => ({
   contact: { id: 'contact-1', name: 'Priya Menon', phone: '+919847011201', email: null },
   stage: { id: 'stage-new', name: 'New', kind: 'open' },
   temperature: 'unscored',
+  temperatureReason: null,
+  temperatureSetBy: null,
   interest: 'Family room, 3 nights',
   dateFrom: '2026-12-20',
   dateTo: '2026-12-23',

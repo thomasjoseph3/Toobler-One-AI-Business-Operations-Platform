@@ -27,6 +27,7 @@ import {
 } from './lead-display';
 import { LeadNotesCard } from '../notes/LeadNotesCard';
 import { LeadTasksCard } from '../tasks/LeadTasksCard';
+import { LeadTemperatureRow } from './LeadTemperatureRow';
 import { LeadDetailsCard } from './LeadDetailsCard';
 import { readNoticeFromState, useLeadActions } from './useLeadActions';
 
@@ -253,6 +254,9 @@ export function LeadPage() {
             <h3 className="text-heading-md mb-3 text-text-primary">{t('leadPage.about.heading')}</h3>
             <dl className="flex flex-col gap-2">
               <Row label={t('leadPage.about.stage')}>{lead.stage.name}</Row>
+              <Row label={t('leadPage.about.temperature')}>
+                <LeadTemperatureRow lead={lead} onSaved={leadResource.reload} />
+              </Row>
               <Row label={t('leadPage.about.owner')}>{findOwnerLabel(lead.ownerUserId, signedInUser.id)}</Row>
               <Row label={t('leadPage.about.source')}>{findChannelLabel(lead.firstChannel)}</Row>
               <Row label={t('leadPage.about.added')}>{formatMoment(lead.createdAt, business.timeZone)}</Row>

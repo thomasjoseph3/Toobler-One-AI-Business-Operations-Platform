@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   assignLeadRequestSchema,
+  setLeadTemperatureRequestSchema,
   createLeadRequestSchema,
   leadIdParamsSchema,
   leadSchema,
@@ -75,6 +76,19 @@ export function leadsRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return leadsService.moveLead(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // For any signed-in, verified person. Sets hot, warm or cold by hand; it stays until the lead's next conversation is scored.
+  typedApp.patch(
+    '/leads/:id/temperature',
+    {
+      config: { access: 'staff' },
+      schema: { params: leadIdParamsSchema, body: setLeadTemperatureRequestSchema, response: { 200: leadSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return leadsService.setTemperature(request.principal, request.params.id, request.body);
     },
   );
 
