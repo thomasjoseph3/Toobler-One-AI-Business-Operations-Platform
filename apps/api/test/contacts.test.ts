@@ -67,6 +67,7 @@ describe('POST /api/v1/contacts', () => {
         'custom',
         'email',
         'id',
+        'importedAt',
         'language',
         'lifecycleStage',
         'name',
