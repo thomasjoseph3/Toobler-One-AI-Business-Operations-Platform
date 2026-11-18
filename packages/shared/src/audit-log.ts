@@ -11,7 +11,12 @@ export const auditLogQuerySchema = z.object({
   area: z
     .string()
     .transform((text) => text.split(',').filter((area) => area.trim() !== ''))
-    .pipe(z.array(z.string().regex(/^[a-z_]+$/)).min(1).max(12))
+    .pipe(
+      z
+        .array(z.string().regex(/^[a-z_]+$/))
+        .min(1)
+        .max(12),
+    )
     .optional(),
   /** Only lines at or after this moment (ISO, with its offset). */
   from: z.iso.datetime({ offset: true }).optional(),

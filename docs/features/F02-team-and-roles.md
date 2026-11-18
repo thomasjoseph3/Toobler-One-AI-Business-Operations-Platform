@@ -2,7 +2,7 @@
 
 **Requirements:** `1-foundation/02-users-roles-and-teams.md`, `1-foundation/04-security-privacy-and-audit.md` (activity log part); docs/ROLES-AND-ACCESS.md; docs/SECURITY.md.
 **Depends on:** F01 sign-in.      **Module:** `core.auth` (people, invitations, teams all live in the sign-in module: it owns the `users` table).
-**Status:** `in_progress` under the standing instruction (17 Nov 2026): built in slices of at most 2 routes, each tested and committed locally.
+**Status:** `approved` (18 Nov 2026) under the owner's standing instruction (17 Nov 2026) after `npm run verify` passed; built in 7 slices of at most 2 routes. The owner has not tested it by hand yet.
 
 ## Feature guide
 
