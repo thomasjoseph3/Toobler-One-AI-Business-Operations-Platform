@@ -12,6 +12,11 @@ export interface AgentConversationState {
   details: Readonly<Record<string, string>>;
   /** What the customer told us for the business's own custom fields, already checked, by "contact.car_model" (the record, a dot, the field's key). */
   customAnswers: Readonly<Record<string, CustomValue>>;
+  /** True once the customer asked what it costs. It helps score the lead. */
+  askedPrice: boolean;
+  /** The first and last day the customer gave, as plain dates like 2026-12-12 (the last may be null), or null when none were given. */
+  dateFrom: string | null;
+  dateTo: string | null;
   /** What this conversation is, for choosing the promise. */
   situation: PromiseSituation;
   /** The one promise made, or null while none has been. */
@@ -25,6 +30,9 @@ export interface AgentConversationState {
 export const EMPTY_AGENT_CONVERSATION_STATE: AgentConversationState = {
   details: {},
   customAnswers: {},
+  askedPrice: false,
+  dateFrom: null,
+  dateTo: null,
   situation: 'sale_enquiry',
   promise: null,
   callbackReason: null,
@@ -65,6 +73,15 @@ export interface StateChange {
   messageForModel: string;
 }
 
+/** A real calendar date written as 2026-12-12 (a made-up day such as 2026-02-31 is refused). */
+const PLAIN_DATE = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((text) => {
+    const date = new Date(`${text}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(text);
+  });
+
 const SHORT_TEXT = z.string().trim().min(1).max(200);
 
 /** What the model may save about a customer. Every field is optional: it saves what it has learned so far. */
@@ -81,6 +98,9 @@ export const saveDetailsInputSchema = z
     numberOfPeople: SHORT_TEXT.optional().describe('How many people, as they said it'),
     budget: SHORT_TEXT.optional().describe('Their budget, only if they offered one'),
     bestTimeToCall: SHORT_TEXT.optional().describe('When they would like to be called'),
+    askedPrice: z.boolean().optional().describe('Set to true when the customer asked what it costs'),
+    dateFrom: PLAIN_DATE.optional().describe('The first day they want, as YYYY-MM-DD, only if they gave a clear date'),
+    dateTo: PLAIN_DATE.optional().describe('The last day they want, as YYYY-MM-DD, only if they gave one'),
     readyToBook: z
       .boolean()
       .optional()
@@ -149,7 +169,19 @@ export function recordDetails(
   // A person who is not a sale stays not a sale; otherwise ready to book is remembered
   const situation: PromiseSituation =
     state.situation === 'not_a_sale' ? 'not_a_sale' : input.readyToBook === true ? 'ready_to_book' : state.situation;
-  const afterSaving: AgentConversationState = { ...state, details, situation };
+  // A date range the wrong way round is not saved, and the model is told to ask again
+  const dateFrom = input.dateFrom ?? state.dateFrom;
+  const dateToGiven = input.dateTo ?? state.dateTo;
+  const datesAreInOrder = dateFrom === null || dateToGiven === null || dateToGiven >= dateFrom;
+  if (!datesAreInOrder) problems.push('The last day is before the first day: ask the customer to check the dates.');
+  const afterSaving: AgentConversationState = {
+    ...state,
+    details,
+    situation,
+    askedPrice: state.askedPrice || input.askedPrice === true,
+    dateFrom: datesAreInOrder ? dateFrom : state.dateFrom,
+    dateTo: datesAreInOrder ? dateToGiven : state.dateTo,
+  };
 
   const replacingTheUnsaidPromise = shouldReplaceUnsaidPromise(afterSaving, context);
   if (afterSaving.promise && !replacingTheUnsaidPromise) {

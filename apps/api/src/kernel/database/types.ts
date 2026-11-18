@@ -581,6 +581,11 @@ export interface ConversationFactsTable {
   earlier_tool_results: ColumnType<unknown[], string, string>;
   /** What the AI heard for the business's custom fields, keyed "contact.car_model". Written as JSON text, read back as an object. */
   custom_answers: ColumnType<Json, string | undefined, string>;
+  /** The customer asked what it costs (F10). */
+  asked_price: Generated<boolean>;
+  /** The dates the customer gave, as plain dates (F10). */
+  date_from: string | null;
+  date_to: string | null;
   created_by: Json | null;
   updated_by: Json | null;
   created_at: Generated<Date>;

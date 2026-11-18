@@ -50,6 +50,9 @@ export async function findConversationState(
   return {
     details: toDetails(row.details),
     customAnswers: toCustomAnswers(row.custom_answers),
+    askedPrice: row.asked_price,
+    dateFrom: row.date_from,
+    dateTo: row.date_to,
     situation: row.situation,
     promise,
     callbackReason: row.callback_reason,
@@ -76,6 +79,9 @@ export async function saveConversationState(
   const values = {
     details: JSON.stringify(state.details),
     custom_answers: JSON.stringify(state.customAnswers),
+    asked_price: state.askedPrice,
+    date_from: state.dateFrom,
+    date_to: state.dateTo,
     situation: state.situation,
     promise_kind: state.promise?.kind ?? null,
     promise_sentence: state.promise?.sentence ?? null,

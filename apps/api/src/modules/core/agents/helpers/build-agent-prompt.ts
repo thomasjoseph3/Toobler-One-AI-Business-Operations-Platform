@@ -10,7 +10,7 @@ import type { WhatTheAgentMaySee } from '../../offerings';
 // Pure: no database. The business's own words are given as facts to quote, never as instructions.
 
 /** The version of these rules. It goes into every usage record, so a change in behaviour can be traced to a change in the rules. */
-export const AGENT_PROMPT_VERSION = 'agent-1';
+export const AGENT_PROMPT_VERSION = 'agent-2';
 
 /** What the agent has already learned about this customer in this conversation, as plain labelled facts. */
 export type DetailsSoFar = Readonly<Record<string, string>>;
@@ -56,7 +56,7 @@ HOW TO TALK
 
 WHAT TO COLLECT
 - Gently find out, one question at a time: their name, what they are interested in, any dates, how many people, a budget if they offer one, and the best time to call. Their phone number is needed so the team can call; ask for it when they want a callback or a booking.
-- Whenever you learn something new, call save_details with it. Save only what the customer said.
+- Whenever you learn something new, call save_details with it. Save only what the customer said. Set askedPrice to true when they ask what something costs. When they give clear dates, also pass dateFrom (and dateTo, if they gave an end) as YYYY-MM-DD, using today's date to work out the year.
 
 HOW TO FINISH
 - A sale (the customer wants prices, a room, a booking, or to buy): call save_details with everything you have. If the customer says they want to book or to go ahead, set readyToBook to true in that same call. It gives you the one promise to make: say it word for word, once. Make no other promise.

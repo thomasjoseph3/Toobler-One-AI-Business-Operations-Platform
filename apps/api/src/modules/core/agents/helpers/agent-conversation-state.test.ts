@@ -189,3 +189,34 @@ describe('a promise chosen in this same message can still be corrected; one the 
     expect(again.state.situation).toBe('not_a_sale');
   });
 });
+
+describe('the facts that score a lead (F10)', () => {
+  const context = { now: new Date('2026-11-18T10:00:00Z'), timeZone: 'Asia/Dubai', weeklyHours: undefined };
+
+  it('remembers that the price was asked, and the dates, and never forgets them', () => {
+    const first = recordDetails(
+      EMPTY_AGENT_CONVERSATION_STATE,
+      { askedPrice: true, dateFrom: '2026-12-12', dateTo: '2026-12-15' },
+      context,
+    );
+    expect(first.state).toMatchObject({ askedPrice: true, dateFrom: '2026-12-12', dateTo: '2026-12-15' });
+    const second = recordDetails(first.state, { name: 'Priya' }, context);
+    expect(second.state).toMatchObject({ askedPrice: true, dateFrom: '2026-12-12', dateTo: '2026-12-15' });
+  });
+
+  it('does not save dates the wrong way round and tells the model to ask again', () => {
+    const change = recordDetails(
+      EMPTY_AGENT_CONVERSATION_STATE,
+      { dateFrom: '2026-12-15', dateTo: '2026-12-12' },
+      context,
+    );
+    expect(change.state.dateFrom).toBeNull();
+    expect(change.messageForModel).toContain('last day is before the first day');
+  });
+
+  it('refuses a made-up date in the tool input', () => {
+    expect(saveDetailsInputSchema.safeParse({ dateFrom: '2026-02-31' }).success).toBe(false);
+    expect(saveDetailsInputSchema.safeParse({ dateFrom: '2026-02-28' }).success).toBe(true);
+    expect(saveDetailsInputSchema.safeParse({ dateFrom: 'next week' }).success).toBe(false);
+  });
+});

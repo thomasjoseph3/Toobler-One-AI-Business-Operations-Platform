@@ -625,3 +625,35 @@ export async function setLeadTemperature(
     .where('deleted_at', 'is', null)
     .execute();
 }
+
+/**
+ * Adds what a conversation taught us about a live lead: "asked the price" and "asked to book" are only ever switched on (never off), and the
+ * dates are filled in only when the lead has none (what staff typed is never overridden). Does not touch "last activity" or the temperature.
+ */
+export async function addConversationFactsToLead(
+  db: Db,
+  options: {
+    accountId: string;
+    leadId: string;
+    askedPrice: boolean;
+    askedToBook: boolean;
+    dateFrom: string | null;
+    dateTo: string | null;
+    actor: Actor;
+  },
+): Promise<void> {
+  await db
+    .updateTable('leads')
+    .set({
+      asked_price: sql<boolean>`asked_price OR ${options.askedPrice}`,
+      asked_to_book: sql<boolean>`asked_to_book OR ${options.askedToBook}`,
+      // The last day only comes with a first day, and only when the lead has no dates at all
+      date_from: sql<string | null>`coalesce(date_from, ${options.dateFrom}::date)`,
+      date_to: sql<string | null>`CASE WHEN date_from IS NULL THEN ${options.dateTo}::date ELSE date_to END`,
+      updated_by: { kind: options.actor.kind, id: options.actor.id },
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.leadId)
+    .where('deleted_at', 'is', null)
+    .execute();
+}

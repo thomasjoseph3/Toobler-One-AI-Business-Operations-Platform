@@ -17,3 +17,6 @@ export { findLeadsOfContacts, findLeadTotalsForContacts } from './services/lead-
 export type { ContactLeadTotals, LeadListEntry } from './services/lead-totals.service';
 // The agents module adds what the AI heard for the business's own lead fields to the lead.
 export { addCustomAnswersToLeadWhereEmpty } from './services/lead-custom-answers.service';
+// The agents module gives a lead what its conversation taught us, and the lead is scored by the fixed rules.
+export { scoreLeadFromConversation } from './services/lead-scoring.service';
+export type { ConversationFactsForScoring } from './services/lead-scoring.service';

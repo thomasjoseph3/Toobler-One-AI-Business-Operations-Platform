@@ -7,7 +7,9 @@ import { publishEvent } from '../../../../kernel/events/publish';
 import { findOrCreateCompanyByName } from '../../companies';
 import { addCustomAnswersToContactWhereEmpty, setContactCompanyIfNone } from '../../contacts';
 import { findFieldDefinitions } from '../../fields';
-import { addCustomAnswersToLeadWhereEmpty } from '../../leads';
+import { addCustomAnswersToLeadWhereEmpty, scoreLeadFromConversation } from '../../leads';
+import { findBusinessIdentity } from '../../auth';
+import type { AgentConversationState } from '../helpers/agent-conversation-state';
 import { splitCustomAnswersByRecord } from '../helpers/agent-custom-answers';
 import * as conversationFactsRepository from '../repositories/conversation-facts.repository';
 
@@ -38,6 +40,7 @@ export async function handleOutcomesApplied(event: DomainEvent, accountContext: 
     if (!state) return;
     await addCompanyTheCustomerNamed(transaction, { accountId, contactId, companyName: state.details['Company'] });
     await addCustomAnswers(transaction, { accountId, contactId, leadIds, customAnswers: state.customAnswers });
+    await scoreTheLead(transaction, { accountId, leadId: leadIds[0], state });
   });
 }
 
@@ -126,4 +129,36 @@ async function addCustomAnswers(
       details: { recordType: 'lead', recordId: leadId, fields: Object.keys(answers.lead) },
     });
   }
+}
+
+/** Today's date in a time zone as a plain date like 2026-11-18. */
+function findTodayIn(timeZone: string, now: Date): string {
+  // The "en-CA" format writes year-month-day, which is the plain-date shape
+  return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+/**
+ * Gives the conversation's lead what the AI learned that scores it (the customer asked the price, asked to book, the dates they gave) and scores it by
+ * the fixed rules. A conversation that made no lead (a question, a complaint) scores nothing.
+ */
+async function scoreTheLead(
+  transaction: Db,
+  options: { accountId: string; leadId: string | undefined; state: AgentConversationState },
+): Promise<void> {
+  const { accountId, leadId, state } = options;
+  if (leadId === undefined) return;
+  const identity = await findBusinessIdentity(transaction, accountId);
+  if (!identity) return;
+  await scoreLeadFromConversation(transaction, {
+    accountId,
+    leadId,
+    facts: {
+      askedPrice: state.askedPrice,
+      askedToBook: state.situation === 'ready_to_book',
+      dateFrom: state.dateFrom,
+      dateTo: state.dateTo,
+    },
+    today: findTodayIn(identity.timeZone, new Date()),
+    actor: AGENT_ACTOR,
+  });
 }
