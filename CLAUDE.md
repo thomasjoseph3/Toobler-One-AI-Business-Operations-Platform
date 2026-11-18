@@ -37,6 +37,11 @@ engine and the CRM core**.
    file by file, what was added or changed and why; give the owner the exact steps to test it in Postman and in the
    browser; then **stop** until the owner has verified it and says to continue. Never batch slices together.
 
+   **Change (owner, 18 Nov 2026): a feature is now built as ONE unit.** The 2-routes-at-a-time limit no longer applies. A feature goes brief → migration →
+   backend → front end → ALL its tests (unit, API integration, isolation, journey, browser) → `npm run verify` → hand-off, with logical commits inside the
+   feature. Nothing else loosens: every route still has works / 401 / 403 / 404 / 400 tests, every table has RLS, every delete asks "Are you sure?", and the
+   feature guide is still written before hand-off. The standing instruction to carry on without waiting also stays.
+
 6. **Feature guide (owner rule, 13 Nov 2026): every feature file in `docs/features/` starts with a `## Feature guide`** written so a
    non-technical user can understand it (what it does, why it is useful, a day-in-the-life example, who can do what, settings and limits,
    what it never does, what is not part of it), followed by a "For the tech team" part (module, tables, routes, jobs, events, how it works,
