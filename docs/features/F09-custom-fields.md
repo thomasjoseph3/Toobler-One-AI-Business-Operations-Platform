@@ -2,11 +2,27 @@
 
 **Requirements:** `2-crm-core/06-custom-fields.md`; `requirements/API.md` (Custom fields); docs/plan/PHASE-1.md (F09).
 **Depends on:** F04 contacts, F05 companies, F06 leads.      **Module:** `core.fields` (core).
-**Status:** `in_progress` under the standing instruction (17 Nov 2026): built in slices of at most 2 routes, each tested and committed locally.
+**Status:** `approved` (18 Nov 2026, verify green; was `in_progress`) under the standing instruction (17 Nov 2026): built in slices of at most 2 routes, each tested and committed locally.
 
 ## Feature guide
 
-*(Written in full at the end of the last slice. Plan below.)*
+**What it does.** Every business is different. A wedding planner wants to remember a "Wedding date" and a "Guest count"; a car dealer wants a "Car model". Custom fields let a manager add their own boxes to contacts, companies and leads, in Settings → Fields, in seven kinds: text, number, date, dropdown (one choice), yes/no, phone and email.
+
+**Why it is useful.** The business keeps what matters to it in the same place as everything else, instead of in a notebook or a spreadsheet. The AI can ask the customer for it in the chat, so it is already filled in when your team opens the lead.
+
+**A day in the life.** Meera runs a wedding venue. She adds a lead field "Guest count" and ticks "AI should ask". That evening a visitor chats with the website assistant; after giving a name and phone number they are asked, once, roughly how many guests. The answer, 120, is on their lead the next morning. When Meera's team marks the lead Won, the system refuses until "Venue deposit" (marked "Required before Won") is filled in.
+
+**Who can do what.** Managers add, change, reorder and remove fields. Everyone who can see a contact, company or lead can read and fill in its answers (staff on "own leads only" only for their own leads).
+
+**Settings and limits.** Up to 50 fields per kind of record and 30 choices in a dropdown. The AI asks at most three questions in one conversation, only from contact and lead fields, and never pushes. A field's type and internal key cannot change after it is made (renaming the label is fine). Removing a field hides it at once; its saved answers are kept for 30 days, then deleted for good by a nightly job.
+
+**What it never does.** The AI never overrides an answer your team typed, never asks about companies, and never saves an answer that does not fit the field (a date that is not a date, a choice that is not on the list). The activity log records which fields changed, never the answers.
+
+**Not part of it.** Fields on tickets or tasks, calculated fields, and showing custom fields as columns in the leads board or in exports are not built.
+
+### For the tech team
+
+Module `core.fields` (requires nothing; contacts, companies, leads and agents require it). Table `field_definitions` (migrations 056, 059); `custom` jsonb on contacts, companies, leads (057, 058); `conversation_facts.custom_answers` (060). Routes: `GET/POST /fields`, `PATCH/DELETE /fields/{id}`, `POST /fields/reorder`; answers travel in the `custom` property of the existing contact, company and lead routes. One shared check, `validateCustomValues` in `packages/shared`, used by the API and the AI tool. Jobs: `fields.purge_removed` (nightly, queues one per business) and `fields.purge_removed_for_business`. Events: publishes `field.values_purged`; listens (contacts, companies, leads) to delete the answer; the agents module listens to `conversation.outcomes_applied` to add the AI's answers. Known limits: the AI asks only the first three marked fields; answers go to the conversation's first lead; company fields are not asked (R75).
 
 ## Reused from the hotel agent
 
