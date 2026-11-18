@@ -263,6 +263,8 @@ Every route must say who may call it (a route without that declaration does not 
 | POST | `/api/v1/conversation-types/test` | Managers only ("Try it": makes one real AI call, limited to 10 a minute) |
 | GET | `/api/v1/conversations/{id}` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversations/{id}/type` | Any signed-in person, except the "own leads only" role (403) |
+| GET | `/api/v1/conversations?filtered=true` | Any signed-in person, except the "own leads only" role (403) |
+| POST | `/api/v1/conversations/{id}/unfilter` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversation-types/reorder` | Managers only |
 | PATCH | `/api/v1/conversation-types/:id` | Managers only |
 | DELETE | `/api/v1/conversation-types/:id` | Managers only |

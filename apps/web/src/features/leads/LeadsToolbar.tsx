@@ -12,6 +12,7 @@ import {
   SelectField,
   SortIcon,
 } from '@toobler-one/ui';
+import { Link } from 'react-router';
 import { formatMessage, t } from '../../app/i18n';
 import {
   countActiveFilters,
@@ -189,6 +190,13 @@ export function LeadsToolbar({ view, stages, onChangeView, onCreateLead }: Leads
             <SortPanel view={view} onChangeView={onChangeView} />
           </Popover>
         )}
+        {/* The conversations that were filtered out (spam, wrong numbers, silent calls) are kept on their own page */}
+        <Link
+          to="/leads/filtered"
+          className="text-body-md-semibold inline-flex h-8 items-center rounded-md border border-border-default px-3 text-text-primary hover:bg-hover"
+        >
+          {t('filtered.link')}
+        </Link>
         <SegmentedControl
           ariaLabel={t('leads.toolbar.viewLabel')}
           value={view.layout}

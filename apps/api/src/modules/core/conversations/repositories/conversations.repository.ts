@@ -320,3 +320,81 @@ export async function confirmConversationType(
     .where('id', '=', options.conversationId)
     .execute();
 }
+
+/** The columns of a conversation in the Filtered list. */
+export interface FilteredConversationRow {
+  id: string;
+  channel: ConversationChannelWord;
+  fromPhoneKey: string | null;
+  fromEmail: string | null;
+  typeKey: string;
+  typeReason: string | null;
+  createdAt: Date;
+}
+
+/** Turns a Filtered-list query's conditions on: a real (not test), sorted conversation whose current outcome is "filter". */
+function selectFilteredConversations(db: Db, accountId: string) {
+  return db
+    .selectFrom('conversations as conversation')
+    .where('conversation.account_id', '=', accountId)
+    .where('conversation.is_test', '=', false)
+    .where('conversation.status', '=', 'sorted')
+    .where('conversation.type_key', 'is not', null)
+    .where((condition) =>
+      condition.exists(
+        condition
+          .selectFrom('conversation_outcomes as outcome')
+          .select('outcome.id')
+          .whereRef('outcome.conversation_id', '=', 'conversation.id')
+          .where('outcome.account_id', '=', accountId)
+          .where('outcome.kind', '=', 'filter')
+          .where('outcome.superseded_at', 'is', null),
+      ),
+    );
+}
+
+/** One page of the conversations that were filtered out, newest first, and how many there are in all. */
+export async function listFilteredConversations(
+  db: Db,
+  options: { accountId: string; limit: number; offset: number },
+): Promise<{ rows: FilteredConversationRow[]; total: number }> {
+  const rows = await selectFilteredConversations(db, options.accountId)
+    .select([
+      'conversation.id',
+      'conversation.channel',
+      'conversation.from_phone_key',
+      'conversation.from_email',
+      'conversation.type_key',
+      'conversation.type_reason',
+      'conversation.created_at',
+    ])
+    .orderBy('conversation.created_at', 'desc')
+    .orderBy('conversation.id', 'desc')
+    .limit(options.limit)
+    .offset(options.offset)
+    .execute();
+  const count = await selectFilteredConversations(db, options.accountId)
+    .select((expression) => expression.fn.countAll<string>().as('total'))
+    .executeTakeFirstOrThrow();
+  return {
+    rows: rows.map((row) => ({
+      id: row.id,
+      channel: row.channel,
+      fromPhoneKey: row.from_phone_key,
+      fromEmail: row.from_email,
+      typeKey: row.type_key as string,
+      typeReason: row.type_reason,
+      createdAt: row.created_at,
+    })),
+    total: Number(count.total),
+  };
+}
+
+/** True when the conversation is a real sorted one whose current outcome is "filter". */
+export async function isConversationFiltered(db: Db, accountId: string, conversationId: string): Promise<boolean> {
+  const row = await selectFilteredConversations(db, accountId)
+    .select('conversation.id')
+    .where('conversation.id', '=', conversationId)
+    .executeTakeFirst();
+  return row !== undefined;
+}

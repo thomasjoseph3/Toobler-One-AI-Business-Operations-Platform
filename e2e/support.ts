@@ -76,6 +76,13 @@ export interface PretendApi {
   leadEdits: Record<string, Record<string, unknown>>;
   /** The temperatures the page set by hand with `PATCH /leads/{id}/temperature`. */
   temperatureChanges: Array<{ leadId: string; temperature: string }>;
+  /** The Filtered tab: the filtered conversations (a moved one leaves the list), the ones moved, and a way to make the list or the move fail. */
+  filtered: {
+    items: Array<Record<string, unknown>>;
+    movedIds: string[];
+    listFails: boolean;
+    moveRefusal: { status: number; code: string; message: string } | null;
+  };
   /** Ids of leads that "do not exist" (the page gets a 404 for them). */
   missingLeadIds: string[];
   /** When set, `PATCH /leads/{id}` is refused with this status and code. */
@@ -227,6 +234,33 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         patchedLeads: [],
         leadEdits: {},
         temperatureChanges: [],
+        filtered: {
+          items: [
+            {
+              id: 'filtered-1',
+              channel: 'whatsapp',
+              fromPhone: '+919847099001',
+              fromEmail: null,
+              type: { key: 'spam', label: 'Spam' },
+              reason: 'A sales pitch.',
+              firstWords: 'Win a free prize now',
+              createdAt: '2026-11-17T08:00:00.000Z',
+            },
+            {
+              id: 'filtered-2',
+              channel: 'phone',
+              fromPhone: '+919847099002',
+              fromEmail: null,
+              type: { key: 'no_conversation', label: 'No conversation' },
+              reason: null,
+              firstWords: null,
+              createdAt: '2026-11-16T08:00:00.000Z',
+            },
+          ],
+          movedIds: [],
+          listFails: false,
+          moveRefusal: null,
+        },
         missingLeadIds: [],
         leadEditRefusal: null,
         knowledge: startingKnowledge(),
@@ -477,6 +511,23 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        if (path === '/conversations' && request.method() === 'GET') {
+          if (pretendApi.filtered.listFails) {
+            return route.fulfill(json(500, { error: { code: 'SERVER_ERROR', message: 'Something went wrong.' } }));
+          }
+          const items = pretendApi.filtered.items;
+          return route.fulfill(json(200, { items, total: items.length, page: 1, limit: 25 }));
+        }
+        const unfilterMatch = /^\/conversations\/([^/]+)\/unfilter$/.exec(path);
+        if (unfilterMatch && request.method() === 'POST') {
+          if (pretendApi.filtered.moveRefusal) {
+            const { status, code, message } = pretendApi.filtered.moveRefusal;
+            return route.fulfill(json(status, { error: { code, message } }));
+          }
+          pretendApi.filtered.movedIds.push(unfilterMatch[1]!);
+          pretendApi.filtered.items = pretendApi.filtered.items.filter((item) => item.id !== unfilterMatch[1]);
+          return route.fulfill(json(200, { id: unfilterMatch[1] }));
+        }
         const temperatureMatch = /^\/leads\/(lead-(\d+))\/temperature$/.exec(path);
         if (temperatureMatch && request.method() === 'PATCH') {
           const leadId = temperatureMatch[1]!;

@@ -553,3 +553,92 @@ describe('removing a type', () => {
     expect(detail.type.key).toBe('unclear');
   });
 });
+
+describe('GET /api/v1/conversations?filtered=true and POST /conversations/{id}/unfilter (F10)', () => {
+  it('lists the filtered conversations newest first, with the type, the first words and the sender, and not the sorted leads', async () => {
+    const { accountId, manager } = await newBusiness();
+    const spamPhone = uniqueDigits();
+    const spam = await sortedConversation(accountId, { fromPhoneKey: spamPhone }, answerFor('spam'), {
+      words: 'Win a free prize now',
+    });
+    await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('wrong_number'));
+    await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('new_enquiry'));
+
+    const response = await send(manager, 'GET', '/conversations?filtered=true');
+    expect(response.statusCode, response.body).toBe(200);
+    const body = response.json();
+    expect(body).toMatchObject({ total: 2, page: 1, limit: 25 });
+    expect(body.items.map((item: { type: { key: string } }) => item.type.key)).toEqual(['wrong_number', 'spam']);
+    expect(body.items[1]).toMatchObject({
+      id: spam.conversationId,
+      channel: 'whatsapp',
+      fromPhone: `+${spamPhone}`,
+      type: { key: 'spam', label: 'Spam' },
+      firstWords: 'Win a free prize now',
+    });
+  });
+
+  it('pages the list, and is empty for a business with nothing filtered', async () => {
+    const { accountId, manager } = await newBusiness();
+    expect((await send(manager, 'GET', '/conversations?filtered=true')).json()).toMatchObject({ items: [], total: 0 });
+    for (let count = 0; count < 3; count += 1) {
+      await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('spam'));
+    }
+    const second = (await send(manager, 'GET', '/conversations?filtered=true&page=2&limit=2')).json();
+    expect(second).toMatchObject({ total: 3, page: 2, limit: 2 });
+    expect(second.items).toHaveLength(1);
+  });
+
+  it('refuses a list without filtered=true (400), the "own leads only" role (403), and shows only the business’s own (isolation)', async () => {
+    const { accountId, manager } = await newBusiness();
+    await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('spam'));
+    expect((await send(manager, 'GET', '/conversations')).statusCode).toBe(400);
+    expect((await send(manager, 'GET', '/conversations?filtered=false')).statusCode).toBe(400);
+    const other = await newBusiness();
+    expect((await send(other.manager, 'GET', '/conversations?filtered=true')).json().total).toBe(0);
+    await setRole(manager, 'staff_own');
+    expect((await send(manager, 'GET', '/conversations?filtered=true')).statusCode).toBe(403);
+  });
+
+  it('moves a filtered conversation back onto the board: a contact and a lead are made, and it leaves the Filtered list', async () => {
+    const { accountId, manager } = await newBusiness();
+    const { conversationId } = await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('spam'));
+    const response = await send(manager, 'POST', `/conversations/${conversationId}/unfilter`);
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().type.key).toBe('new_enquiry');
+    expect(response.json().contact).not.toBeNull();
+    expect((await send(manager, 'GET', '/conversations?filtered=true')).json().total).toBe(0);
+    expect(await correctionsOf(conversationId)).toHaveLength(1);
+    // Doing it again is refused: it is no longer filtered
+    const again = await send(manager, 'POST', `/conversations/${conversationId}/unfilter`);
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error.code).toBe('NOT_FILTERED');
+  });
+
+  it('refuses a conversation that was never filtered (409), an unknown one and another business’s (404), and the "own leads only" role (403)', async () => {
+    const { accountId, manager } = await newBusiness();
+    const enquiry = await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('new_enquiry'));
+    expect((await send(manager, 'POST', `/conversations/${enquiry.conversationId}/unfilter`)).statusCode).toBe(409);
+    expect((await send(manager, 'POST', `/conversations/${randomUUID()}/unfilter`)).statusCode).toBe(404);
+
+    const other = await newBusiness();
+    const spam = await sortedConversation(other.accountId, { fromPhoneKey: uniqueDigits() }, answerFor('spam'));
+    expect((await send(manager, 'POST', `/conversations/${spam.conversationId}/unfilter`)).statusCode).toBe(404);
+    await setRole(other.manager, 'staff_own');
+    expect((await send(other.manager, 'POST', `/conversations/${spam.conversationId}/unfilter`)).statusCode).toBe(403);
+  });
+
+  it('says there is no enquiry type when the business has switched every lead type off (409)', async () => {
+    const { accountId, manager } = await newBusiness();
+    const { conversationId } = await sortedConversation(accountId, { fromPhoneKey: uniqueDigits() }, answerFor('spam'));
+    await database.system
+      .updateTable('conversation_types')
+      .set({ is_active: false })
+      .where('account_id', '=', accountId)
+      .where('outcome', '=', 'lead')
+      .execute();
+    const response = await send(manager, 'POST', `/conversations/${conversationId}/unfilter`);
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.code).toBe('NO_ENQUIRY_TYPE');
+  });
+});

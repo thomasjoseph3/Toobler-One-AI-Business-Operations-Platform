@@ -73,3 +73,23 @@ export async function hasTestChatWithAgentReply(db: Db, accountId: string): Prom
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** The start of each conversation's first customer message (up to `maxCharacters`), by conversation id. A conversation with none is left out. */
+export async function findFirstCustomerWords(
+  db: Db,
+  options: { accountId: string; conversationIds: string[]; maxCharacters: number },
+): Promise<Map<string, string>> {
+  if (options.conversationIds.length === 0) return new Map();
+  const rows = await db
+    .selectFrom('conversation_messages')
+    .select(['conversation_id', 'body'])
+    .distinctOn('conversation_id')
+    .where('account_id', '=', options.accountId)
+    .where('conversation_id', 'in', options.conversationIds)
+    .where('sender', '=', 'customer')
+    .orderBy('conversation_id')
+    .orderBy('created_at')
+    .orderBy('id')
+    .execute();
+  return new Map(rows.map((row) => [row.conversation_id, row.body.trim().slice(0, options.maxCharacters)]));
+}

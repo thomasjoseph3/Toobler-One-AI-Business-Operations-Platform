@@ -249,3 +249,38 @@ export type ConversationDetail = z.infer<typeof conversationDetailSchema>;
 /** A person changing a conversation's type to one of the business's switched-on types. Choosing the type it already has confirms it. */
 export const setConversationTypeRequestSchema = z.object({ typeKey: z.string().trim().min(1).max(60) }).strict();
 export type SetConversationTypeRequest = z.infer<typeof setConversationTypeRequestSchema>;
+
+/**
+ * The Filtered list (spam, wrong numbers, silent calls): `filtered=true` is required, because the Filtered list is the only list of conversations so far.
+ * Newest first, paged like the other lists.
+ */
+export const listFilteredConversationsQuerySchema = z.object({
+  filtered: z.literal('true'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+});
+export type ListFilteredConversationsQuery = z.infer<typeof listFilteredConversationsQuerySchema>;
+
+/** One filtered conversation in the Filtered tab: who, how it came, why it was filtered and the customer's first words. */
+export const filteredConversationSchema = z.object({
+  id: z.string(),
+  channel: conversationChannelSchema,
+  fromPhone: z.string().nullable(),
+  fromEmail: z.string().nullable(),
+  /** The type it was filtered as, in the business's own word ("Spam", "Wrong number", "No conversation"). */
+  type: z.object({ key: z.string(), label: z.string() }),
+  /** Why the AI or the rules chose that type, when known. */
+  reason: z.string().nullable(),
+  /** The start of the customer's first message (up to 160 characters), or null when they wrote nothing. */
+  firstWords: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type FilteredConversation = z.infer<typeof filteredConversationSchema>;
+
+export const filteredConversationsResponseSchema = z.object({
+  items: z.array(filteredConversationSchema),
+  total: z.number().int(),
+  page: z.number().int(),
+  limit: z.number().int(),
+});
+export type FilteredConversationsResponse = z.infer<typeof filteredConversationsResponseSchema>;

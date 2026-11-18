@@ -366,6 +366,12 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'POST /api/v1/conversations/{id}/unfilter',
+    what: "move A's filtered conversation back onto the board",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/unfilter` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'PATCH /api/v1/leads/{id}/temperature',
     what: "set the temperature of A's lead",
     request: () => ({ method: 'PATCH', url: `/leads/${dataOfA.leadId}/temperature`, payload: { temperature: 'hot' } }),
@@ -1023,6 +1029,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/leads', url: '/leads?limit=100' },
   { route: 'GET /api/v1/leads', url: '/leads?view=board' },
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
+  { route: 'GET /api/v1/conversations', url: '/conversations?filtered=true&limit=100' },
   { route: 'GET /api/v1/conversation-types', url: '/conversation-types' },
   { route: 'GET /api/v1/block-list', url: '/block-list' },
   { route: 'GET /api/v1/pipeline', url: '/pipeline' },
@@ -1073,6 +1080,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/conversations': 'covered by the list check (the Filtered list shows none of A’s conversations)',
   'GET /api/v1/conversation-types': 'covered by the list check',
   'GET /api/v1/block-list': 'covered by the list check',
   'GET /api/v1/channels/webchat':
