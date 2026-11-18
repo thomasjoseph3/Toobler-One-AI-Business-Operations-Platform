@@ -279,7 +279,7 @@ The design above is the plan; this section says what the code does today. All sl
   paste a message, see which type it gets and why.
 - **Inbox:** a type chip on every conversation, an "AI unsure" chip where it applies, and a **Change type** menu.
 - **Lead page and ticket page:** **This isn't a lead / This isn't a ticket → Change type**.
-- **Leads → Filtered tab:** filtered conversations grouped by type, each with **Move to leads**.
+- **Leads → Filtered tab** (built in F10, at `/leads/filtered`, opened from the Leads toolbar): filtered conversations, newest first, each with its type, sender, first words and **Move to leads**. Routes: `GET /conversations?filtered=true` and `POST /conversations/{id}/unfilter` (a type correction to the business's lead type, preferring `new_enquiry`). The list is not grouped by type yet.
 - **Reports:** conversations by type, and how often the AI's type was right (from corrections).
 
 ## How we test it

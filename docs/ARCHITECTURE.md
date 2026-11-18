@@ -177,7 +177,8 @@ Phase 1 tools (from the requirements, with the conversation-types change):
 | `get_business_info`, `list_offerings`, `search_knowledge` | core.knowledge | reads |
 | `log_unanswered_question` | core.knowledge | writes |
 | `set_conversation_type` | core.conversations | writes (live type, playbook switch, urgent alerts) |
-| `save_details` (requirement name `save_lead`) | core.conversations | writes facts to the conversation; the router makes the contact, lead or ticket |
+| `save_details` (requirement name `save_lead`) | core.conversations | writes facts to the conversation (including `askedPrice` and dates, which score the lead after the conversation); the router makes the contact, lead or ticket |
+| `save_custom_answers` | core.agents (only when the business has "AI should ask" fields) | writes the customer's answers for the business's own contact and lead fields to the conversation; added to the records after it |
 | `request_human_callback` | core.tickets | ticket |
 | `send_details_whatsapp` | channel.whatsapp | sends |
 | `transfer_call`, `end_call` | channel.phone | call control |
