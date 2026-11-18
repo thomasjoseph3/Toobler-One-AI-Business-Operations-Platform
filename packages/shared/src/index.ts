@@ -32,3 +32,4 @@ export * from './audit-log';
 export * from './companies';
 export * from './custom-fields';
 export * from './global-search';
+export * from './views';

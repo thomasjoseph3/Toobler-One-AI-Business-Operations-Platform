@@ -408,6 +408,25 @@ export interface LostReasonsTable {
   updated_at: Generated<Date>;
 }
 
+/** A named, saved way of looking at a list (F11): its filters, sort and layout. Fenced by account_id. Deleted for real. */
+export interface SavedViewsTable {
+  id: string;
+  account_id: string;
+  object: 'lead';
+  name: string;
+  /** The list's own filter words, written as JSON text and read back as an object. */
+  filters: ColumnType<Record<string, unknown>, string | undefined, string>;
+  sort_field: string | null;
+  sort_order: 'asc' | 'desc' | null;
+  layout: Generated<'list' | 'pipeline'>;
+  owner_user_id: string;
+  shared: Generated<boolean>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** How a business shares out new leads (one row per business). Fenced by account_id. */
 export interface AssignmentRulesTable {
   account_id: string;
@@ -861,6 +880,7 @@ export interface DB {
   pipelines: PipelinesTable;
   pipeline_stages: PipelineStagesTable;
   lost_reasons: LostReasonsTable;
+  saved_views: SavedViewsTable;
   assignment_rules: AssignmentRulesTable;
   assignment_rule_people: AssignmentRulePeopleTable;
   leads: LeadsTable;

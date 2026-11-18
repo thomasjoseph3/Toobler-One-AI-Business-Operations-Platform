@@ -40,6 +40,8 @@ export interface LeadsToolbarProps {
   onChangeView: (changes: Partial<LeadsView>) => void;
   /** Opens the Create lead form. */
   onCreateLead: () => void;
+  /** Opens the box that saves the list as it is as a named view. */
+  onSaveView: () => void;
 }
 
 /** The Filter panel: which leads to show (open or closed, one stage, only mine). It applies as soon as a choice is made. */
@@ -133,7 +135,7 @@ function SortPanel({ view, onChangeView }: Pick<LeadsToolbarProps, 'view' | 'onC
  * Export and Create lead on the right. Everything works except Import and Export, which are drawn as designed and wait for F12.
  * On the Pipeline board the API cannot sort and only the owner filter applies, so Sort is switched off there (the Figma still shows it).
  */
-export function LeadsToolbar({ view, stages, onChangeView, onCreateLead }: LeadsToolbarProps) {
+export function LeadsToolbar({ view, stages, onChangeView, onCreateLead, onSaveView }: LeadsToolbarProps) {
   const activeFilterCount = countActiveFilters(view);
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -197,6 +199,9 @@ export function LeadsToolbar({ view, stages, onChangeView, onCreateLead }: Leads
         >
           {t('filtered.link')}
         </Link>
+        <Button size="compact" onClick={onSaveView}>
+          {t('views.saveView')}
+        </Button>
         <SegmentedControl
           ariaLabel={t('leads.toolbar.viewLabel')}
           value={view.layout}

@@ -263,6 +263,8 @@ Every route must say who may call it (a route without that declaration does not 
 | POST | `/api/v1/conversation-types/test` | Managers only ("Try it": makes one real AI call, limited to 10 a minute) |
 | GET | `/api/v1/conversations/{id}` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversations/{id}/type` | Any signed-in person, except the "own leads only" role (403) |
+| GET | `/api/v1/views?object=lead` | Any signed-in person (their own views and the ones shared with the team) |
+| POST | `/api/v1/views` | Any signed-in person (the view is their own; sharing comes in slice 3 and is for managers) |
 | GET | `/api/v1/conversations?filtered=true` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversations/{id}/unfilter` | Any signed-in person, except the "own leads only" role (403) |
 | POST | `/api/v1/conversation-types/reorder` | Managers only |

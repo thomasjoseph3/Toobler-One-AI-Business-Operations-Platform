@@ -76,6 +76,12 @@ export interface PretendApi {
   leadEdits: Record<string, Record<string, unknown>>;
   /** The temperatures the page set by hand with `PATCH /leads/{id}/temperature`. */
   temperatureChanges: Array<{ leadId: string; temperature: string }>;
+  /** Saved views of the Leads list: what is saved, what the page sent, and a way to make saving fail. */
+  views: {
+    items: Array<Record<string, unknown>>;
+    created: Array<Record<string, unknown>>;
+    refusal: { status: number; code: string; message: string } | null;
+  };
   /** The top-bar search: what was searched for, what the pretend API answers, and a way to make it fail. */
   search: { queries: string[]; results: Record<string, unknown>; fails: boolean };
   /** The Filtered tab: the filtered conversations (a moved one leaves the list), the ones moved, and a way to make the list or the move fail. */
@@ -236,6 +242,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         patchedLeads: [],
         leadEdits: {},
         temperatureChanges: [],
+        views: { items: [], created: [], refusal: null },
         search: {
           queries: [],
           results: {
@@ -531,6 +538,29 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        if (path === '/views' && request.method() === 'GET') {
+          return route.fulfill(json(200, { items: pretendApi.views.items }));
+        }
+        if (path === '/views' && request.method() === 'POST') {
+          if (pretendApi.views.refusal) {
+            const { status, code, message } = pretendApi.views.refusal;
+            return route.fulfill(json(status, { error: { code, message } }));
+          }
+          const body = request.postDataJSON() as Record<string, unknown>;
+          pretendApi.views.created.push(body);
+          const saved = {
+            id: `view-${pretendApi.views.items.length + 1}`,
+            object: 'lead',
+            name: body.name,
+            filters: body.filters ?? {},
+            sort: body.sort ?? null,
+            layout: body.layout ?? 'list',
+            shared: false,
+            isMine: true,
+          };
+          pretendApi.views.items.push(saved);
+          return route.fulfill(json(201, saved));
+        }
         if (path === '/search' && request.method() === 'GET') {
           if (pretendApi.search.fails) {
             return route.fulfill(json(500, { error: { code: 'SERVER_ERROR', message: 'Something went wrong.' } }));

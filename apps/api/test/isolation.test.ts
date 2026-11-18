@@ -855,6 +855,12 @@ const attempts: Attempt[] = [
     expectedStatus: 201,
   },
   {
+    route: 'POST /api/v1/views',
+    what: "save a view as B (it lands in B's business only; the same name as one of A's is allowed)",
+    request: () => ({ method: 'POST', url: '/views', payload: { object: 'lead', name: 'Isolation view' } }),
+    expectedStatus: 201,
+  },
+  {
     route: 'POST /api/v1/fields/reorder',
     what: "reorder with A's field id (B's own fields do not include it)",
     request: () => ({ method: 'POST', url: '/fields/reorder', payload: { object: 'lead', ids: [dataOfA.fieldId] } }),
@@ -1029,6 +1035,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/leads', url: '/leads?limit=100' },
   { route: 'GET /api/v1/leads', url: '/leads?view=board' },
   { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
+  { route: 'GET /api/v1/views', url: '/views?object=lead' },
   { route: 'GET /api/v1/search', url: '/search?q=Contact' },
   { route: 'GET /api/v1/conversations', url: '/conversations?filtered=true&limit=100' },
   { route: 'GET /api/v1/conversation-types', url: '/conversation-types' },
@@ -1081,6 +1088,7 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/views': 'covered by the list check, and by views.test.ts',
   'GET /api/v1/search':
     'covered by the list check (a search that matches A’s people finds none of them), and by search.test.ts',
   'GET /api/v1/conversations': 'covered by the list check (the Filtered list shows none of A’s conversations)',

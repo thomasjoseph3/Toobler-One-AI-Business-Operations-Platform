@@ -7,6 +7,7 @@ import type {
   LeadsResponse,
   Pipeline,
   PipelineStage,
+  ViewsListResponse,
 } from '@toobler-one/shared';
 import { Alert, Button, Card, EmptyState, ErrorState, LeadsIcon, LoadingState, Pagination } from '@toobler-one/ui';
 import { ApiRequestError, apiRequest } from '../../api/client';
@@ -26,6 +27,9 @@ import { StageNameDialog } from './StageNameDialog';
 import { listOpenStageIdsInOrder, moveStageInOrder, type ColumnDirection } from './stage-order';
 import { LeadCards, LeadsTable } from './LeadsTable';
 import { LeadsToolbar } from './LeadsToolbar';
+import { SaveViewDialog } from './SaveViewDialog';
+import { findActiveSavedView, isPlainLeadsView } from './saved-views';
+import { ViewTabs } from './ViewTabs';
 import {
   buildLeadsPath,
   countActiveFilters,
@@ -69,6 +73,9 @@ export function LeadsPage() {
       : { id: '', role: '' };
   const leadsResource = useApiResource<LeadsResponse>(buildLeadsPath(view, signedInUser.id));
   const pipelineResource = useApiResource<Pipeline>('/pipeline');
+  const viewsResource = useApiResource<ViewsListResponse>('/views?object=lead');
+  // The "Save view" box: open or shut
+  const [isSaveViewOpen, setIsSaveViewOpen] = useState(false);
   // What is on screen while a reload is under way: the last good answer, so the board never blanks out and flashes
   const leadsData = useKeptData(leadsResource.state);
   const pipelineData = useKeptData(pipelineResource.state);
@@ -77,6 +84,8 @@ export function LeadsPage() {
     leadsData.data !== null && leadsData.data.view === 'list' ? leadsData.data.items.map((lead) => lead.id) : [];
   const noteCounts = useNoteCounts(listedLeadIds);
   const stages = pipelineData.data?.stages ?? [];
+  // The saved views for the tabs (none while they load or if they could not be loaded: the list itself still works)
+  const savedViews = viewsResource.state.status === 'ready' ? viewsResource.state.data.items : [];
   // The board as the person has just changed it, before the server has answered; it is dropped as soon as a newer answer arrives
   const [boardOverride, setBoardOverride] = useState<{ source: LeadsBoardResponse; columns: BoardColumn[] } | null>(
     null,
@@ -170,7 +179,29 @@ export function LeadsPage() {
           {actions.notice.text}
         </Alert>
       ) : null}
-      <LeadsToolbar view={view} stages={stages} onChangeView={changeView} onCreateLead={openCreatePanel} />
+      <ViewTabs
+        savedViews={savedViews}
+        activeViewId={findActiveSavedView(savedViews, view)?.id}
+        isPlain={isPlainLeadsView(view)}
+      />
+      <LeadsToolbar
+        view={view}
+        stages={stages}
+        onChangeView={changeView}
+        onCreateLead={openCreatePanel}
+        onSaveView={() => setIsSaveViewOpen(true)}
+      />
+      {isSaveViewOpen ? (
+        <SaveViewDialog
+          view={view}
+          onClose={() => setIsSaveViewOpen(false)}
+          onSaved={() => {
+            setIsSaveViewOpen(false);
+            viewsResource.reload();
+            actions.showNotice({ tone: 'success', text: t('views.saved') });
+          }}
+        />
+      ) : null}
       <CreateLeadPanel
         key={createPanelOpenCount}
         isOpen={isCreatePanelOpen}
