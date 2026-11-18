@@ -184,6 +184,16 @@ export interface AccountsTable {
   task_reminder_minutes: Generated<number>;
   /** How many minutes after a task was due, still open, the managers are told (1 to 1440). */
   task_late_alert_minutes: Generated<number>;
+  /** Opening time in the business's local clock (default 09:00); staff alerts hold outside office hours. */
+  opens_at: Generated<string>;
+  /** Closing time in the business's local clock (default 18:00); F22's "overnight"/"closing" use it. */
+  closes_at: Generated<string>;
+  /** When on, alerts go out at any hour; when off, only between opening and closing. */
+  night_alerts_on: Generated<boolean>;
+  /** The number "needs a person" alerts go to (E.164), or null. */
+  alert_phone_e164: string | null;
+  /** The email "needs a person" alerts fall back to, or null. */
+  alert_email: string | null;
   /** When the business went live (started answering real customers); null until then. */
   live_at: Date | null;
   live_by: Json | null;
@@ -947,6 +957,36 @@ export interface OffersTable {
   updated_at: Generated<Date>;
 }
 
+/** A person's on/off choice for an optional alert kind (F23). No row means on. Fenced by account_id. */
+export interface AlertPreferencesTable {
+  account_id: string;
+  user_id: string;
+  kind: 'hot_lead' | 'callback_due' | 'callback_late' | 'morning_summary';
+  is_on: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One staff alert that went out (F23): who it is for, what kind, what about, how sent, and whether read. Fenced by account_id. */
+export interface NotificationsTable {
+  id: string;
+  account_id: string;
+  /** The recipient; null when the alert went to the business's alert number (needs_person). */
+  user_id: string | null;
+  kind: 'hot_lead' | 'callback_due' | 'callback_late' | 'needs_person' | 'morning_summary';
+  lead_id: string | null;
+  task_id: string | null;
+  conversation_id: string | null;
+  channel: 'whatsapp' | 'email' | 'console';
+  status: Generated<'sent' | 'failed'>;
+  /** The same for repeats of one event, so a burst is grouped into one row (its count goes up). */
+  group_key: string;
+  grouped_count: Generated<number>;
+  read_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -1006,4 +1046,6 @@ export interface DB {
   offers: OffersTable;
   faqs: FaqsTable;
   unanswered_questions: UnansweredQuestionsTable;
+  alert_preferences: AlertPreferencesTable;
+  notifications: NotificationsTable;
 }
