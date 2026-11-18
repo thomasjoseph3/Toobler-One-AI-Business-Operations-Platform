@@ -14,7 +14,21 @@ export interface PretendCompanies {
   refusal: { status: number; code: string; message: string } | null;
   /** When true, the list cannot be loaded. */
   fails: boolean;
+  /** The people in each company (by company id), as the company page lists them. */
+  people: Record<
+    string,
+    Array<{ id: string; name: string | null; phone: string | null; email: string | null; lifecycleStage: string }>
+  >;
+  /** The leads of each company's people (by company id), as the company page lists them. */
+  leads: Record<string, Array<Record<string, unknown>>>;
+  /** Which company each contact is in (by contact id), so the contact page can show it. */
+  contactCompany: Record<string, string | null>;
+  /** What the page sent to put a contact in a company or take it out. */
+  linkedContacts: Array<{ contactId: string; companyId: string | null }>;
 }
+
+/** The names of the people the pretend contact search can find, so a person put in a company shows under their own name. */
+const KNOWN_CONTACT_NAMES: Record<string, string> = { 'contact-priya': 'Priya Menon', 'contact-arjun': 'Arjun Nair' };
 
 /** Builds one pretend company. */
 function pretendCompany(
@@ -61,6 +75,42 @@ export function startingCompanies(): PretendCompanies {
     listRequests: [],
     refusal: null,
     fails: false,
+    people: {
+      'company-1': [
+        {
+          id: 'contact-0',
+          name: 'Priya Menon 0',
+          phone: '+919847010000',
+          email: 'person0@infosys.com',
+          lifecycleStage: 'lead',
+        },
+        { id: 'contact-1', name: 'Rahul Das 1', phone: null, email: 'person1@infosys.com', lifecycleStage: 'customer' },
+      ],
+    },
+    leads: {
+      'company-1': [
+        {
+          id: 'lead-0',
+          contactId: 'contact-0',
+          stageName: 'Contacted',
+          stageKind: 'open',
+          interest: 'Team offsite',
+          budgetPaise: null,
+          createdAt: '2026-11-16T08:00:00.000Z',
+        },
+        {
+          id: 'lead-1',
+          contactId: 'contact-1',
+          stageName: 'Won',
+          stageKind: 'won',
+          interest: 'Conference hall',
+          budgetPaise: 15_000_000,
+          createdAt: '2026-11-10T08:00:00.000Z',
+        },
+      ],
+    },
+    contactCompany: { 'contact-0': 'company-1', 'contact-1': 'company-1' },
+    linkedContacts: [],
   };
 }
 
@@ -69,21 +119,88 @@ export function answerCompaniesCall(
   state: PretendCompanies,
   call: { method: string; path: string; search: string; body: Record<string, unknown> | null },
 ): PretendAnswer | undefined {
+  const contactLink = /^\/contacts\/([\w-]+)\/company$/u.exec(call.path);
+  if (contactLink && call.method === 'PUT') {
+    if (state.refusal) {
+      const { status, code, message } = state.refusal;
+      state.refusal = null;
+      return { status, body: { error: { code, message } } };
+    }
+    const contactId = contactLink[1]!;
+    const companyId = (call.body?.['companyId'] as string | null | undefined) ?? null;
+    state.linkedContacts.push({ contactId, companyId });
+    // The person leaves any company they were in, and joins the new one
+    let person = undefined as
+      | { id: string; name: string | null; phone: string | null; email: string | null; lifecycleStage: string }
+      | undefined;
+    for (const [id, people] of Object.entries(state.people)) {
+      person = people.find((candidate) => candidate.id === contactId) ?? person;
+      state.people[id] = people.filter((candidate) => candidate.id !== contactId);
+    }
+    if (companyId) {
+      state.people[companyId] = [
+        ...(state.people[companyId] ?? []),
+        person ?? {
+          id: contactId,
+          name: KNOWN_CONTACT_NAMES[contactId] ?? `Priya Menon ${contactId.replace('contact-', '')}`,
+          phone: null,
+          email: null,
+          lifecycleStage: 'new',
+        },
+      ];
+    }
+    state.contactCompany[contactId] = companyId;
+    return {
+      status: 200,
+      body: {
+        id: contactId,
+        name: null,
+        phone: null,
+        email: null,
+        language: null,
+        lifecycleStage: 'new',
+        companyId,
+        createdAt: '2026-11-10T08:00:00.000Z',
+        updatedAt: '2026-11-16T09:30:00.000Z',
+      },
+    };
+  }
+  const detailMatch = /^\/companies\/([\w-]+)$/u.exec(call.path);
+  if (detailMatch && call.method === 'GET') {
+    if (state.fails) return { status: 500, body: { error: { code: 'UNKNOWN_ERROR', message: 'Down.' } } };
+    const company = state.companies.find((candidate) => candidate['id'] === detailMatch[1]);
+    if (!company) return { status: 404, body: { error: { code: 'NOT_FOUND', message: "That company wasn't found." } } };
+    const people = state.people[detailMatch[1]!] ?? [];
+    return {
+      status: 200,
+      body: {
+        ...company,
+        contactCount: people.length,
+        contacts: people,
+        leads: (state.leads[detailMatch[1]!] ?? []).filter((lead) =>
+          people.some((person) => person.id === lead['contactId']),
+        ),
+      },
+    };
+  }
   if (call.path !== '/companies') return undefined;
   if (call.method === 'GET') {
     state.listRequests.push(call.search);
     if (state.fails) return { status: 500, body: { error: { code: 'UNKNOWN_ERROR', message: 'Down.' } } };
     const query = new URLSearchParams(call.search);
     const searchText = (query.get('q') ?? '').toLowerCase();
-    const matching = state.companies.filter((company) =>
-      searchText === ''
-        ? true
-        : [company['name'], company['domain'], company['city']].some((value) =>
-            String(value ?? '')
-              .toLowerCase()
-              .includes(searchText),
-          ),
-    );
+    const domain = query.get('domain');
+    const matching = state.companies
+      .filter((company) => (domain ? company['domain'] === domain : true))
+      .filter((company) =>
+        searchText === ''
+          ? true
+          : [company['name'], company['domain'], company['city']].some((value) =>
+              String(value ?? '')
+                .toLowerCase()
+                .includes(searchText),
+            ),
+      );
     const limit = Number(query.get('limit') ?? 25);
     const page = Number(query.get('page') ?? 1);
     return {

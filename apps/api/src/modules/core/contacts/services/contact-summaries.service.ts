@@ -1,3 +1,5 @@
+import type { Contact } from '@toobler-one/shared';
+import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 import * as contactsRepository from '../repositories/contacts.repository';
 
@@ -35,4 +37,35 @@ export async function findContactCompanyLinks(
   options: { accountId: string; companyIds: string[] },
 ): Promise<Array<{ contactId: string; companyId: string }>> {
   return contactsRepository.findContactCompanyLinks(transaction, options.accountId, options.companyIds);
+}
+
+/** The live contacts of one company, by name. Used by the companies module (through this module's index.ts) for the company page. Run it inside the business's own transaction. */
+export async function findContactsOfCompany(
+  transaction: Db,
+  options: { accountId: string; companyId: string },
+): Promise<Contact[]> {
+  return contactsRepository.findContactsOfCompany(transaction, options.accountId, options.companyId);
+}
+
+/**
+ * Puts a contact in a company, or takes it out with `null`. Returns the contact as it is now and the company it was in before, or undefined when
+ * there is no such live contact (also for another business's contact). The caller has already checked the company belongs to the business. Used by
+ * the companies module (through this module's index.ts). Run it inside the business's own transaction.
+ */
+export async function setContactCompany(
+  transaction: Db,
+  options: { accountId: string; contactId: string; companyId: string | null; actor: Actor },
+): Promise<{ contact: Contact; previousCompanyId: string | null } | undefined> {
+  const before = await contactsRepository.findContactForUpdate(transaction, options.accountId, options.contactId);
+  if (!before) return undefined;
+  const contact = await contactsRepository.setContactCompany(transaction, options);
+  return contact ? { contact, previousCompanyId: before.companyId } : undefined;
+}
+
+/** Takes every contact out of a company that is being deleted. Returns how many were let go. Used by the companies module. Run it inside the business's own transaction. */
+export async function clearCompanyOfContacts(
+  transaction: Db,
+  options: { accountId: string; companyId: string; actor: Actor },
+): Promise<number> {
+  return contactsRepository.clearCompanyOfContacts(transaction, options);
 }

@@ -265,7 +265,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             );
           }
         }
-        if (path === '/companies') {
+        if (path === '/companies' || path.startsWith('/companies/') || /^\/contacts\/[\w-]+\/company$/u.test(path)) {
           const companiesAnswer = answerCompaniesCall(pretendApi.companies, {
             method: request.method(),
             path,
@@ -308,7 +308,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             userId: profileFor(pretendApi).user.id,
             role: pretendApi.role,
           });
-          if (notesAnswer) return route.fulfill(json(notesAnswer.status, notesAnswer.body));
+          if (notesAnswer) {
+            // A contact's own page also says which company it is in (the companies pretend keeps that)
+            const contactIdMatch = /^\/contacts\/(contact-\d+)$/u.exec(path);
+            if (contactIdMatch && typeof notesAnswer.body === 'object' && notesAnswer.body !== null) {
+              (notesAnswer.body as Record<string, unknown>)['companyId'] =
+                pretendApi.companies.contactCompany[contactIdMatch[1]!] ?? null;
+            }
+            return route.fulfill(json(notesAnswer.status, notesAnswer.body));
+          }
         }
         if (path.startsWith('/ai/') || path.startsWith('/modules')) {
           const settingsAnswer = answerSettingsCall(pretendApi.settings, {

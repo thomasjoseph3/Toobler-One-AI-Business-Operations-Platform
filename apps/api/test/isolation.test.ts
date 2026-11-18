@@ -79,6 +79,7 @@ interface BusinessAData {
   userId: string;
   invitationId: string;
   teamId: string;
+  companyId: string;
   secretWords: string;
 }
 
@@ -238,7 +239,7 @@ beforeAll(async () => {
     201,
   );
   // A has a company with a secret name; B must never see it
-  await sendOk(
+  const companyOfA = await sendOk(
     businessA,
     'POST',
     '/companies',
@@ -280,6 +281,7 @@ beforeAll(async () => {
     userId: businessA.profile.user.id,
     invitationId: invitationOfA.invitation.id,
     teamId: teamOfA.id,
+    companyId: companyOfA.id,
     secretWords,
   };
 
@@ -788,6 +790,22 @@ const attempts: Attempt[] = [
     route: 'POST /api/v1/companies',
     what: "add a company with A's owner as its owner",
     request: () => ({ method: 'POST', url: '/companies', payload: { name: 'Hijack', ownerUserId: dataOfA.userId } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/companies/{id}',
+    what: "read A's company with its people and leads",
+    request: () => ({ method: 'GET', url: `/companies/${dataOfA.companyId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PUT /api/v1/contacts/{id}/company',
+    what: "put A's contact in A's company",
+    request: () => ({
+      method: 'PUT',
+      url: `/contacts/${dataOfA.contactId}/company`,
+      payload: { companyId: dataOfA.companyId },
+    }),
     expectedStatus: 404,
   },
   {

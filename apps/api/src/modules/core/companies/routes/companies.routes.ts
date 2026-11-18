@@ -2,14 +2,19 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   companiesListResponseSchema,
+  companyDetailSchema,
+  companyIdParamsSchema,
   companySchema,
+  contactSchema,
   createCompanyRequestSchema,
+  linkContactParamsSchema,
   listCompaniesQuerySchema,
+  setContactCompanyRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createCompaniesService } from '../services/companies.service';
 
-/** Registers GET /api/v1/companies (the list) and POST /api/v1/companies (add a company). */
+/** Registers /api/v1/companies (list, add), GET /api/v1/companies/{id} (one company with its people and leads) and PUT /api/v1/contacts/{id}/company (link a contact). */
 export function companiesRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const companiesService = createCompaniesService({ database: app.kernel.database });
@@ -35,6 +40,33 @@ export function companiesRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const company = await companiesService.createCompany(request.principal, request.body);
       return reply.code(201).send(company);
+    },
+  );
+
+  // For any signed-in, verified person. The "own leads only" role sees only the leads it owns.
+  typedApp.get(
+    '/companies/:id',
+    { config: { access: 'staff' }, schema: { params: companyIdParamsSchema, response: { 200: companyDetailSchema } } },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return companiesService.getCompany(request.principal, request.params.id);
+    },
+  );
+
+  // For any signed-in, verified person (API.md: Staff). `{ "companyId": null }` takes the contact out of its company.
+  typedApp.put(
+    '/contacts/:id/company',
+    {
+      config: { access: 'staff' },
+      schema: {
+        params: linkContactParamsSchema,
+        body: setContactCompanyRequestSchema,
+        response: { 200: contactSchema },
+      },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return companiesService.setCompanyOfContact(request.principal, request.params.id, request.body.companyId);
     },
   );
 }

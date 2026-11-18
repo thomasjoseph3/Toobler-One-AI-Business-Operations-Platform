@@ -12,6 +12,6 @@ export { DEFAULT_STAGES } from './helpers/default-pipeline';
 // The notes module (F07) checks a lead exists, and is the person's to see, before it saves a note on it.
 export { findLeadReference, findVisibleLeadIds } from './services/lead-reference.service';
 export type { LeadReference } from './services/lead-reference.service';
-// The companies module (F05) adds up the open and won leads of a company's people.
-export { findLeadTotalsForContacts } from './services/lead-totals.service';
-export type { ContactLeadTotals } from './services/lead-totals.service';
+// The companies module (F05) adds up the open and won leads of a company's people and lists them on the company page.
+export { findLeadsOfContacts, findLeadTotalsForContacts } from './services/lead-totals.service';
+export type { ContactLeadTotals, LeadListEntry } from './services/lead-totals.service';

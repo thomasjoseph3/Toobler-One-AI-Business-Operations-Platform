@@ -133,3 +133,15 @@ export async function listCompanies(
     .executeTakeFirstOrThrow();
   return { items: rows.map(toCompanyRow), total: Number(countRow.total) };
 }
+
+/** One live company of the business, or undefined (also for a deleted company and another business's company). */
+export async function findCompanyById(db: Db, accountId: string, companyId: string): Promise<CompanyRow | undefined> {
+  const row = await db
+    .selectFrom('companies')
+    .select(COMPANY_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', '=', companyId)
+    .where('deleted_at', 'is', null)
+    .executeTakeFirst();
+  return row ? toCompanyRow(row) : undefined;
+}

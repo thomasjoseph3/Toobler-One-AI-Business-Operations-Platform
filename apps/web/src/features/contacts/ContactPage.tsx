@@ -24,6 +24,7 @@ import { findLeadDisplayName, toWhatsappDigits, formatMoment } from '../leads/le
 import { findLifecycleLabelKey, findLifecycleTagTone } from './contacts-view';
 import { describeContactSaveProblem } from './contact-problem';
 import { ContactNotesCard } from '../notes/ContactNotesCard';
+import { ContactCompanyCard } from '../companies/ContactCompanyCard';
 import { EditContactPanel } from './EditContactPanel';
 
 /** One small label and value in the details card. */
@@ -214,7 +215,10 @@ export function ContactPage() {
             <Row label={t('contactPage.details.updated')}>{formatMoment(contact.updatedAt, timeZone)}</Row>
           </dl>
         </Card>
-        <ContactNotesCard contactId={contact.id} />
+        <div className="flex flex-col gap-6">
+          <ContactCompanyCard contact={contact} onChanged={contactResource.reload} />
+          <ContactNotesCard contactId={contact.id} />
+        </div>
       </div>
       <ConfirmDialog
         isOpen={isDeleteAsked}

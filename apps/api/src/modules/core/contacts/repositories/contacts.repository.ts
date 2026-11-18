@@ -271,3 +271,48 @@ export async function findContactCompanyLinks(
     .execute();
   return rows.flatMap((row) => (row.company_id === null ? [] : [{ contactId: row.id, companyId: row.company_id }]));
 }
+
+/** The live contacts that belong to this company, by name. Run it inside the business's fence. */
+export async function findContactsOfCompany(db: Db, accountId: string, companyId: string): Promise<Contact[]> {
+  const rows = await db
+    .selectFrom('contacts')
+    .select(CONTACT_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('company_id', '=', companyId)
+    .where('deleted_at', 'is', null)
+    .orderBy('name')
+    .orderBy('id')
+    .execute();
+  return rows.map(toContact);
+}
+
+/** Puts a live contact in a company (or takes it out of any company with `null`), and stamps who did it. Returns the contact, or undefined when there is no such live contact. */
+export async function setContactCompany(
+  db: Db,
+  options: { accountId: string; contactId: string; companyId: string | null; actor: Actor },
+): Promise<Contact | undefined> {
+  const row = await db
+    .updateTable('contacts')
+    .set({ company_id: options.companyId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.contactId)
+    .where('deleted_at', 'is', null)
+    .returning(CONTACT_COLUMNS)
+    .executeTakeFirst();
+  return row ? toContact(row) : undefined;
+}
+
+/** Takes every contact out of this company (when the company is deleted). Returns how many contacts were let go. */
+export async function clearCompanyOfContacts(
+  db: Db,
+  options: { accountId: string; companyId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('contacts')
+    .set({ company_id: null, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('company_id', '=', options.companyId)
+    .returning('id')
+    .execute();
+  return rows.length;
+}

@@ -3,6 +3,8 @@ import {
   isFreeMailDomain,
   type CompaniesListResponse,
   type Company,
+  type CompanyDetail,
+  type Contact,
   type CreateCompanyRequest,
   type ListCompaniesQuery,
 } from '@toobler-one/shared';
@@ -11,11 +13,12 @@ import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
 import { ApiError, conflict, notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
+import { publishEvent } from '../../../../kernel/events/publish';
 import { uuidv7 } from '../../../../kernel/ids';
 import { parsePhone } from '../../../../kernel/phone';
 import { findPeopleSummaries } from '../../auth';
-import { findContactCompanyLinks } from '../../contacts';
-import { findLeadTotalsForContacts } from '../../leads';
+import { findContactCompanyLinks, findContactsOfCompany, setContactCompany } from '../../contacts';
+import { findLeadsOfContacts, findLeadTotalsForContacts } from '../../leads';
 import { makeCompanyNameKey } from '../helpers/company-name';
 import * as companiesRepository from '../repositories/companies.repository';
 import type { CompanyRow } from '../repositories/companies.repository';
@@ -38,11 +41,17 @@ const domainExists = (companyId: string | undefined) =>
  * Fills in the numbers and the owner's name for some companies: how many contacts, how many open leads and the combined budget of won leads of
  * their people. All worked out in code from the contacts and the leads. Run it inside the business's own transaction.
  */
-export async function describeCompanies(transaction: Db, accountId: string, rows: CompanyRow[]): Promise<Company[]> {
+export async function describeCompanies(
+  transaction: Db,
+  accountId: string,
+  rows: CompanyRow[],
+  visibleToUserId?: string,
+): Promise<Company[]> {
   const links = await findContactCompanyLinks(transaction, { accountId, companyIds: rows.map((row) => row.id) });
   const totals = await findLeadTotalsForContacts(transaction, {
     accountId,
     contactIds: links.map((link) => link.contactId),
+    ...(visibleToUserId ? { visibleToUserId } : {}),
   });
   const owners = await findPeopleSummaries(transaction, {
     accountId,
@@ -75,6 +84,11 @@ function makeSearchPattern(text: string | undefined): string | undefined {
   return `%${text.replace(/[\\%_]/gu, (character) => `\\${character}`)}%`;
 }
 
+/** For the "own leads only" role, the person whose leads may be counted and listed; nobody for everyone else. */
+function visibleLeadsOf(principal: Pick<Principal, 'role' | 'userId'>): string | undefined {
+  return principal.role === 'staff_own' ? principal.userId : undefined;
+}
+
 /**
  * Everything about a business's companies. The routes call this.
  * Repositories used: companies (in ../repositories). Reads contacts, leads and people only through their modules' index files.
@@ -87,7 +101,7 @@ export function createCompaniesService({ database }: { database: Database }) {
      * (capital letters and spaces do not matter) or a domain a live company already has answers 409 naming that company.
      */
     async createCompany(
-      principal: Pick<Principal, 'accountId' | 'userId' | 'defaultCountry'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role' | 'defaultCountry'>,
       request: CreateCompanyRequest,
     ): Promise<Company> {
       if (request.domain !== undefined && isFreeMailDomain(request.domain)) {
@@ -134,7 +148,7 @@ export function createCompaniesService({ database }: { database: Database }) {
             kind: 'companies.created',
             details: { recordType: 'company', recordId: row.id },
           });
-          const [company] = await describeCompanies(transaction, accountId, [row]);
+          const [company] = await describeCompanies(transaction, accountId, [row], visibleLeadsOf(principal));
           return company as Company;
         });
       } catch (error) {
@@ -150,9 +164,89 @@ export function createCompaniesService({ database }: { database: Database }) {
       }
     },
 
+    /**
+     * One company with its numbers, its people and their leads (newest first). The "own leads only" role sees only the leads it owns, and the
+     * numbers add up only those. An unknown company, a deleted one and another business's company answer 404.
+     */
+    async getCompany(
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
+      companyId: string,
+    ): Promise<CompanyDetail> {
+      return database.runInAccountTransaction(principal.accountId, async (transaction) => {
+        const row = await companiesRepository.findCompanyById(transaction, principal.accountId, companyId);
+        if (!row) throw notFound('That company');
+        const [company] = await describeCompanies(transaction, principal.accountId, [row], visibleLeadsOf(principal));
+        const contacts = await findContactsOfCompany(transaction, { accountId: principal.accountId, companyId });
+        const leads = await findLeadsOfContacts(transaction, {
+          accountId: principal.accountId,
+          contactIds: contacts.map((contact) => contact.id),
+          ...(visibleLeadsOf(principal) ? { visibleToUserId: principal.userId } : {}),
+        });
+        return {
+          ...(company as Company),
+          contacts: contacts.map((contact) => ({
+            id: contact.id,
+            name: contact.name,
+            phone: contact.phone,
+            email: contact.email,
+            lifecycleStage: contact.lifecycleStage,
+          })),
+          leads: leads.map((lead) => ({
+            id: lead.id,
+            contactId: lead.contactId,
+            stageName: lead.stageName,
+            stageKind: lead.stageKind,
+            interest: lead.interest,
+            budgetPaise: lead.budgetPaise,
+            createdAt: lead.createdAt.toISOString(),
+          })),
+        };
+      });
+    },
+
+    /**
+     * Puts a contact in a company, or takes it out of its company with `null`. A contact belongs to at most one company, so this also moves it
+     * out of the company it was in. An unknown contact or company, and another business's, answer 404. Writes the activity log and publishes
+     * `contact.company_changed` (ids only). Putting a contact in the company it is already in changes nothing.
+     */
+    async setCompanyOfContact(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      contactId: string,
+      companyId: string | null,
+    ): Promise<Contact> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        if (companyId !== null && !(await companiesRepository.findCompanyById(transaction, accountId, companyId))) {
+          throw notFound('That company');
+        }
+        const result = await setContactCompany(transaction, { accountId, contactId, companyId, actor });
+        if (!result) throw notFound('That contact');
+        if (result.previousCompanyId !== companyId) {
+          await writeActivityLog(transaction, {
+            accountId,
+            actor,
+            kind: 'contacts.company_changed',
+            details: { recordType: 'contact', recordId: contactId, fields: ['companyId'] },
+          });
+          await publishEvent(transaction, {
+            accountId,
+            eventName: 'contact.company_changed',
+            payload: {
+              contactId,
+              fromCompanyId: result.previousCompanyId,
+              toCompanyId: companyId,
+              by: { kind: actor.kind, id: actor.id },
+            },
+          });
+        }
+        return result.contact;
+      });
+    },
+
     /** One page of the business's companies, newest change first, narrowed by a search and/or an exact domain, with the numbers about their people. */
     async listCompanies(
-      principal: Pick<Principal, 'accountId'>,
+      principal: Pick<Principal, 'accountId' | 'userId' | 'role'>,
       query: ListCompaniesQuery,
     ): Promise<CompaniesListResponse> {
       const { items, total } = await database.runInAccountTransaction(principal.accountId, async (transaction) => {
@@ -162,7 +256,10 @@ export function createCompaniesService({ database }: { database: Database }) {
           limit: query.limit,
           offset: (query.page - 1) * query.limit,
         });
-        return { items: await describeCompanies(transaction, principal.accountId, found.items), total: found.total };
+        return {
+          items: await describeCompanies(transaction, principal.accountId, found.items, visibleLeadsOf(principal)),
+          total: found.total,
+        };
       });
       return { items, total, page: query.page, limit: query.limit };
     },

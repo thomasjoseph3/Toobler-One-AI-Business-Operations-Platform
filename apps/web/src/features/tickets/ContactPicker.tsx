@@ -16,8 +16,11 @@ export function ContactPicker(props: {
   onChoose: (person: PickedPerson | null) => void;
   /** The words to show under the box when no person was chosen. */
   errorMessage?: string | undefined;
+  /** The box's name and the hint under it, when this is not about a ticket (the defaults ask "Who is it about?"). */
+  label?: string;
+  hint?: string;
 }) {
-  const { chosenPerson, onChoose, errorMessage } = props;
+  const { chosenPerson, onChoose, errorMessage, label, hint } = props;
   const [searchText, setSearchText] = useState('');
   const search = useContactSearch(chosenPerson === null ? searchText : '');
 
@@ -38,12 +41,12 @@ export function ContactPicker(props: {
   return (
     <div className="flex flex-col gap-3">
       <TextField
-        label={t('tickets.form.person')}
+        label={label ?? t('tickets.form.person')}
         type="search"
         value={searchText}
         onChange={(event) => setSearchText(event.target.value)}
         autoComplete="off"
-        helperText={t('tickets.form.personHint')}
+        helperText={hint ?? t('tickets.form.personHint')}
         {...(errorMessage ? { errorMessage } : {})}
       />
       {search.status === 'searching' ? (

@@ -484,14 +484,15 @@ export async function handOverOpenLeads(
   return rows.length;
 }
 
-/** For each of these contacts: how many open leads and how many won leads they have, and the combined budget of the won ones in paise (deleted leads do not count). Contacts with no leads are left out. */
+/** For each of these contacts (with `visibleToUserId`, counting only the leads that person owns): how many open leads and how many won leads they have, and the combined budget of the won ones in paise (deleted leads do not count). Contacts with no leads are left out. */
 export async function summariseLeadsOfContacts(
   db: Db,
   accountId: string,
   contactIds: string[],
+  visibleToUserId?: string,
 ): Promise<Array<{ contactId: string; openLeads: number; wonLeads: number; wonValuePaise: number }>> {
   if (contactIds.length === 0) return [];
-  const rows = await db
+  let query = db
     .selectFrom('leads as lead')
     .innerJoin('pipeline_stages as stage', 'stage.id', 'lead.stage_id')
     .select([
@@ -502,13 +503,29 @@ export async function summariseLeadsOfContacts(
     ])
     .where('lead.account_id', '=', accountId)
     .where('lead.contact_id', 'in', contactIds)
-    .where('lead.deleted_at', 'is', null)
-    .groupBy('lead.contact_id')
-    .execute();
+    .where('lead.deleted_at', 'is', null);
+  // The "own leads only" role adds up only the leads it owns
+  if (visibleToUserId) query = query.where('lead.owner_user_id', '=', visibleToUserId);
+  const rows = await query.groupBy('lead.contact_id').execute();
   return rows.map((row) => ({
     contactId: row.contact_id,
     openLeads: Number(row.open_leads),
     wonLeads: Number(row.won_leads),
     wonValuePaise: Number(row.won_value),
   }));
+}
+
+/** The live leads of these contacts, newest first. With `visibleToUserId` (the "own leads only" role) only the ones that person owns. */
+export async function listLeadsOfContacts(
+  db: Db,
+  options: { accountId: string; contactIds: string[]; visibleToUserId?: string },
+): Promise<LeadRow[]> {
+  if (options.contactIds.length === 0) return [];
+  const rows = await selectLeadRows(db, { accountId: options.accountId, visibleToUserId: options.visibleToUserId })
+    .select(LEAD_COLUMNS)
+    .where('lead.contact_id', 'in', options.contactIds)
+    .orderBy('lead.created_at', 'desc')
+    .orderBy('lead.id', 'desc')
+    .execute();
+  return rows.map(toLeadRow);
 }

@@ -2,6 +2,7 @@ import type { Company } from '@toobler-one/shared';
 import { Card, Table, TableBody, TableCell, TableHead, TableHeaderCell, TableRow } from '@toobler-one/ui';
 import { formatMessage, t } from '../../app/i18n';
 import { formatBudget } from '../leads/lead-display';
+import { CompanyNameLink } from './CompanyNameLink';
 
 /** The company's won value as rupees ("₹1,50,000"), or a dash when nothing is won yet. */
 function describeWonValue(wonValuePaise: number): string {
@@ -25,7 +26,9 @@ export function CompaniesTable({ companies }: { companies: readonly Company[] })
         {companies.map((company) => (
           <TableRow key={company.id}>
             <TableCell className="text-text-primary">
-              <span className="block">{company.name}</span>
+              <CompanyNameLink companyId={company.id} className="block">
+                {company.name}
+              </CompanyNameLink>
               {company.city ? <span className="text-body-sm block text-text-secondary">{company.city}</span> : null}
             </TableCell>
             <TableCell>{company.contactCount}</TableCell>
@@ -46,7 +49,9 @@ export function CompanyCards({ companies }: { companies: readonly Company[] }) {
       {companies.map((company) => (
         <li key={company.id}>
           <Card isCompact className="flex flex-col gap-2">
-            <p className="text-body-md-semibold min-w-0 text-text-primary">{company.name}</p>
+            <p className="text-body-md-semibold min-w-0 text-text-primary">
+              <CompanyNameLink companyId={company.id}>{company.name}</CompanyNameLink>
+            </p>
             {company.city ? <p className="text-body-sm text-text-secondary">{company.city}</p> : null}
             <p className="text-body-sm text-text-secondary">
               {company.contactCount === 1

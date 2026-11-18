@@ -15,6 +15,7 @@ import { ModulesPage } from '../features/settings/ModulesPage';
 import { SettingsAiPage } from '../features/settings/SettingsAiPage';
 import { AcceptInvitationPage } from '../pages/AcceptInvitationPage';
 import { CompaniesPage } from '../features/companies/CompaniesPage';
+import { CompanyPage } from '../features/companies/CompanyPage';
 import { ActivityPage } from '../features/team/ActivityPage';
 import { TeamPage } from '../features/team/TeamPage';
 import { TeamsPage } from '../features/team/TeamsPage';
@@ -69,6 +70,7 @@ export function App() {
                 ))}
                 <Route path="/leads/:leadId" element={<LeadPage />} />
                 <Route path="/contacts/:contactId" element={<ContactPage />} />
+                <Route path="/companies/:companyId" element={<CompanyPage />} />
                 <Route path="/tickets/:ticketId" element={<TicketPage />} />
                 <Route path="/setup/chat" element={<SetupChatPage />} />
                 <Route path="/knowledge/test-agent" element={<TestAgentPage />} />

@@ -132,3 +132,43 @@ export const companiesListResponseSchema = z.object({
   limit: z.number().int(),
 });
 export type CompaniesListResponse = z.infer<typeof companiesListResponseSchema>;
+
+/** The address part naming a company. */
+export const companyIdParamsSchema = z.object({ id: z.uuid() });
+
+/** A person of the company, as its page lists them. */
+export const companyContactSchema = z.object({
+  id: z.string(),
+  name: z.string().nullable(),
+  phone: z.string().nullable(),
+  email: z.string().nullable(),
+  lifecycleStage: z.enum(['new', 'lead', 'customer', 'repeat_customer', 'not_a_fit']),
+});
+export type CompanyContact = z.infer<typeof companyContactSchema>;
+
+/** A lead of one of the company's people, as its page lists it. */
+export const companyLeadSchema = z.object({
+  id: z.string(),
+  contactId: z.string(),
+  /** The word for the stage in this business's pipeline. */
+  stageName: z.string(),
+  stageKind: z.enum(['open', 'won', 'lost']),
+  interest: z.string().nullable(),
+  budgetPaise: z.number().int().nullable(),
+  createdAt: z.string(),
+});
+export type CompanyLead = z.infer<typeof companyLeadSchema>;
+
+/** `GET /companies/{id}`: the company with its numbers, its people and their leads. The "own leads only" role sees only the leads it owns. */
+export const companyDetailSchema = companySchema.extend({
+  contacts: z.array(companyContactSchema),
+  leads: z.array(companyLeadSchema),
+});
+export type CompanyDetail = z.infer<typeof companyDetailSchema>;
+
+/** The address part naming a contact, for `PUT /contacts/{id}/company`. */
+export const linkContactParamsSchema = z.object({ id: z.uuid() });
+
+/** `PUT /contacts/{id}/company`: the company the contact now belongs to, or `null` to take the contact out of its company. */
+export const setContactCompanyRequestSchema = z.object({ companyId: z.uuid().nullable() }).strict();
+export type SetContactCompanyRequest = z.infer<typeof setContactCompanyRequestSchema>;
