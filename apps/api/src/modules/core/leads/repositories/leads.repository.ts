@@ -1,4 +1,5 @@
-import type { StageKind } from '@toobler-one/shared';
+import type { CheckedFilterCondition, StageKind } from '@toobler-one/shared';
+import { conditionsToSql } from '../../../../kernel/filters/conditions-to-sql';
 import { sql } from 'kysely';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
@@ -81,7 +82,15 @@ export interface LeadFilters {
   status?: 'open' | 'closed' | undefined;
   /** For the "own leads only" role: only the leads this person owns. Left out, every lead of the business. */
   visibleToUserId?: string | undefined;
+  /** Conditions that already passed the shared check (temperature, custom fields); every one must hold. */
+  conditions?: readonly CheckedFilterCondition[] | undefined;
 }
+
+/** Where a lead keeps what a filter condition can look at. */
+const LEAD_FILTER_COLUMNS = {
+  customColumn: 'lead.custom',
+  builtInColumns: { temperature: 'lead.temperature' },
+} as const;
 
 /** The query every lead read starts from: live leads of the business, each joined to its stage, narrowed by the filters. */
 function selectLeadRows(db: Db, filters: LeadFilters) {
@@ -97,6 +106,8 @@ function selectLeadRows(db: Db, filters: LeadFilters) {
   if (filters.visibleToUserId) query = query.where('lead.owner_user_id', '=', filters.visibleToUserId);
   if (filters.status === 'open') query = query.where('lead.closed_at', 'is', null);
   if (filters.status === 'closed') query = query.where('lead.closed_at', 'is not', null);
+  const conditionSql = conditionsToSql(filters.conditions ?? [], LEAD_FILTER_COLUMNS);
+  if (conditionSql) query = query.where(conditionSql);
   return query;
 }
 

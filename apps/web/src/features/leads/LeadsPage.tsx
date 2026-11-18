@@ -132,6 +132,7 @@ export function LeadsPage() {
       status: DEFAULT_LEADS_VIEW.status,
       stageId: DEFAULT_LEADS_VIEW.stageId,
       owner: DEFAULT_LEADS_VIEW.owner,
+      conditions: DEFAULT_LEADS_VIEW.conditions,
     });
   const reloadAll = () => {
     leadsResource.reload();

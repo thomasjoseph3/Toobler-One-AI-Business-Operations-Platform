@@ -29,8 +29,22 @@ describe('readLeadsView', () => {
       owner: 'me',
       sort: 'callbackAt',
       order: 'asc',
+      conditions: [],
       page: 3,
     });
+  });
+
+  it('reads the extra conditions from the address, and leaves out any that cannot be read', () => {
+    const conditions = [{ field: 'temperature', operator: 'is', value: 'hot' }];
+    const view = readLeadsView(new URLSearchParams({ filters: JSON.stringify(conditions) }));
+    expect(view.conditions).toEqual(conditions);
+    expect(readLeadsView(new URLSearchParams({ filters: 'not json' })).conditions).toEqual([]);
+    expect(readLeadsView(new URLSearchParams({ filters: '[{"field":"a","colour":"red"}]' })).conditions).toEqual([]);
+    // They travel in the address and in the request to the API, and count as filters on the button
+    const written = writeLeadsView(view);
+    expect(readLeadsView(written).conditions).toEqual(conditions);
+    expect(buildLeadsPath(view, 'user-1')).toContain('filters=');
+    expect(countActiveFilters(view)).toBe(1);
   });
   it('ignores anything it does not understand, so a bad link never breaks the page', () => {
     const view = readLeadsView(

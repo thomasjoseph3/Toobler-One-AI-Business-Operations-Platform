@@ -119,6 +119,8 @@ export const listLeadsQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
+  /** More conditions (F11 filter engine): a JSON list like `[{"field":"temperature","operator":"is","value":"hot"}]`, at most 4000 characters. Every condition must hold. */
+  filters: z.string().max(4000).optional(),
 });
 export type ListLeadsQuery = z.infer<typeof listLeadsQuerySchema>;
 

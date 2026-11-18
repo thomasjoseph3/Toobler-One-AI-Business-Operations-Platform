@@ -1,7 +1,7 @@
 // What the Leads list is showing: which leads (status, stage, owner), in what order, and which page. This is kept in the web
 // address (/leads?status=closed&sort=createdAt), so a refresh or the Back button keeps the view and a link can be shared.
 // Pure functions (no screen, no network), so each rule can be tested alone.
-import type { PipelineStage } from '@toobler-one/shared';
+import { parseFiltersText, type FilterCondition, type PipelineStage } from '@toobler-one/shared';
 import { t, type MessageKey } from '../../app/i18n';
 
 /** `list` = the table; `pipeline` = the board with a column per stage. */
@@ -21,6 +21,8 @@ export interface LeadsView {
   owner: 'anyone' | 'me';
   sort: LeadsSort;
   order: LeadsOrder;
+  /** Extra conditions (the temperature, the business's own fields), every one of which must hold. */
+  conditions: FilterCondition[];
   page: number;
 }
 
@@ -32,6 +34,7 @@ export const DEFAULT_LEADS_VIEW: LeadsView = {
   owner: 'anyone',
   sort: 'lastActivity',
   order: 'desc',
+  conditions: [],
   page: 1,
 };
 
@@ -59,7 +62,11 @@ export function readLeadsView(searchParams: URLSearchParams): LeadsView {
         : DEFAULT_LEADS_VIEW.order;
   const pageNumber = Number(searchParams.get('page'));
   const page = Number.isInteger(pageNumber) && pageNumber >= 1 ? pageNumber : DEFAULT_LEADS_VIEW.page;
-  return { layout, status, stageId, owner, sort, order, page };
+  // The conditions travel in the address as a JSON list; text that cannot be read is left out, so a bad link never breaks the page
+  const filtersText = searchParams.get('filters');
+  const parsedFilters = filtersText === null ? undefined : parseFiltersText(filtersText);
+  const conditions = parsedFilters && 'conditions' in parsedFilters ? parsedFilters.conditions : [];
+  return { layout, status, stageId, owner, sort, order, conditions, page };
 }
 
 /** Writes the view as a web address query. Only what differs from the default is written, so the plain page has a plain address. */
@@ -71,6 +78,7 @@ export function writeLeadsView(view: LeadsView): URLSearchParams {
   if (view.owner !== DEFAULT_LEADS_VIEW.owner) searchParams.set('owner', view.owner);
   if (view.sort !== DEFAULT_LEADS_VIEW.sort) searchParams.set('sort', view.sort);
   if (view.order !== DEFAULT_LEADS_VIEW.order) searchParams.set('order', view.order);
+  if (view.conditions.length > 0) searchParams.set('filters', JSON.stringify(view.conditions));
   if (view.page !== DEFAULT_LEADS_VIEW.page) searchParams.set('page', String(view.page));
   return searchParams;
 }
@@ -81,6 +89,7 @@ export function buildLeadsPath(view: LeadsView, signedInUserId: string): string 
   if (view.layout === 'pipeline') {
     const boardQuery = new URLSearchParams({ view: 'board' });
     if (view.owner === 'me') boardQuery.set('ownerUserId', signedInUserId);
+    if (view.conditions.length > 0) boardQuery.set('filters', JSON.stringify(view.conditions));
     return `/leads?${boardQuery.toString()}`;
   }
   const query = new URLSearchParams({
@@ -92,14 +101,18 @@ export function buildLeadsPath(view: LeadsView, signedInUserId: string): string 
   });
   if (view.stageId !== null) query.set('stageId', view.stageId);
   if (view.owner === 'me') query.set('ownerUserId', signedInUserId);
+  if (view.conditions.length > 0) query.set('filters', JSON.stringify(view.conditions));
   return `/leads?${query.toString()}`;
 }
 
-/** How many filters are switched on (shown as a number on the Filter button). Closed leads, one stage and "only mine" each count as one. */
+/** How many filters are switched on (shown as a number on the Filter button). Closed leads, one stage, "only mine" and each extra condition count as one. */
 export function countActiveFilters(view: LeadsView): number {
   // On the board only the owner filter applies, so the others do not count
-  if (view.layout === 'pipeline') return view.owner !== 'anyone' ? 1 : 0;
-  return [view.status !== 'open', view.stageId !== null, view.owner !== 'anyone'].filter(Boolean).length;
+  if (view.layout === 'pipeline') return (view.owner !== 'anyone' ? 1 : 0) + view.conditions.length;
+  return (
+    [view.status !== 'open', view.stageId !== null, view.owner !== 'anyone'].filter(Boolean).length +
+    view.conditions.length
+  );
 }
 
 /** The stages a person can pick for this status: the open stages when looking at open leads, Won and Lost when looking at closed ones. */

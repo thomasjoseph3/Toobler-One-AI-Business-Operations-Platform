@@ -12,6 +12,7 @@ export function leadsViewToRequest(view: LeadsView, name: string): CreateViewReq
   if (view.status !== DEFAULT_LEADS_VIEW.status) filters.status = view.status;
   if (view.stageId !== null) filters.stageId = view.stageId;
   if (view.owner !== DEFAULT_LEADS_VIEW.owner) filters.owner = 'me';
+  if (view.conditions.length > 0) filters.conditions = view.conditions;
   return {
     object: 'lead',
     name: name.trim(),
@@ -30,13 +31,16 @@ export function savedViewToLeadsView(saved: SavedView): LeadsView {
     owner: saved.filters.owner === 'me' ? 'me' : DEFAULT_LEADS_VIEW.owner,
     sort: saved.sort?.field ?? DEFAULT_LEADS_VIEW.sort,
     order: saved.sort?.order ?? DEFAULT_LEADS_VIEW.order,
+    conditions: saved.filters.conditions ?? [],
     page: 1,
   };
 }
 
 /** Leaves out what the list ignores in its layout (the board shows every stage and cannot sort), so two views that look the same count as the same. */
 function normalise(view: LeadsView): LeadsView {
-  if (view.layout === 'pipeline') return { ...DEFAULT_LEADS_VIEW, layout: 'pipeline', owner: view.owner };
+  if (view.layout === 'pipeline') {
+    return { ...DEFAULT_LEADS_VIEW, layout: 'pipeline', owner: view.owner, conditions: view.conditions };
+  }
   return { ...view, page: 1 };
 }
 
@@ -50,7 +54,8 @@ export function isSameLeadsView(first: LeadsView, second: LeadsView): boolean {
     left.stageId === right.stageId &&
     left.owner === right.owner &&
     left.sort === right.sort &&
-    left.order === right.order
+    left.order === right.order &&
+    JSON.stringify(left.conditions) === JSON.stringify(right.conditions)
   );
 }
 

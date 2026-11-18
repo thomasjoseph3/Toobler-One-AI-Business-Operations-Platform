@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { filterConditionSchema, MAX_FILTER_CONDITIONS } from './filter-conditions';
 
 // Saved views between the API and the web app (F11): a person filters and sorts a list, names the result ("My hot leads") and finds it again as a tab.
 
@@ -18,6 +19,8 @@ export const leadViewFiltersSchema = z
     status: z.enum(['open', 'closed']).optional(),
     stageId: z.uuid().optional(),
     owner: z.literal('me').optional(),
+    /** Conditions from the filter engine (temperature, custom fields), every one of which must hold. */
+    conditions: z.array(filterConditionSchema).max(MAX_FILTER_CONDITIONS).optional(),
   })
   .strict();
 export type LeadViewFilters = z.infer<typeof leadViewFiltersSchema>;

@@ -9,6 +9,13 @@ import type {
   SetLeadTemperatureRequest,
   UpdateLeadRequest,
 } from '@toobler-one/shared';
+import {
+  checkFilterConditions,
+  customFieldsToFilterable,
+  parseFiltersText,
+  type CheckedFilterCondition,
+  type FilterableField,
+} from '@toobler-one/shared';
 import type { AssignLeadRequest } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
@@ -38,6 +45,37 @@ import * as pipelineRepository from '../repositories/pipeline.repository';
 // The database error codes for "a unique rule was broken" and "a foreign key points at nothing".
 const UNIQUE_VIOLATION = '23505';
 const FOREIGN_KEY_VIOLATION = '23503';
+
+/** What a lead list can be filtered on besides the business's custom fields: the temperature. */
+const TEMPERATURE_FILTERABLE: FilterableField = {
+  field: 'temperature',
+  label: 'Temperature',
+  type: 'dropdown',
+  options: ['hot', 'warm', 'cold', 'unscored'],
+};
+
+/**
+ * Reads the `filters` of a lead list request: the text must be a list of conditions, and every condition must make sense for its field (the temperature, or
+ * one of the business's live lead fields). Throws 400 INVALID_FILTERS with the first problem in words. No filters means no conditions.
+ */
+async function readLeadFilterConditions(
+  transaction: Db,
+  accountId: string,
+  filtersText: string | undefined,
+): Promise<CheckedFilterCondition[]> {
+  if (filtersText === undefined || filtersText.trim() === '') return [];
+  const parsed = parseFiltersText(filtersText);
+  if ('problem' in parsed) throw new ApiError(400, 'INVALID_FILTERS', parsed.problem);
+  if (parsed.conditions.length === 0) return [];
+  const definitions = await findFieldDefinitions(transaction, accountId, 'lead');
+  const { checked, problems } = checkFilterConditions(parsed.conditions, [
+    TEMPERATURE_FILTERABLE,
+    ...customFieldsToFilterable(definitions),
+  ]);
+  const firstProblem = problems[0];
+  if (firstProblem) throw new ApiError(400, 'INVALID_FILTERS', firstProblem.message, { problems });
+  return checked;
+}
 
 /** The most leads one board column carries; the column says how many more there are. */
 const BOARD_COLUMN_LIMIT = 50;
@@ -651,8 +689,9 @@ export function createLeadsService({ database }: { database: Database }) {
       const accountId = principal.accountId;
       return database.runInAccountTransaction(accountId, async (transaction) => {
         const visibleToUserId = ownLeadsOnlyUserId(principal);
+        const conditions = await readLeadFilterConditions(transaction, accountId, query.filters);
         if (query.view === 'board') {
-          return readBoard(transaction, accountId, query, visibleToUserId);
+          return readBoard(transaction, accountId, query, visibleToUserId, conditions);
         }
         const { rows, total } = await leadsRepository.listLeadRows(
           transaction,
@@ -664,6 +703,7 @@ export function createLeadsService({ database }: { database: Database }) {
             offeringId: query.offeringId,
             status: query.status,
             visibleToUserId,
+            conditions,
           },
           { limit: query.limit, offset: (query.page - 1) * query.limit },
           { sort: query.sort, order: query.order },
@@ -681,12 +721,13 @@ export function createLeadsService({ database }: { database: Database }) {
   };
 }
 
-/** The board: every stage in order, each with its newest leads (the owner and contact filters apply, the others do not). */
+/** The board: every stage in order, each with its newest leads (the owner, contact and condition filters apply, the others do not). */
 async function readBoard(
   transaction: Db,
   accountId: string,
   query: ListLeadsQuery,
   visibleToUserId: string | undefined,
+  conditions: readonly CheckedFilterCondition[],
 ): Promise<LeadsBoardResponse> {
   const pipeline = await pipelineRepository.findPipelineForAccount(transaction, accountId);
   if (!pipeline) throw notFound('The pipeline');
@@ -703,6 +744,7 @@ async function readBoard(
         contactId: query.contactId,
         offeringId: query.offeringId,
         visibleToUserId,
+        conditions,
       },
       { limit: BOARD_COLUMN_LIMIT, offset: 0 },
     );

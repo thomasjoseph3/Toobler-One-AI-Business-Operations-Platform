@@ -14,6 +14,9 @@ import {
   SortIcon,
 } from '@toobler-one/ui';
 import { Link } from 'react-router';
+import { useFieldDefinitions } from '../fields/use-field-definitions';
+import { ConditionsEditor } from './ConditionsEditor';
+import { listFilterableLeadFields } from './filter-conditions-ui';
 import { formatMessage, t } from '../../app/i18n';
 import {
   countActiveFilters,
@@ -49,6 +52,7 @@ export interface LeadsToolbarProps {
 function FilterPanel({ view, stages, onChangeView }: Pick<LeadsToolbarProps, 'view' | 'stages' | 'onChangeView'>) {
   const stageChoices = findStageChoices(stages, view.status);
   const filtersAreOn = countActiveFilters(view) > 0;
+  const filterableFields = listFilterableLeadFields(useFieldDefinitions('lead'));
   // The board always shows every stage, open and closed, so only the owner can narrow it
   const isBoard = view.layout === 'pipeline';
   return (
@@ -87,6 +91,13 @@ function FilterPanel({ view, stages, onChangeView }: Pick<LeadsToolbarProps, 'vi
         ]}
         onChange={(event) => onChangeView({ owner: event.target.value === 'me' ? 'me' : 'anyone' })}
       />
+      {/* Keyed by the conditions on the list, so the rows start again from what is applied whenever the list's conditions change from elsewhere (Clear, a view) */}
+      <ConditionsEditor
+        key={JSON.stringify(view.conditions)}
+        fields={filterableFields}
+        applied={view.conditions}
+        onApply={(conditions) => onChangeView({ conditions })}
+      />
       <Button
         variant="tertiary"
         size="compact"
@@ -96,6 +107,7 @@ function FilterPanel({ view, stages, onChangeView }: Pick<LeadsToolbarProps, 'vi
             status: DEFAULT_LEADS_VIEW.status,
             stageId: DEFAULT_LEADS_VIEW.stageId,
             owner: DEFAULT_LEADS_VIEW.owner,
+            conditions: DEFAULT_LEADS_VIEW.conditions,
           })
         }
       >

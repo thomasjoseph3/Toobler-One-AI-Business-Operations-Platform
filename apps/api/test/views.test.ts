@@ -121,6 +121,39 @@ describe('POST /views and GET /views', () => {
   });
 });
 
+describe('views that keep filter-engine conditions', () => {
+  it('saves and returns the conditions with the view, and refuses ones of the wrong shape', async () => {
+    const owner = await signUpOwner(app, database);
+    const conditions = [
+      { field: 'temperature', operator: 'is', value: 'hot' },
+      { field: 'custom.guests', operator: 'greater_than', value: 100 },
+    ];
+    const saved = await owner.ok(
+      'POST',
+      '/views',
+      { object: 'lead', name: 'Big hot ones', filters: { conditions } },
+      201,
+    );
+    expect(saved.filters.conditions).toEqual(conditions);
+    expect((await owner.ok('GET', '/views?object=lead')).items[0].filters.conditions).toEqual(conditions);
+    await owner.refused(
+      'POST',
+      '/views',
+      { object: 'lead', name: 'Bad', filters: { conditions: [{ field: 'a', operator: 'like' }] } },
+      400,
+    );
+    await owner.refused(
+      'POST',
+      '/views',
+      { object: 'lead', name: 'Bad', filters: { conditions: Array.from({ length: 11 }, () => conditions[0]) } },
+      400,
+    );
+    expect((await owner.ok('PATCH', `/views/${saved.id}`, { filters: { conditions: [] } })).filters.conditions).toEqual(
+      [],
+    );
+  });
+});
+
 describe('PATCH /views/{id} and DELETE /views/{id}', () => {
   it('renames and changes what a view shows, and writes one activity line with field names only', async () => {
     const owner = await signUpOwner(app, database);

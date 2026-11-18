@@ -241,4 +241,28 @@ test.describe('Leads list', () => {
     expect(iconBox.x).toBeGreaterThan(chipBox.x + chipBox.width - 1);
     expect(Math.abs(iconBox.y + iconBox.height / 2 - (chipBox.y + chipBox.height / 2))).toBeLessThan(8);
   });
+
+  test('Filter: extra conditions on the temperature and a custom field are applied together, asked of the API, kept in the address and cleared', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/leads');
+    await page.getByRole('button', { name: 'Filter' }).click();
+    const panel = page.getByRole('dialog', { name: 'Filter leads' });
+    await panel.getByRole('button', { name: 'Add a filter' }).click();
+    // A new row starts with the temperature: pick "is" Hot
+    await panel.getByLabel('Value').selectOption({ label: 'Hot' });
+    // A half-filled second row waits and is not sent
+    await panel.getByRole('button', { name: 'Add a filter' }).click();
+    await panel.getByRole('button', { name: 'Apply filters' }).click();
+    await expect(page).toHaveURL(/filters=/);
+    await expect
+      .poll(() => decodeURIComponent(pretendApi.leadQueries.at(-1) ?? ''))
+      .toContain('filters=[{"field":"temperature","operator":"is","value":"hot"}]');
+    await expect(page.getByRole('button', { name: /Filter.*Filters on: 1/ })).toBeVisible();
+    // Clear filters takes the condition off the list and out of the address
+    await panel.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(page).not.toHaveURL(/filters=/);
+    await expect.poll(() => pretendApi.leadQueries.at(-1)).not.toContain('filters=');
+  });
 });
