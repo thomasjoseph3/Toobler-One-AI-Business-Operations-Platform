@@ -1,6 +1,52 @@
 # F22 Today page
 
-**Status:** in_progress · **Branch:** `feature/F22-today-page` · **Requirement:** `requirements/phase-1-lead-engine/4-staff-workspace/01-today-page.md`
+**Status:** approved · **Branch:** `feature/F22-today-page` · **Requirement:** `requirements/phase-1-lead-engine/4-staff-workspace/01-today-page.md`
+
+## Feature guide
+
+**What it is.** Today is the first screen a staff member sees after signing in. It answers one question — *who do I
+call next?* — and lets them act on it in one tap.
+
+**Why it is useful.** Staff open the app between other jobs. Instead of a menu, they get their next action straight
+away: who is overdue, which hot leads nobody has rung, what is due today, who came in overnight, and how the week is
+going. Every person has **Call** and **WhatsApp** buttons that open the phone's dialler or WhatsApp.
+
+**A day in the life.** Anita signs in at 9 a.m. The top of Today shows *Late*: a callback she promised yesterday. She
+taps **Call**. Under it, *Hot — not yet contacted* lists a new enquiry; she taps **WhatsApp**. She glances at *This
+week*: 12 leads in, 9 contacted, 3 won, average 14 minutes to first reply. Done in under a minute.
+
+**Who can do what.** Everyone signed in sees their own Today. Managers and ordinary staff can switch between **Mine**
+and **Team** (the whole business). The "own leads only" role sees only its own and has no Team switch. Managers also
+see a small *finish setting up* nudge with how many setup steps are left.
+
+**What it shows, in order.** *Late* (overdue tasks and past callbacks) · *Hot, not yet contacted* · *Due today* (your
+tasks) · *Came in overnight* (new leads since closing) · *This week* (leads in / contacted / won, and average time to
+first reply).
+
+**Settings and limits.** Nothing to configure. The page refreshes by itself when a lead or task changes. "Closing
+time" is 6 p.m. for now (real office hours come with F23); "time to first reply" counts the first staff touch (a stage
+move or a note) until phone calls are logged (F29).
+
+**What it never does.** It never adds, edits or deletes anything — it is a read-only starting point. It never shows
+another business's data, and it never shows the team view to the own-leads-only role.
+
+**Not part of it.** Staff alerts and the morning summary (F23), real office hours (F23), and logged phone calls (F29).
+
+### For the tech team
+
+- **Module:** `core.today` (always on; owns no table, adds no write route). Reads `leads`, `tasks`, `activities`
+  (first staff touch), `setup_steps` and `accounts.time_zone` through each module's `index.ts`.
+- **Route:** `GET /api/v1/today?scope=me|team` (access `staff`). 400 on a bad scope, 401 signed out, 403 when the
+  own-leads-only role asks for `team`.
+- **How it works:** the service computes the business-time-zone day/week/closing boundaries (`helpers/today-bounds.ts`),
+  reads the leads and tasks (scoped to the owner for `me`), works out each section in pure code
+  (`helpers/today-sections.ts`), then adds contact names, E.164 phones and owner names.
+- **Live updates:** the page listens to `GET /events`; F22 added the lead and task event names to the live allowlist
+  (`live-updates/helpers/live-events.ts`), and the own-leads-only role now hears its own lead/task events (ids only).
+- **Known limits / decisions (R81):** "contacted", "closing time" (18:00 constant) and "first call" are approximations
+  until F23 (office hours) and F29 (calls). No table, no write route.
+- **Tests:** `today-sections.test.ts` (6), `today-bounds.test.ts` (8), `today.test.ts` (7 API), isolation entry; the
+  browser spec is pending the batched e2e run.
 
 The Today page is the first screen a staff member sees when they sign in. It answers one question — **who do I call
 next?** — and lets them act (Call / WhatsApp) without hunting through menus.
