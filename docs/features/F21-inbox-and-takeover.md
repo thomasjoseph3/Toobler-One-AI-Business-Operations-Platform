@@ -2,7 +2,7 @@
 
 **Requirements:** `4-staff-workspace/02-inbox.md`, `3-ai-agents-and-channels/07-staff-takeover.md`, `requirements/API.md` (Inbox, Staff takeover, `/events`); docs/plan/PHASE-1.md (F21); docs/CONVERSATION-TYPES.md.
 **Depends on:** F15 conversations, F19 agent, F20 website chat, F10 filtered tab.      **Modules:** `core.conversations` (inbox, takeover, reply, done) and a new small core module `core.live` (the `/events` stream; F22 Today adds its own event names to the same allowlist). The web chat widget (`channel.webchat`) learns to show staff replies.
-**Status:** `in_review`, built as ONE unit (owner decision 18 Nov 2026).
+**Status:** `approved` (18 Nov 2026, owner), built as ONE unit (owner decision 18 Nov 2026).
 
 ## Feature guide
 
