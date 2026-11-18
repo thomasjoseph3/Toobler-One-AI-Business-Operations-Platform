@@ -145,3 +145,90 @@ export async function findCompanyById(db: Db, accountId: string, companyId: stri
     .executeTakeFirst();
   return row ? toCompanyRow(row) : undefined;
 }
+
+/** Like findCompanyById, but locks the row until the transaction ends, so two edits at once cannot overwrite each other. */
+export async function findCompanyForUpdate(
+  db: Db,
+  accountId: string,
+  companyId: string,
+): Promise<CompanyRow | undefined> {
+  const row = await db
+    .selectFrom('companies')
+    .select(COMPANY_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', '=', companyId)
+    .where('deleted_at', 'is', null)
+    .forUpdate()
+    .executeTakeFirst();
+  return row ? toCompanyRow(row) : undefined;
+}
+
+/** The new values of a company. A key that is left out is not touched; `null` clears the field. */
+export interface CompanyChanges {
+  name?: string;
+  domain?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  ownerUserId?: string | null;
+}
+
+/**
+ * Changes the listed fields of a live company, stamps who did it, and returns the company. Undefined if there is no such live company. Throws a
+ * unique-violation (23505) when another live company already has the name or the domain.
+ */
+export async function updateCompany(
+  db: Db,
+  accountId: string,
+  companyId: string,
+  changes: CompanyChanges,
+  actor: Actor,
+): Promise<CompanyRow | undefined> {
+  const row = await db
+    .updateTable('companies')
+    .set({
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.domain !== undefined ? { domain: changes.domain } : {}),
+      ...(changes.phone !== undefined ? { phone: changes.phone } : {}),
+      ...(changes.city !== undefined ? { city: changes.city } : {}),
+      ...(changes.ownerUserId !== undefined ? { owner_user_id: changes.ownerUserId } : {}),
+      updated_by: { kind: actor.kind, id: actor.id },
+    })
+    .where('account_id', '=', accountId)
+    .where('id', '=', companyId)
+    .where('deleted_at', 'is', null)
+    .returning(COMPANY_COLUMNS)
+    .executeTakeFirst();
+  return row ? toCompanyRow(row) : undefined;
+}
+
+/**
+ * Soft-deletes a live company: sets `deleted_at` and stamps who did it. The row stays (the app role cannot delete rows); it just stops showing up
+ * and frees its name and domain for a new company. Returns false when there is no such live company.
+ */
+export async function softDeleteCompany(db: Db, accountId: string, companyId: string, actor: Actor): Promise<boolean> {
+  const row = await db
+    .updateTable('companies')
+    .set({ deleted_at: new Date(), updated_by: { kind: actor.kind, id: actor.id } })
+    .where('account_id', '=', accountId)
+    .where('id', '=', companyId)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/** Gives every live company of a person to another person (when the person leaves the business). Returns how many companies moved. */
+export async function handOverCompanies(
+  db: Db,
+  options: { accountId: string; fromUserId: string; toUserId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('companies')
+    .set({ owner_user_id: options.toUserId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('owner_user_id', '=', options.fromUserId)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .execute();
+  return rows.length;
+}

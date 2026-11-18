@@ -270,9 +270,18 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             method: request.method(),
             path,
             search: new URL(request.url()).search,
-            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            body:
+              request.method() === 'GET' || request.method() === 'DELETE'
+                ? null
+                : (request.postDataJSON() as Record<string, unknown> | null),
           });
-          if (companiesAnswer) return route.fulfill(json(companiesAnswer.status, companiesAnswer.body));
+          if (companiesAnswer) {
+            return route.fulfill(
+              companiesAnswer.body === undefined
+                ? { status: companiesAnswer.status }
+                : json(companiesAnswer.status, companiesAnswer.body),
+            );
+          }
         }
         if (path === '/tasks' || path.startsWith('/tasks/')) {
           const profile = profileFor(pretendApi);

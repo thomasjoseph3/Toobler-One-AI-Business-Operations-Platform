@@ -2,9 +2,11 @@ import { useState, type FormEvent } from 'react';
 import type { Company } from '@toobler-one/shared';
 import { Alert, Button, SidePanel, TextField } from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
-import { t } from '../../app/i18n';
+import { formatMessage, t } from '../../app/i18n';
 import {
+  buildCompanyFormFromCompany,
   buildCreateCompanyRequest,
+  buildUpdateCompanyRequest,
   checkCompanyForm,
   EMPTY_COMPANY_FORM,
   type CompanyFormFields,
@@ -17,6 +19,8 @@ const FORM_ID = 'company-form';
 export interface CompanyFormPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  /** When given, the form changes this company (`PATCH /companies/{id}`) instead of adding one. */
+  editingCompany?: Company;
   /** Called after the company was saved, with its name for the confirmation. */
   onSaved: (companyName: string) => void;
 }
@@ -25,8 +29,10 @@ export interface CompanyFormPanelProps {
  * The Add company form in a side panel: name, website domain, phone and city. It checks on the device first, then sends `POST /companies`. The
  * person adding it looks after it. Everything typed stays when something goes wrong, and a name or domain already used is said in plain words.
  */
-export function CompanyFormPanel({ isOpen, onClose, onSaved }: CompanyFormPanelProps) {
-  const [fields, setFields] = useState<CompanyFormFields>(EMPTY_COMPANY_FORM);
+export function CompanyFormPanel({ isOpen, onClose, editingCompany, onSaved }: CompanyFormPanelProps) {
+  const [fields, setFields] = useState<CompanyFormFields>(() =>
+    editingCompany ? buildCompanyFormFromCompany(editingCompany) : EMPTY_COMPANY_FORM,
+  );
   const [problems, setProblems] = useState<CompanyFormProblems>({});
   const [formProblem, setFormProblem] = useState<string | undefined>();
   const [isSaving, setIsSaving] = useState(false);
@@ -41,7 +47,14 @@ export function CompanyFormPanel({ isOpen, onClose, onSaved }: CompanyFormPanelP
     if (Object.keys(foundProblems).length > 0) return;
     setIsSaving(true);
     try {
-      await apiRequest<Company>('POST', '/companies', buildCreateCompanyRequest(fields));
+      if (editingCompany) {
+        const changes = buildUpdateCompanyRequest(fields, editingCompany);
+        // Nothing changed: no need to ask the API
+        if (Object.keys(changes).length > 0)
+          await apiRequest<Company>('PATCH', `/companies/${editingCompany.id}`, changes);
+      } else {
+        await apiRequest<Company>('POST', '/companies', buildCreateCompanyRequest(fields));
+      }
       onSaved(fields.name.trim());
     } catch (error) {
       setFormProblem(describeCompanySaveProblem(error));
@@ -53,13 +66,17 @@ export function CompanyFormPanel({ isOpen, onClose, onSaved }: CompanyFormPanelP
     <SidePanel
       isOpen={isOpen}
       onClose={onClose}
-      title={t('companies.form.title')}
+      title={
+        editingCompany
+          ? formatMessage('companies.edit.title', { name: editingCompany.name })
+          : t('companies.form.title')
+      }
       closeLabel={t('companies.form.close')}
       footer={
         <>
           <Button onClick={onClose}>{t('companies.form.cancel')}</Button>
           <Button type="submit" form={FORM_ID} variant="primary" isLoading={isSaving}>
-            {t('companies.form.submit')}
+            {editingCompany ? t('companies.edit.submit') : t('companies.form.submit')}
           </Button>
         </>
       }
@@ -100,7 +117,7 @@ export function CompanyFormPanel({ isOpen, onClose, onSaved }: CompanyFormPanelP
           maxLength={80}
           autoComplete="off"
         />
-        <p className="text-body-xs text-text-secondary">{t('companies.form.ownerNote')}</p>
+        {editingCompany ? null : <p className="text-body-xs text-text-secondary">{t('companies.form.ownerNote')}</p>}
       </form>
     </SidePanel>
   );

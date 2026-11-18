@@ -1,8 +1,18 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import type { CompanyDetail, Contact } from '@toobler-one/shared';
-import { Alert, Button, Card, CompaniesIcon, EmptyState, ErrorState, LoadingState, Tag } from '@toobler-one/ui';
+import {
+  Alert,
+  Button,
+  Card,
+  CompaniesIcon,
+  ConfirmDialog,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  Tag,
+} from '@toobler-one/ui';
 import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
@@ -10,6 +20,7 @@ import { useSession } from '../../auth/session';
 import { findLifecycleLabelKey, findLifecycleTagTone } from '../contacts/contacts-view';
 import { formatBudget, findLeadDisplayName } from '../leads/lead-display';
 import { ContactPicker } from '../tickets/ContactPicker';
+import { CompanyFormPanel } from './CompanyFormPanel';
 import { describeCompanySaveProblem } from './company-problem';
 
 /** One small label and value in the details card. */
@@ -37,10 +48,16 @@ function stageTagTone(stageKind: 'open' | 'won' | 'lost') {
 export function CompanyPage() {
   const { companyId = '' } = useParams();
   const { sessionState } = useSession();
+  const navigate = useNavigate();
   const companyResource = useApiResource<CompanyDetail>(`/companies/${companyId}`);
   const [isAddingPerson, setIsAddingPerson] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  // A counter so each opening of the form starts from what the company has now
+  const [editOpenCount, setEditOpenCount] = useState(0);
+  const [isDeleteAsked, setIsDeleteAsked] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const backLink = (
     <Link
       to="/companies"
@@ -88,6 +105,8 @@ export function CompanyPage() {
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
   if (sessionState.status !== 'signedIn') return null;
   const company = companyResource.state.data;
+  // Only managers can delete (the API refuses staff), so only they are shown the button
+  const isManager = sessionState.profile.user.role === 'manager';
   const nameOfContact = (contactId: string) => {
     const contact = company.contacts.find((candidate) => candidate.id === contactId);
     return contact ? findLeadDisplayName(contact) : t('leads.contactRemoved');
@@ -107,6 +126,22 @@ export function CompanyPage() {
     companyResource.reload();
   };
 
+  // Deletes the company (after the person said yes), then goes back to the list with a confirmation. Its people stay.
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    setProblem(null);
+    try {
+      await apiRequest('DELETE', `/companies/${company.id}`);
+      navigate('/companies', {
+        state: { notice: { tone: 'success', text: formatMessage('companyPage.delete.done', { name: company.name }) } },
+      });
+    } catch (error) {
+      setProblem(describeCompanySaveProblem(error));
+      setIsDeleteAsked(false);
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
       {backLink}
@@ -121,7 +156,26 @@ export function CompanyPage() {
         </Alert>
       ) : null}
       <Card className="mb-6">
-        <h2 className="text-heading-xl break-words text-text-primary">{company.name}</h2>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <h2 className="text-heading-xl min-w-0 break-words text-text-primary">{company.name}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="compact"
+              onClick={() => {
+                setNotice(null);
+                setEditOpenCount((count) => count + 1);
+                setIsEditOpen(true);
+              }}
+            >
+              {t('companyPage.edit.button')}
+            </Button>
+            {isManager ? (
+              <Button size="compact" variant="destructive" onClick={() => setIsDeleteAsked(true)}>
+                {t('companyPage.delete.button')}
+              </Button>
+            ) : null}
+          </div>
+        </div>
         <dl className="mt-4 grid gap-2 md:grid-cols-2 md:gap-x-8">
           <Row label={t('companyPage.domain')}>{company.domain ?? t('contacts.none')}</Row>
           <Row label={t('companyPage.phone')}>{company.phone ?? t('contacts.none')}</Row>
@@ -230,6 +284,31 @@ export function CompanyPage() {
           </ul>
         </Card>
       </div>
+      <ConfirmDialog
+        isOpen={isDeleteAsked}
+        tone="danger"
+        title={formatMessage('companyPage.delete.title', { name: company.name })}
+        description={t('companyPage.delete.description')}
+        confirmLabel={t('companyPage.delete.confirm')}
+        cancelLabel={t('companies.form.cancel')}
+        closeLabel={t('companyPage.delete.close')}
+        isConfirming={isDeleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setIsDeleteAsked(false)}
+      />
+      {isEditOpen ? (
+        <CompanyFormPanel
+          key={editOpenCount}
+          isOpen
+          editingCompany={company}
+          onClose={() => setIsEditOpen(false)}
+          onSaved={(companyName) => {
+            setIsEditOpen(false);
+            setNotice(formatMessage('companyPage.saved', { name: companyName }));
+            companyResource.reload();
+          }}
+        />
+      ) : null}
     </>
   );
 }

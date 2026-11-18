@@ -10,6 +10,7 @@ import {
   linkContactParamsSchema,
   listCompaniesQuerySchema,
   setContactCompanyRequestSchema,
+  updateCompanyRequestSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createCompaniesService } from '../services/companies.service';
@@ -67,6 +68,30 @@ export function companiesRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return companiesService.setCompanyOfContact(request.principal, request.params.id, request.body.companyId);
+    },
+  );
+
+  // For any signed-in, verified person (API.md: Staff). Only the fields sent change.
+  typedApp.patch(
+    '/companies/:id',
+    {
+      config: { access: 'staff' },
+      schema: { params: companyIdParamsSchema, body: updateCompanyRequestSchema, response: { 200: companySchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return companiesService.updateCompany(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // Managers only (API.md). The company's people are not deleted: they just lose the link.
+  typedApp.delete(
+    '/companies/:id',
+    { config: { access: 'manager' }, schema: { params: companyIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await companiesService.deleteCompany(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }

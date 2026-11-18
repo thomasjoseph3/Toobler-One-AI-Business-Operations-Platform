@@ -809,6 +809,18 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'PATCH /api/v1/companies/{id}',
+    what: "change A's company",
+    request: () => ({ method: 'PATCH', url: `/companies/${dataOfA.companyId}`, payload: { city: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/companies/{id}',
+    what: "delete A's company",
+    request: () => ({ method: 'DELETE', url: `/companies/${dataOfA.companyId}` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/team/invitations',
     what: 'invite the owner of A (an email that already has an account anywhere is refused)',
     request: () => ({

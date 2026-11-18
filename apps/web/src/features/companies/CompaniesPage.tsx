@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useSearchParams } from 'react-router';
 import type { CompaniesListResponse } from '@toobler-one/shared';
 import {
   Alert,
@@ -33,12 +33,19 @@ const PAGE_FRAME_CLASSES = 'md:flex md:h-full md:min-h-0 md:flex-col';
 /** How long to wait after the last key press before searching, so typing does not search on every letter. */
 const SEARCH_DELAY_MILLISECONDS = 300;
 
+/** Reads the message another page left behind in the navigation (for example "Infosys HR was deleted."), or nothing. */
+function readNoticeFromState(state: unknown): string | null {
+  const notice = (state as { notice?: { text?: unknown } } | null)?.notice;
+  return typeof notice?.text === 'string' ? notice.text : null;
+}
+
 /**
  * The Companies page, laid out like the Contacts page: the toolbar (search and Add company), then the companies as a table (tablet and desktop)
  * or cards (phone), 25 to a page, with Previous and Next under it. What is shown (search, page) lives in the web address, so a refresh or the Back
  * button keeps it. It has loading, error (with retry), empty ("no companies yet") and "nothing matches" states.
  */
 export function CompaniesPage() {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = readCompaniesView(searchParams);
   const companiesResource = useApiResource<CompaniesListResponse>(buildCompaniesPath(view));
@@ -46,7 +53,8 @@ export function CompaniesPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   // A counter so each opening of the form starts with an empty one
   const [formOpenCount, setFormOpenCount] = useState(0);
-  const [notice, setNotice] = useState<string | null>(null);
+  // A confirmation the company page left behind ("Infosys HR was deleted.") shows first
+  const [notice, setNotice] = useState<string | null>(readNoticeFromState(location.state));
 
   // Applies the typed search a moment after the typing stops
   useEffect(() => {

@@ -23,6 +23,9 @@ export interface PretendCompanies {
   leads: Record<string, Array<Record<string, unknown>>>;
   /** Which company each contact is in (by contact id), so the contact page can show it. */
   contactCompany: Record<string, string | null>;
+  /** What the page sent to change a company, and which companies it deleted. */
+  patchedCompanies: Array<{ companyId: string; body: Record<string, unknown> }>;
+  deletedCompanyIds: string[];
   /** What the page sent to put a contact in a company or take it out. */
   linkedContacts: Array<{ contactId: string; companyId: string | null }>;
 }
@@ -110,6 +113,8 @@ export function startingCompanies(): PretendCompanies {
       ],
     },
     contactCompany: { 'contact-0': 'company-1', 'contact-1': 'company-1' },
+    patchedCompanies: [],
+    deletedCompanyIds: [],
     linkedContacts: [],
   };
 }
@@ -166,6 +171,23 @@ export function answerCompaniesCall(
     };
   }
   const detailMatch = /^\/companies\/([\w-]+)$/u.exec(call.path);
+  if (detailMatch && (call.method === 'PATCH' || call.method === 'DELETE')) {
+    const company = state.companies.find((candidate) => candidate['id'] === detailMatch[1]);
+    if (!company) return { status: 404, body: { error: { code: 'NOT_FOUND', message: "That company wasn't found." } } };
+    if (state.refusal) {
+      const { status, code, message } = state.refusal;
+      state.refusal = null;
+      return { status, body: { error: { code, message } } };
+    }
+    if (call.method === 'PATCH') {
+      state.patchedCompanies.push({ companyId: String(company['id']), body: call.body ?? {} });
+      Object.assign(company, call.body ?? {});
+      return { status: 200, body: company };
+    }
+    state.deletedCompanyIds.push(String(company['id']));
+    state.companies = state.companies.filter((candidate) => candidate !== company);
+    return { status: 204 };
+  }
   if (detailMatch && call.method === 'GET') {
     if (state.fails) return { status: 500, body: { error: { code: 'UNKNOWN_ERROR', message: 'Down.' } } };
     const company = state.companies.find((candidate) => candidate['id'] === detailMatch[1]);

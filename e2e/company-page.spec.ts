@@ -45,9 +45,7 @@ test.describe('Company page', () => {
     await page.getByRole('button', { name: /Priya Menon/ }).click();
     await expect(page.getByText('Priya Menon is now in this company.')).toBeVisible();
     expect(pretendApi.companies.linkedContacts).toEqual([{ contactId: 'contact-priya', companyId: 'company-2' }]);
-    await expect(
-      page.getByRole('region', { name: 'People' }).getByRole('link', { name: 'Priya Menon' }),
-    ).toBeVisible();
+    await expect(page.getByRole('region', { name: 'People' }).getByRole('link', { name: 'Priya Menon' })).toBeVisible();
   });
 
   test('says in plain words when the company is not there', async ({ page }) => {
@@ -71,6 +69,76 @@ test.describe('Company page', () => {
     await expect(page.getByRole('heading', { name: 'Infosys HR', level: 2 })).toBeVisible();
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
     expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.length}`)).toEqual([]);
+  });
+});
+
+test.describe('Changing and deleting a company', () => {
+  test('edits a company, sending only what changed, and clears a box that was emptied', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/companies/company-1');
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await expect(page.getByLabel('Company name')).toHaveValue('Infosys HR');
+    await expect(page.getByLabel('City')).toHaveValue('Bengaluru');
+    await page.getByLabel('City').fill('Pune');
+    await page.getByLabel('Website or email domain').fill('');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('Infosys HR was saved.')).toBeVisible();
+    expect(pretendApi.companies.patchedCompanies).toEqual([
+      { companyId: 'company-1', body: { domain: null, city: 'Pune' } },
+    ]);
+    await expect(page.getByText('Pune', { exact: true })).toBeVisible();
+  });
+
+  test('sends nothing when the form is saved without a change', async ({ page, pretendApi }) => {
+    await page.goto('/companies/company-1');
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByText('Infosys HR was saved.')).toBeVisible();
+    expect(pretendApi.companies.patchedCompanies).toEqual([]);
+  });
+
+  test('says in plain words when the new name is already used, keeping what was typed', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.companies.refusal = {
+      status: 409,
+      code: 'COMPANY_EXISTS',
+      message: 'A company with this name already exists.',
+    };
+    await page.goto('/companies/company-1');
+    await page.getByRole('button', { name: 'Edit' }).click();
+    await page.getByLabel('Company name').fill('Nair Travels');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    await expect(page.getByRole('alert')).toContainText('You already have a company with this name.');
+    await expect(page.getByLabel('Company name')).toHaveValue('Nair Travels');
+  });
+
+  test('asks "Are you sure?" naming the company, then deletes it and says so on the list', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/companies/company-1');
+    await page.getByRole('button', { name: 'Delete' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete Infosys HR?' });
+    await expect(dialog.getByText(/Its people stay/)).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    expect(pretendApi.companies.deletedCompanyIds).toEqual([]);
+
+    await page.getByRole('button', { name: 'Delete' }).click();
+    await dialog.getByRole('button', { name: 'Delete company' }).click();
+    await expect(page).toHaveURL(/\/companies$/);
+    await expect(page.getByText('Infosys HR was deleted.')).toBeVisible();
+    expect(pretendApi.companies.deletedCompanyIds).toEqual(['company-1']);
+  });
+
+  test('shows no Delete button to staff, but staff can still edit', async ({ page, pretendApi }) => {
+    pretendApi.role = 'staff';
+    await page.goto('/companies/company-1');
+    await expect(page.getByRole('button', { name: 'Edit' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete' })).toHaveCount(0);
   });
 });
 

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ApiRequestError } from '../../api/client';
 import { buildCompaniesPath, DEFAULT_COMPANIES_VIEW, readCompaniesView, writeCompaniesView } from './companies-view';
-import { buildCreateCompanyRequest, checkCompanyForm, EMPTY_COMPANY_FORM } from './company-form';
+import {
+  buildCompanyFormFromCompany,
+  buildCreateCompanyRequest,
+  buildUpdateCompanyRequest,
+  checkCompanyForm,
+  EMPTY_COMPANY_FORM,
+} from './company-form';
 import { describeCompanySaveProblem } from './company-problem';
 
 describe('the Companies list view', () => {
@@ -51,5 +57,43 @@ describe('refusals in words', () => {
     expect(describeCompanySaveProblem(new ApiRequestError(500, 'UNKNOWN_ERROR', 'boom'))).toContain(
       'Something went wrong',
     );
+  });
+});
+
+describe('changing a company', () => {
+  const company = { name: 'Infosys HR', domain: 'infosys.com', phone: '+919847012345', city: 'Pune' };
+
+  it('fills the form from the company', () => {
+    expect(buildCompanyFormFromCompany(company)).toEqual({
+      name: 'Infosys HR',
+      domain: 'infosys.com',
+      phone: '+919847012345',
+      city: 'Pune',
+    });
+    expect(buildCompanyFormFromCompany({ ...company, domain: null, phone: null, city: null })).toEqual({
+      name: 'Infosys HR',
+      domain: '',
+      phone: '',
+      city: '',
+    });
+  });
+
+  it('sends nothing when nothing changed, even when the domain is retyped as a web address', () => {
+    expect(buildUpdateCompanyRequest(buildCompanyFormFromCompany(company), company)).toEqual({});
+    expect(
+      buildUpdateCompanyRequest(
+        { ...buildCompanyFormFromCompany(company), domain: 'https://www.infosys.com/' },
+        company,
+      ),
+    ).toEqual({});
+  });
+
+  it('sends only what changed, and null for a box that was emptied', () => {
+    expect(
+      buildUpdateCompanyRequest(
+        { name: ' Infosys Finance ', domain: '', phone: '+919847012345', city: 'Goa' },
+        company,
+      ),
+    ).toEqual({ name: 'Infosys Finance', domain: null, city: 'Goa' });
   });
 });

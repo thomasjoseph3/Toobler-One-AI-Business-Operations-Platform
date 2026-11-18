@@ -172,3 +172,24 @@ export const linkContactParamsSchema = z.object({ id: z.uuid() });
 /** `PUT /contacts/{id}/company`: the company the contact now belongs to, or `null` to take the contact out of its company. */
 export const setContactCompanyRequestSchema = z.object({ companyId: z.uuid().nullable() }).strict();
 export type SetContactCompanyRequest = z.infer<typeof setContactCompanyRequestSchema>;
+
+/** For an edit: a blank text, like an emptied form field, means "clear it". Leaving the key out means "leave it as it is". */
+const clearIfBlank = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
+
+/**
+ * What staff send to change a company. Only the fields sent change; `null` (or blank text) clears the domain, phone and city, and `ownerUserId`
+ * `null` leaves the company with nobody. The name cannot be emptied. At least one field is needed. Any other field is refused.
+ */
+export const updateCompanyRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(MAX_COMPANY_NAME_LENGTH).optional(),
+    domain: z.preprocess(clearIfBlank, domainField.nullable().optional()),
+    phone: z.preprocess(clearIfBlank, z.string().trim().max(40).nullable().optional()),
+    city: z.preprocess(clearIfBlank, z.string().trim().max(80).nullable().optional()),
+    ownerUserId: z.uuid().nullable().optional(),
+  })
+  .strict()
+  .refine((request) => Object.values(request).some((value) => value !== undefined), {
+    message: 'Send at least one field to change.',
+  });
+export type UpdateCompanyRequest = z.infer<typeof updateCompanyRequestSchema>;

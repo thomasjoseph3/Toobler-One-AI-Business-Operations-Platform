@@ -1,6 +1,12 @@
 // The rules of the Add company form: checking what was typed and turning it into what the API takes.
 // Pure functions (no screen, no network), so each rule can be tested alone.
-import { isFreeMailDomain, normaliseDomain, type CreateCompanyRequest } from '@toobler-one/shared';
+import {
+  isFreeMailDomain,
+  normaliseDomain,
+  type Company,
+  type CreateCompanyRequest,
+  type UpdateCompanyRequest,
+} from '@toobler-one/shared';
 import type { MessageKey } from '../../app/i18n';
 
 /** Everything typed in the company form, as the text boxes hold it. */
@@ -38,5 +44,32 @@ export function buildCreateCompanyRequest(fields: CompanyFormFields): CreateComp
   if (fields.domain.trim() !== '') request.domain = fields.domain.trim();
   if (fields.phone.trim() !== '') request.phone = fields.phone.trim();
   if (fields.city.trim() !== '') request.city = fields.city.trim();
+  return request;
+}
+
+/** The form filled in with an existing company, for changing it (the phone is shown as stored, like +919847012345). */
+export function buildCompanyFormFromCompany(
+  company: Pick<Company, 'name' | 'domain' | 'phone' | 'city'>,
+): CompanyFormFields {
+  return { name: company.name, domain: company.domain ?? '', phone: company.phone ?? '', city: company.city ?? '' };
+}
+
+/**
+ * Turns the edited form into the request body for `PATCH /companies/{id}`: only the boxes that differ from the company are sent, and a box
+ * emptied by the person becomes `null` (clear it). An empty object means nothing changed. A domain is compared as the clean domain, so
+ * retyping "https://www.infosys.com/" over "infosys.com" is not a change.
+ */
+export function buildUpdateCompanyRequest(
+  fields: CompanyFormFields,
+  company: Pick<Company, 'name' | 'domain' | 'phone' | 'city'>,
+): UpdateCompanyRequest {
+  const request: UpdateCompanyRequest = {};
+  if (fields.name.trim() !== company.name) request.name = fields.name.trim();
+  const typedDomain = fields.domain.trim() === '' ? null : (normaliseDomain(fields.domain) ?? fields.domain.trim());
+  if (typedDomain !== company.domain) request.domain = typedDomain;
+  const typedPhone = fields.phone.trim() === '' ? null : fields.phone.trim();
+  if (typedPhone !== company.phone) request.phone = typedPhone;
+  const typedCity = fields.city.trim() === '' ? null : fields.city.trim();
+  if (typedCity !== company.city) request.city = typedCity;
   return request;
 }
