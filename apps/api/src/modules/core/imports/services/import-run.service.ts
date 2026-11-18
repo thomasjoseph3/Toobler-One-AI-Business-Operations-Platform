@@ -26,13 +26,15 @@ export async function runImport(accountContext: AccountContext, importId: string
   const actor: Actor = { kind: 'import', id: importId };
 
   const loaded = await accountContext.runInAccountTransaction(async (transaction) => {
-    const row = await importsRepository.findImportById(transaction, accountId, importId);
-    if (!row || row.status === 'done') return undefined;
+    const stored = await importsRepository.findImportById(transaction, accountId, importId);
+    if (!stored || stored.status === 'done') return undefined;
     // A retry of a run that failed or was cut short carries on
-    if (row.status !== 'running') await importsRepository.resumeRunning(transaction, { accountId, importId });
-    const rows = await importsRepository.findImportData(transaction, accountId, importId);
-    const definitions = await findFieldDefinitions(transaction, accountId, 'contact');
-    return { row, rows, definitions };
+    if (stored.status !== 'running') await importsRepository.resumeRunning(transaction, { accountId, importId });
+    return {
+      row: stored,
+      rows: await importsRepository.findImportData(transaction, accountId, importId),
+      definitions: await findFieldDefinitions(transaction, accountId, 'contact'),
+    };
   });
   if (!loaded) return;
   const { row, rows, definitions } = loaded;
