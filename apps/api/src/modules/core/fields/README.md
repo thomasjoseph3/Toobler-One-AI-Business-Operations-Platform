@@ -4,8 +4,8 @@ Built in slices of at most 2 API routes (see `docs/features/F09-custom-fields.md
 
 | Folder          | What is in it                                                                                                                 |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `routes/`       | `fields.routes.ts`: `GET /fields`, `POST /fields`                                                                             |
-| `services/`     | `fields.service.ts`: list and add fields (the key is made from the label and never reused; at most 50 live fields per object) |
+| `routes/`       | `fields.routes.ts`: `GET /fields`, `POST /fields`, `PATCH /fields/{id}`, `DELETE /fields/{id}`                                                                       |
+| `services/`     | `fields.service.ts`: list, add, change and remove (archive) fields (the key is made from the label and never reused; at most 50 live fields per object) |
 | `repositories/` | `field-definitions.repository.ts`: the SQL for `field_definitions`                                                            |
 | `helpers/`      | (later slices)                                                                                                                |
 

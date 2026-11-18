@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import type { FieldObject, FieldsListResponse } from '@toobler-one/shared';
-import { Alert, Badge, Button, Card, ErrorState, LoadingState, SegmentedControl } from '@toobler-one/ui';
+import type { FieldDefinition, FieldObject, FieldsListResponse } from '@toobler-one/shared';
+import { Alert, Badge, Button, Card, ConfirmDialog, ErrorState, LoadingState, SegmentedControl } from '@toobler-one/ui';
+import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useKeptData } from '../knowledge/use-kept-resource';
 import { SettingsTabs } from '../settings/SettingsTabs';
 import { FieldFormPanel } from './FieldFormPanel';
-import { describeFieldType, FIELD_OBJECT_CHOICES } from './fields-state';
+import { describeFieldProblem, describeFieldType, FIELD_OBJECT_CHOICES } from './fields-state';
 
 /**
  * Settings → Fields (managers only): the custom fields of contacts, companies and leads, one tab each, with an Add field button that opens the
@@ -18,7 +19,29 @@ export function FieldsPage() {
   const data = useKeptData(resource.state);
   const [object, setObject] = useState<FieldObject>('contact');
   const [isAdding, setIsAdding] = useState(false);
+  const [fieldBeingChanged, setFieldBeingChanged] = useState<FieldDefinition | null>(null);
+  const [fieldToRemove, setFieldToRemove] = useState<FieldDefinition | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [removeProblem, setRemoveProblem] = useState<string | null>(null);
+
+  // Removes the field the person confirmed, then reloads the list; says what went wrong when it fails
+  async function confirmRemove() {
+    if (!fieldToRemove) return;
+    setIsRemoving(true);
+    setRemoveProblem(null);
+    try {
+      await apiRequest('DELETE', `/fields/${fieldToRemove.id}`);
+      setNotice(formatMessage('fields.removed', { label: fieldToRemove.label }));
+      setFieldToRemove(null);
+      resource.reload();
+    } catch (error) {
+      setRemoveProblem(describeFieldProblem(error));
+      setFieldToRemove(null);
+    } finally {
+      setIsRemoving(false);
+    }
+  }
 
   if (data.isFirstLoad) return <LoadingState label={t('fields.loading')} />;
   if (data.hasFailed || data.data === null) {
@@ -54,6 +77,7 @@ export function FieldsPage() {
         options={FIELD_OBJECT_CHOICES.map((choice) => ({ value: choice.object, label: t(choice.labelKey) }))}
       />
       {notice ? <Alert tone="success">{notice}</Alert> : null}
+      {removeProblem ? <Alert tone="error">{removeProblem}</Alert> : null}
       <Card>
         {fieldsOfObject.length === 0 ? <p className="text-body-md text-text-secondary">{t('fields.empty')}</p> : null}
         <ul>
@@ -70,6 +94,23 @@ export function FieldsPage() {
                   {formatMessage('fields.options', { options: field.options.join(', ') })}
                 </p>
               ) : null}
+              <div className="flex gap-2">
+                <Button
+                  size="compact"
+                  aria-label={formatMessage('fields.change', { label: field.label })}
+                  onClick={() => setFieldBeingChanged(field)}
+                >
+                  {t('fields.changeButton')}
+                </Button>
+                <Button
+                  size="compact"
+                  variant="destructive"
+                  aria-label={formatMessage('fields.remove', { label: field.label })}
+                  onClick={() => setFieldToRemove(field)}
+                >
+                  {t('fields.removeButton')}
+                </Button>
+              </div>
             </li>
           ))}
         </ul>
@@ -86,6 +127,31 @@ export function FieldsPage() {
           }}
         />
       ) : null}
+      {fieldBeingChanged ? (
+        <FieldFormPanel
+          isOpen
+          object={fieldBeingChanged.object}
+          field={fieldBeingChanged}
+          onClose={() => setFieldBeingChanged(null)}
+          onSaved={(label) => {
+            setFieldBeingChanged(null);
+            setNotice(formatMessage('fields.changed', { label }));
+            resource.reload();
+          }}
+        />
+      ) : null}
+      <ConfirmDialog
+        isOpen={fieldToRemove !== null}
+        title={fieldToRemove ? formatMessage('fields.removeTitle', { label: fieldToRemove.label }) : ''}
+        description={t('fields.removeDescription')}
+        confirmLabel={t('fields.removeConfirm')}
+        cancelLabel={t('fields.form.cancel')}
+        closeLabel={t('fields.form.close')}
+        tone="danger"
+        isConfirming={isRemoving}
+        onConfirm={() => void confirmRemove()}
+        onCancel={() => setFieldToRemove(null)}
+      />
     </div>
   );
 }

@@ -6,11 +6,13 @@ import {
   type FieldDefinition,
   type FieldsListResponse,
   type ListFieldsQuery,
+  MAX_DROPDOWN_OPTIONS,
+  type UpdateFieldRequest,
 } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
 import type { Actor } from '../../../../kernel/context';
 import type { Database } from '../../../../kernel/database';
-import { conflict } from '../../../../kernel/errors';
+import { badRequest, conflict, notFound } from '../../../../kernel/errors';
 import type { Principal } from '../../../../kernel/http/guard';
 import { uuidv7 } from '../../../../kernel/ids';
 import * as fieldDefinitionsRepository from '../repositories/field-definitions.repository';
@@ -95,6 +97,76 @@ export function createFieldsService({ database }: { database: Database }) {
         }
         throw error;
       }
+    },
+
+    /**
+     * Changes a field's name, choices or switches (never its key or type). Choices only fit a dropdown and must stay 1 to 30; "required before Won" only
+     * fits a lead field. Another business's field, or a removed one, is 404.
+     */
+    async updateField(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      fieldId: string,
+      request: UpdateFieldRequest,
+    ): Promise<FieldDefinition> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const existing = await fieldDefinitionsRepository.findFieldDefinition(transaction, accountId, fieldId);
+        if (!existing) throw notFound('That field');
+        let options: string[] | undefined;
+        if (request.options !== undefined) {
+          if (existing.type !== 'dropdown') throw badRequest('Only a dropdown has choices.');
+          options = tidyOptions(request.options);
+          if (options.length === 0) throw badRequest('A dropdown needs at least one choice.');
+          if (options.length > MAX_DROPDOWN_OPTIONS) {
+            throw badRequest(`A dropdown can have at most ${MAX_DROPDOWN_OPTIONS} choices.`);
+          }
+        }
+        if (request.requiredForWon === true && existing.object !== 'lead') {
+          throw badRequest('“Required before Won” is for leads only.');
+        }
+        const updated = await fieldDefinitionsRepository.updateFieldDefinition(
+          transaction,
+          accountId,
+          fieldId,
+          {
+            ...(request.label !== undefined ? { label: request.label } : {}),
+            ...(options !== undefined ? { options } : {}),
+            ...(request.aiAsks !== undefined ? { aiAsks: request.aiAsks } : {}),
+            ...(request.requiredForWon !== undefined ? { requiredForWon: request.requiredForWon } : {}),
+          },
+          actor,
+        );
+        if (!updated) throw notFound('That field');
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'fields.updated',
+          details: { recordType: 'field', recordId: fieldId },
+        });
+        return updated;
+      });
+    },
+
+    /** Removes a field by archiving it: its saved values are kept but hidden, and its key stays taken. Another business's field, or one already removed, is 404. */
+    async deleteField(principal: Pick<Principal, 'accountId' | 'userId'>, fieldId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        const wasArchived = await fieldDefinitionsRepository.archiveFieldDefinition(
+          transaction,
+          accountId,
+          fieldId,
+          actor,
+        );
+        if (!wasArchived) throw notFound('That field');
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'fields.deleted',
+          details: { recordType: 'field', recordId: fieldId },
+        });
+      });
     },
   };
 }

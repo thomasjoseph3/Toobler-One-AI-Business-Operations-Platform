@@ -3,6 +3,8 @@ import { ApiRequestError } from '../../api/client';
 import {
   buildCreateFieldRequest,
   buildEmptyFieldForm,
+  buildFieldFormFromField,
+  buildUpdateFieldRequest,
   checkFieldForm,
   describeFieldProblem,
   describeFieldType,
@@ -75,5 +77,47 @@ describe('words', () => {
       'Something went wrong. Please try again.',
     );
     expect(describeFieldProblem(new ApiRequestError(0, 'NETWORK_ERROR', 'x'))).toContain('connect');
+  });
+});
+
+describe('changing a field', () => {
+  const dropdown = {
+    id: 'f1',
+    object: 'lead' as const,
+    key: 'car_model',
+    label: 'Car model',
+    type: 'dropdown' as const,
+    options: ['Swift', 'Baleno'],
+    aiAsks: true,
+    requiredForWon: false,
+  };
+
+  it('fills the form from the field, with the choices one to a line', () => {
+    expect(buildFieldFormFromField(dropdown)).toEqual({
+      label: 'Car model',
+      type: 'dropdown',
+      optionsText: 'Swift\nBaleno',
+      aiAsks: true,
+      requiredForWon: false,
+    });
+  });
+
+  it('sends the name, switches and (for a dropdown) the choices, never the type', () => {
+    const form = { ...buildFieldFormFromField(dropdown), label: ' Vehicle ', optionsText: 'Swift\n\nSwift\nBrezza' };
+    expect(buildUpdateFieldRequest(form, 'lead')).toEqual({
+      label: 'Vehicle',
+      options: ['Swift', 'Brezza'],
+      aiAsks: true,
+      requiredForWon: false,
+    });
+  });
+
+  it('sends no choices for other types and no "required before Won" off a lead', () => {
+    const form = { ...buildEmptyFieldForm(), label: 'Birthday', type: 'date' as const, requiredForWon: true };
+    expect(buildUpdateFieldRequest(form, 'contact')).toEqual({ label: 'Birthday', aiAsks: false });
+  });
+
+  it('says a vanished field in plain words (404)', () => {
+    expect(describeFieldProblem(new ApiRequestError(404, 'NOT_FOUND', 'x'))).toContain('no longer there');
   });
 });

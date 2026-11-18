@@ -4,6 +4,8 @@ import {
   MAX_DROPDOWN_OPTIONS,
   tidyOptions,
   type CreateFieldRequest,
+  type FieldDefinition,
+  type UpdateFieldRequest,
   type FieldObject,
   type FieldType,
 } from '@toobler-one/shared';
@@ -53,6 +55,17 @@ export function readOptions(optionsText: string): string[] {
   return tidyOptions(optionsText.split('\n'));
 }
 
+/** The form filled in with an existing field, for changing it (the choices one to a line). */
+export function buildFieldFormFromField(field: FieldDefinition): FieldFormFields {
+  return {
+    label: field.label,
+    type: field.type,
+    optionsText: field.options.join('\n'),
+    aiAsks: field.aiAsks,
+    requiredForWon: field.requiredForWon,
+  };
+}
+
 /** The problems found in the form, by box (each is the key of a message). */
 export interface FieldFormProblems {
   label?: MessageKey;
@@ -83,11 +96,22 @@ export function buildCreateFieldRequest(fields: FieldFormFields, object: FieldOb
   };
 }
 
+/** Turns the form into the request for `PATCH /fields/{id}`: the name and the switches, plus the choices for a dropdown (the type never changes). */
+export function buildUpdateFieldRequest(fields: FieldFormFields, object: FieldObject): UpdateFieldRequest {
+  return {
+    label: fields.label.trim(),
+    ...(fields.type === 'dropdown' ? { options: readOptions(fields.optionsText) } : {}),
+    aiAsks: fields.aiAsks,
+    ...(object === 'lead' ? { requiredForWon: fields.requiredForWon } : {}),
+  };
+}
+
 /** One plain sentence for a failed change to the fields. The API's own words are shown for a refusal it wrote in plain words (the limit of 50). */
 export function describeFieldProblem(error: unknown): string {
   if (error instanceof ApiRequestError) {
     if (error.status === 0) return t('fields.problem.network');
     if (error.status === 403) return t('settings.managersOnly');
+    if (error.status === 404) return t('fields.problem.gone');
     if ((error.status === 400 || error.status === 409) && error.message && error.code !== 'UNKNOWN_ERROR')
       return error.message;
   }

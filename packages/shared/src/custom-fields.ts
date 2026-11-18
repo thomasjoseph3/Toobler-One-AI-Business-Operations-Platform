@@ -101,6 +101,24 @@ export const createFieldRequestSchema = z
   });
 export type CreateFieldRequest = z.infer<typeof createFieldRequestSchema>;
 
+/**
+ * What a manager sends to change a field: its name, its choices (dropdowns only), and the two switches. The key, the type and the object are fixed for
+ * the field's life, so they are refused. At least one thing must be sent. Whether the choices fit the field's type is checked against the stored field.
+ */
+export const updateFieldRequestSchema = z
+  .object({
+    label: z.string().trim().min(1).max(MAX_FIELD_LABEL_LENGTH).optional(),
+    options: z.array(z.string().trim().max(MAX_FIELD_OPTION_LENGTH)).max(60).optional(),
+    aiAsks: z.boolean().optional(),
+    requiredForWon: z.boolean().optional(),
+  })
+  .strict()
+  .refine((request) => Object.keys(request).length > 0, { message: 'Send at least one thing to change.' });
+export type UpdateFieldRequest = z.infer<typeof updateFieldRequestSchema>;
+
+/** `PATCH /fields/{id}` and `DELETE /fields/{id}`: which field. */
+export const fieldIdParamsSchema = z.object({ id: z.uuid() });
+
 /** `GET /fields?object=`: which object's fields (all three when left out). */
 export const listFieldsQuerySchema = z.object({ object: fieldObjectSchema.optional() });
 export type ListFieldsQuery = z.infer<typeof listFieldsQuerySchema>;

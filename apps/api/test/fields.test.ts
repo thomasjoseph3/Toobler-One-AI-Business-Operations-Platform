@@ -5,7 +5,7 @@ import { buildTestApp, unsafeRequestHeaders } from './support/app';
 import { openTestDatabase } from './support/harness';
 import { addTeamMember, signUpOwner } from './support/team';
 
-// F09 slice 1: adding a custom field and listing the business's fields. Whole stories by real people, plus the usual refusals and the fence between businesses.
+// F09 slices 1 and 2: adding, listing, changing and removing custom fields. Whole stories by real people, plus the usual refusals and the fence between businesses.
 
 let database: Database;
 let app: FastifyInstance;
@@ -192,5 +192,151 @@ describe('GET /api/v1/fields', () => {
     await owner.refused('GET', '/fields?object=deal', undefined, 400);
     const nobody = await app.inject({ method: 'GET', url: '/api/v1/fields' });
     expect(nobody.statusCode).toBe(401);
+  });
+});
+
+describe('PATCH /api/v1/fields/{id}', () => {
+  it('changes the name, choices and switches, keeping the key and type', async () => {
+    const owner = await signUpOwner(app, database);
+    const field = await owner.ok(
+      'POST',
+      '/fields',
+      { object: 'lead', label: 'Car model', type: 'dropdown', options: ['Swift'] },
+      201,
+    );
+    const changed = await owner.ok(
+      'PATCH',
+      `/fields/${field.id}`,
+      { label: ' Vehicle ', options: ['Swift', ' Baleno ', 'swift'], aiAsks: true, requiredForWon: true },
+      200,
+    );
+    expect(changed).toMatchObject({
+      id: field.id,
+      key: 'car_model',
+      type: 'dropdown',
+      label: 'Vehicle',
+      options: ['Swift', 'Baleno'],
+      aiAsks: true,
+      requiredForWon: true,
+    });
+    // Only what is sent changes
+    const again = await owner.ok('PATCH', `/fields/${field.id}`, { aiAsks: false }, 200);
+    expect(again).toMatchObject({
+      label: 'Vehicle',
+      options: ['Swift', 'Baleno'],
+      aiAsks: false,
+      requiredForWon: true,
+    });
+  });
+
+  it('refuses a bad change (400): nothing sent, key or type, choices on a non-dropdown, no choices left, required before Won off a lead', async () => {
+    const owner = await signUpOwner(app, database);
+    const dropdown = await owner.ok(
+      'POST',
+      '/fields',
+      { object: 'lead', label: 'Pick', type: 'dropdown', options: ['A'] },
+      201,
+    );
+    const text = await owner.ok('POST', '/fields', { object: 'contact', label: 'Note', type: 'text' }, 201);
+    await owner.refused('PATCH', `/fields/${dropdown.id}`, {}, 400);
+    await owner.refused('PATCH', `/fields/${dropdown.id}`, { key: 'sneaky' }, 400);
+    await owner.refused('PATCH', `/fields/${dropdown.id}`, { type: 'text' }, 400);
+    await owner.refused('PATCH', `/fields/${dropdown.id}`, { object: 'contact' }, 400);
+    await owner.refused('PATCH', `/fields/${dropdown.id}`, { label: '  ' }, 400);
+    await owner.refused('PATCH', `/fields/${dropdown.id}`, { options: [' ', ''] }, 400);
+    await owner.refused(
+      'PATCH',
+      `/fields/${dropdown.id}`,
+      { options: Array.from({ length: 31 }, (_, index) => `C${index}`) },
+      400,
+    );
+    await owner.refused('PATCH', `/fields/${text.id}`, { options: ['x'] }, 400);
+    await owner.refused('PATCH', `/fields/${text.id}`, { requiredForWon: true }, 400);
+    await owner.refused('PATCH', '/fields/not-an-id', { label: 'A' }, 400);
+    expect((await owner.ok('GET', '/fields?object=lead')).items[0]).toMatchObject({ label: 'Pick', options: ['A'] });
+  });
+
+  it('is 404 for an unknown, removed or another business’s field, and for managers only (403, 401)', async () => {
+    const owner = await signUpOwner(app, database);
+    const staff = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const stranger = await signUpOwner(app, database);
+    const field = await owner.ok('POST', '/fields', { object: 'lead', label: 'Mine', type: 'text' }, 201);
+    await stranger.refused('PATCH', `/fields/${field.id}`, { label: 'Hacked' }, 404);
+    await owner.refused('PATCH', `/fields/${crypto.randomUUID()}`, { label: 'A' }, 404);
+    await staff.refused('PATCH', `/fields/${field.id}`, { label: 'A' }, 403);
+    const nobody = await app.inject({
+      method: 'PATCH',
+      url: `/api/v1/fields/${field.id}`,
+      headers: unsafeRequestHeaders,
+      payload: { label: 'A' },
+    });
+    expect(nobody.statusCode).toBe(401);
+    await owner.ok('DELETE', `/fields/${field.id}`, undefined, 204);
+    await owner.refused('PATCH', `/fields/${field.id}`, { label: 'A' }, 404);
+    expect((await stranger.ok('GET', '/fields')).items).toEqual([]);
+  });
+
+  it('writes the activity log with no words', async () => {
+    const owner = await signUpOwner(app, database);
+    const field = await owner.ok('POST', '/fields', { object: 'lead', label: 'Plain', type: 'text' }, 201);
+    await owner.ok('PATCH', `/fields/${field.id}`, { label: 'Renamed Secret Words' }, 200);
+    const line = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', owner.businessId)
+      .where('kind', '=', 'fields.updated')
+      .executeTakeFirstOrThrow();
+    expect(JSON.stringify(line)).not.toContain('Renamed Secret Words');
+  });
+});
+
+describe('DELETE /api/v1/fields/{id}', () => {
+  it('archives the field: it leaves the list, its row and key stay, and its place is freed', async () => {
+    const owner = await signUpOwner(app, database);
+    const field = await owner.ok('POST', '/fields', { object: 'lead', label: 'Old', type: 'text' }, 201);
+    await owner.ok('DELETE', `/fields/${field.id}`, undefined, 204);
+    expect((await owner.ok('GET', '/fields')).items).toEqual([]);
+    const row = await database.system
+      .selectFrom('field_definitions')
+      .select(['key', 'archived_at'])
+      .where('id', '=', field.id)
+      .executeTakeFirstOrThrow();
+    expect(row.key).toBe('old');
+    expect(row.archived_at).not.toBeNull();
+    // The key stays taken
+    const next = await owner.ok('POST', '/fields', { object: 'lead', label: 'Old', type: 'text' }, 201);
+    expect(next.key).toBe('old_2');
+    await owner.refused('DELETE', `/fields/${field.id}`, undefined, 404);
+  });
+
+  it('is 404 for an unknown or another business’s field (left untouched), 403 for staff, 401 signed out, 400 for a bad id', async () => {
+    const owner = await signUpOwner(app, database);
+    const staff = await addTeamMember(app, database, owner, { name: 'Rahul Das', role: 'staff' });
+    const stranger = await signUpOwner(app, database);
+    const field = await owner.ok('POST', '/fields', { object: 'lead', label: 'Mine', type: 'text' }, 201);
+    await stranger.refused('DELETE', `/fields/${field.id}`, undefined, 404);
+    await owner.refused('DELETE', `/fields/${crypto.randomUUID()}`, undefined, 404);
+    await staff.refused('DELETE', `/fields/${field.id}`, undefined, 403);
+    await owner.refused('DELETE', '/fields/not-an-id', undefined, 400);
+    const nobody = await app.inject({
+      method: 'DELETE',
+      url: `/api/v1/fields/${field.id}`,
+      headers: unsafeRequestHeaders,
+    });
+    expect(nobody.statusCode).toBe(401);
+    expect((await owner.ok('GET', '/fields')).items).toHaveLength(1);
+  });
+
+  it('writes the activity log with no words', async () => {
+    const owner = await signUpOwner(app, database);
+    const field = await owner.ok('POST', '/fields', { object: 'lead', label: 'Gone Secret Words', type: 'text' }, 201);
+    await owner.ok('DELETE', `/fields/${field.id}`, undefined, 204);
+    const line = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', owner.businessId)
+      .where('kind', '=', 'fields.deleted')
+      .executeTakeFirstOrThrow();
+    expect(JSON.stringify(line)).not.toContain('Secret Words');
   });
 });

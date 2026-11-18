@@ -274,15 +274,24 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
             );
           }
         }
-        if (path === '/fields') {
+        if (path === '/fields' || path.startsWith('/fields/')) {
           const fieldsAnswer = answerFieldsCall(pretendApi.fields, {
             method: request.method(),
             path,
             search: new URL(request.url()).search,
-            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            body:
+              request.method() === 'GET' || request.method() === 'DELETE'
+                ? null
+                : (request.postDataJSON() as Record<string, unknown> | null),
             role: pretendApi.role,
           });
-          if (fieldsAnswer) return route.fulfill(json(fieldsAnswer.status, fieldsAnswer.body));
+          if (fieldsAnswer) {
+            return route.fulfill(
+              fieldsAnswer.body === undefined
+                ? { status: fieldsAnswer.status }
+                : json(fieldsAnswer.status, fieldsAnswer.body),
+            );
+          }
         }
         if (path === '/companies' || path.startsWith('/companies/') || /^\/contacts\/[\w-]+\/company$/u.test(path)) {
           const companiesAnswer = answerCompaniesCall(pretendApi.companies, {

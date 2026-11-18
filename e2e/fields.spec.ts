@@ -82,6 +82,41 @@ test.describe('Settings: Fields', () => {
     await expect(page.getByLabel('Field name')).toHaveValue('Notes');
   });
 
+  test('changes a field: the type is fixed, and only the changes are saved', async ({ page, pretendApi }) => {
+    await page.goto('/settings/fields');
+    await page.getByRole('button', { name: 'Leads' }).click();
+    await page.getByRole('button', { name: 'Change Car model' }).click();
+    await expect(page.getByLabel('Type')).toBeDisabled();
+    await expect(page.getByLabel('Field name')).toHaveValue('Car model');
+    await expect(page.getByLabel('Choices')).toHaveValue('Swift\nBaleno\nBrezza');
+    await page.getByLabel('Field name').fill('Vehicle');
+    await page.getByLabel('Choices').fill('Swift\nBaleno');
+    await page.getByLabel('The AI should ask for this').uncheck();
+    await page.getByRole('dialog').getByRole('button', { name: 'Save changes' }).click();
+
+    await expect(page.getByText('The field Vehicle was changed.')).toBeVisible();
+    expect(pretendApi.fields.patchedFields).toEqual([
+      { id: 'field-1', body: { label: 'Vehicle', options: ['Swift', 'Baleno'], aiAsks: false, requiredForWon: true } },
+    ]);
+    await expect(page.getByRole('heading', { name: 'Vehicle', level: 3 })).toBeVisible();
+  });
+
+  test('removes a field only after "Are you sure?" names it', async ({ page, pretendApi }) => {
+    await page.goto('/settings/fields');
+    await page.getByRole('button', { name: 'Remove Birthday' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Remove the field Birthday?')).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    expect(pretendApi.fields.removedFieldIds).toEqual([]);
+    await expect(page.getByRole('heading', { name: 'Birthday', level: 3 })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Remove Birthday' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Remove field' }).click();
+    await expect(page.getByText('The field Birthday was removed.')).toBeVisible();
+    expect(pretendApi.fields.removedFieldIds).toEqual(['field-2']);
+    await expect(page.getByRole('heading', { name: 'Birthday', level: 3 })).toHaveCount(0);
+  });
+
   test('shows an error with a retry when the fields cannot be loaded', async ({ page, pretendApi }) => {
     pretendApi.fields.fails = true;
     await page.goto('/settings/fields');

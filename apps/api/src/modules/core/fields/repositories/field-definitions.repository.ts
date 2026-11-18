@@ -121,3 +121,63 @@ export async function insertFieldDefinition(
     .executeTakeFirstOrThrow();
   return toFieldDefinition(row);
 }
+
+/** One live (not removed) field of the business with its object's rules, or undefined when there is none (or it belongs to another business). */
+export async function findFieldDefinition(
+  db: Db,
+  accountId: string,
+  fieldId: string,
+): Promise<FieldDefinition | undefined> {
+  const row = await db
+    .selectFrom('field_definitions')
+    .select(FIELD_COLUMNS)
+    .where('account_id', '=', accountId)
+    .where('id', '=', fieldId)
+    .where('archived_at', 'is', null)
+    .executeTakeFirst();
+  return row === undefined ? undefined : toFieldDefinition(row);
+}
+
+/** Changes the editable parts of a live field (only what is given) and returns it, or undefined when there is no such live field. */
+export async function updateFieldDefinition(
+  db: Db,
+  accountId: string,
+  fieldId: string,
+  changes: { label?: string; options?: string[]; aiAsks?: boolean; requiredForWon?: boolean },
+  actor: Actor,
+): Promise<FieldDefinition | undefined> {
+  const row = await db
+    .updateTable('field_definitions')
+    .set({
+      ...(changes.label !== undefined ? { label: changes.label } : {}),
+      ...(changes.options !== undefined ? { options: JSON.stringify(changes.options) } : {}),
+      ...(changes.aiAsks !== undefined ? { ai_asks: changes.aiAsks } : {}),
+      ...(changes.requiredForWon !== undefined ? { required_for_won: changes.requiredForWon } : {}),
+      updated_by: { kind: actor.kind, id: actor.id },
+      updated_at: new Date(),
+    })
+    .where('account_id', '=', accountId)
+    .where('id', '=', fieldId)
+    .where('archived_at', 'is', null)
+    .returning(FIELD_COLUMNS)
+    .executeTakeFirst();
+  return row === undefined ? undefined : toFieldDefinition(row);
+}
+
+/** Removes a field by archiving it (its values are kept, hidden, and the key stays taken). Returns false when there is no such live field. */
+export async function archiveFieldDefinition(
+  db: Db,
+  accountId: string,
+  fieldId: string,
+  actor: Actor,
+): Promise<boolean> {
+  const row = await db
+    .updateTable('field_definitions')
+    .set({ archived_at: new Date(), updated_by: { kind: actor.kind, id: actor.id }, updated_at: new Date() })
+    .where('account_id', '=', accountId)
+    .where('id', '=', fieldId)
+    .where('archived_at', 'is', null)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}

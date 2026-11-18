@@ -80,6 +80,7 @@ interface BusinessAData {
   invitationId: string;
   teamId: string;
   companyId: string;
+  fieldId: string;
   secretWords: string;
 }
 
@@ -239,7 +240,13 @@ beforeAll(async () => {
     201,
   );
   // A has a custom field with a secret label; B must never see it
-  await sendOk(businessA, 'POST', '/fields', { object: 'lead', label: `Field ${secretWords}`, type: 'text' }, 201);
+  const fieldOfA = await sendOk(
+    businessA,
+    'POST',
+    '/fields',
+    { object: 'lead', label: `Field ${secretWords}`, type: 'text' },
+    201,
+  );
   // A has a company with a secret name; B must never see it
   const companyOfA = await sendOk(
     businessA,
@@ -284,6 +291,7 @@ beforeAll(async () => {
     invitationId: invitationOfA.invitation.id,
     teamId: teamOfA.id,
     companyId: companyOfA.id,
+    fieldId: fieldOfA.id,
     secretWords,
   };
 
@@ -833,6 +841,18 @@ const attempts: Attempt[] = [
     what: "add a field as B (it lands in B's business only; A's fields stay as they were)",
     request: () => ({ method: 'POST', url: '/fields', payload: { object: 'lead', label: 'B only', type: 'text' } }),
     expectedStatus: 201,
+  },
+  {
+    route: 'PATCH /api/v1/fields/{id}',
+    what: "change A's field",
+    request: () => ({ method: 'PATCH', url: `/fields/${dataOfA.fieldId}`, payload: { label: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/fields/{id}',
+    what: "remove A's field",
+    request: () => ({ method: 'DELETE', url: `/fields/${dataOfA.fieldId}` }),
+    expectedStatus: 404,
   },
   {
     route: 'POST /api/v1/team/invitations',

@@ -6,6 +6,10 @@ import type { PretendAnswer } from './pretend-knowledge';
 export interface PretendFields {
   /** The fields the pretend API has, in the order to show them, as the real API sends them. */
   fields: Array<Record<string, unknown>>;
+  /** What the page sent to change a field, by field id. */
+  patchedFields: Array<{ id: string; body: Record<string, unknown> }>;
+  /** The ids of the fields the page removed. */
+  removedFieldIds: string[];
   /** What the page sent to add a field. */
   postedFields: Array<Record<string, unknown>>;
   /** When set, the next field is refused with this status, code and message. */
@@ -39,6 +43,8 @@ export function startingFields(): PretendFields {
         requiredForWon: false,
       },
     ],
+    patchedFields: [],
+    removedFieldIds: [],
     postedFields: [],
     refusal: null,
     fails: false,
@@ -56,6 +62,26 @@ export function answerFieldsCall(
     role: 'manager' | 'staff';
   },
 ): PretendAnswer | undefined {
+  const fieldIdMatch = /^\/fields\/([^/]+)$/u.exec(call.path);
+  if (fieldIdMatch && (call.method === 'PATCH' || call.method === 'DELETE')) {
+    if (call.role !== 'manager')
+      return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
+    const field = state.fields.find((candidate) => candidate['id'] === fieldIdMatch[1]);
+    if (!field) return { status: 404, body: { error: { code: 'NOT_FOUND', message: "That field wasn't found." } } };
+    if (state.refusal) {
+      const { status, code, message } = state.refusal;
+      state.refusal = null;
+      return { status, body: { error: { code, message } } };
+    }
+    if (call.method === 'DELETE') {
+      state.removedFieldIds.push(String(field['id']));
+      state.fields = state.fields.filter((candidate) => candidate !== field);
+      return { status: 204 };
+    }
+    state.patchedFields.push({ id: String(field['id']), body: call.body ?? {} });
+    Object.assign(field, call.body ?? {});
+    return { status: 200, body: field };
+  }
   if (call.path !== '/fields') return undefined;
   if (call.method === 'GET') {
     if (state.fails) return { status: 500, body: { error: { code: 'UNKNOWN_ERROR', message: 'Down.' } } };

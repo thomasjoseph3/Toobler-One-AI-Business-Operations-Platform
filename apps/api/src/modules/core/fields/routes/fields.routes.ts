@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import {
   createFieldRequestSchema,
+  fieldIdParamsSchema,
+  updateFieldRequestSchema,
   fieldDefinitionSchema,
   fieldsListResponseSchema,
   listFieldsQuerySchema,
@@ -9,7 +11,7 @@ import {
 import { unauthorized } from '../../../../kernel/errors';
 import { createFieldsService } from '../services/fields.service';
 
-/** Registers GET /api/v1/fields (the business's custom fields) and POST /api/v1/fields (add one). */
+/** Registers GET and POST /api/v1/fields (list, add) and PATCH and DELETE /api/v1/fields/{id} (change, remove). */
 export function fieldsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const fieldsService = createFieldsService({ database: app.kernel.database });
@@ -38,6 +40,30 @@ export function fieldsRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const field = await fieldsService.createField(request.principal, request.body);
       return reply.code(201).send(field);
+    },
+  );
+
+  // Managers only. The key, type and object never change.
+  typedApp.patch(
+    '/fields/:id',
+    {
+      config: { access: 'manager' },
+      schema: { params: fieldIdParamsSchema, body: updateFieldRequestSchema, response: { 200: fieldDefinitionSchema } },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return fieldsService.updateField(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // Managers only. Removing archives: the values are kept hidden for 30 days and the key stays taken.
+  typedApp.delete(
+    '/fields/:id',
+    { config: { access: 'manager' }, schema: { params: fieldIdParamsSchema } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await fieldsService.deleteField(request.principal, request.params.id);
+      return reply.code(204).send();
     },
   );
 }
