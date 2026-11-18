@@ -22,6 +22,8 @@ export const contactSchema = z.object({
   companyId: z.string().nullable(),
   /** The answers to the business's custom contact fields (F09), by field key; only live fields. */
   custom: customValuesSchema,
+  /** When an import made this contact (F12), or null for a contact added any other way. Shown as the tag "Imported". */
+  importedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

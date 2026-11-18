@@ -321,6 +321,8 @@ export interface ContactsTable {
   company_id: Generated<string | null>;
   /** Answers to the business's custom contact fields, by field key (F09). Kept for removed fields too, hidden. */
   custom: ColumnType<Record<string, unknown>, string | undefined, string>;
+  /** When an import made this contact (F12). */
+  imported_at: Date | null;
   deleted_at: Generated<Date | null>;
   created_by: Json | null;
   updated_by: Json | null;
@@ -445,6 +447,53 @@ export interface ContactListMembersTable {
   contact_id: string;
   added_by: Json | null;
   added_at: Generated<Date>;
+}
+
+/** A spreadsheet import (F12): the rows wait here while the columns are checked, then the run, the counts and the report. Fenced by account_id. */
+export interface ImportsTable {
+  id: string;
+  account_id: string;
+  object: 'contact';
+  file_name: string;
+  status: Generated<'uploaded' | 'ready' | 'running' | 'done' | 'failed'>;
+  /** The column names, written as JSON text and read back as a list. */
+  headers: ColumnType<string[], string, string>;
+  /** The rows (lists of texts), or null once the run ends. */
+  data: ColumnType<string[][] | null, string | null, string | null>;
+  row_count: number;
+  mapping: ColumnType<Array<string | null> | null, string | null | undefined, string | null>;
+  default_country: string;
+  counts: ColumnType<Record<string, number>, string | undefined, string>;
+  report: ColumnType<Array<{ row: number; reason: string; message: string }>, string | undefined, string>;
+  processed: Generated<number>;
+  error: string | null;
+  by_user_id: string;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  started_at: Date | null;
+  finished_at: Date | null;
+}
+
+/** A CSV export (F12): built by a job from a list's own filters, kept for 24 hours, given out by a link with a random token. Fenced by account_id. */
+export interface ExportsTable {
+  id: string;
+  account_id: string;
+  object: 'contact' | 'company' | 'lead';
+  query: Generated<string>;
+  status: Generated<'queued' | 'running' | 'done' | 'failed'>;
+  file_name: string | null;
+  content: Buffer | null;
+  row_count: number | null;
+  token_hash: string | null;
+  expires_at: Date | null;
+  error: string | null;
+  by_user_id: string;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
 }
 
 /** How a business shares out new leads (one row per business). Fenced by account_id. */
@@ -902,6 +951,8 @@ export interface DB {
   lost_reasons: LostReasonsTable;
   saved_views: SavedViewsTable;
   contact_lists: ContactListsTable;
+  imports: ImportsTable;
+  exports: ExportsTable;
   contact_list_members: ContactListMembersTable;
   assignment_rules: AssignmentRulesTable;
   assignment_rule_people: AssignmentRulePeopleTable;

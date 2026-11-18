@@ -9,6 +9,11 @@ export interface PretendBrowser {
     url: string,
     payload?: object,
   ): Promise<Awaited<ReturnType<FastifyInstance['inject']>>>;
+  /** Uploads one file the way a browser form does (multipart), with whichever cookies the browser would attach. */
+  upload(
+    url: string,
+    file: { fileName: string; content: Buffer; contentType?: string },
+  ): Promise<Awaited<ReturnType<FastifyInstance['inject']>>>;
   /** The names of the cookies the browser holds right now. */
   cookieNames(): string[];
   /** The value of one cookie, or undefined (what a thief with access to the browser could copy). */
@@ -43,6 +48,24 @@ export function createPretendBrowser(app: FastifyInstance): PretendBrowser {
         else cookieJar.set(cookie.name, cookie.value);
       }
       return response;
+    },
+    async upload(url, file) {
+      const boundary = '----toobler-test-boundary';
+      const head = Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${file.fileName}"\r\nContent-Type: ${file.contentType ?? 'application/octet-stream'}\r\n\r\n`,
+      );
+      const tail = Buffer.from(`\r\n--${boundary}--\r\n`);
+      const cookiesToSend = [...cookieJar.entries()].map(([name, value]) => `${name}=${value}`).join('; ');
+      return app.inject({
+        method: 'POST',
+        url,
+        headers: {
+          ...unsafeRequestHeaders,
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+          ...(cookiesToSend ? { cookie: cookiesToSend } : {}),
+        },
+        payload: Buffer.concat([head, file.content, tail]),
+      });
     },
     cookieNames: () => [...cookieJar.keys()],
     cookieValue: (name) => cookieJar.get(name),

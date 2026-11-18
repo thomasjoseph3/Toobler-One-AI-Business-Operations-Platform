@@ -18,6 +18,7 @@ const CONTACT_COLUMNS = [
   'lifecycle_stage',
   'company_id',
   'custom',
+  'imported_at',
   'created_at',
   'updated_at',
 ] as const;
@@ -42,6 +43,7 @@ function toContact(row: {
   lifecycle_stage: LifecycleStage;
   company_id: string | null;
   custom: Record<string, unknown>;
+  imported_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }): Contact {
@@ -54,6 +56,7 @@ function toContact(row: {
     lifecycleStage: row.lifecycle_stage,
     companyId: row.company_id,
     custom: toCustomValues(row.custom),
+    importedAt: row.imported_at?.toISOString() ?? null,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -404,4 +407,42 @@ export async function addCustomAnswersWhereEmpty(
     .returning('id')
     .executeTakeFirst();
   return row !== undefined;
+}
+
+/**
+ * Adds a contact made by an import, with all the details the file gave, unless a live contact already has this phone or email (the database's unique rules
+ * decide, so two rows or two imports at the same moment cannot both add it, and a refusal does not break the caller's transaction). Returns true when added.
+ */
+export async function insertImportedContactIfFree(
+  db: Db,
+  contact: {
+    id: string;
+    accountId: string;
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+    language: string | null;
+    custom: Record<string, unknown>;
+    importedAt: Date;
+    actor: Actor;
+  },
+): Promise<boolean> {
+  const actorStamp = { kind: contact.actor.kind, id: contact.actor.id };
+  const result = await db
+    .insertInto('contacts')
+    .values({
+      id: contact.id,
+      account_id: contact.accountId,
+      name: contact.name,
+      phone: contact.phone,
+      email: contact.email,
+      language: contact.language,
+      custom: JSON.stringify(contact.custom),
+      imported_at: contact.importedAt,
+      created_by: actorStamp,
+      updated_by: actorStamp,
+    })
+    .onConflict((conflict) => conflict.doNothing())
+    .executeTakeFirst();
+  return Number(result.numInsertedOrUpdatedRows ?? 0) > 0;
 }

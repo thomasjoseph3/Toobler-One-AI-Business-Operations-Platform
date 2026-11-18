@@ -28,6 +28,11 @@ export interface TeamMember {
   send(method: HttpMethod, url: string, payload?: object): Promise<Awaited<ReturnType<PretendBrowser['send']>>>;
   /** Sends a request as this person, checks it answered with `status`, and returns the body (nothing for 204). */
   ok(method: HttpMethod, url: string, payload?: object, status?: number): Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  /** Uploads a file as this person and returns the raw response. */
+  upload(
+    url: string,
+    file: { fileName: string; content: Buffer; contentType?: string },
+  ): Promise<Awaited<ReturnType<PretendBrowser['send']>>>;
   /** Sends a request that must be refused with `status`, and returns the error code. */
   refused(method: HttpMethod, url: string, payload: object | undefined, status: number): Promise<string>;
 }
@@ -39,6 +44,7 @@ function makeTeamMember(
   const member: TeamMember = {
     ...details,
     send: (method, url, payload) => details.browser.send(method, `/api/v1${url}`, payload),
+    upload: (url, file) => details.browser.upload(`/api/v1${url}`, file),
     async ok(method, url, payload, status = 200) {
       const response = await member.send(method, url, payload);
       expect(response.statusCode, `${details.name}: ${method} ${url} -> ${response.body}`).toBe(status);

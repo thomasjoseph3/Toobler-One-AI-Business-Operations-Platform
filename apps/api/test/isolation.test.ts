@@ -57,6 +57,26 @@ async function sendOk(person: SignedInPerson, method: string, url: string, paylo
   return response.statusCode === 204 ? undefined : response.json();
 }
 
+/** Uploads a file as this person (a spreadsheet for an import), the way a browser form does. */
+async function uploadAs(person: SignedInPerson, url: string, fileName: string, content: Buffer) {
+  const boundary = '----toobler-isolation-boundary';
+  const head = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: text/csv\r\n\r\n`,
+  );
+  const response = await app.inject({
+    method: 'POST',
+    url: `/api/v1${url}`,
+    headers: {
+      ...unsafeRequestHeaders,
+      'content-type': `multipart/form-data; boundary=${boundary}`,
+      cookie: person.cookieHeader,
+    },
+    payload: Buffer.concat([head, content, Buffer.from(`\r\n--${boundary}--\r\n`)]),
+  });
+  expect(response.statusCode, `upload ${url}: ${response.body}`).toBe(201);
+  return response.json();
+}
+
 /** Everything business A owns that business B will aim at. */
 interface BusinessAData {
   conversationId: string;
@@ -83,6 +103,7 @@ interface BusinessAData {
   fieldId: string;
   viewId: string;
   listId: string;
+  importId: string;
   secretWords: string;
 }
 
@@ -253,6 +274,13 @@ beforeAll(async () => {
   const viewOfA = await sendOk(businessA, 'POST', '/views', { object: 'lead', name: `View ${secretWords}` }, 201);
   // A has a contact list with a secret name; B must never see it
   const listOfA = await sendOk(businessA, 'POST', '/lists', { name: `List ${secretWords}` }, 201);
+  // A has an import waiting with a secret file; B must never see it
+  const importOfA = await uploadAs(
+    businessA,
+    '/imports',
+    'a.csv',
+    Buffer.from(`Phone,Name\n+971500000001,${secretWords}\n`),
+  );
   // A has a company with a secret name; B must never see it
   const companyOfA = await sendOk(
     businessA,
@@ -300,6 +328,7 @@ beforeAll(async () => {
     fieldId: fieldOfA.id,
     viewId: viewOfA.id,
     listId: listOfA.id,
+    importId: importOfA.id,
     secretWords,
   };
 
@@ -913,6 +942,24 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'GET /api/v1/imports/{id}',
+    what: "read A's import (its report and counts)",
+    request: () => ({ method: 'GET', url: `/imports/${dataOfA.importId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/imports/{id}',
+    what: "set the columns of A's import",
+    request: () => ({ method: 'PATCH', url: `/imports/${dataOfA.importId}`, payload: { targets: ['phone', 'name'] } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/imports/{id}/run',
+    what: "run A's import",
+    request: () => ({ method: 'POST', url: `/imports/${dataOfA.importId}/run` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/fields/reorder',
     what: "reorder with A's field id (B's own fields do not include it)",
     request: () => ({ method: 'POST', url: '/fields/reorder', payload: { object: 'lead', ids: [dataOfA.fieldId] } }),
@@ -1153,6 +1200,8 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'POST /api/v1/imports':
+    'the file lands in the caller’s own business only and names no other record (the business comes from the session); managers only, tested in imports.test.ts',
   'GET /api/v1/lists': 'covered by the list check, and by lists.test.ts',
   'GET /api/v1/views': 'covered by the list check, and by views.test.ts',
   'GET /api/v1/search':
