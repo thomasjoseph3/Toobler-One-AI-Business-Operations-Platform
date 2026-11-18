@@ -6,7 +6,23 @@
 
 ## Feature guide
 
-*(Written in full at the end of the last slice. Plan below.)*
+**What it does.** As a business grows, the full list of leads or contacts is too long to scan. This feature gives every person four ways to find what they work on: **search** (the box at the top: type a name, a phone number or an email and see matching contacts, companies and leads), **filters** (narrow a list by the business's own fields, such as "Car model is Swift" or "Guest count is more than 100", or by a lead's temperature), **saved views** (keep a filtered, sorted Leads list under a name like "My hot leads" and open it again from a tab) and **lists** (a fixed group of contacts, like "Diwali offer 2026", for campaigns later).
+
+**Why it is useful.** Each person sees just what they work on, without scanning hundreds of rows, and the same few clicks work on every list.
+
+**A day in the life.** Rahul filters the leads: owner is me, temperature is hot. He presses Save view and names it "My hot leads"; it is now a tab he opens every morning. The manager shares a "Hot this week" view so the whole team sees the same tab. A customer rings; Rahul types "98470" in the top box and finds her contact, her company and her open lead at once. Before Diwali, Meera filters contacts by "Car model is Swift", presses Save as list and calls it "Swift owners 2026"; later she adds two more people by hand.
+
+**Who can do what.** Everyone signed in can search, filter, save their own views and make or fill lists. Only a **manager** can share a view with the team or delete a list. A manager can also stop sharing or delete a shared view of anyone, but cannot change what it shows. Staff on "own leads only" find only their own leads, in search and in every filter.
+
+**Settings and limits.** Search shows at most 5 of each kind and needs 2 letters. At most 10 filters at once. At most 30 saved views per person per list. A list holds at most 5000 contacts. A list is **fixed**: it is made once, and a contact who changes later stays in it until someone removes them.
+
+**What it never does.** Filters never show data the person may not see. A bad filter is refused with a plain sentence, never ignored. Searching, filtering and saving views never change any lead or contact.
+
+**Not part of it.** Choosing which columns a list shows (the Phase 1 plan mentions it; the designer's column chooser is not built yet), sorting Contacts, Companies and Tasks by any field (Leads can sort; the others keep their fixed order), and filters on Tasks beyond the due tab, owner, lead and person they already have (tasks have no custom fields). Lists used for campaigns come with Phase 4.
+
+### For the tech team
+
+Modules `core.search`, `core.views` and `core.lists` (all core; lists requires contacts, search requires contacts, companies and leads; none owns another's table). Tables `saved_views` (063), `contact_lists` and `contact_list_members` (064). Routes: `GET /search`; `GET/POST /views`, `PATCH/DELETE /views/{id}`; `GET/POST /lists`, `GET/POST /lists/{id}/members`, `DELETE /lists/{id}/members/{contactId}`, `DELETE /lists/{id}`; and a `filters` query on `GET /leads`, `/contacts` and `/companies`. The filter engine: `packages/shared/src/filter-conditions.ts` (the one check), `apps/api/src/kernel/filters/conditions-to-sql.ts` (the one SQL builder, parameters only) and `read-filter-request.ts` (the one reader that answers 400 `INVALID_FILTERS`). No jobs, no events. Known limits: no column chooser; no sort fields on contacts and companies; search is a plain `ilike` (measured under 200 ms with 50,000 contacts, so no index yet).
 
 ## Reused from the hotel agent
 
