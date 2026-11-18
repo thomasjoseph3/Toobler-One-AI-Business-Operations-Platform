@@ -248,3 +248,65 @@ describe('GET /lists/{id}/members and POST /lists/{id}/members', () => {
     expect((await owner.ok('GET', '/lists')).items[0].memberCount).toBe(5000);
   });
 });
+
+describe('DELETE /lists/{id}/members/{contactId} and DELETE /lists/{id}', () => {
+  it('takes one person out of a list without touching the contact, and refuses someone who is not in it (404)', async () => {
+    const { owner, priya, rahul } = await businessWithContacts();
+    const list = await owner.ok('POST', '/lists', { name: 'Two', contactIds: [priya, rahul] }, 201);
+    await owner.ok('DELETE', `/lists/${list.id}/members/${priya}`, undefined, 204);
+    expect(
+      (await owner.ok('GET', `/lists/${list.id}/members`)).items.map((person: { id: string }) => person.id),
+    ).toEqual([rahul]);
+    expect((await owner.ok('GET', `/contacts/${priya}`)).id).toBe(priya);
+    await owner.refused('DELETE', `/lists/${list.id}/members/${priya}`, undefined, 404);
+    await owner.refused('DELETE', `/lists/${list.id}/members/0194c9a8-0000-7000-8000-000000000000`, undefined, 404);
+    await owner.refused('DELETE', `/lists/${list.id}/members/not-an-id`, undefined, 400);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', owner.businessId)
+      .where('kind', '=', 'lists.member_removed')
+      .execute();
+    expect(lines).toHaveLength(1);
+  });
+
+  it('lets any signed-in person remove people but only a manager delete a list', async () => {
+    const { owner, priya } = await businessWithContacts();
+    const staff = await addTeamMember(app, database, owner, { name: 'Asha', role: 'staff' });
+    const list = await owner.ok('POST', '/lists', { name: 'Team list', contactIds: [priya] }, 201);
+    await staff.ok('DELETE', `/lists/${list.id}/members/${priya}`, undefined, 204);
+    await staff.refused('DELETE', `/lists/${list.id}`, undefined, 403);
+    expect((await owner.ok('GET', '/lists')).items).toHaveLength(1);
+  });
+
+  it('deletes a list for good with its people rows, keeps the contacts, and logs it without the name', async () => {
+    const { owner, priya } = await businessWithContacts();
+    const list = await owner.ok('POST', '/lists', { name: 'Secret list', contactIds: [priya] }, 201);
+    await owner.ok('DELETE', `/lists/${list.id}`, undefined, 204);
+    expect((await owner.ok('GET', '/lists')).items).toEqual([]);
+    expect((await owner.ok('GET', `/contacts/${priya}`)).id).toBe(priya);
+    const rows = await database.system
+      .selectFrom('contact_list_members')
+      .select('list_id')
+      .where('list_id', '=', list.id)
+      .execute();
+    expect(rows).toEqual([]);
+    await owner.refused('DELETE', `/lists/${list.id}`, undefined, 404);
+    await owner.refused('GET', `/lists/${list.id}/members`, undefined, 404);
+    const lines = await database.system
+      .selectFrom('activity_log')
+      .selectAll()
+      .where('account_id', '=', owner.businessId)
+      .where('kind', '=', 'lists.deleted')
+      .execute();
+    expect(lines).toHaveLength(1);
+    expect(JSON.stringify(lines)).not.toContain('Secret list');
+  });
+
+  it('lets the name be used again after the list is deleted', async () => {
+    const { owner } = await businessWithContacts();
+    const first = await owner.ok('POST', '/lists', { name: 'Diwali' }, 201);
+    await owner.ok('DELETE', `/lists/${first.id}`, undefined, 204);
+    await owner.ok('POST', '/lists', { name: 'Diwali' }, 201);
+  });
+});

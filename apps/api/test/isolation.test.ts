@@ -901,6 +901,18 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'DELETE /api/v1/lists/{id}/members/{contactId}',
+    what: "take a person out of A's list",
+    request: () => ({ method: 'DELETE', url: `/lists/${dataOfA.listId}/members/${dataOfA.contactId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/lists/{id}',
+    what: "delete A's list",
+    request: () => ({ method: 'DELETE', url: `/lists/${dataOfA.listId}` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/fields/reorder',
     what: "reorder with A's field id (B's own fields do not include it)",
     request: () => ({ method: 'POST', url: '/fields/reorder', payload: { object: 'lead', ids: [dataOfA.fieldId] } }),

@@ -161,6 +161,45 @@ export function createListsService({ database }: { database: Database }) {
         return finishAdding(transaction, { accountId, listId, added, actor });
       });
     },
+
+    /** Takes one person out of a list (the contact itself is not touched). An unknown list, another business's list and a person who is not in the list are 404. */
+    async removeMember(
+      principal: Pick<Principal, 'accountId' | 'userId'>,
+      listId: string,
+      contactId: string,
+    ): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        if (!(await contactListsRepository.findContactListById(transaction, accountId, listId)))
+          throw notFound('That list');
+        if (!(await contactListsRepository.removeMember(transaction, { accountId, listId, contactId }))) {
+          throw notFound('That person in the list');
+        }
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'lists.member_removed',
+          details: { recordType: 'list', recordId: listId, fields: ['members'] },
+        });
+      });
+    },
+
+    /** Deletes a list for good (managers only; the route checks the role). Its people stay as contacts. An unknown list and another business's list are 404. */
+    async deleteList(principal: Pick<Principal, 'accountId' | 'userId'>, listId: string): Promise<void> {
+      const accountId = principal.accountId;
+      const actor: Actor = { kind: 'user', id: principal.userId };
+      await database.runInAccountTransaction(accountId, async (transaction) => {
+        if (!(await contactListsRepository.deleteContactList(transaction, accountId, listId)))
+          throw notFound('That list');
+        await writeActivityLog(transaction, {
+          accountId,
+          actor,
+          kind: 'lists.deleted',
+          details: { recordType: 'list', recordId: listId, fields: ['name'] },
+        });
+      });
+    },
   };
 }
 

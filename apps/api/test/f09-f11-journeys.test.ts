@@ -212,3 +212,58 @@ describe('journey: finding things and saving views', () => {
     expect((await owner.ok('GET', '/views?object=lead')).items).toEqual([]);
   });
 });
+
+describe('journey: filtering, then keeping a group of contacts as a list', () => {
+  it('add fields and contacts → filter contacts and leads → save the matching contacts as a list → add and remove people → staff cannot delete it → a manager does', async () => {
+    const owner = await signUpOwner(app, database);
+    const colleague = await addTeamMember(app, database, owner, { name: 'Asha', role: 'staff' });
+    await owner.ok(
+      'POST',
+      '/fields',
+      { object: 'contact', label: 'Car', type: 'dropdown', options: ['Swift', 'Baleno'] },
+      201,
+    );
+    await owner.ok('POST', '/fields', { object: 'lead', label: 'Guests', type: 'number' }, 201);
+    const make = async (name: string, car: string, guests: number) => {
+      const contact = await owner.ok('POST', '/contacts', { name, phone: uniqueUaeNumber(), custom: { car } }, 201);
+      const lead = await owner.ok('POST', '/leads', { contactId: contact.id, custom: { guests } }, 201);
+      return { contact: contact.id as string, lead: lead.id as string };
+    };
+    const priya = await make('Priya Menon', 'Swift', 50);
+    const rahul = await make('Rahul Nair', 'Baleno', 300);
+    const meera = await make('Meera Menon', 'Swift', 120);
+
+    // Filter the leads and the contacts with the same engine
+    const bigLeads = await colleague.ok(
+      'GET',
+      `/leads?filters=${encodeURIComponent(JSON.stringify([{ field: 'custom.guests', operator: 'greater_than', value: 100 }]))}`,
+    );
+    expect(bigLeads.items.map((lead: { id: string }) => lead.id).sort()).toEqual([rahul.lead, meera.lead].sort());
+    const swiftFilter = JSON.stringify([{ field: 'custom.car', operator: 'is', value: 'Swift' }]);
+    const swiftContacts = await colleague.ok('GET', `/contacts?filters=${encodeURIComponent(swiftFilter)}`);
+    expect(swiftContacts.total).toBe(2);
+
+    // Save the contacts matching that view as a list (staff may make lists)
+    const list = await colleague.ok(
+      'POST',
+      '/lists',
+      { name: 'Swift owners', fromView: { filters: swiftFilter } },
+      201,
+    );
+    expect(list.memberCount).toBe(2);
+
+    // Add another by hand, then take one out; the contacts themselves are untouched
+    await colleague.ok('POST', `/lists/${list.id}/members`, { contactIds: [rahul.contact] });
+    await colleague.ok('DELETE', `/lists/${list.id}/members/${priya.contact}`, undefined, 204);
+    const people = (await owner.ok('GET', `/lists/${list.id}/members`)).items
+      .map((person: { id: string }) => person.id)
+      .sort();
+    expect(people).toEqual([meera.contact, rahul.contact].sort());
+    expect((await owner.ok('GET', `/contacts/${priya.contact}`)).id).toBe(priya.contact);
+
+    // Only a manager deletes the list
+    await colleague.refused('DELETE', `/lists/${list.id}`, undefined, 403);
+    await owner.ok('DELETE', `/lists/${list.id}`, undefined, 204);
+    expect((await colleague.ok('GET', '/lists')).items).toEqual([]);
+  });
+});

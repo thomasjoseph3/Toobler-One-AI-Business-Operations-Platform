@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import type { AddListMembersResponse, ListMembersResponse } from '@toobler-one/shared';
 import {
   Alert,
   Button,
   Card,
+  ConfirmDialog,
   ContactsIcon,
   EmptyState,
   ErrorState,
@@ -23,6 +24,7 @@ import { ApiRequestError, apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { findLeadDisplayName } from '../leads/lead-display';
+import { useSession } from '../../auth/session';
 import { MINIMUM_SEARCH_LENGTH, useContactSearch } from '../leads/useContactSearch';
 import { useKeptData } from '../knowledge/use-kept-resource';
 
@@ -45,6 +47,13 @@ function describeAddProblem(error: unknown): string {
  */
 export function ListPage() {
   const { listId = '' } = useParams();
+  const navigate = useNavigate();
+  const { sessionState } = useSession();
+  const isManager = sessionState.status === 'signedIn' && sessionState.profile.user.role === 'manager';
+  // The person to take out (asks "Are you sure?" naming them), and whether the whole list is being deleted
+  const [personToRemove, setPersonToRemove] = useState<{ id: string; displayName: string } | null>(null);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
   const [page, setPage] = useState(1);
   const resource = useApiResource<ListMembersResponse>(
     `/lists/${listId}/members?page=${page}&limit=${MEMBERS_PAGE_SIZE}`,
@@ -73,6 +82,36 @@ export function ListPage() {
       setNotice({ tone: 'error', text: describeAddProblem(error) });
     } finally {
       setIsAdding(false);
+    }
+  }
+
+  // Takes the person out of the list (after the person said yes), then loads the list again
+  async function removePerson() {
+    if (personToRemove === null) return;
+    setIsBusy(true);
+    try {
+      await apiRequest('DELETE', `/lists/${listId}/members/${personToRemove.id}`);
+      setNotice({ tone: 'success', text: formatMessage('lists.remove.done', { name: personToRemove.displayName }) });
+    } catch (error) {
+      setNotice({ tone: 'error', text: describeAddProblem(error) });
+    }
+    setPersonToRemove(null);
+    setIsBusy(false);
+    resource.reload();
+  }
+
+  // Deletes the whole list (managers, after "Are you sure?"), then goes back to the lists with the news
+  async function deleteList(listName: string) {
+    setIsBusy(true);
+    try {
+      await apiRequest('DELETE', `/lists/${listId}`);
+      navigate('/contacts/lists', {
+        state: { notice: { tone: 'success', text: formatMessage('lists.delete.done', { name: listName }) } },
+      });
+    } catch (error) {
+      setIsConfirmingDelete(false);
+      setNotice({ tone: 'error', text: describeAddProblem(error) });
+      setIsBusy(false);
     }
   }
 
@@ -127,7 +166,38 @@ export function ListPage() {
     <>
       {backLink}
       <h2 className="text-heading-lg text-text-primary [overflow-wrap:anywhere]">{data.list.name}</h2>
-      <p className="text-body-md mb-4 text-text-secondary">{formatMessage('lists.members', { count: data.total })}</p>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <p className="text-body-md text-text-secondary">{formatMessage('lists.members', { count: data.total })}</p>
+        {isManager ? (
+          <Button size="compact" disabled={isBusy} onClick={() => setIsConfirmingDelete(true)}>
+            {t('lists.delete.button')}
+          </Button>
+        ) : null}
+      </div>
+      <ConfirmDialog
+        isOpen={isConfirmingDelete}
+        tone="danger"
+        title={formatMessage('lists.delete.title', { name: data.list.name })}
+        description={t('lists.delete.description')}
+        confirmLabel={t('lists.delete.confirm')}
+        cancelLabel={t('leadForm.cancel')}
+        closeLabel={t('leadForm.close')}
+        isConfirming={isBusy}
+        onConfirm={() => void deleteList(data.list.name)}
+        onCancel={() => setIsConfirmingDelete(false)}
+      />
+      <ConfirmDialog
+        isOpen={personToRemove !== null}
+        tone="danger"
+        title={formatMessage('lists.remove.title', { name: personToRemove?.displayName ?? '', list: data.list.name })}
+        description={t('lists.remove.description')}
+        confirmLabel={t('lists.remove.confirm')}
+        cancelLabel={t('leadForm.cancel')}
+        closeLabel={t('leadForm.close')}
+        isConfirming={isBusy}
+        onConfirm={() => void removePerson()}
+        onCancel={() => setPersonToRemove(null)}
+      />
       {notice !== null ? (
         <Alert tone={notice.tone} className="mb-4">
           {notice.text}
@@ -198,6 +268,9 @@ export function ListPage() {
                   <TableHeaderCell>{t('lists.members.name')}</TableHeaderCell>
                   <TableHeaderCell>{t('lists.members.phone')}</TableHeaderCell>
                   <TableHeaderCell>{t('lists.members.email')}</TableHeaderCell>
+                  <TableHeaderCell>
+                    <span className="sr-only">{t('lists.members.actions')}</span>
+                  </TableHeaderCell>
                 </tr>
               </TableHead>
               <TableBody>
@@ -210,6 +283,16 @@ export function ListPage() {
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{member.phone}</TableCell>
                     <TableCell className="[overflow-wrap:anywhere]">{member.email}</TableCell>
+                    <TableCell className="w-28">
+                      <Button
+                        size="compact"
+                        disabled={isBusy}
+                        aria-label={formatMessage('lists.remove.button.label', { name: findLeadDisplayName(member) })}
+                        onClick={() => setPersonToRemove({ id: member.id, displayName: findLeadDisplayName(member) })}
+                      >
+                        {t('lists.remove.button')}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

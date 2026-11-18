@@ -85,6 +85,8 @@ export interface PretendApi {
     /** The people in each list (the contact ids), what the page sent to add, and a way to make adding fail. */
     members: Record<string, string[]>;
     addedMembers: Array<{ listId: string; contactIds: string[] }>;
+    removedMembers: Array<{ listId: string; contactId: string }>;
+    deletedLists: string[];
     addRefusal: { status: number; code: string; message: string } | null;
   };
   /** Saved views of the Leads list: what is saved, what the page sent, and a way to make saving fail. */
@@ -263,6 +265,8 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           listFails: false,
           members: {},
           addedMembers: [],
+          removedMembers: [],
+          deletedLists: [],
           addRefusal: null,
         },
         views: { items: [], created: [], patched: [], deletedIds: [], refusal: null },
@@ -561,7 +565,23 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        const removeMemberMatch = /^\/lists\/([^/]+)\/members\/([^/]+)$/.exec(path);
+        if (removeMemberMatch && request.method() === 'DELETE') {
+          const [, listId, contactId] = removeMemberMatch as unknown as [string, string, string];
+          pretendApi.lists.removedMembers.push({ listId, contactId });
+          pretendApi.lists.members[listId] = (pretendApi.lists.members[listId] ?? []).filter((id) => id !== contactId);
+          const list = pretendApi.lists.items.find((item) => item.id === listId);
+          if (list) list.memberCount = pretendApi.lists.members[listId]!.length;
+          return route.fulfill({ status: 204 });
+        }
         const listMembersMatch = /^\/lists\/([^/]+)\/members$/.exec(path);
+        const oneListMatch = /^\/lists\/([^/]+)$/.exec(path);
+        if (oneListMatch && request.method() === 'DELETE') {
+          const listId = oneListMatch[1]!;
+          pretendApi.lists.deletedLists.push(listId);
+          pretendApi.lists.items = pretendApi.lists.items.filter((item) => item.id !== listId);
+          return route.fulfill({ status: 204 });
+        }
         if (listMembersMatch) {
           const listId = listMembersMatch[1]!;
           const list = pretendApi.lists.items.find((item) => item.id === listId);

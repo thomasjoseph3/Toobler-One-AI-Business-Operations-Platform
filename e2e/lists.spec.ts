@@ -81,7 +81,7 @@ test.describe('One contact list', () => {
     await page.getByRole('button', { name: 'Add Priya Menon to the list' }).click();
     await expect(page.getByRole('status').filter({ hasText: 'Priya Menon was added to the list.' })).toBeVisible();
     expect(pretendApi.lists.addedMembers).toEqual([{ listId: 'list-1', contactIds: ['contact-priya'] }]);
-    await expect(page.getByRole('cell', { name: 'Priya Menon' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Priya Menon', exact: true })).toBeVisible();
 
     await page.getByLabel('Find a person to add').fill('priya');
     await page.getByRole('button', { name: 'Add Priya Menon to the list' }).click();
@@ -97,5 +97,53 @@ test.describe('One contact list', () => {
     await page.getByLabel('Find a person to add').fill('priya');
     await page.getByRole('button', { name: 'Add Priya Menon to the list' }).click();
     await expect(page.getByRole('alert').filter({ hasText: 'at most 5000' })).toBeVisible();
+  });
+});
+
+test.describe('Removing people and deleting a list', () => {
+  const diwali = { id: 'list-1', name: 'Diwali offer 2026', memberCount: 1, createdAt: '2026-11-18T10:00:00.000Z' };
+
+  test('asks "Are you sure?" naming the person before taking them out, and Cancel keeps them', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.lists.items = [{ ...diwali }];
+    pretendApi.lists.members['list-1'] = ['contact-priya'];
+    await page.goto('/contacts/lists/list-1');
+    await page.getByRole('button', { name: 'Remove Priya Menon from the list' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Remove Priya Menon from Diwali offer 2026?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    expect(pretendApi.lists.removedMembers).toEqual([]);
+    await page.getByRole('button', { name: 'Remove Priya Menon from the list' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Remove from list' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Priya Menon was removed from the list.' })).toBeVisible();
+    expect(pretendApi.lists.removedMembers).toEqual([{ listId: 'list-1', contactId: 'contact-priya' }]);
+    await expect(page.getByText('Nobody is in this list yet')).toBeVisible();
+  });
+
+  test('a manager deletes the list after "Are you sure?" naming it, and lands on the Lists page with the news', async ({
+    page,
+    pretendApi,
+  }) => {
+    pretendApi.lists.items = [{ ...diwali }];
+    await page.goto('/contacts/lists/list-1');
+    await page.getByRole('button', { name: 'Delete list' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Delete the list Diwali offer 2026?' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Delete list' }).click();
+    await expect(page).toHaveURL(/\/contacts\/lists$/);
+    await expect(page.getByRole('status').filter({ hasText: 'The list Diwali offer 2026 was deleted.' })).toBeVisible();
+    expect(pretendApi.lists.deletedLists).toEqual(['list-1']);
+    await expect(page.getByText('No lists yet')).toBeVisible();
+  });
+
+  test('staff can remove people but are not offered Delete list', async ({ page, pretendApi }) => {
+    pretendApi.role = 'staff';
+    pretendApi.lists.items = [{ ...diwali }];
+    pretendApi.lists.members['list-1'] = ['contact-priya'];
+    await page.goto('/contacts/lists/list-1');
+    await expect(page.getByRole('button', { name: 'Remove Priya Menon from the list' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete list' })).toHaveCount(0);
   });
 });

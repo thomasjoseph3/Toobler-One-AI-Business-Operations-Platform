@@ -267,6 +267,8 @@ Every route must say who may call it (a route without that declaration does not 
 | POST | `/api/v1/lists` | Any signed-in person |
 | GET | `/api/v1/lists/{id}/members` | Any signed-in person |
 | POST | `/api/v1/lists/{id}/members` | Any signed-in person |
+| DELETE | `/api/v1/lists/{id}/members/{contactId}` | Any signed-in person |
+| DELETE | `/api/v1/lists/{id}` | Managers only (403 for staff) |
 | GET | `/api/v1/views?object=lead` | Any signed-in person (their own views and the ones shared with the team) |
 | POST | `/api/v1/views` | Any signed-in person (the view is their own; sharing comes in slice 3 and is for managers) |
 | PATCH | `/api/v1/views/{id}` | The owner (their own view); only a manager sets `shared`; a manager can also change a shared view of anyone but only share or stop sharing it. Another person's unshared view is 404, a shared view they may not change is 403 |

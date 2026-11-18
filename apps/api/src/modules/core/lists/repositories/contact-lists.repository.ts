@@ -146,3 +146,29 @@ export async function lockContactList(db: Db, accountId: string, listId: string)
     .executeTakeFirst();
   return row !== undefined;
 }
+
+/** Takes one contact out of a list. Returns false when that contact was not in the list. */
+export async function removeMember(
+  db: Db,
+  options: { accountId: string; listId: string; contactId: string },
+): Promise<boolean> {
+  const row = await db
+    .deleteFrom('contact_list_members')
+    .where('account_id', '=', options.accountId)
+    .where('list_id', '=', options.listId)
+    .where('contact_id', '=', options.contactId)
+    .returning('contact_id')
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/** Deletes a list for good; its member rows go with it. The contacts themselves are not touched. Returns false when there is no such list. */
+export async function deleteContactList(db: Db, accountId: string, listId: string): Promise<boolean> {
+  const row = await db
+    .deleteFrom('contact_lists')
+    .where('account_id', '=', accountId)
+    .where('id', '=', listId)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}

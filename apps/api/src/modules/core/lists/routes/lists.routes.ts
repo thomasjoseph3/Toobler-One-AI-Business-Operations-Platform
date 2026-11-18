@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
 import {
   addListMembersRequestSchema,
   addListMembersResponseSchema,
@@ -7,13 +8,14 @@ import {
   contactListsResponseSchema,
   createListRequestSchema,
   listIdParamsSchema,
+  listMemberParamsSchema,
   listMembersQuerySchema,
   listMembersResponseSchema,
 } from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createListsService } from '../services/lists.service';
 
-/** Registers /api/v1/lists (the static contact lists: list them, make one) and /lists/{id}/members (read a list's people, add people). */
+/** Registers /api/v1/lists (the static contact lists: list them, make one) and /lists/{id}/members (read a list's people, add people), /lists/{id}/members/{contactId} (take one out) and /lists/{id} (delete). */
 export function listsRoutes(app: FastifyInstance) {
   const typedApp = app.withTypeProvider<ZodTypeProvider>();
   const listsService = createListsService({ database: app.kernel.database });
@@ -70,6 +72,28 @@ export function listsRoutes(app: FastifyInstance) {
     async (request) => {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       return listsService.addMembers(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // For any signed-in, verified person. Takes one person out of the list; the contact is not touched.
+  typedApp.delete(
+    '/lists/:id/members/:contactId',
+    { config: { access: 'staff' }, schema: { params: listMemberParamsSchema, response: { 204: z.null() } } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await listsService.removeMember(request.principal, request.params.id, request.params.contactId);
+      return reply.code(204).send(null);
+    },
+  );
+
+  // For managers only (the guard answers 403 to staff). Deletes the list for good; its people stay as contacts.
+  typedApp.delete(
+    '/lists/:id',
+    { config: { access: 'manager' }, schema: { params: listIdParamsSchema, response: { 204: z.null() } } },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await listsService.deleteList(request.principal, request.params.id);
+      return reply.code(204).send(null);
     },
   );
 }

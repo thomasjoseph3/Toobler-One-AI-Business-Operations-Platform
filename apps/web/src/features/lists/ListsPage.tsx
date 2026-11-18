@@ -1,7 +1,8 @@
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import type { ContactListsResponse } from '@toobler-one/shared';
 import {
+  Alert,
   Button,
   Card,
   ContactsIcon,
@@ -24,6 +25,8 @@ import { formatMessage, t } from '../../app/i18n';
  */
 export function ListsPage() {
   const resource = useApiResource<ContactListsResponse>('/lists');
+  // A confirmation another page left behind ("The list X was deleted.")
+  const leftBehind = (useLocation().state as { notice?: { text?: unknown } } | null)?.notice?.text;
   const backLink = (
     <Link
       to="/contacts"
@@ -83,6 +86,11 @@ export function ListsPage() {
       {backLink}
       <h2 className="text-heading-lg text-text-primary">{t('lists.heading')}</h2>
       <p className="text-body-md mb-4 text-text-secondary">{t('lists.description')}</p>
+      {typeof leftBehind === 'string' ? (
+        <Alert tone="success" className="mb-4">
+          {leftBehind}
+        </Alert>
+      ) : null}
       <Card isFlush>{body}</Card>
     </>
   );
