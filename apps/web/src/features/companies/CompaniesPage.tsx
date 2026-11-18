@@ -14,6 +14,9 @@ import {
   TextField,
 } from '@toobler-one/ui';
 import { useApiResource } from '../../api/useApiResource';
+import { useSession } from '../../auth/session';
+import { ExportButton } from '../exports/ExportButton';
+import { buildCompaniesExportRequest } from '../exports/exports-state';
 import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { ConditionsEditor } from '../shared/ConditionsEditor';
 import { listFilterableCustomFields } from '../shared/filter-conditions-ui';
@@ -52,6 +55,8 @@ export function CompaniesPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const view = readCompaniesView(searchParams);
+  const { sessionState } = useSession();
+  const isManager = sessionState.status === 'signedIn' && sessionState.profile.user.role === 'manager';
   const filterableFields = listFilterableCustomFields(useFieldDefinitions('company'));
   const companiesResource = useApiResource<CompaniesListResponse>(buildCompaniesPath(view));
   const [typedSearch, setTypedSearch] = useState(view.searchText);
@@ -132,9 +137,12 @@ export function CompaniesPage() {
             </ListFilterPopover>
           ) : null}
         </div>
-        <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} onClick={openForm}>
-          {t('companies.add')}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {isManager ? <ExportButton request={buildCompaniesExportRequest(view)} /> : null}
+          <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} onClick={openForm}>
+            {t('companies.add')}
+          </Button>
+        </div>
       </div>
       <CompanyFormPanel
         key={formOpenCount}

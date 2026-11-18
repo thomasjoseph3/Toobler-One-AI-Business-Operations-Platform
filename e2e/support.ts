@@ -3,6 +3,7 @@ import { answerFaqsCall, startingFaqs, type PretendFaqs } from './pretend-faqs';
 import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from './pretend-knowledge';
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
 import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
+import { answerImportsCall, startingImports, type PretendImports } from './pretend-imports';
 import { answerTasksCall, startingTasks, type PretendTasks } from './pretend-tasks';
 import {
   answerCompaniesCall,
@@ -76,6 +77,8 @@ export interface PretendApi {
   leadEdits: Record<string, Record<string, unknown>>;
   /** The temperatures the page set by hand with `PATCH /leads/{id}/temperature`. */
   temperatureChanges: Array<{ leadId: string; temperature: string }>;
+  /** Imports and exports of contacts, companies and leads. */
+  imports: PretendImports;
   /** Contact lists: what is saved, what the page sent, and ways to make the list or the save fail. */
   lists: {
     items: Array<Record<string, unknown>>;
@@ -258,6 +261,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         patchedLeads: [],
         leadEdits: {},
         temperatureChanges: [],
+        imports: startingImports(),
         lists: {
           items: [],
           created: [],
@@ -565,6 +569,27 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        if (path.startsWith('/imports') || path.startsWith('/exports')) {
+          const importsAnswer = answerImportsCall(pretendApi.imports, {
+            method: request.method(),
+            path,
+            body:
+              request.method() === 'GET' || request.headers()['content-type']?.startsWith('multipart/')
+                ? null
+                : (request.postDataJSON() as Record<string, unknown> | null),
+            fileName: /filename="([^"]+)"/u.exec(request.postData() ?? '')?.[1] ?? null,
+          });
+          if (importsAnswer) {
+            if (importsAnswer.text !== undefined) {
+              return route.fulfill({
+                status: importsAnswer.status,
+                body: importsAnswer.text,
+                headers: importsAnswer.headers ?? {},
+              });
+            }
+            return route.fulfill(json(importsAnswer.status, importsAnswer.body));
+          }
+        }
         const removeMemberMatch = /^\/lists\/([^/]+)\/members\/([^/]+)$/.exec(path);
         if (removeMemberMatch && request.method() === 'DELETE') {
           const [, listId, contactId] = removeMemberMatch as unknown as [string, string, string];

@@ -6,7 +6,23 @@
 
 ## Feature guide
 
-*(Written in full before hand-off. Plan below.)*
+**What it does.** A business can bring in the customers it already has from a spreadsheet (Excel or CSV), and take any list out again as a spreadsheet. **Import** (Contacts → Import): choose a file, see which column the system thinks is the name, phone, email, company and so on (and fix any wrong guess), see how many people would be new, how many are already in your contacts and how many rows would be skipped, then press Import and read the report. **Export** (the Export button on Contacts, Companies and Leads): you get a CSV file of exactly what the list on your screen shows, with your own custom fields, by email and as a download.
+
+**Why it is useful.** Every business already has customers somewhere: a notebook, an Excel sheet, a phone. Starting from zero is a reason not to switch. And a business must always be able to take its own data away.
+
+**A day in the life.** Meera's school has 1,300 families in an Excel sheet. She opens Contacts → Import, chooses the file, and sees "1,240 new contacts, 46 match contacts you already have (they will be updated, not added twice), 14 rows will be skipped." She fixes one column that was guessed wrong, presses Import, watches the progress bar, and reads that row 5 had a phone number that is not a number. She fixes the sheet and imports it again: nobody is added twice. Later she filters Contacts by "Car model is Swift", presses Export, and gets an email with a link to a file that has exactly those people.
+
+**Who can do what.** Only **managers** can import and export. Staff see no Import or Export button, and the routes refuse them.
+
+**Settings and limits.** A file can be CSV or Excel (.xlsx), up to 10 MB, 50,000 rows and 60 columns. A person already in your contacts is found the way the AI finds them (the phone, then the email), updated and never added twice: the file fills in what the contact is missing (name, phone, email, language) and sets the custom answers it has; a name or detail a contact already has is never replaced, and a phone or email that belongs to a different contact is never moved. People made by an import are tagged **Imported** (so they can be told apart when marketing arrives in a later phase). An export holds at most 50,000 rows and the file is kept for 24 hours.
+
+**What it never does.** It never imports anything until you press Import. It never makes a duplicate. It never guesses at a phone number, email or language it cannot read: the row is skipped and the report says why (never repeating what the row held). The rows of your file are deleted from our database as soon as the import ends; only the counts and the report stay. An export cell that begins like a spreadsheet formula (=, +, -, @) is written as plain text, so opening the file can never run anything; phone numbers come out exactly as they are in the system.
+
+**Not part of it.** Importing companies, leads or tickets (only contacts so far); exporting as an Excel (.xlsx) file (CSV opens in Excel and Google Sheets); a "Delete the import" undo; exporting tickets, tasks or notes; sending marketing messages (Phase 4).
+
+### For the tech team
+
+Modules `core.imports` and `core.exports` (core; each requires auth, contacts, companies and fields; exports also leads). Tables `imports` and `exports` (migrations 066 and 067) and `contacts.imported_at` (065). Routes (all `manager`): `POST /imports` (multipart), `PATCH /imports/{id}`, `POST /imports/{id}/run`, `GET /imports/{id}`; `POST /exports`, `GET /exports/{id}`, `GET /exports/{id}/download`. Jobs: `imports.run` (250-row chunks, each with its progress in one transaction, so a retry resumes), `exports.build`, and `exports.purge_expired` (hourly, one `exports.purge_expired_for_business` per business). The row matching is `applyImportedContact` in the contacts module (`index.ts`); each list module reads its own rows for export (`findContactsForExport`, `findCompaniesForExport`, `findLeadsForExport`) through the same filter reader as the list. The CSV writer is `apps/api/src/kernel/csv/write-csv.ts`. Packages: `@fastify/multipart`, `csv-parse`, `read-excel-file` (docs/DEPENDENCIES.md). Measured: a 10,000-row file imports in about 30 s locally (limit 120 s). Known limits: the import's upload and rows live in a jsonb column (10 MB file limit keeps it small); an export's bad `filters` only fails when the file is built (the screen always sends the list's valid ones); times in an export are UTC dates.
 
 ## Reused from the hotel agent
 

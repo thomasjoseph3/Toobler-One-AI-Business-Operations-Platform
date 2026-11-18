@@ -122,6 +122,12 @@ function findStandardTarget(header: string): StandardImportTarget | null {
   if (EMAIL_WORDS.includes(word)) return 'email';
   if (COMPANY_WORDS.includes(word)) return 'company';
   if (LANGUAGE_WORDS.includes(word)) return 'language';
+  // Not an exact word: look for the part that gives it away ("Mobile No", "Phone (WhatsApp)", "Company name", "Client email id"), most telling first
+  if (word.includes('mail')) return 'email';
+  if (/phone|mobile|whatsapp|telephone|contactno|cellno/u.test(word)) return 'phone';
+  if (/company|organi[sz]ation|firm|employer/u.test(word)) return 'company';
+  if (/language/u.test(word)) return 'language';
+  if (/name$/u.test(word)) return 'name';
   return null;
 }
 

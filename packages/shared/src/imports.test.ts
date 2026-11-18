@@ -18,8 +18,18 @@ describe('guessColumnTargets', () => {
   it('knows the usual names for name, phone, email, company and language, whatever the capitals and punctuation', () => {
     expect(
       guessColumnTargets(['Full Name', 'Mobile No.', 'E-mail', 'Organisation', 'Language', 'Notes'], fields),
-    ).toEqual(['name', null, 'email', 'company', 'language', null]);
+    ).toEqual(['name', 'phone', 'email', 'company', 'language', null]);
     expect(guessColumnTargets(['NAME', 'Phone Number', 'EMAIL ADDRESS'], fields)).toEqual(['name', 'phone', 'email']);
+  });
+
+  it('knows names that only contain the telling word', () => {
+    expect(
+      guessColumnTargets(
+        ['Mobile No', 'Phone (WhatsApp)', 'Client Email ID', 'Company Name', 'Preferred Language', 'Guest Name'],
+        [],
+      ),
+    ).toEqual(['phone', null, 'email', 'company', 'language', 'name']);
+    expect(guessColumnTargets(['Source', 'Notes', 'Nickname'], [])).toEqual([null, null, 'name']);
   });
 
   it('knows the business’s own contact fields by label or key', () => {

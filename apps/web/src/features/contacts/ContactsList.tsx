@@ -28,7 +28,11 @@ export interface ContactsTableProps {
 /** The contact's stage as a tag: the word always shows, the colour is only a hint. */
 function StageTag({ contact }: { contact: Contact }) {
   return (
-    <Tag tone={findLifecycleTagTone(contact.lifecycleStage)}>{t(findLifecycleLabelKey(contact.lifecycleStage))}</Tag>
+    <span className="inline-flex flex-wrap items-center gap-1">
+      <Tag tone={findLifecycleTagTone(contact.lifecycleStage)}>{t(findLifecycleLabelKey(contact.lifecycleStage))}</Tag>
+      {/* A contact an import made is marked in words (never colour alone) */}
+      {contact.importedAt !== null ? <Tag tone="neutral">{t('contacts.imported')}</Tag> : null}
+    </span>
   );
 }
 

@@ -40,9 +40,10 @@ async function sendOnce<Answer>(method: string, path: string, body?: unknown): P
         Accept: 'application/json',
         // The API refuses any change that does not carry this header: a page on another website cannot add it (CSRF)
         'X-Requested-With': 'toobler-web',
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        // A file upload (FormData) sets its own Content-Type with the boundary; everything else is JSON
+        ...(body === undefined || body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(body === undefined ? {} : { body: body instanceof FormData ? body : JSON.stringify(body) }),
     });
   } catch {
     // The browser could not reach the API at all (offline, server down)
@@ -107,6 +108,44 @@ export async function apiRequest<Answer>(
     const canRefresh = error instanceof ApiRequestError && error.status === 401 && !path.startsWith('/auth/');
     if (!canRefresh) throw error;
     if (await refreshSession()) return sendOnce<Answer>(method, path, body);
+    sessionEndedListeners.forEach((listener) => listener());
+    throw error;
+  }
+}
+
+/** A file the API gave: its bytes and the name it suggested. */
+export interface DownloadedFile {
+  blob: Blob;
+  fileName: string;
+}
+
+/** Fetches a file once. Throws ApiRequestError with the API's own error shape when it is not a success. */
+async function downloadOnce(path: string): Promise<DownloadedFile> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_PREFIX}${path}`, {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'toobler-web' },
+    });
+  } catch {
+    throw new ApiRequestError(0, 'NETWORK_ERROR', 'Could not reach the server.');
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    const problem = readErrorBody(text ? safelyParseJson(text) : undefined);
+    throw new ApiRequestError(response.status, problem.code, problem.message);
+  }
+  const suggested = /filename="([^"]+)"/u.exec(response.headers.get('content-disposition') ?? '')?.[1];
+  return { blob: await response.blob(), fileName: suggested ?? 'download.csv' };
+}
+
+/** Downloads a file from the API with the person's session, refreshing the session once when it has run out (the same rule as apiRequest). */
+export async function apiDownload(path: string): Promise<DownloadedFile> {
+  try {
+    return await downloadOnce(path);
+  } catch (error) {
+    if (!(error instanceof ApiRequestError) || error.status !== 401) throw error;
+    if (await refreshSession()) return downloadOnce(path);
     sessionEndedListeners.forEach((listener) => listener());
     throw error;
   }

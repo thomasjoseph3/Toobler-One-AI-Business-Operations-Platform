@@ -4,6 +4,8 @@ import { t } from '../../app/i18n';
 import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { ConditionsEditor } from '../shared/ConditionsEditor';
 import { listFilterableCustomFields } from '../shared/filter-conditions-ui';
+import { ExportButton } from '../exports/ExportButton';
+import { buildContactsExportRequest } from '../exports/exports-state';
 import { ListFilterPopover } from '../shared/ListFilterPopover';
 import { countActiveContactFilters, LIFECYCLE_CHOICES, readContactsView, type ContactsView } from './contacts-view';
 
@@ -19,6 +21,8 @@ export interface ContactsToolbarProps {
   onAddContact: () => void;
   /** Opens the box that saves the contacts matching the list on screen as a fixed list. */
   onSaveAsList: () => void;
+  /** True for a manager: only managers import and export. */
+  isManager: boolean;
 }
 
 /**
@@ -33,6 +37,7 @@ export function ContactsToolbar({
   onClearFilters,
   onAddContact,
   onSaveAsList,
+  isManager,
 }: ContactsToolbarProps) {
   const activeFilterCount = countActiveContactFilters(view);
   const filterableFields = listFilterableCustomFields(useFieldDefinitions('contact'));
@@ -80,6 +85,14 @@ export function ContactsToolbar({
         </ListFilterPopover>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {isManager ? (
+          <>
+            <Link to="/contacts/import" className={buttonClasses('secondary', 'compact')}>
+              {t('import.link')}
+            </Link>
+            <ExportButton request={buildContactsExportRequest(view)} />
+          </>
+        ) : null}
         <Link to="/contacts/lists" className={buttonClasses('secondary', 'compact')}>
           {t('lists.link')}
         </Link>

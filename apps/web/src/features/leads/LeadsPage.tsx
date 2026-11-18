@@ -30,6 +30,7 @@ import { LeadCards, LeadsTable } from './LeadsTable';
 import { LeadsToolbar } from './LeadsToolbar';
 import { SaveViewDialog } from './SaveViewDialog';
 import { findActiveSavedView, isPlainLeadsView } from './saved-views';
+import { buildLeadsExportRequest } from '../exports/exports-state';
 import { ViewTabs } from './ViewTabs';
 import { maySeeViewActions, ViewActions } from './ViewActions';
 import {
@@ -207,6 +208,7 @@ export function LeadsPage() {
         onChangeView={changeView}
         onCreateLead={openCreatePanel}
         onSaveView={() => setIsSaveViewOpen(true)}
+        exportRequest={user.role === 'manager' ? buildLeadsExportRequest(view, user.id) : null}
       />
       {isSaveViewOpen ? (
         <SaveViewDialog

@@ -269,6 +269,13 @@ Every route must say who may call it (a route without that declaration does not 
 | POST | `/api/v1/lists/{id}/members` | Any signed-in person |
 | DELETE | `/api/v1/lists/{id}/members/{contactId}` | Any signed-in person |
 | DELETE | `/api/v1/lists/{id}` | Managers only (403 for staff) |
+| POST | `/api/v1/imports` | Managers only (403 for staff); the file is kept in the manager's own business |
+| PATCH | `/api/v1/imports/{id}` | Managers only; another business's import is 404 |
+| POST | `/api/v1/imports/{id}/run` | Managers only; 409 unless the columns were checked, and only once |
+| GET | `/api/v1/imports/{id}` | Managers only |
+| POST | `/api/v1/exports` | Managers only |
+| GET | `/api/v1/exports/{id}` | Managers only |
+| GET | `/api/v1/exports/{id}/download` | Managers only; 409 while building, 410 after 24 hours |
 | GET | `/api/v1/views?object=lead` | Any signed-in person (their own views and the ones shared with the team) |
 | POST | `/api/v1/views` | Any signed-in person (the view is their own; sharing comes in slice 3 and is for managers) |
 | PATCH | `/api/v1/views/{id}` | The owner (their own view); only a manager sets `shared`; a manager can also change a shared view of anyone but only share or stop sharing it. Another person's unshared view is 404, a shared view they may not change is 403 |

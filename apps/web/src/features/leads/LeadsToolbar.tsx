@@ -2,7 +2,6 @@ import type { PipelineStage } from '@toobler-one/shared';
 import {
   Button,
   buttonClasses,
-  ExportIcon,
   FilterIcon,
   ImportIcon,
   ListViewIcon,
@@ -14,6 +13,8 @@ import {
   SortIcon,
 } from '@toobler-one/ui';
 import { Link } from 'react-router';
+import type { ExportObject } from '@toobler-one/shared';
+import { ExportButton } from '../exports/ExportButton';
 import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { ConditionsEditor } from '../shared/ConditionsEditor';
 import { listFilterableLeadFields } from '../shared/filter-conditions-ui';
@@ -46,6 +47,8 @@ export interface LeadsToolbarProps {
   onCreateLead: () => void;
   /** Opens the box that saves the list as it is as a named view. */
   onSaveView: () => void;
+  /** What to send to export the leads as the list shows them, or null for someone who may not export (only managers do). */
+  exportRequest: { object: ExportObject; query: string } | null;
 }
 
 /** The Filter panel: which leads to show (open or closed, one stage, only mine). It applies as soon as a choice is made. */
@@ -148,7 +151,14 @@ function SortPanel({ view, onChangeView }: Pick<LeadsToolbarProps, 'view' | 'onC
  * Export and Create lead on the right. Everything works except Import and Export, which are drawn as designed and wait for F12.
  * On the Pipeline board the API cannot sort and only the owner filter applies, so Sort is switched off there (the Figma still shows it).
  */
-export function LeadsToolbar({ view, stages, onChangeView, onCreateLead, onSaveView }: LeadsToolbarProps) {
+export function LeadsToolbar({
+  view,
+  stages,
+  onChangeView,
+  onCreateLead,
+  onSaveView,
+  exportRequest,
+}: LeadsToolbarProps) {
   const activeFilterCount = countActiveFilters(view);
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -223,12 +233,16 @@ export function LeadsToolbar({ view, stages, onChangeView, onCreateLead, onSaveV
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="compact" leadingIcon={<ImportIcon size={15} />} {...notWorkingYet}>
-          {t('leads.toolbar.import')}
-        </Button>
-        <Button size="compact" leadingIcon={<ExportIcon size={15} />} {...notWorkingYet}>
-          {t('leads.toolbar.export')}
-        </Button>
+        {/* Importing and exporting are for managers; the import brings in contacts, so it opens the Contacts import */}
+        {exportRequest !== null ? (
+          <>
+            <Link to="/contacts/import" className={buttonClasses('secondary', 'compact')}>
+              <ImportIcon size={15} />
+              {t('leads.toolbar.import')}
+            </Link>
+            <ExportButton request={exportRequest} />
+          </>
+        ) : null}
         <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} onClick={onCreateLead}>
           {t('leads.toolbar.create')}
         </Button>

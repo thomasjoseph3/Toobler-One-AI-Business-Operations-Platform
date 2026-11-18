@@ -158,6 +158,7 @@ export function ContactsPage() {
         onClearFilters={clearFilters}
         onAddContact={openCreatePanel}
         onSaveAsList={() => setIsSaveListOpen(true)}
+        isManager={user.role === 'manager'}
       />
       {isSaveListOpen ? (
         <SaveListDialog
