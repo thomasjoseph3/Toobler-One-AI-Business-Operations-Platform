@@ -27,3 +27,4 @@ export * from './setup';
 export * from './setup-chat';
 export * from './activities';
 export * from './tasks';
+export * from './team';

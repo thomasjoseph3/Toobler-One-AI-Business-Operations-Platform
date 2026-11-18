@@ -223,6 +223,24 @@ export interface AuthTokensTable {
   used_at: Date | null;
 }
 
+/** An invitation to join a business (F02). Only a hash of the emailed link is stored. Fenced by account_id. */
+export interface InvitationsTable {
+  id: string;
+  account_id: string;
+  email: string;
+  name: string;
+  mobile_e164: string | null;
+  mobile_key: string | null;
+  role: 'manager' | 'staff' | 'staff_own';
+  token_hash: string;
+  invited_by: string;
+  expires_at: Date;
+  accepted_at: Date | null;
+  cancelled_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** Wrong passwords per email typed, for the lockout. Not fenced; closed to the app role instead. */
 export interface LoginAttemptsTable {
   email: string;
@@ -749,6 +767,7 @@ export interface DB {
   user_credentials: UserCredentialsTable;
   sessions: SessionsTable;
   auth_tokens: AuthTokensTable;
+  invitations: InvitationsTable;
   login_attempts: LoginAttemptsTable;
   account_modules: AccountModulesTable;
   contacts: ContactsTable;

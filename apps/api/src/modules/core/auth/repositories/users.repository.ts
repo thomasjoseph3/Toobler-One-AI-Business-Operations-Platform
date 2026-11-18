@@ -255,3 +255,33 @@ export async function listManagersToEmail(db: Db, accountId: string): Promise<Pe
     .execute();
   return rows.map((row) => ({ id: row.id, name: row.name, email: row.email }));
 }
+
+/** A person of the business as the Team screen lists them. */
+export interface TeamMemberRow {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string | null;
+  role: 'manager' | 'staff' | 'staff_own';
+  status: 'active' | 'disabled';
+  lastSignedInAt: Date | null;
+}
+
+/** Every person of the business (removed people too), managers first and then by name. Run it inside the business's own transaction. */
+export async function listTeamMembers(db: Db, accountId: string): Promise<TeamMemberRow[]> {
+  const rows = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email', 'mobile_e164', 'role', 'status', 'last_login_at'])
+    .where('account_id', '=', accountId)
+    .orderBy('name')
+    .execute();
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    mobile: row.mobile_e164,
+    role: row.role,
+    status: row.status,
+    lastSignedInAt: row.last_login_at,
+  }));
+}

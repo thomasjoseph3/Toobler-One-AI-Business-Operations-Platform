@@ -4,6 +4,7 @@ import { answerKnowledgeCall, startingKnowledge, type PretendKnowledge } from '.
 import { answerAgentCall, startingAgent, type PretendAgent } from './pretend-agent';
 import { answerNotesCall, startingNotes, type PretendNotes } from './pretend-notes';
 import { answerTasksCall, startingTasks, type PretendTasks } from './pretend-tasks';
+import { answerTeamCall, startingTeam, type PretendTeam } from './pretend-team';
 import { answerSettingsCall, startingSettings, type PretendSettings } from './pretend-settings';
 import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
 import { answerSalesCall, startingSales, type PretendSales } from './pretend-sales';
@@ -88,6 +89,8 @@ export interface PretendApi {
   notes: PretendNotes;
   /** Tasks (the Tasks page, the lead page and the Add task form). */
   tasks: PretendTasks;
+  /** The team (Settings → Team): people, invitations. */
+  team: PretendTeam;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -218,6 +221,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         settings: startingSettings(),
         notes: startingNotes(),
         tasks: startingTasks(PRETEND_PROFILE.user.id, PRETEND_PROFILE.user.name),
+        team: startingTeam(PRETEND_PROFILE.user.id, PRETEND_PROFILE.user.name, PRETEND_PROFILE.user.email),
       };
       await page.route('**/api/v1/**', async (route) => {
         const request = route.request();
@@ -229,6 +233,15 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           return route.fulfill(
             pretendApi.signedIn && !pretendApi.accessExpired ? json(200, profileFor(pretendApi)) : unauthorized,
           );
+        }
+        if (path === '/team' || path === '/team/invitations') {
+          const teamAnswer = answerTeamCall(pretendApi.team, {
+            method: request.method(),
+            path,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            role: pretendApi.role,
+          });
+          if (teamAnswer) return route.fulfill(json(teamAnswer.status, teamAnswer.body));
         }
         if (path === '/tasks' || path.startsWith('/tasks/')) {
           const profile = profileFor(pretendApi);

@@ -13,6 +13,7 @@ import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
 import { ModulesPage } from '../features/settings/ModulesPage';
 import { SettingsAiPage } from '../features/settings/SettingsAiPage';
+import { TeamPage } from '../features/team/TeamPage';
 import { SetupPage } from '../features/setup/SetupPage';
 import { WhatYouSellPage } from '../features/what-you-sell/WhatYouSellPage';
 import { TestAgentPage } from '../features/test-agent/TestAgentPage';
@@ -68,6 +69,7 @@ export function App() {
                 <Route path="/knowledge/what-you-sell" element={<WhatYouSellPage />} />
                 <Route path="/knowledge/faqs" element={<FaqsPage />} />
                 <Route path="/settings/modules" element={<ModulesPage />} />
+                <Route path="/settings/team" element={<TeamPage />} />
                 {UiGallery ? (
                   <Route
                     path="/dev/ui"

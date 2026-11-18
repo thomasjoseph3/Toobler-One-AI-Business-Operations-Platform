@@ -6,6 +6,7 @@ import { profileRoutes } from './routes/profile.routes';
 import { createSessionAuthenticator } from './authenticator';
 import { sessionsRoutes } from './routes/sessions.routes';
 import { signUpRoutes } from './routes/sign-up.routes';
+import { teamRoutes } from './routes/team.routes';
 
 /**
  * Sign-up, sign-in, sessions and passwords. Built in slices (docs/features/F01-sign-up-and-sign-in.md): each feature
@@ -26,5 +27,6 @@ export default defineModule({
     emailVerificationRoutes(app);
     passwordResetRoutes(app);
     passwordRoutes(app);
+    teamRoutes(app);
   },
 });

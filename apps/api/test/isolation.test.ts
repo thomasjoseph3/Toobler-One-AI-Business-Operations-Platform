@@ -235,6 +235,14 @@ beforeAll(async () => {
     { leadId: lead.id, title: 'A private task', dueAt: '2030-01-01T10:00:00Z' },
     201,
   );
+  // A has invited a person; B must never see the invitation
+  await sendOk(
+    businessA,
+    'POST',
+    '/team/invitations',
+    { name: `Invitee ${secretWords}`, email: `invitee-${randomUUID().slice(0, 8)}@example.com`, role: 'staff' },
+    201,
+  );
   dataOfA = {
     conversationId: conversationOfA,
     testChatId: testChatOfA,
@@ -689,6 +697,22 @@ const attempts: Attempt[] = [
     what: "delete A's task",
     request: () => ({ method: 'DELETE', url: `/tasks/${dataOfA.taskId}` }),
     expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/team',
+    what: "list the team (B must see only its own people, never A's people or A's invitations)",
+    request: () => ({ method: 'GET', url: '/team' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/team/invitations',
+    what: 'invite the owner of A (an email that already has an account anywhere is refused)',
+    request: () => ({
+      method: 'POST',
+      url: '/team/invitations',
+      payload: { name: 'Hacker', email: businessA.email, role: 'manager' },
+    }),
+    expectedStatus: 409,
   },
   {
     route: 'POST /api/v1/setup/chat',
