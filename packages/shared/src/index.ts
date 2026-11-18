@@ -30,3 +30,4 @@ export * from './tasks';
 export * from './team';
 export * from './audit-log';
 export * from './companies';
+export * from './custom-fields';

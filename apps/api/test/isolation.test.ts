@@ -238,6 +238,8 @@ beforeAll(async () => {
     { leadId: lead.id, title: 'A private task', dueAt: '2030-01-01T10:00:00Z' },
     201,
   );
+  // A has a custom field with a secret label; B must never see it
+  await sendOk(businessA, 'POST', '/fields', { object: 'lead', label: `Field ${secretWords}`, type: 'text' }, 201);
   // A has a company with a secret name; B must never see it
   const companyOfA = await sendOk(
     businessA,
@@ -819,6 +821,18 @@ const attempts: Attempt[] = [
     what: "delete A's company",
     request: () => ({ method: 'DELETE', url: `/companies/${dataOfA.companyId}` }),
     expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/fields',
+    what: "list the fields (B must see only its own, never A's)",
+    request: () => ({ method: 'GET', url: '/fields' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/fields',
+    what: "add a field as B (it lands in B's business only; A's fields stay as they were)",
+    request: () => ({ method: 'POST', url: '/fields', payload: { object: 'lead', label: 'B only', type: 'text' } }),
+    expectedStatus: 201,
   },
   {
     route: 'POST /api/v1/team/invitations',

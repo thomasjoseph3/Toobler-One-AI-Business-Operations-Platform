@@ -7,6 +7,7 @@ import tickets from './core/tickets/module';
 import activities from './core/activities/module';
 import tasks from './core/tasks/module';
 import companies from './core/companies/module';
+import fields from './core/fields/module';
 import conversations from './core/conversations/module';
 import knowledge from './core/knowledge/module';
 import offerings from './core/offerings/module';
@@ -29,6 +30,7 @@ export const modules: readonly ModuleManifest[] = [
   activities,
   tasks,
   companies,
+  fields,
   conversations,
   knowledge,
   offerings,

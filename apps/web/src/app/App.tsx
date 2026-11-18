@@ -14,6 +14,7 @@ import { LeadsPage } from '../features/leads/LeadsPage';
 import { ModulesPage } from '../features/settings/ModulesPage';
 import { SettingsAiPage } from '../features/settings/SettingsAiPage';
 import { AcceptInvitationPage } from '../pages/AcceptInvitationPage';
+import { FieldsPage } from '../features/fields/FieldsPage';
 import { CompaniesPage } from '../features/companies/CompaniesPage';
 import { CompanyPage } from '../features/companies/CompanyPage';
 import { ActivityPage } from '../features/team/ActivityPage';
@@ -79,6 +80,7 @@ export function App() {
                 <Route path="/settings/modules" element={<ModulesPage />} />
                 <Route path="/settings/team" element={<TeamPage />} />
                 <Route path="/settings/teams" element={<TeamsPage />} />
+                <Route path="/settings/fields" element={<FieldsPage />} />
                 <Route path="/settings/activity" element={<ActivityPage />} />
                 {UiGallery ? (
                   <Route

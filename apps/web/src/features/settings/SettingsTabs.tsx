@@ -9,6 +9,7 @@ const TABS: ReadonlyArray<{ path: string; labelKey: MessageKey; managersOnly?: b
   { path: '/settings/modules', labelKey: 'settingsTabs.modules' },
   { path: '/settings/team', labelKey: 'settingsTabs.team', managersOnly: true },
   { path: '/settings/teams', labelKey: 'settingsTabs.teams', managersOnly: true },
+  { path: '/settings/fields', labelKey: 'settingsTabs.fields', managersOnly: true },
   { path: '/settings/activity', labelKey: 'settingsTabs.activity', managersOnly: true },
 ];
 
@@ -19,7 +20,8 @@ export function SettingsTabs() {
   // A page only managers may open (the API refuses everyone else) is left out of the row for staff
   const visibleTabs = TABS.filter((tab) => !tab.managersOnly || isManager);
   return (
-    <nav aria-label={t('settingsTabs.label')} className="-mx-1 flex gap-1 overflow-x-auto pb-1">
+    // `w-0 min-w-full`: the row fills the page but adds nothing to how wide the page wants to be, so many tabs scroll inside the row instead of widening the page (a phone's layout width and every side panel with it)
+    <nav aria-label={t('settingsTabs.label')} className="-mx-1 flex w-0 min-w-full gap-1 overflow-x-auto pb-1">
       {visibleTabs.map((tab) => (
         <NavLink
           key={tab.path}

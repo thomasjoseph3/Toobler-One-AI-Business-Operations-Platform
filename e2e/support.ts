@@ -11,6 +11,7 @@ import {
   type PretendCompanies,
 } from './pretend-companies';
 import { answerTeamCall, startingTeam, type PretendTeam } from './pretend-team';
+import { answerFieldsCall, startingFields, type PretendFields } from './pretend-fields';
 import { answerSettingsCall, startingSettings, type PretendSettings } from './pretend-settings';
 import { answerWebchatCall, startingWebchat, type PretendWebchat } from './pretend-webchat';
 import { answerSalesCall, startingSales, type PretendSales } from './pretend-sales';
@@ -99,6 +100,8 @@ export interface PretendApi {
   team: PretendTeam;
   /** Companies (the Companies page and the Add company form). */
   companies: PretendCompanies;
+  /** Custom fields (Settings → Fields). */
+  fields: PretendFields;
 }
 
 /** The business's lost reasons as the pretend API gives them. */
@@ -230,6 +233,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         notes: startingNotes(),
         tasks: startingTasks(PRETEND_PROFILE.user.id, PRETEND_PROFILE.user.name),
         companies: startingCompanies(),
+        fields: startingFields(),
         team: startingTeam(PRETEND_PROFILE.user.id, PRETEND_PROFILE.user.name, PRETEND_PROFILE.user.email),
       };
       await page.route('**/api/v1/**', async (route) => {
@@ -269,6 +273,16 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
               teamAnswer.body === undefined ? { status: teamAnswer.status } : json(teamAnswer.status, teamAnswer.body),
             );
           }
+        }
+        if (path === '/fields') {
+          const fieldsAnswer = answerFieldsCall(pretendApi.fields, {
+            method: request.method(),
+            path,
+            search: new URL(request.url()).search,
+            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            role: pretendApi.role,
+          });
+          if (fieldsAnswer) return route.fulfill(json(fieldsAnswer.status, fieldsAnswer.body));
         }
         if (path === '/companies' || path.startsWith('/companies/') || /^\/contacts\/[\w-]+\/company$/u.test(path)) {
           const companiesAnswer = answerCompaniesCall(pretendApi.companies, {

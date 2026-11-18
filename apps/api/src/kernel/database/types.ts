@@ -344,6 +344,27 @@ export interface CompaniesTable {
   updated_at: Generated<Date>;
 }
 
+/** A custom field a business added to its contacts, companies or leads (F09). Fenced by account_id. Removed by archiving. */
+export interface FieldDefinitionsTable {
+  id: string;
+  account_id: string;
+  object: 'contact' | 'company' | 'lead';
+  /** Made from the label; never changes and is never reused. */
+  key: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'dropdown' | 'yes_no' | 'phone' | 'email';
+  /** The choices of a dropdown, in order (a list of texts, written as JSON text). */
+  options: ColumnType<string[], string | undefined, string>;
+  ai_asks: Generated<boolean>;
+  required_for_won: Generated<boolean>;
+  sort: number;
+  archived_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** The one pipeline of a business (its leads board). Fenced by account_id. */
 export interface PipelinesTable {
   id: string;
@@ -814,6 +835,7 @@ export interface DB {
   account_modules: AccountModulesTable;
   contacts: ContactsTable;
   companies: CompaniesTable;
+  field_definitions: FieldDefinitionsTable;
   pipelines: PipelinesTable;
   pipeline_stages: PipelineStagesTable;
   lost_reasons: LostReasonsTable;
