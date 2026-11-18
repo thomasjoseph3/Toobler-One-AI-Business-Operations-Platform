@@ -1,4 +1,5 @@
-import { Button, PlusIcon, SelectField, TextField } from '@toobler-one/ui';
+import { Link } from 'react-router';
+import { Button, buttonClasses, PlusIcon, SelectField, TextField } from '@toobler-one/ui';
 import { t } from '../../app/i18n';
 import { useFieldDefinitions } from '../fields/use-field-definitions';
 import { ConditionsEditor } from '../shared/ConditionsEditor';
@@ -16,6 +17,8 @@ export interface ContactsToolbarProps {
   onClearFilters: () => void;
   /** Opens the Add contact form. */
   onAddContact: () => void;
+  /** Opens the box that saves the contacts matching the list on screen as a fixed list. */
+  onSaveAsList: () => void;
 }
 
 /**
@@ -29,6 +32,7 @@ export function ContactsToolbar({
   onChangeView,
   onClearFilters,
   onAddContact,
+  onSaveAsList,
 }: ContactsToolbarProps) {
   const activeFilterCount = countActiveContactFilters(view);
   const filterableFields = listFilterableCustomFields(useFieldDefinitions('contact'));
@@ -76,6 +80,12 @@ export function ContactsToolbar({
         </ListFilterPopover>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <Link to="/contacts/lists" className={buttonClasses('secondary', 'compact')}>
+          {t('lists.link')}
+        </Link>
+        <Button size="compact" onClick={onSaveAsList}>
+          {t('lists.saveAsList')}
+        </Button>
         <Button variant="primary" size="compact" leadingIcon={<PlusIcon size={16} />} onClick={onAddContact}>
           {t('contacts.add')}
         </Button>

@@ -427,6 +427,26 @@ export interface SavedViewsTable {
   updated_at: Generated<Date>;
 }
 
+/** A fixed group of contacts (F11), saved from a contacts view or built by hand. Fenced by account_id. */
+export interface ContactListsTable {
+  id: string;
+  account_id: string;
+  name: string;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One contact in one contact list. Added and removed, never edited. Fenced by account_id. */
+export interface ContactListMembersTable {
+  account_id: string;
+  list_id: string;
+  contact_id: string;
+  added_by: Json | null;
+  added_at: Generated<Date>;
+}
+
 /** How a business shares out new leads (one row per business). Fenced by account_id. */
 export interface AssignmentRulesTable {
   account_id: string;
@@ -881,6 +901,8 @@ export interface DB {
   pipeline_stages: PipelineStagesTable;
   lost_reasons: LostReasonsTable;
   saved_views: SavedViewsTable;
+  contact_lists: ContactListsTable;
+  contact_list_members: ContactListMembersTable;
   assignment_rules: AssignmentRulesTable;
   assignment_rule_people: AssignmentRulePeopleTable;
   leads: LeadsTable;

@@ -76,6 +76,13 @@ export interface PretendApi {
   leadEdits: Record<string, Record<string, unknown>>;
   /** The temperatures the page set by hand with `PATCH /leads/{id}/temperature`. */
   temperatureChanges: Array<{ leadId: string; temperature: string }>;
+  /** Contact lists: what is saved, what the page sent, and ways to make the list or the save fail. */
+  lists: {
+    items: Array<Record<string, unknown>>;
+    created: Array<Record<string, unknown>>;
+    refusal: { status: number; code: string; message: string } | null;
+    listFails: boolean;
+  };
   /** Saved views of the Leads list: what is saved, what the page sent, and a way to make saving fail. */
   views: {
     items: Array<Record<string, unknown>>;
@@ -245,6 +252,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         patchedLeads: [],
         leadEdits: {},
         temperatureChanges: [],
+        lists: { items: [], created: [], refusal: null, listFails: false },
         views: { items: [], created: [], patched: [], deletedIds: [], refusal: null },
         search: {
           queries: [],
@@ -541,6 +549,28 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (path === '/lost-reasons') return route.fulfill(json(200, { items: PRETEND_LOST_REASONS }));
         // One lead, and editing its details
+        if (path === '/lists' && request.method() === 'GET') {
+          if (pretendApi.lists.listFails) {
+            return route.fulfill(json(500, { error: { code: 'SERVER_ERROR', message: 'Something went wrong.' } }));
+          }
+          return route.fulfill(json(200, { items: pretendApi.lists.items }));
+        }
+        if (path === '/lists' && request.method() === 'POST') {
+          if (pretendApi.lists.refusal) {
+            const { status, code, message } = pretendApi.lists.refusal;
+            return route.fulfill(json(status, { error: { code, message } }));
+          }
+          const body = request.postDataJSON() as Record<string, unknown>;
+          pretendApi.lists.created.push(body);
+          const saved = {
+            id: `list-${pretendApi.lists.items.length + 1}`,
+            name: body.name,
+            memberCount: 7,
+            createdAt: '2026-11-18T10:00:00.000Z',
+          };
+          pretendApi.lists.items.push(saved);
+          return route.fulfill(json(201, saved));
+        }
         if (path === '/views' && request.method() === 'GET') {
           return route.fulfill(json(200, { items: pretendApi.views.items }));
         }

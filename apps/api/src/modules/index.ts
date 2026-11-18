@@ -10,6 +10,7 @@ import companies from './core/companies/module';
 import fields from './core/fields/module';
 import search from './core/search/module';
 import views from './core/views/module';
+import lists from './core/lists/module';
 import conversations from './core/conversations/module';
 import knowledge from './core/knowledge/module';
 import offerings from './core/offerings/module';
@@ -35,6 +36,7 @@ export const modules: readonly ModuleManifest[] = [
   fields,
   search,
   views,
+  lists,
   conversations,
   knowledge,
   offerings,

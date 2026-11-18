@@ -19,6 +19,8 @@ import { useSession } from '../../auth/session';
 import { describeShownRange } from '../leads/lead-display';
 import { ContactCards, ContactsTable } from './ContactsList';
 import { ContactRowMenu } from './ContactRowMenu';
+import { SaveListDialog } from '../lists/SaveListDialog';
+import { describeListMade } from '../lists/lists-state';
 import { ContactsToolbar } from './ContactsToolbar';
 import { CreateContactPanel } from './CreateContactPanel';
 import { describeContactSaveProblem } from './contact-problem';
@@ -64,6 +66,8 @@ export function ContactsPage() {
   // A counter so each opening of the panel starts with an empty form
   const [createPanelOpenCount, setCreatePanelOpenCount] = useState(0);
   // A confirmation the contact page left behind ("Priya was deleted.") shows first
+  // The "Save as list" box: open or shut
+  const [isSaveListOpen, setIsSaveListOpen] = useState(false);
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(
     readNoticeFromState(location.state),
   );
@@ -153,7 +157,18 @@ export function ContactsPage() {
         onChangeView={changeView}
         onClearFilters={clearFilters}
         onAddContact={openCreatePanel}
+        onSaveAsList={() => setIsSaveListOpen(true)}
       />
+      {isSaveListOpen ? (
+        <SaveListDialog
+          view={view}
+          onClose={() => setIsSaveListOpen(false)}
+          onSaved={(list) => {
+            setIsSaveListOpen(false);
+            setNotice({ tone: 'success', text: describeListMade(list.name, list.memberCount) });
+          }}
+        />
+      ) : null}
       <CreateContactPanel
         key={createPanelOpenCount}
         isOpen={isCreatePanelOpen}

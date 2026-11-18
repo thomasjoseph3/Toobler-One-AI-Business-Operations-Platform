@@ -10,6 +10,7 @@ import { TicketsPage } from '../features/tickets/TicketsPage';
 import { TasksPage } from '../features/tasks/TasksPage';
 import { ContactsPage } from '../features/contacts/ContactsPage';
 import { FilteredPage } from '../features/leads/FilteredPage';
+import { ListsPage } from '../features/lists/ListsPage';
 import { LeadPage } from '../features/leads/LeadPage';
 import { LeadsPage } from '../features/leads/LeadsPage';
 import { ModulesPage } from '../features/settings/ModulesPage';
@@ -72,6 +73,7 @@ export function App() {
                 ))}
                 <Route path="/leads/filtered" element={<FilteredPage />} />
                 <Route path="/leads/:leadId" element={<LeadPage />} />
+                <Route path="/contacts/lists" element={<ListsPage />} />
                 <Route path="/contacts/:contactId" element={<ContactPage />} />
                 <Route path="/companies/:companyId" element={<CompanyPage />} />
                 <Route path="/tickets/:ticketId" element={<TicketPage />} />

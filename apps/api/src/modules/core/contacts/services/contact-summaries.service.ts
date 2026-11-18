@@ -1,4 +1,6 @@
-import type { Contact } from '@toobler-one/shared';
+import { customFieldsToFilterable, type Contact, type LifecycleStage } from '@toobler-one/shared';
+import { readFilterRequest } from '../../../../kernel/filters/read-filter-request';
+import { findFieldDefinitions } from '../../fields';
 import type { Actor } from '../../../../kernel/context';
 import type { Db } from '../../../../kernel/database';
 import { readSearchText } from '../helpers/contact-search';
@@ -112,4 +114,41 @@ export async function findContactsMatchingText(
     offset: 0,
   });
   return items.map((contact) => ({ id: contact.id, name: contact.name, phone: contact.phone, email: contact.email }));
+}
+
+/** What a contacts view is made of: the search text, a lifecycle stage and the filter engine's `filters` text (the same words the contacts list takes). */
+export interface ContactsViewSelection {
+  q?: string | undefined;
+  lifecycleStage?: LifecycleStage | undefined;
+  filters?: string | undefined;
+}
+
+/**
+ * The ids of the live contacts that match a contacts view right now (at most `limit`, newest change first), for a static list made from a view. The
+ * conditions are checked by the same filter reader as the contacts list, so a bad filter is 400 INVALID_FILTERS. Used by the lists module (through this
+ * module's index.ts). Run it inside the business's own transaction.
+ */
+export async function findContactIdsMatchingView(
+  transaction: Db,
+  options: { accountId: string; view: ContactsViewSelection; limit: number },
+): Promise<string[]> {
+  const definitions = await findFieldDefinitions(transaction, options.accountId, 'contact');
+  const conditions = readFilterRequest(options.view.filters, customFieldsToFilterable(definitions));
+  const { items } = await contactsRepository.listContacts(transaction, options.accountId, {
+    search: readSearchText(options.view.q),
+    lifecycleStage: options.view.lifecycleStage,
+    conditions,
+    limit: options.limit,
+    offset: 0,
+  });
+  return items.map((contact) => contact.id);
+}
+
+/** Which of these ids are live contacts of the business (an unknown id, a deleted contact and another business's contact are missing from the answer). */
+export async function findLiveContactIds(
+  transaction: Db,
+  options: { accountId: string; contactIds: string[] },
+): Promise<string[]> {
+  const contacts = await contactsRepository.findContactsByIds(transaction, options.accountId, options.contactIds);
+  return contacts.map((contact) => contact.id);
 }
