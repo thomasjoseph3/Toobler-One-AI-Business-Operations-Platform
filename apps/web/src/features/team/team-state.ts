@@ -106,3 +106,18 @@ export function describeAcceptProblem(error: unknown): string {
   }
   return t('team.problem.generic');
 }
+
+/** The roles a person can be changed to: every role except the one they have. */
+export function listOtherRoles(currentRole: TeamRole): TeamRole[] {
+  return ROLE_CHOICES.map((choice) => choice.role).filter((role) => role !== currentRole);
+}
+
+/** The people who can take over a removed person's work: everyone still working in the business except the person being removed. */
+export function listHandOverChoices(
+  members: ReadonlyArray<{ id: string; name: string; status: 'active' | 'disabled' }>,
+  removedMemberId: string,
+): Array<{ value: string; label: string }> {
+  return members
+    .filter((member) => member.status === 'active' && member.id !== removedMemberId)
+    .map((member) => ({ value: member.id, label: member.name }));
+}

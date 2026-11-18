@@ -77,6 +77,62 @@ test.describe('Settings: Team', () => {
     await expect(page.getByLabel('Name')).toHaveValue('Meera Pillai');
   });
 
+  test('changes a person’s role from their menu', async ({ page, pretendApi }) => {
+    await page.goto('/settings/team');
+    await page.getByRole('button', { name: 'More actions for Rahul Das' }).click();
+    await page.getByRole('button', { name: 'Make Manager' }).click();
+    await expect(page.getByText('Rahul Das is now Manager.')).toBeVisible();
+    expect(pretendApi.team.patchedMembers).toEqual([{ memberId: 'member-staff-1', body: { role: 'manager' } }]);
+    await expect(page.getByRole('region', { name: 'People' }).getByText('Manager', { exact: true })).toHaveCount(2);
+  });
+
+  test('has no menu on your own row', async ({ page }) => {
+    await page.goto('/settings/team');
+    await expect(page.getByRole('button', { name: 'More actions for Anita Nair' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'More actions for Rahul Das' })).toBeVisible();
+  });
+
+  test('asks "Are you sure?" naming the person, hands their work to the chosen person, and can add them back', async ({
+    page,
+    pretendApi,
+  }) => {
+    await page.goto('/settings/team');
+    await page.getByRole('button', { name: 'More actions for Rahul Das' }).click();
+    await page.getByRole('button', { name: 'Remove from the team' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Remove Rahul Das?' });
+    await expect(dialog.getByText(/will no longer be able to sign in/)).toBeVisible();
+    // Cancelling changes nothing
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    expect(pretendApi.team.removedMembers).toEqual([]);
+
+    await page.getByRole('button', { name: 'More actions for Rahul Das' }).click();
+    await page.getByRole('button', { name: 'Remove from the team' }).click();
+    await dialog.getByLabel('Hand their open work to').selectOption({ label: 'Anita Nair' });
+    await dialog.getByRole('button', { name: 'Remove Rahul Das' }).click();
+    await expect(page.getByText('Rahul Das was removed. Their open work went to Anita Nair.')).toBeVisible();
+    expect(pretendApi.team.removedMembers).toEqual([
+      { memberId: 'member-staff-1', handOverTo: '0191f0a0-0000-7000-8000-000000000001' },
+    ]);
+    await expect(page.getByText('Removed', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'More actions for Rahul Das' }).click();
+    await page.getByRole('button', { name: 'Add back' }).click();
+    await expect(page.getByText('Rahul Das is back in the team.')).toBeVisible();
+    await expect(page.getByText('Removed', { exact: true })).toHaveCount(0);
+  });
+
+  test('says in the API’s words when a change is refused', async ({ page, pretendApi }) => {
+    pretendApi.team.refusal = {
+      status: 409,
+      code: 'LAST_MANAGER',
+      message: 'The business needs at least one manager. Make someone else a manager first.',
+    };
+    await page.goto('/settings/team');
+    await page.getByRole('button', { name: 'More actions for Rahul Das' }).click();
+    await page.getByRole('button', { name: 'Make Manager' }).click();
+    await expect(page.getByRole('alert')).toContainText('The business needs at least one manager.');
+  });
+
   test('shows an error with a retry when the team cannot be loaded', async ({ page, pretendApi }) => {
     pretendApi.team.fails = true;
     await page.goto('/settings/team');

@@ -119,3 +119,34 @@ export async function setLastAssignedUser(
     .where('account_id', '=', options.accountId)
     .execute();
 }
+
+/**
+ * A person has left the business: if the rule gives new leads to them (the one person, or the fallback for sharing out by offering) it now gives
+ * them to `toUserId`, and they drop out of the round-robin turns. Returns true when anything changed. Run it inside the business's fence.
+ */
+export async function replacePersonInAssignmentRule(
+  db: Db,
+  options: { accountId: string; fromUserId: string; toUserId: string; actor: Actor },
+): Promise<boolean> {
+  const changedRule = await db
+    .updateTable('assignment_rules')
+    .set({ user_id: options.toUserId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('user_id', '=', options.fromUserId)
+    .returning('account_id')
+    .execute();
+  const droppedTurns = await db
+    .deleteFrom('assignment_rule_people')
+    .where('account_id', '=', options.accountId)
+    .where('user_id', '=', options.fromUserId)
+    .returning('user_id')
+    .execute();
+  // If the person was the last to be given a lead, the next turn simply starts again from the first person
+  await db
+    .updateTable('assignment_rules')
+    .set({ last_assigned_user_id: null })
+    .where('account_id', '=', options.accountId)
+    .where('last_assigned_user_id', '=', options.fromUserId)
+    .execute();
+  return changedRule.length > 0 || droppedTurns.length > 0;
+}

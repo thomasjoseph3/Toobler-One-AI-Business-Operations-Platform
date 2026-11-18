@@ -14,6 +14,9 @@ export interface PretendTeam {
   emailWorks: boolean;
   fails: boolean;
   /** What the accept page sent (the token and a note of how long the password was; the password itself is never kept). */
+  /** What the page sent to change a person (role or add back), and the removals (with who takes over). */
+  patchedMembers: Array<{ memberId: string; body: Record<string, unknown> }>;
+  removedMembers: Array<{ memberId: string; handOverTo: string | null }>;
   acceptedInvitations: Array<{ token: string; passwordLength: number }>;
 }
 
@@ -59,6 +62,8 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
     refusal: null,
     emailWorks: true,
     fails: false,
+    patchedMembers: [],
+    removedMembers: [],
     acceptedInvitations: [],
   };
 }
@@ -66,7 +71,13 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
 /** Answers a team call, or undefined when it is not one. */
 export function answerTeamCall(
   state: PretendTeam,
-  call: { method: string; path: string; body: Record<string, unknown> | null; role: 'manager' | 'staff' },
+  call: {
+    method: string;
+    path: string;
+    search?: string;
+    body: Record<string, unknown> | null;
+    role: 'manager' | 'staff';
+  },
 ): PretendAnswer | undefined {
   if (call.path === '/auth/invitations/preview' || call.path === '/auth/accept-invitation') {
     const invalid = {
@@ -96,6 +107,33 @@ export function answerTeamCall(
       passwordLength: String(call.body['password']).length,
     });
     return { status: 200, body: { ok: true } };
+  }
+  const memberMatch = /^\/team\/members\/([\w-]+)$/u.exec(call.path);
+  if (memberMatch) {
+    if (call.role !== 'manager')
+      return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
+    const member = state.members.find((candidate) => candidate['id'] === memberMatch[1]);
+    if (!member) return { status: 404, body: { error: { code: 'NOT_FOUND', message: "That person wasn't found." } } };
+    if (state.refusal) {
+      const { status, code, message } = state.refusal;
+      state.refusal = null;
+      return { status, body: { error: { code, message } } };
+    }
+    if (call.method === 'PATCH') {
+      state.patchedMembers.push({ memberId: memberMatch[1]!, body: call.body ?? {} });
+      if (call.body?.['role']) member['role'] = call.body['role'];
+      if (call.body?.['status'] === 'active') member['status'] = 'active';
+      return { status: 200, body: member };
+    }
+    if (call.method === 'DELETE') {
+      state.removedMembers.push({
+        memberId: memberMatch[1]!,
+        handOverTo: new URLSearchParams(call.search ?? '').get('hand_over_to'),
+      });
+      member['status'] = 'disabled';
+      return { status: 204 };
+    }
+    return undefined;
   }
   if (call.path !== '/team' && call.path !== '/team/invitations') return undefined;
   if (call.role !== 'manager') return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };

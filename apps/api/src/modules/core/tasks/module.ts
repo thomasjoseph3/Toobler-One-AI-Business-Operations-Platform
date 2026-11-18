@@ -1,6 +1,7 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { tasksRoutes } from './routes/tasks.routes';
 import { createTaskAlertsService } from './services/task-alerts.service';
+import { handleTeamMemberRemoved } from './services/team-events.service';
 
 /**
  * Tasks and reminders (F08). A core module: always on. Built in slices of at most 2 routes
@@ -11,6 +12,8 @@ export default defineModule({
   kind: 'core',
   // A task is about a person and usually one of their leads (contacts, leads), and has an owner who is a person of the business (auth)
   requires: ['core.auth', 'core.contacts', 'core.leads'],
+  // When a person is removed from the team, their open tasks go to the person the manager chose
+  events: { 'team.member_removed': handleTeamMemberRemoved },
   jobs: [
     {
       // Runs by itself every minute. It has no business of its own: it queues one check per business.

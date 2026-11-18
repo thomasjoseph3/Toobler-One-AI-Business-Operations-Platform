@@ -8,6 +8,8 @@ import {
   describeAcceptProblem,
   describeRole,
   describeTeamProblem,
+  listHandOverChoices,
+  listOtherRoles,
 } from './team-state';
 
 describe('the Invite form', () => {
@@ -78,5 +80,21 @@ describe('the accept page', () => {
     expect(describeAcceptProblem(new ApiRequestError(500, 'UNKNOWN_ERROR', 'boom'))).toBe(
       'Something went wrong. Please try again.',
     );
+  });
+});
+
+describe('changing a role and removing a person', () => {
+  it('offers the two other roles', () => {
+    expect(listOtherRoles('staff')).toEqual(['staff_own', 'manager']);
+    expect(listOtherRoles('manager')).toEqual(['staff', 'staff_own']);
+  });
+
+  it('offers only people still working, never the person being removed', () => {
+    const members = [
+      { id: 'a', name: 'Anita', status: 'active' as const },
+      { id: 'b', name: 'Rahul', status: 'active' as const },
+      { id: 'c', name: 'Gone', status: 'disabled' as const },
+    ];
+    expect(listHandOverChoices(members, 'b')).toEqual([{ value: 'a', label: 'Anita' }]);
   });
 });

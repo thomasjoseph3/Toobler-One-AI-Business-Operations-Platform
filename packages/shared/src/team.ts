@@ -81,3 +81,22 @@ export const acceptInvitationRequestSchema = z.object({
   password: z.string().min(10).max(128),
 });
 export type AcceptInvitationRequest = z.infer<typeof acceptInvitationRequestSchema>;
+
+/** The id of a person of the business in an address. */
+export const teamMemberIdParamsSchema = z.object({ id: z.uuid() });
+
+/**
+ * `PATCH /team/members/{id}`: change a person's role, and/or add a removed person back (`status: 'active'`). At least one. Removing a person is
+ * `DELETE`, not this.
+ */
+export const updateTeamMemberRequestSchema = z
+  .object({ role: teamRoleSchema, status: z.literal('active') })
+  .partial()
+  .refine((request) => request.role !== undefined || request.status !== undefined, {
+    message: 'Send a role or a status.',
+  });
+export type UpdateTeamMemberRequest = z.infer<typeof updateTeamMemberRequestSchema>;
+
+/** `DELETE /team/members/{id}?hand_over_to=`: who takes over the removed person's open leads, tasks and tickets (the manager removing them when left out). */
+export const removeTeamMemberQuerySchema = z.object({ hand_over_to: z.uuid().optional() });
+export type RemoveTeamMemberQuery = z.infer<typeof removeTeamMemberQuerySchema>;

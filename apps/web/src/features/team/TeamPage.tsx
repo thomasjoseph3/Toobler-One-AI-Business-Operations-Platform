@@ -1,30 +1,45 @@
-import { useState } from 'react';
-import type { Invitation, InvitationCreated, TeamMember, TeamResponse } from '@toobler-one/shared';
-import { Alert, Badge, Button, Card, ErrorState, LoadingState } from '@toobler-one/ui';
+import { useState, type ReactNode } from 'react';
+import type { Invitation, InvitationCreated, TeamMember, TeamResponse, TeamRole } from '@toobler-one/shared';
+import {
+  ActionMenu,
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  ErrorState,
+  LoadingState,
+  SelectField,
+  type ActionMenuItem,
+} from '@toobler-one/ui';
+import { apiRequest } from '../../api/client';
 import { useApiResource } from '../../api/useApiResource';
 import { formatMessage, t } from '../../app/i18n';
 import { useSession } from '../../auth/session';
 import { useKeptData } from '../knowledge/use-kept-resource';
 import { SettingsTabs } from '../settings/SettingsTabs';
 import { InviteMemberPanel } from './InviteMemberPanel';
-import { describeRole, formatTeamDate } from './team-state';
+import { describeRole, describeTeamProblem, formatTeamDate, listHandOverChoices, listOtherRoles } from './team-state';
 
 /** One person of the business in the list: name, email, role, and when they last signed in (or that they were removed). */
-function MemberRow({ member, isYou }: { member: TeamMember; isYou: boolean }) {
+function MemberRow({ member, isYou, menu }: { member: TeamMember; isYou: boolean; menu: ReactNode }) {
   return (
-    <li className="flex flex-col gap-1 border-b border-border-default py-3 last:border-b-0">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-label-md text-text-primary">{member.name}</h3>
-        {isYou ? <Badge tone="info">{t('team.members.you')}</Badge> : null}
-        <Badge tone="neutral">{describeRole(member.role)}</Badge>
-        {member.status === 'disabled' ? <Badge tone="warning">{t('team.members.removed')}</Badge> : null}
+    <li className="flex items-start justify-between gap-2 border-b border-border-default py-3 last:border-b-0">
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-label-md text-text-primary">{member.name}</h3>
+          {isYou ? <Badge tone="info">{t('team.members.you')}</Badge> : null}
+          <Badge tone="neutral">{describeRole(member.role)}</Badge>
+          {member.status === 'disabled' ? <Badge tone="warning">{t('team.members.removed')}</Badge> : null}
+        </div>
+        <p className="text-body-md text-text-secondary">{member.email}</p>
+        <p className="text-label-sm text-text-secondary">
+          {member.lastSignedInAt
+            ? formatMessage('team.members.lastSignedIn', { date: formatTeamDate(member.lastSignedInAt) })
+            : t('team.members.neverSignedIn')}
+        </p>
       </div>
-      <p className="text-body-md text-text-secondary">{member.email}</p>
-      <p className="text-label-sm text-text-secondary">
-        {member.lastSignedInAt
-          ? formatMessage('team.members.lastSignedIn', { date: formatTeamDate(member.lastSignedInAt) })
-          : t('team.members.neverSignedIn')}
-      </p>
+      {menu}
     </li>
   );
 }
@@ -60,6 +75,11 @@ export function TeamPage() {
   const [isInviting, setIsInviting] = useState(false);
   const [justInvited, setJustInvited] = useState<InvitationCreated | null>(null);
   const [linkWasCopied, setLinkWasCopied] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<TeamMember | null>(null);
+  const [handOverToUserId, setHandOverToUserId] = useState('');
+  const [isRemoving, setIsRemoving] = useState(false);
 
   // The guard around the app only shows this page to someone who is signed in; this keeps the types honest
   if (sessionState.status !== 'signedIn') return null;
@@ -74,6 +94,76 @@ export function TeamPage() {
     } catch {
       setLinkWasCopied(false);
     }
+  };
+
+  // Changes a person's role or adds them back, then reloads the list and says what happened
+  const changeMember = async (member: TeamMember, changes: { role: TeamRole } | { status: 'active' }) => {
+    setProblem(null);
+    try {
+      await apiRequest('PATCH', `/team/members/${member.id}`, changes);
+      setNotice(
+        'role' in changes
+          ? formatMessage('team.changed.role', { name: member.name, role: describeRole(changes.role) })
+          : formatMessage('team.changed.restored', { name: member.name }),
+      );
+    } catch (error) {
+      setProblem(describeTeamProblem(error));
+    }
+    resource.reload();
+  };
+
+  // Removes the person the manager said yes to, handing their open work to the person chosen in the box
+  const confirmRemove = async (allMembers: TeamMember[]) => {
+    if (memberToRemove === null) return;
+    setIsRemoving(true);
+    setProblem(null);
+    try {
+      await apiRequest('DELETE', `/team/members/${memberToRemove.id}?hand_over_to=${handOverToUserId}`);
+      const successor = allMembers.find((member) => member.id === handOverToUserId);
+      setNotice(formatMessage('team.changed.removed', { name: memberToRemove.name, successor: successor?.name ?? '' }));
+    } catch (error) {
+      setProblem(describeTeamProblem(error));
+    }
+    setIsRemoving(false);
+    setMemberToRemove(null);
+    resource.reload();
+  };
+
+  // The "…" menu of one person: change role, remove, or add back (nothing for yourself: someone else removes you)
+  const menuFor = (member: TeamMember): ReactNode => {
+    if (member.id === signedInUserId) return null;
+    const items: ActionMenuItem[] =
+      member.status === 'disabled'
+        ? [
+            {
+              id: 'add-back',
+              label: t('team.menu.addBack'),
+              onSelect: () => void changeMember(member, { status: 'active' }),
+            },
+          ]
+        : [
+            ...listOtherRoles(member.role).map((role) => ({
+              id: `role-${role}`,
+              label: formatMessage('team.menu.makeRole', { role: describeRole(role) }),
+              onSelect: () => void changeMember(member, { role }),
+            })),
+            {
+              id: 'remove',
+              label: t('team.menu.remove'),
+              tone: 'danger' as const,
+              onSelect: () => {
+                setMemberToRemove(member);
+                setHandOverToUserId(signedInUserId);
+              },
+            },
+          ];
+    return (
+      <ActionMenu
+        triggerLabel={formatMessage('team.menu.label', { name: member.name })}
+        panelLabel={t('team.menu.panel')}
+        items={items}
+      />
+    );
   };
 
   if (data.isFirstLoad) return <LoadingState label={t('team.loading')} />;
@@ -103,6 +193,8 @@ export function TeamPage() {
           {t('team.invite.open')}
         </Button>
       </div>
+      {notice ? <Alert tone="success">{notice}</Alert> : null}
+      {problem ? <Alert tone="error">{problem}</Alert> : null}
       {justInvited ? (
         <Alert tone={justInvited.emailSent ? 'success' : 'error'}>
           <p>
@@ -128,7 +220,7 @@ export function TeamPage() {
         {members.length === 0 ? <p className="text-body-md text-text-secondary">{t('team.members.empty')}</p> : null}
         <ul>
           {members.map((member) => (
-            <MemberRow key={member.id} member={member} isYou={member.id === signedInUserId} />
+            <MemberRow key={member.id} member={member} isYou={member.id === signedInUserId} menu={menuFor(member)} />
           ))}
         </ul>
       </Card>
@@ -145,6 +237,32 @@ export function TeamPage() {
           ))}
         </ul>
       </Card>
+      <Dialog
+        isOpen={memberToRemove !== null}
+        onClose={() => setMemberToRemove(null)}
+        title={memberToRemove ? formatMessage('team.remove.title', { name: memberToRemove.name }) : ''}
+        closeLabel={t('team.remove.close')}
+        footer={
+          <>
+            <Button onClick={() => setMemberToRemove(null)}>{t('team.remove.cancel')}</Button>
+            <Button variant="destructive" isLoading={isRemoving} onClick={() => void confirmRemove(members)}>
+              {memberToRemove ? formatMessage('team.remove.confirm', { name: memberToRemove.name }) : ''}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-body-md text-text-secondary">
+            {memberToRemove ? formatMessage('team.remove.description', { name: memberToRemove.name }) : ''}
+          </p>
+          <SelectField
+            label={t('team.remove.handOver')}
+            value={handOverToUserId}
+            onChange={(event) => setHandOverToUserId(event.target.value)}
+            options={memberToRemove ? listHandOverChoices(members, memberToRemove.id) : []}
+          />
+        </div>
+      </Dialog>
       {isInviting ? (
         <InviteMemberPanel
           isOpen

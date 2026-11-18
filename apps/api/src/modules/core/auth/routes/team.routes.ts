@@ -1,6 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { inviteMemberRequestSchema, invitationCreatedSchema, teamResponseSchema } from '@toobler-one/shared';
+import {
+  inviteMemberRequestSchema,
+  invitationCreatedSchema,
+  removeTeamMemberQuerySchema,
+  teamMemberIdParamsSchema,
+  teamMemberSchema,
+  teamResponseSchema,
+  updateTeamMemberRequestSchema,
+} from '@toobler-one/shared';
 import { unauthorized } from '../../../../kernel/errors';
 import { createTeamService } from '../services/team.service';
 
@@ -31,6 +39,37 @@ export function teamRoutes(app: FastifyInstance) {
       if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
       const created = await teamService.inviteMember(request.principal, request.body);
       return reply.code(201).send(created);
+    },
+  );
+
+  // Managers only: change a person's role, or add a removed person back. The business always keeps one manager (409 otherwise).
+  typedApp.patch(
+    '/team/members/:id',
+    {
+      config: { access: 'manager' },
+      schema: {
+        params: teamMemberIdParamsSchema,
+        body: updateTeamMemberRequestSchema,
+        response: { 200: teamMemberSchema },
+      },
+    },
+    async (request) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      return teamService.updateMember(request.principal, request.params.id, request.body);
+    },
+  );
+
+  // Managers only: remove a person (they can no longer sign in; their open leads, tasks and tickets go to `hand_over_to`, or to the manager removing them).
+  typedApp.delete(
+    '/team/members/:id',
+    {
+      config: { access: 'manager' },
+      schema: { params: teamMemberIdParamsSchema, querystring: removeTeamMemberQuerySchema },
+    },
+    async (request, reply) => {
+      if (!request.principal) throw unauthorized(); // the guard always sets it; this satisfies the type checker
+      await teamService.removeMember(request.principal, request.params.id, request.query.hand_over_to);
+      return reply.code(204).send();
     },
   );
 }

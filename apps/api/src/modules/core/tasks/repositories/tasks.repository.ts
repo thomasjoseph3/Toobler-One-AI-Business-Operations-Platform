@@ -347,3 +347,20 @@ export async function findTaskWords(
     .where('id', '=', taskId)
     .executeTakeFirst();
 }
+
+/** Gives every open task (not done, not deleted) of a person to another person. Returns how many tasks moved. Run it inside the business's fence. */
+export async function handOverOpenTasks(
+  db: Db,
+  options: { accountId: string; fromUserId: string; toUserId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('tasks')
+    .set({ owner_user_id: options.toUserId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('owner_user_id', '=', options.fromUserId)
+    .where('done_at', 'is', null)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .execute();
+  return rows.length;
+}

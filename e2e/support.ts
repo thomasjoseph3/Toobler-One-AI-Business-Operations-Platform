@@ -236,6 +236,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         }
         if (
           path === '/team' ||
+          path.startsWith('/team/members/') ||
           path === '/team/invitations' ||
           path === '/auth/invitations/preview' ||
           path === '/auth/accept-invitation'
@@ -243,10 +244,18 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
           const teamAnswer = answerTeamCall(pretendApi.team, {
             method: request.method(),
             path,
-            body: request.method() === 'GET' ? null : (request.postDataJSON() as Record<string, unknown> | null),
+            search: new URL(request.url()).search,
+            body:
+              request.method() === 'GET' || request.method() === 'DELETE'
+                ? null
+                : (request.postDataJSON() as Record<string, unknown> | null),
             role: pretendApi.role,
           });
-          if (teamAnswer) return route.fulfill(json(teamAnswer.status, teamAnswer.body));
+          if (teamAnswer) {
+            return route.fulfill(
+              teamAnswer.body === undefined ? { status: teamAnswer.status } : json(teamAnswer.status, teamAnswer.body),
+            );
+          }
         }
         if (path === '/tasks' || path.startsWith('/tasks/')) {
           const profile = profileFor(pretendApi);

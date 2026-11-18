@@ -1,6 +1,6 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { assignmentRulesRoutes } from './routes/assignment-rules.routes';
-import { handleContactUnmarkedNotAFit } from './services/lifecycle-events.service';
+import { handleContactUnmarkedNotAFit, handleTeamMemberRemoved } from './services/lifecycle-events.service';
 import { leadsRoutes } from './routes/leads.routes';
 import { lostReasonsRoutes } from './routes/lost-reasons.routes';
 import { pipelineRoutes } from './routes/pipeline.routes';
@@ -16,7 +16,11 @@ export default defineModule({
   // offering a lead is about and who looks after it (for sharing out by offering), through the offerings module
   requires: ['core.contacts', 'core.offerings'],
   // When staff take the "not a fit" mark off a contact, its stage is worked out again from its leads
-  events: { 'contact.unmarked_not_a_fit': handleContactUnmarkedNotAFit },
+  // ...and when a person is removed from the team, their open leads go to the person the manager chose
+  events: {
+    'contact.unmarked_not_a_fit': handleContactUnmarkedNotAFit,
+    'team.member_removed': handleTeamMemberRemoved,
+  },
   routes: (app) => {
     pipelineRoutes(app);
     lostReasonsRoutes(app);

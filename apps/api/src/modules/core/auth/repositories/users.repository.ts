@@ -285,3 +285,64 @@ export async function listTeamMembers(db: Db, accountId: string): Promise<TeamMe
     lastSignedInAt: row.last_login_at,
   }));
 }
+
+/** The ids of the business's active managers, locked until the transaction ends, so two managers changing each other at the same moment take turns (the business always keeps one). */
+export async function lockActiveManagerIds(db: Db, accountId: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('users')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('role', '=', 'manager')
+    .where('status', '=', 'active')
+    .forUpdate()
+    .execute();
+  return rows.map((row) => row.id);
+}
+
+/** One person of the business as the Team screen lists them, locked until the transaction ends. Undefined for an unknown id and for a person of another business. */
+export async function findTeamMemberForUpdate(
+  db: Db,
+  accountId: string,
+  userId: string,
+): Promise<TeamMemberRow | undefined> {
+  const row = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email', 'mobile_e164', 'role', 'status', 'last_login_at'])
+    .where('account_id', '=', accountId)
+    .where('id', '=', userId)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    mobile: row.mobile_e164,
+    role: row.role,
+    status: row.status,
+    lastSignedInAt: row.last_login_at,
+  };
+}
+
+/** Changes a person's role and/or status, and stamps who did it. Run it inside the business's fence. */
+export async function changeTeamMember(
+  db: Db,
+  options: {
+    accountId: string;
+    userId: string;
+    changes: { role?: 'manager' | 'staff' | 'staff_own'; status?: 'active' | 'disabled' };
+    changedBy: string;
+  },
+): Promise<void> {
+  await db
+    .updateTable('users')
+    .set({
+      ...(options.changes.role !== undefined ? { role: options.changes.role } : {}),
+      ...(options.changes.status !== undefined ? { status: options.changes.status } : {}),
+      updated_by: { kind: 'user', id: options.changedBy },
+      updated_at: sql`now()`,
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.userId)
+    .execute();
+}

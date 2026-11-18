@@ -705,6 +705,18 @@ const attempts: Attempt[] = [
     expectedStatus: 200,
   },
   {
+    route: 'PATCH /api/v1/team/members/{id}',
+    what: "change the role of A's owner",
+    request: () => ({ method: 'PATCH', url: `/team/members/${dataOfA.userId}`, payload: { role: 'staff' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/team/members/{id}',
+    what: "remove A's owner",
+    request: () => ({ method: 'DELETE', url: `/team/members/${dataOfA.userId}` }),
+    expectedStatus: 404,
+  },
+  {
     route: 'POST /api/v1/team/invitations',
     what: 'invite the owner of A (an email that already has an account anywhere is refused)',
     request: () => ({

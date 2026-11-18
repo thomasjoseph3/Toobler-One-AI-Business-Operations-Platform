@@ -251,3 +251,19 @@ export async function findNewestOpenTicketOfKindForContact(
     .limit(1)
     .executeTakeFirst();
 }
+
+/** Gives every open ticket of a person to another person. Returns how many tickets moved. Run it inside the business's fence. */
+export async function handOverOpenTickets(
+  db: Db,
+  options: { accountId: string; fromUserId: string; toUserId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('tickets')
+    .set({ owner_user_id: options.toUserId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('owner_user_id', '=', options.fromUserId)
+    .where('status', '=', 'open')
+    .returning('id')
+    .execute();
+  return rows.length;
+}

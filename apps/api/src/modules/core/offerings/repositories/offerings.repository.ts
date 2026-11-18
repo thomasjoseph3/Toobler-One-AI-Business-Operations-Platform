@@ -318,3 +318,19 @@ export async function findOfferingSummariesByIds(
     removed: row.deleted_at !== null,
   }));
 }
+
+/** Makes another person look after every live offering a person looked after. Returns how many offerings moved. Run it inside the business's fence. */
+export async function handOverOfferings(
+  db: Db,
+  options: { accountId: string; fromUserId: string; toUserId: string; actor: Actor },
+): Promise<number> {
+  const rows = await db
+    .updateTable('offerings')
+    .set({ owner_user_id: options.toUserId, updated_by: { kind: options.actor.kind, id: options.actor.id } })
+    .where('account_id', '=', options.accountId)
+    .where('owner_user_id', '=', options.fromUserId)
+    .where('deleted_at', 'is', null)
+    .returning('id')
+    .execute();
+  return rows.length;
+}
