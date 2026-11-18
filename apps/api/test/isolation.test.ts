@@ -104,6 +104,7 @@ interface BusinessAData {
   viewId: string;
   listId: string;
   importId: string;
+  exportId: string;
   secretWords: string;
 }
 
@@ -281,6 +282,8 @@ beforeAll(async () => {
     'a.csv',
     Buffer.from(`Phone,Name\n+971500000001,${secretWords}\n`),
   );
+  // A has an export of its contacts; B must never read or download it
+  const exportOfA = await sendOk(businessA, 'POST', '/exports', { object: 'contact' }, 202);
   // A has a company with a secret name; B must never see it
   const companyOfA = await sendOk(
     businessA,
@@ -329,6 +332,7 @@ beforeAll(async () => {
     viewId: viewOfA.id,
     listId: listOfA.id,
     importId: importOfA.id,
+    exportId: exportOfA.id,
     secretWords,
   };
 
@@ -958,6 +962,24 @@ const attempts: Attempt[] = [
     what: "run A's import",
     request: () => ({ method: 'POST', url: `/imports/${dataOfA.importId}/run` }),
     expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/exports/{id}',
+    what: "read the status of A's export",
+    request: () => ({ method: 'GET', url: `/exports/${dataOfA.exportId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/exports/{id}/download',
+    what: "download A's export file",
+    request: () => ({ method: 'GET', url: `/exports/${dataOfA.exportId}/download` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/exports',
+    what: "ask for an export as B (it is B's own list, never A's: the business comes from the session)",
+    request: () => ({ method: 'POST', url: '/exports', payload: { object: 'contact' } }),
+    expectedStatus: 202,
   },
   {
     route: 'POST /api/v1/fields/reorder',

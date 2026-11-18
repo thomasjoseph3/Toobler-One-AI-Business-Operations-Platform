@@ -13,6 +13,8 @@ import { customFieldsToFilterable, type CheckedFilterCondition, type FilterableF
 import { readFilterRequest } from '../../../../kernel/filters/read-filter-request';
 import type { AssignLeadRequest } from '@toobler-one/shared';
 import { writeActivityLog } from '../../../../kernel/activity-log';
+import { customAnswerToCell, momentToDateCell } from '../../../../kernel/csv/cells';
+import type { CsvTable } from '../../../../kernel/csv/write-csv';
 import type { Actor } from '../../../../kernel/context';
 import type { Database, Db } from '../../../../kernel/database';
 import { ApiError, conflict, forbidden, notFound } from '../../../../kernel/errors';
@@ -752,3 +754,80 @@ async function readBoard(
 }
 
 export type LeadsService = ReturnType<typeof createLeadsService>;
+
+/** How many leads are read from the database at a time when exporting. */
+const EXPORT_PAGE_ROWS = 500;
+
+/**
+ * The leads that match a leads list's own query (`status`, `stageId`, `ownerUserId`, `contactId`, `offeringId`, `filters`, `sort`) as a table: the person, stage, temperature and its reason, what
+ * they want, the dates, the number of people, the budget in rupees, the source, the dates added and last active, and one column for each of the business's live lead fields. Exactly
+ * what the list shows, in the list's order, all pages, up to `maxRows`. Meant for managers (every lead of the business). Run it inside the business's own transaction.
+ */
+export async function findLeadsForExport(
+  transaction: Db,
+  options: { accountId: string; query: ListLeadsQuery; maxRows: number },
+): Promise<CsvTable> {
+  const { accountId, query } = options;
+  const definitions = await findFieldDefinitions(transaction, accountId, 'lead');
+  const conditions = await readLeadFilterConditions(transaction, accountId, query.filters);
+  const rows: string[][] = [];
+  for (let offset = 0; rows.length < options.maxRows; offset += EXPORT_PAGE_ROWS) {
+    const { rows: leadRows } = await leadsRepository.listLeadRows(
+      transaction,
+      {
+        accountId,
+        stageId: query.stageId,
+        ownerUserId: query.ownerUserId,
+        contactId: query.contactId,
+        offeringId: query.offeringId,
+        status: query.status,
+        conditions,
+      },
+      { limit: Math.min(EXPORT_PAGE_ROWS, options.maxRows - rows.length), offset },
+      { sort: query.sort, order: query.order },
+    );
+    if (leadRows.length === 0) break;
+    const related = await loadRelatedForLeads(transaction, accountId, leadRows);
+    for (const leadRow of leadRows) {
+      const lead = toLead(leadRow, related);
+      rows.push([
+        lead.contact?.name ?? '',
+        lead.contact?.phone ?? '',
+        lead.contact?.email ?? '',
+        lead.stage.name,
+        lead.temperature === 'unscored' ? '' : lead.temperature,
+        lead.temperatureReason ?? '',
+        lead.interest ?? '',
+        lead.dateFrom ?? '',
+        lead.dateTo ?? '',
+        lead.partySize === null ? '' : String(lead.partySize),
+        lead.budgetPaise === null ? '' : String(lead.budgetPaise / 100),
+        lead.firstChannel,
+        momentToDateCell(lead.createdAt),
+        momentToDateCell(lead.lastActivityAt),
+        ...definitions.map((definition) => customAnswerToCell(lead.custom[definition.key])),
+      ]);
+    }
+    if (leadRows.length < EXPORT_PAGE_ROWS) break;
+  }
+  return {
+    headers: [
+      'Name',
+      'Phone',
+      'Email',
+      'Stage',
+      'Temperature',
+      'Temperature reason',
+      'What they want',
+      'From',
+      'To',
+      'Number of people',
+      'Budget (rupees)',
+      'Source',
+      'Added',
+      'Last activity',
+      ...definitions.map((definition) => definition.label),
+    ],
+    rows,
+  };
+}

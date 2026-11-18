@@ -20,3 +20,5 @@ export { addCustomAnswersToLeadWhereEmpty } from './services/lead-custom-answers
 // The agents module gives a lead what its conversation taught us, and the lead is scored by the fixed rules.
 export { scoreLeadFromConversation } from './services/lead-scoring.service';
 export type { ConversationFactsForScoring } from './services/lead-scoring.service';
+// The exports module (F12) writes the leads a list shows as a CSV file.
+export { findLeadsForExport } from './services/leads.service';

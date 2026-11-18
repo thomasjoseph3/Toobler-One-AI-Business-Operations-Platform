@@ -304,3 +304,20 @@ export async function removeCustomAnswerKey(
     .executeTakeFirst();
   return Number(result.numUpdatedRows);
 }
+
+/** The names of the live companies among these ids, by id. A deleted company and another business's company are left out. */
+export async function findCompanyNamesByIds(
+  db: Db,
+  accountId: string,
+  companyIds: string[],
+): Promise<Map<string, string>> {
+  if (companyIds.length === 0) return new Map();
+  const rows = await db
+    .selectFrom('companies')
+    .select(['id', 'name'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', companyIds)
+    .where('deleted_at', 'is', null)
+    .execute();
+  return new Map(rows.map((row) => [row.id, row.name]));
+}

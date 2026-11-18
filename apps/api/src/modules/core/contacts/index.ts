@@ -25,3 +25,5 @@ export type { ContactIdentity } from './services/contact-identity.service';
 // The imports module (F12) matches and saves the rows of a spreadsheet as contacts, the same way the AI finds a person.
 export { applyImportedContact, previewImportedContact } from './services/contact-import.service';
 export type { ImportApplied, ImportPreview, SkippedImport } from './services/contact-import.service';
+// The exports module (F12) writes the contacts a list shows as a CSV file.
+export { findContactsForExport } from './services/contact-export.service';

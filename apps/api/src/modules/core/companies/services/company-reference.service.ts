@@ -52,3 +52,11 @@ export async function findOrCreateCompanyByName(
   });
   return { companyId: insertedId, created: true };
 }
+
+/** The names of the live companies among these ids, by id (a deleted company and another business's company are left out). Used by the exports module (through this module's index.ts). */
+export async function findCompanyNames(
+  transaction: Db,
+  options: { accountId: string; companyIds: string[] },
+): Promise<Map<string, string>> {
+  return companiesRepository.findCompanyNamesByIds(transaction, options.accountId, options.companyIds);
+}

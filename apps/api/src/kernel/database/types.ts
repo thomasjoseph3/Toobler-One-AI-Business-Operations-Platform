@@ -476,7 +476,7 @@ export interface ImportsTable {
   finished_at: Date | null;
 }
 
-/** A CSV export (F12): built by a job from a list's own filters, kept for 24 hours, given out by a link with a random token. Fenced by account_id. */
+/** A CSV export (F12): built by a job from a list's own filters, kept for 24 hours, downloaded through the manager's own session. Fenced by account_id. */
 export interface ExportsTable {
   id: string;
   account_id: string;
@@ -486,7 +486,6 @@ export interface ExportsTable {
   file_name: string | null;
   content: Buffer | null;
   row_count: number | null;
-  token_hash: string | null;
   expires_at: Date | null;
   error: string | null;
   by_user_id: string;
