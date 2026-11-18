@@ -166,14 +166,14 @@ test.describe('FAQs: search, staff and problems', () => {
   test('shows which FAQ the AI’s search would find for a customer question', async ({ page, pretendApi }) => {
     await page.goto('/knowledge/faqs');
     await page.getByLabel('A customer question').fill('Is there parking available?');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.getByText('The AI would find:')).toBeVisible();
     await expect(
       page.getByRole('region').or(page.locator('li')).filter({ hasText: 'Yes, free parking for guests.' }).first(),
     ).toBeVisible();
     expect(pretendApi.faqs.searches).toEqual(['Is there parking available?']);
     await page.getByLabel('A customer question').fill('Do you arrange helicopter rides?');
-    await page.getByRole('button', { name: 'Search' }).click();
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.getByText(/Nothing matches/)).toBeVisible();
   });
 

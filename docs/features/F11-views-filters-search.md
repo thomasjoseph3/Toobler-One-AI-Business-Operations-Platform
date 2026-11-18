@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/08-views-filters-and-search.md`; `requirements/API.md` (Views, filters and search); docs/plan/PHASE-1.md (F11).
 **Depends on:** F04 contacts, F05 companies, F06 leads, F09 custom fields.      **Modules:** `core.search` (search), later `core.views` (views and lists).
-**Status:** `in_progress` under the standing instruction (17 Nov 2026): built in slices of at most 2 routes, each tested and committed locally. Branch `feature/F11-views-filters-search`, cut from `dev`.
+**Status:** `approved` (18 Nov 2026, verify green: 2845 unit/API, 734 e2e; was `in_progress`) under the standing instruction (17 Nov 2026): built in slices of at most 2 routes, each tested and committed locally. Branch `feature/F11-views-filters-search`, cut from `dev`.
 
 ## Feature guide
 
