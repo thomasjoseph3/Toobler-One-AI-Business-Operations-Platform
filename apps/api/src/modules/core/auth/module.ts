@@ -1,4 +1,5 @@
 import { defineModule } from '../../../kernel/module-system/define';
+import { auditLogRoutes } from './routes/audit-log.routes';
 import { invitationAcceptRoutes } from './routes/invitation-accept.routes';
 import { emailVerificationRoutes } from './routes/email-verification.routes';
 import { passwordRoutes } from './routes/password.routes';
@@ -31,6 +32,7 @@ export default defineModule({
     passwordRoutes(app);
     teamRoutes(app);
     teamsRoutes(app);
+    auditLogRoutes(app);
     invitationAcceptRoutes(app);
   },
 });

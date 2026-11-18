@@ -30,7 +30,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F31 | Setup wizard and fill from website | approved | [brief](../features/F31-setup-wizard.md) | 2026-11-17 |
 | F07 | Timeline and notes | approved | [brief](../features/F07-timeline-and-notes.md) | 2026-11-17 |
 | F08 | Tasks and reminders | approved | [brief](../features/F08-tasks-and-reminders.md) | 2026-11-17 |
-| F02 | Team, roles, teams and the activity log | in_progress | [brief](../features/F02-team-and-roles.md) | |
+| F02 | Team, roles, teams and the activity log | in_review | [brief](../features/F02-team-and-roles.md) | |
 | F05 | Companies | planned | | |
 | F09 | Custom fields | planned | | |
 | F10 | Lead scoring and the Filtered tab | planned | | |

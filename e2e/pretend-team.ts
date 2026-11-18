@@ -10,6 +10,17 @@ export interface PretendTeam {
   teams: Array<{ id: string; name: string; members: Array<{ userId: string; name: string }> }>;
   /** What the page sent to add a team. */
   postedTeams: Array<Record<string, unknown>>;
+  /** The activity log lines, newest first, and the addresses the page asked for. */
+  auditLines: Array<{
+    id: string;
+    kind: string;
+    actor: { kind: string; userId: string | null; name: string | null };
+    recordType: string | null;
+    recordId: string | null;
+    fields: string[];
+    createdAt: string;
+  }>;
+  auditRequests: string[];
   /** What the page sent to change a team, and which teams it deleted. */
   patchedTeams: Array<{ teamId: string; body: Record<string, unknown> }>;
   deletedTeamIds: string[];
@@ -72,6 +83,36 @@ export function startingTeam(managerId: string, managerName: string, managerEmai
     ],
     teams: [{ id: 'team-1', name: 'Front office', members: [{ userId: 'member-staff-1', name: 'Rahul Das' }] }],
     postedTeams: [],
+    auditLines: [
+      {
+        id: 'line-3',
+        kind: 'team.role_changed',
+        actor: { kind: 'user', userId: managerId, name: managerName },
+        recordType: 'user',
+        recordId: 'member-staff-1',
+        fields: ['role'],
+        createdAt: '2026-11-17T09:30:00.000Z',
+      },
+      {
+        id: 'line-2',
+        kind: 'agent.something_new',
+        actor: { kind: 'agent', userId: null, name: null },
+        recordType: null,
+        recordId: null,
+        fields: [],
+        createdAt: '2026-11-17T09:10:00.000Z',
+      },
+      {
+        id: 'line-1',
+        kind: 'leads.created',
+        actor: { kind: 'user', userId: 'member-staff-1', name: 'Rahul Das' },
+        recordType: 'lead',
+        recordId: 'lead-0',
+        fields: [],
+        createdAt: '2026-11-16T05:00:00.000Z',
+      },
+    ],
+    auditRequests: [],
     patchedTeams: [],
     deletedTeamIds: [],
     postedInvitations: [],
@@ -97,6 +138,24 @@ export function answerTeamCall(
     role: 'manager' | 'staff';
   },
 ): PretendAnswer | undefined {
+  if (call.path === '/audit-log') {
+    if (call.role !== 'manager')
+      return { status: 403, body: { error: { code: 'FORBIDDEN', message: 'Not allowed.' } } };
+    state.auditRequests.push(call.search ?? '');
+    if (state.fails) return { status: 500, body: { error: { code: 'UNKNOWN_ERROR', message: 'Down.' } } };
+    const query = new URLSearchParams(call.search ?? '');
+    const person = query.get('person');
+    const areas = query.get('area')?.split(',') ?? [];
+    const lines = state.auditLines.filter(
+      (line) =>
+        (!person || line.actor.userId === person) &&
+        (areas.length === 0 || areas.some((area) => line.kind.startsWith(`${area}.`))),
+    );
+    return {
+      status: 200,
+      body: { items: lines, total: lines.length, page: Number(query.get('page') ?? 1), limit: 50 },
+    };
+  }
   if (call.path === '/auth/invitations/preview' || call.path === '/auth/accept-invitation') {
     const invalid = {
       status: 400,

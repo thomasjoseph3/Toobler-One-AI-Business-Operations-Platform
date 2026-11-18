@@ -1,6 +1,6 @@
 # Roles and access: who can sign in, and who can do what
 
-*The one page that answers "who is who in Toobler One". Written for the owner and the team; plain English first, the exact route table at the end. Last checked against the code on 16 Nov 2026 (93 routes). The rules themselves live in `docs/SECURITY.md` §2 and are enforced in `apps/api/src/kernel/http/guard.ts`.*
+*The one page that answers "who is who in Toobler One". Written for the owner and the team; plain English first, the exact route table at the end. Last checked against the code on 18 Nov 2026 (the team routes of F02 added). The rules themselves live in `docs/SECURITY.md` §2 and are enforced in `apps/api/src/kernel/http/guard.ts`.*
 
 ## 1. The hierarchy in one picture
 
@@ -27,7 +27,7 @@ Two rules sit above everything else:
 | Kind of person | How they get an account today | How they sign in | What they can reach |
 | --- | --- | --- | --- |
 | **Manager** | Signs up on their own (F01): the sign-up creates the business and makes the person its manager. The email must be verified before the app works. | Email and password | Everything in their own business, including settings |
-| **Staff** and **own-leads-only staff** | **Not possible through the app yet.** Inviting people and choosing their role is **F02 (Team, roles and the activity log)**, which is not built. Until then a second person is made by hand in the database (the tests do this). | Email and password (same sign-in) | The daily work of their own business, see section 3 |
+| **Staff** and **own-leads-only staff** | A manager invites them from Settings → Team (F02): the person gets an emailed link (works once, 48 hours), chooses a password and joins with the role the manager picked. | Email and password (same sign-in) | The daily work of their own business, see section 3 |
 | **Platform admin** (Toobler team) | Not through the app, on purpose: the owner switches the admin flag on with one line of SQL for a person. | Email and password (same sign-in) | The platform routes (section 5), plus their own business if they have one |
 | **Platform support** (Toobler staff helping a business, with that business's permission) | **Planned, not built** (F24, Privacy and support access) | | |
 | **Customers** (the business's own customers) | They are not users. They are *contacts*, created by staff or by the AI channels. They never sign in. | Website chat, WhatsApp, calls, email (later features) | Nothing in the staff app |
@@ -56,6 +56,7 @@ Every sign-in is the same screen for every kind of person. What a person can do 
 | Conversations: read one, and change its type ("this isn't a lead") | Yes | Yes | No (a conversation has no owner yet, so who sees which one is decided with the inbox, F21) |
 | Conversation types: add, change, remove, reorder, and "Try it" (test a message with the AI) | **Yes** | No | No |
 | Block list (numbers and emails treated as spam) | **Yes** | No | No (it holds personal data) |
+| Team: invite people, change roles, remove people, teams, the activity log | **Yes** | No | No |
 | Own profile and password | Yes | Yes | Yes |
 
 "View" means the information is shown to the person; only managers can change it. The exact answer for any single action is in the table in section 5, which is built from the code.
@@ -112,6 +113,24 @@ Every route must say who may call it (a route without that declaration does not 
 | Method | Address | Who can call it |
 | --- | --- | --- |
 | GET | `/api/v1/health` | Anyone, signed in or not |
+
+### Team, teams and the activity log (F02)
+
+| Method | Address | Who can call it |
+| --- | --- | --- |
+| GET | `/api/v1/team` | Managers only |
+| POST | `/api/v1/team/invitations` | Managers only |
+| DELETE | `/api/v1/team/invitations/:id` | Managers only |
+| POST | `/api/v1/team/invitations/:id/resend` | Managers only |
+| PATCH | `/api/v1/team/members/:id` | Managers only |
+| DELETE | `/api/v1/team/members/:id` | Managers only |
+| POST | `/api/v1/auth/invitations/preview` | Anyone with the emailed link (the token proves it; works once, 48 hours) |
+| POST | `/api/v1/auth/accept-invitation` | Anyone with the emailed link (the token proves it; works once, 48 hours) |
+| GET | `/api/v1/teams` | Any signed-in person (every role) |
+| POST | `/api/v1/teams` | Managers only |
+| PATCH | `/api/v1/teams/:id` | Managers only |
+| DELETE | `/api/v1/teams/:id` | Managers only |
+| GET | `/api/v1/audit-log` | Managers only |
 
 ### Contacts (F04)
 
@@ -239,7 +258,7 @@ Every route must say who may call it (a route without that declaration does not 
 
 | Missing | Where it is planned |
 | --- | --- |
-| Inviting team members, choosing and changing roles, disabling a person, teams, the activity log screen | F02 |
+| Inviting team members, choosing and changing roles, removing a person, teams, the activity log screen | F02 (built, 18 Nov 2026) |
 | The "own contacts only" filter | F02 / F11 |
 | Support staff visiting a business with its permission, and erasing a person's data | F24 |
 | Platform admin screens (the platform console) | F35 |

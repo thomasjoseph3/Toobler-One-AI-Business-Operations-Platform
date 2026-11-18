@@ -237,6 +237,7 @@ export const test = base.extend<{ consoleProblems: string[]; pretendApi: Pretend
         if (
           path === '/team' ||
           path === '/teams' ||
+          path === '/audit-log' ||
           path.startsWith('/teams/') ||
           path.startsWith('/team/members/') ||
           path === '/team/invitations' ||

@@ -28,3 +28,4 @@ export * from './setup-chat';
 export * from './activities';
 export * from './tasks';
 export * from './team';
+export * from './audit-log';

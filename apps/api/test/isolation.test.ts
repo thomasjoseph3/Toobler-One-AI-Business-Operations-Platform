@@ -765,6 +765,12 @@ const attempts: Attempt[] = [
     expectedStatus: 404,
   },
   {
+    route: 'GET /api/v1/audit-log',
+    what: "read the activity log filtered to A's owner (B must see only its own lines, never A's)",
+    request: () => ({ method: 'GET', url: `/audit-log?person=${dataOfA.userId}` }),
+    expectedStatus: 200,
+  },
+  {
     route: 'POST /api/v1/team/invitations',
     what: 'invite the owner of A (an email that already has an account anywhere is refused)',
     request: () => ({
