@@ -35,7 +35,7 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F09 | Custom fields | approved | [brief](../features/F09-custom-fields.md) | 2026-11-18 |
 | F10 | Lead scoring and the Filtered tab | approved | [brief](../features/F10-lead-scoring-and-filtered-tab.md) | 2026-11-18 |
 | F11 | Views, filters, search and lists | approved | [brief](../features/F11-views-filters-search.md) | 2026-11-18 |
-| F12 | Import and export | in_progress | [brief](../features/F12-import-and-export.md) | |
+| F12 | Import and export | approved | [brief](../features/F12-import-and-export.md) | 2026-11-18 |
 | F13 | Duplicates and merging | planned | | |
 | F21 | Inbox, staff takeover and live updates | planned | | |
 | F22 | Today page | planned | | |

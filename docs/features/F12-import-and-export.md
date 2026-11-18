@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/09-import-and-export.md`; `requirements/API.md` (Import and export); docs/plan/PHASE-1.md (F12).
 **Depends on:** F04 contacts, F05 companies, F09 custom fields, F11 filters.      **Modules:** `core.imports`, `core.exports` (both core).
-**Status:** `in_progress` under the standing instruction, built as ONE unit (owner decision 18 Nov 2026, see CLAUDE.md).
+**Status:** `approved` (18 Nov 2026, verify green: 2912 unit/API, 752 e2e), built as ONE unit (owner decision 18 Nov 2026, see CLAUDE.md).
 
 ## Feature guide
 
