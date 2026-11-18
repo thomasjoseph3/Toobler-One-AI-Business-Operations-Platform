@@ -2,7 +2,7 @@
 
 **Requirements:** `2-crm-core/02-companies.md`; `requirements/API.md` (Companies); docs/plan/PHASE-1.md (F05).
 **Depends on:** F04 contacts, F06 leads, F07 timeline.      **Module:** `core.companies` (core).
-**Status:** `in_progress` under the standing instruction (17 Nov 2026): built in slices of at most 2 routes, each tested and committed locally.
+**Status:** `approved` (18 Nov 2026) under the owner's standing instruction (17 Nov 2026) after `npm run verify` passed; built in 4 slices of at most 2 routes. The owner has not tested it by hand yet.
 
 ## Feature guide
 
