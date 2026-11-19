@@ -9,10 +9,14 @@ import { createContextFactory, type ContextFactory } from './kernel/context';
 import type { Database } from './kernel/database';
 import type { HealthCheck } from './kernel/health';
 import { registerCsrfProtection } from './kernel/http/csrf';
+import { registerApiDocs } from './kernel/http/api-docs';
 import { registerErrorHandling } from './kernel/http/errors';
 import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http/guard';
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
 import { loggerOptions } from './kernel/logger';
+import { createLangChainProvider, type LlmProvider } from './providers/llm';
+import { createImapMailboxProvider, type MailboxProvider } from './providers/mailbox';
+import { createMetaWhatsappProvider, type WhatsappProvider } from './providers/whatsapp';
 import { createMailSender, type MailSender } from './providers/mail';
 import type { ModuleGate, Registry } from './kernel/module-system/registry';
 import { coreOnlyGate } from './kernel/module-system/registry';
@@ -30,8 +34,19 @@ export interface Kernel {
   healthChecks: HealthCheck[];
   /** Sends email. Modules use it through `app.kernel.mail`, never by importing the provider. */
   mail: MailSender;
+  /** The AI model layer. Features use it through the core.ai module's service, never by importing the provider. */
+  llm: LlmProvider;
+  /** Talks to WhatsApp. Channel modules use it through `app.kernel.whatsapp`, never by importing the provider. */
+  whatsapp: WhatsappProvider;
+  /** Reads and answers a business's own mailbox. Channel modules use it through `app.kernel.mailbox`. */
+  mailbox: MailboxProvider;
   /** Whether the per-route limits (login, sign-up, ...) apply. On unless a test turns it off. */
   strictRouteLimits: boolean;
+  /**
+   * Queues a background job (a module must have declared it). The job runner starts after the web server is built, so server.ts sets this
+   * once the runner is running; until then (and in tests that bring no runner) it refuses, so a missing runner is never silently ignored.
+   */
+  enqueueJob: (jobName: string, data: { accountId?: string } & Record<string, unknown>) => Promise<void>;
 }
 
 declare module 'fastify' {
@@ -51,6 +66,14 @@ export interface AppDeps {
   healthChecks?: HealthCheck[];
   /** Replaces the mail sender the settings choose. Tests pass a recording one so no email is really sent. */
   mailSender?: MailSender;
+  /** Replaces the job queue: tests pass one that records what was queued. */
+  enqueueJob?: Kernel['enqueueJob'];
+  /** Replaces the real AI model layer. Tests pass a scripted one so no model is ever called. */
+  llmProvider?: LlmProvider;
+  /** Replaces the real WhatsApp provider. Tests pass a recording one so Meta is never called. */
+  whatsappProvider?: WhatsappProvider;
+  /** Replaces the real mailbox provider. Tests pass a scripted one so no mail server is ever reached. */
+  mailboxProvider?: MailboxProvider;
   /** Turn the per-route limits off (default on). Tests that create many people from one address use this. */
   strictRouteLimits?: boolean;
   /** Requests per window per address; public routes get their own tighter limits. */
@@ -82,7 +105,9 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     reply.header('x-request-id', request.id);
   });
 
-  const gate = dependencies.gate ?? coreOnlyGate(registry);
+  // The gate comes from the module that provides one (core.module_switches). With none, only core modules are on.
+  const gateFactory = registry.modules.find((moduleManifest) => moduleManifest.moduleGate)?.moduleGate;
+  const gate = dependencies.gate ?? gateFactory?.({ config, database, registry }) ?? coreOnlyGate(registry);
   app.decorate('kernel', {
     config,
     database,
@@ -91,7 +116,15 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     contextFor: createContextFactory(database),
     healthChecks: dependencies.healthChecks ?? [],
     strictRouteLimits: dependencies.strictRouteLimits ?? true,
+    enqueueJob:
+      dependencies.enqueueJob ??
+      (async () => {
+        throw new Error('Background jobs are not running, so this job cannot be queued.');
+      }),
     mail: dependencies.mailSender ?? createMailSender(config, (line) => app.log.info(line)),
+    llm: dependencies.llmProvider ?? createLangChainProvider(),
+    whatsapp: dependencies.whatsappProvider ?? createMetaWhatsappProvider(),
+    mailbox: dependencies.mailboxProvider ?? createImapMailboxProvider(),
   });
 
   // The authenticator comes from the module that provides one (core.auth). With none, every signed-in route answers 401.
@@ -99,10 +132,14 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
   const authenticate = dependencies.authenticate ?? authenticatorFactory?.({ config, database }) ?? rejectEveryone;
 
   registerErrorHandling(app);
-  registerCsrfProtection(app, { allowedOrigin: config.webUrl }); // changes need our Origin and header
+  // Changes need our Origin and header. In development the API docs page counts as ours too (so "Try it out" works).
+  registerCsrfProtection(app, { allowedOrigins: [config.webUrl, ...(config.docsOrigin ? [config.docsOrigin] : [])] });
   await app.register(cookie); // lets routes set and read cookies (the sign-in cookies)
   await app.register(helmet);
   await app.register(rateLimit, { global: true, ...(dependencies.rateLimit ?? { max: 300, timeWindow: '1 minute' }) });
+  // Development only. Registered before the guard on purpose: the docs page's own routes carry no `config.access`, and the
+  // guard refuses routes without one. They are read-only pages and do not exist outside development.
+  if (config.docsOrigin) await registerApiDocs(app, { docsOrigin: config.docsOrigin });
   registerGuard(app, {
     authenticate,
     gate,
@@ -123,6 +160,10 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
       },
       { prefix: '/api/v1' },
     );
+  }
+  // Pages and files a module serves outside the API (no prefix, no module tag: they are the same for every business)
+  for (const moduleManifest of registry.modules) {
+    if (moduleManifest.pages) await app.register(async (pageScope) => moduleManifest.pages?.(pageScope));
   }
   return app;
 }

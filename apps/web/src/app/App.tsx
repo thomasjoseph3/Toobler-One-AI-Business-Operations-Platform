@@ -1,8 +1,44 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Route, Routes } from 'react-router';
+import { ChannelsPage } from '../features/channels/ChannelsPage';
+import { FaqsPage } from '../features/faqs/FaqsPage';
+import { KnowledgePage } from '../features/knowledge/KnowledgePage';
+import { ContactPage } from '../features/contacts/ContactPage';
+import { SetupChatPage } from '../features/setup/SetupChatPage';
+import { TicketPage } from '../features/tickets/TicketPage';
+import { TicketsPage } from '../features/tickets/TicketsPage';
+import { TasksPage } from '../features/tasks/TasksPage';
+import { TodayPage } from '../features/today/TodayPage';
+import { ContactsPage } from '../features/contacts/ContactsPage';
+import { FilteredPage } from '../features/leads/FilteredPage';
+import { ExportPage } from '../features/exports/ExportPage';
+import { ConversationPage } from '../features/inbox/ConversationPage';
+import { InboxPage } from '../features/inbox/InboxPage';
+import { ImportPage } from '../features/imports/ImportPage';
+import { DuplicatesPage } from '../features/duplicates/DuplicatesPage';
+import { ListPage } from '../features/lists/ListPage';
+import { ListsPage } from '../features/lists/ListsPage';
+import { LeadPage } from '../features/leads/LeadPage';
+import { LeadsPage } from '../features/leads/LeadsPage';
+import { ModulesPage } from '../features/settings/ModulesPage';
+import { SettingsAiPage } from '../features/settings/SettingsAiPage';
+import { AcceptInvitationPage } from '../pages/AcceptInvitationPage';
+import { FieldsPage } from '../features/fields/FieldsPage';
+import { CompaniesPage } from '../features/companies/CompaniesPage';
+import { CompanyPage } from '../features/companies/CompanyPage';
+import { ActivityPage } from '../features/team/ActivityPage';
+import { TeamPage } from '../features/team/TeamPage';
+import { TeamsPage } from '../features/team/TeamsPage';
+import { SetupPage } from '../features/setup/SetupPage';
+import { WhatYouSellPage } from '../features/what-you-sell/WhatYouSellPage';
+import { TestAgentPage } from '../features/test-agent/TestAgentPage';
+import { RequireSignIn } from '../auth/RequireSignIn';
+import { SessionProvider } from '../auth/session';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
-import { NAVIGATION_ITEMS } from './navigation';
+import { SignInPage } from '../pages/SignInPage';
+import { AuthLayout } from './AuthLayout';
+import { NAVIGATION_ITEMS, type NavigationItem } from './navigation';
 import { Shell } from './shell/Shell';
 import { ThemeProvider } from './theme';
 
@@ -12,29 +48,74 @@ const UiGallery = import.meta.env.DEV
   ? lazy(() => import('../dev/UiGallery').then((module) => ({ default: module.UiGallery })))
   : null;
 
-/** The whole staff app: theme, the page frame, and one route for each menu entry. */
+/** The page for one menu entry: its real screen when it has one, otherwise the "not built yet" page. */
+function pageFor(item: NavigationItem) {
+  if (item.id === 'today') return <TodayPage />;
+  if (item.id === 'leads') return <LeadsPage />;
+  if (item.id === 'inbox') return <InboxPage />;
+  if (item.id === 'contacts') return <ContactsPage />;
+  if (item.id === 'tickets') return <TicketsPage />;
+  if (item.id === 'tasks') return <TasksPage />;
+  if (item.id === 'companies') return <CompaniesPage />;
+  if (item.id === 'knowledge') return <KnowledgePage />;
+  if (item.id === 'setup') return <SetupPage />;
+  if (item.id === 'channels') return <ChannelsPage />;
+  if (item.id === 'settings') return <SettingsAiPage />;
+  return <PlaceholderPage item={item} />;
+}
+
+/** The whole staff app: theme, who is signed in, the sign-in page, and (behind the guard) the page frame with one route for each menu entry. */
 export function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
-        <Routes>
-          <Route element={<Shell />}>
-            {NAVIGATION_ITEMS.map((item) => (
-              <Route key={item.id} path={item.path} element={<PlaceholderPage item={item} />} />
-            ))}
-            {UiGallery ? (
-              <Route
-                path="/dev/ui"
-                element={
-                  <Suspense fallback={null}>
-                    <UiGallery />
-                  </Suspense>
-                }
-              />
-            ) : null}
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
+        <SessionProvider>
+          <Routes>
+            <Route element={<AuthLayout />}>
+              <Route path="/sign-in" element={<SignInPage />} />
+              <Route path="/accept-invitation" element={<AcceptInvitationPage />} />
+            </Route>
+            <Route element={<RequireSignIn />}>
+              <Route element={<Shell />}>
+                {NAVIGATION_ITEMS.map((item) => (
+                  <Route key={item.id} path={item.path} element={pageFor(item)} />
+                ))}
+                <Route path="/inbox/:conversationId" element={<ConversationPage />} />
+                <Route path="/leads/filtered" element={<FilteredPage />} />
+                <Route path="/leads/:leadId" element={<LeadPage />} />
+                <Route path="/contacts/import" element={<ImportPage />} />
+                <Route path="/contacts/duplicates" element={<DuplicatesPage object="contact" />} />
+                <Route path="/companies/duplicates" element={<DuplicatesPage object="company" />} />
+                <Route path="/exports/:exportId" element={<ExportPage />} />
+                <Route path="/contacts/lists" element={<ListsPage />} />
+                <Route path="/contacts/lists/:listId" element={<ListPage />} />
+                <Route path="/contacts/:contactId" element={<ContactPage />} />
+                <Route path="/companies/:companyId" element={<CompanyPage />} />
+                <Route path="/tickets/:ticketId" element={<TicketPage />} />
+                <Route path="/setup/chat" element={<SetupChatPage />} />
+                <Route path="/knowledge/test-agent" element={<TestAgentPage />} />
+                <Route path="/knowledge/what-you-sell" element={<WhatYouSellPage />} />
+                <Route path="/knowledge/faqs" element={<FaqsPage />} />
+                <Route path="/settings/modules" element={<ModulesPage />} />
+                <Route path="/settings/team" element={<TeamPage />} />
+                <Route path="/settings/teams" element={<TeamsPage />} />
+                <Route path="/settings/fields" element={<FieldsPage />} />
+                <Route path="/settings/activity" element={<ActivityPage />} />
+                {UiGallery ? (
+                  <Route
+                    path="/dev/ui"
+                    element={
+                      <Suspense fallback={null}>
+                        <UiGallery />
+                      </Suspense>
+                    }
+                  />
+                ) : null}
+                <Route path="*" element={<NotFoundPage />} />
+              </Route>
+            </Route>
+          </Routes>
+        </SessionProvider>
       </BrowserRouter>
     </ThemeProvider>
   );

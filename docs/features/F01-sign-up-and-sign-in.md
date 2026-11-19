@@ -3,6 +3,64 @@
 **Requirements:** `5-onboarding-and-launch/02-sign-up-and-sign-in.md`; docs/SECURITY.md §2.2; docs/BACKEND.md §2
 **Depends on:** F00      **Module:** `core.auth` (core)
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+Lets a business owner create an account on their own, prove their email, and sign in later with email and password. After signing in they are "inside their business": everything they save is kept for that business and shown only to the right people. It covers:
+- **Sign-up:** your name, business name, work email, mobile number, password and industry. This creates the business and makes you its manager.
+- **Email check:** a link is emailed to you (valid 48 hours); the app is not usable until you click it.
+- **Sign-in, sign-out, forgot and reset password** (the reset link is valid 1 hour), and **changing your password**.
+- **Your profile:** your name, your business, your role, which parts of the product are on.
+
+### Why it is useful
+- **Self-service.** No one at Toobler has to set a business up by hand.
+- **Safe.** Passwords are stored in a way nobody can read back. Too many wrong tries lock the account for a short time. Signing out or changing a password ends other sign-ins at once.
+- **Every account has a reachable owner,** because the email must be verified.
+
+### How it works: a day in the life
+1. An owner opens the sign-up page and fills in the form. A business and a manager account are created, and an email arrives.
+2. They click the link in the email. They are now in the app, and the top bar shows their business name.
+3. Next morning they sign in with email and password. The app quietly renews their sign-in in the background while they work.
+4. They forget their password: they ask for a reset link, set a new password, and every older sign-in is ended.
+
+### Who can do what
+Anyone can sign up, sign in and reset a password. Once signed in, every person can see and edit their own profile and change their own password. (Inviting team members and choosing roles is F02.)
+
+### Settings and limits
+| What | Value |
+| --- | --- |
+| Password | At least 10 characters, not on a list of common passwords, not your email or mobile |
+| Wrong passwords before a lock | 5 (locked for 15 minutes; the message is the same for an unknown email) |
+| Email verification link | 48 hours, single use |
+| Password reset link | 1 hour, single use |
+| Stay signed in | 7 days if unused, 30 days at most |
+| One email | One business (a second sign-up with the same email is refused) |
+
+### What it will never do
+- Tell an outsider whether an email has an account when signing in (unknown email and wrong password look the same).
+- Put tokens where web-page code can read them, or write passwords, tokens, emails or mobile numbers into logs.
+- Let a request pick which business it acts on: the business always comes from the signed-in person.
+
+### Not part of this feature
+Adding team members and roles (F02), switching between businesses, verifying the mobile number or signing in with a WhatsApp code (F25), and the sign-in screens, which wait for the designer.
+
+### For the tech team
+- **Module:** `core.auth`. Migration `002_auth.sql`. Tables: `accounts` (own RLS on `id`), `users` (fenced), and four **global** tables the app role cannot touch at all: `user_credentials` (argon2id hashes), `sessions`, `auth_tokens`, `login_attempts`, reached only through named functions in `kernel/database/across-accounts.ts`.
+- **Tokens:** a 15-minute access JWT (HS256, `jose`) naming the user and session, plus a random refresh token stored only as a SHA-256 hash and **rotated at every use**. A replaced token used again after a one-minute grace ends the session. Both are `HttpOnly`, `SameSite=Lax` cookies set by the API (`toobler_access`, and `toobler_refresh` sent only to `/api/v1/auth/refresh`). Every request also checks the session is live in the database.
+- **CSRF:** every unsafe request must carry an `Origin` equal to our web address and `X-Requested-With: toobler-web`, otherwise 403.
+- **Routes:** `POST /auth/signup`, `/auth/verify-email`, `/auth/resend-email`, `/auth/login`, `/auth/refresh`, `/auth/forgot-password`, `/auth/reset-password`, `/auth/logout`; `GET /me`, `PATCH /me`, `POST /me/password`; `GET /industries`, `POST /industries` (platform admin only). An expired access token answers `401 TOKEN_EXPIRED` so the web app refreshes once.
+- **Mail:** behind an interface: `smtp` (nodemailer, using the `SMTP_*` settings) or `console` (prints the link outside production). Tests use Mailpit in Docker.
+- **Settings:** `JWT_SECRET` (32+ characters), `ACCESS_TOKEN_MINUTES`, `SESSION_IDLE_DAYS`, `SESSION_MAX_DAYS`, `MAIL_PROVIDER`, `SMTP_*`, `EMAIL_FROM`; production refuses to start on a missing or example secret.
+
+### Known limits
+- The sign-in screens are built only for sign-in itself (on the branch `feature/F01-ui-sign-in`); the rest wait for the designer.
+- The mobile number is collected but not verified and not unique.
+- The common-password list is small (a few hundred entries) and can be replaced without code changes.
+
+---
+
 **Goal in one line:** a business owner can create an account alone, prove their email, sign in again later
 (email and password), and land in the app *as a member of their business*, so everything built after this
 (contacts, knowledge base, AI agent) is saved for the right business and shown only to the right people.
@@ -44,10 +102,17 @@ Slices of at most 2 API routes, backend first; **the screens come after the whol
 | 3 | `POST /auth/logout`, `GET /me` | done and tested by the owner |
 | 4 | `POST /auth/verify-email`, `POST /auth/resend-email` | done and tested by the owner |
 | 5 | `POST /auth/refresh` | done and tested by the owner |
-| 6 | lockout after 5 wrong passwords, rate limits, common-password list (no new route) | built, waiting for the owner's test |
-| 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | planned |
-| 8 | `PATCH /me`, `POST /me/password` | planned |
-| UI | sign-up, verify, sign-in, forgot and reset, profile, sign-out | after slice 8 |
+| 6 | lockout after 5 wrong passwords, rate limits, common-password list (no new route) | done and tested by the owner |
+| 7 | `POST /auth/forgot-password`, `POST /auth/reset-password` | done and tested by the owner |
+| 8 | `PATCH /me`, `POST /me/password` | done and tested by the owner |
+| UI 1 | sign-in, sign-out and the signed-in guard (no new routes) | built, waiting for the owner's test |
+| UI 2 | sign-up and the "check your email" screen (adds the "Create an account" link) | planned |
+| UI 3 | the verify-email page, "verify your email" banner, resend | planned |
+| UI 4 | forgot and reset password pages (adds the "Forgot password?" link) | planned |
+| UI 5 | profile page: edit name and mobile, change password | planned |
+| UI 6 | full-stack browser tests (real API and test database), hand-off script | planned |
+
+**Design (owner decision, 13 Nov 2026):** the designer supplied only the Leads list frame, so these screens are designed by us in that style (design system v1.3 tokens, the Figma icons and logo) and listed in docs/FRONTEND.md for the designer to review. Built slice by slice on the branch `feature/ui-design-v1.3`.
 
 ## Reused from the hotel agent
 - Read: `src/modules/core/auth/{routes,service,sessions,repository}.js`, `src/middleware/auth.js` (489 lines). **We keep

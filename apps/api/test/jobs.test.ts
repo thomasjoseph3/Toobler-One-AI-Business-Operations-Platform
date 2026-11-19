@@ -6,18 +6,37 @@ import { createJobRunner, type JobRunner } from '../src/kernel/jobs/job-runner';
 import type { JobData, JobRun } from '../src/kernel/jobs/jobs';
 import { defineModule } from '../src/kernel/module-system/define';
 import { createRegistry, type ModuleGate } from '../src/kernel/module-system/registry';
+import { createScriptedLlmProvider } from '../src/providers/llm';
+import { unusedMailboxProvider } from './support/mailbox';
 import { newAccountId, openTestDatabase, waitFor } from './support/harness';
 import { testConfig } from './support/app';
+
+/** The services a job may use, for tests that do not look at them: real settings and database, no mail, no AI. */
+const jobServices = () => ({
+  config: testConfig(),
+  database,
+  mail: { send: async () => {} },
+  llm: createScriptedLlmProvider(() => ({ answer: 'unused' })),
+  mailbox: unusedMailboxProvider,
+});
 
 let database: Database;
 let runner: JobRunner;
 
 // Everything the probe job saw, in the order it ran.
 const probeRuns: JobRun[] = [];
+// Runs of the job that stands in for a cron-scheduled job (which pg-boss starts with no data).
+const scheduledProbeRuns: JobRun[] = [];
 const probeModule = defineModule({
   id: 'feature.probe',
   kind: 'feature',
   jobs: [
+    {
+      name: 'probe.scheduled',
+      run: async (job) => {
+        scheduledProbeRuns.push(job);
+      },
+    },
     {
       name: 'probe.record',
       run: async (job) => {
@@ -42,6 +61,8 @@ beforeAll(async () => {
     registry: createRegistry([probeModule]),
     gate,
     contextFor: createContextFactory(database),
+    listAccountIds: async () => [],
+    services: jobServices(),
     logger: pino({ level: 'silent' }),
     // A separate pg-boss schema for tests, and fast polling so the tests don't wait.
     options: { schema: 'pgboss_test', pollIntervalSeconds: 0.5 },
@@ -84,6 +105,14 @@ describe('job runner', () => {
     expect(ranForData(jobForBusinessWithProbeOff)).toBeUndefined();
   });
 
+  it('runs a job that arrives with no data at all, like a cron-scheduled job', async () => {
+    // pg-boss hands a scheduled job `null` as its data; the runner must not crash on it.
+    await runner.enqueueJob('probe.scheduled', null as unknown as JobData);
+    await waitFor(() => scheduledProbeRuns.length === 1);
+    expect(scheduledProbeRuns[0]?.data).toEqual({});
+    expect(scheduledProbeRuns[0]?.accountContext).toBeUndefined();
+  });
+
   it('refuses a job nobody declared and a job with a bad business id', async () => {
     await expect(runner.enqueueJob('nobody.declared', {})).rejects.toThrow(/not declared/);
     await expect(runner.enqueueJob('probe.record', { accountId: 'not-a-uuid' })).rejects.toThrow(/valid accountId/);
@@ -101,6 +130,8 @@ describe('job runner heartbeat', () => {
       registry: createRegistry([]),
       gate,
       contextFor: createContextFactory(database),
+      listAccountIds: async () => [],
+      services: jobServices(),
       logger: pino({ level: 'silent' }),
       options: { schema: 'pgboss_test', heartbeatStaleAfterMilliseconds: 1 },
     });
@@ -121,6 +152,8 @@ describe('job runner health when not started', () => {
       registry: createRegistry([]),
       gate,
       contextFor: createContextFactory(database),
+      listAccountIds: async () => [],
+      services: jobServices(),
       logger: pino({ level: 'silent' }),
       options: { schema: 'pgboss_test' },
     });

@@ -1,7 +1,7 @@
 import type { MailMessage } from '../../../../providers/mail';
 
 /** Makes a name safe to place inside HTML, so a name like `<b>x</b>` is shown as text and not as markup. */
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')

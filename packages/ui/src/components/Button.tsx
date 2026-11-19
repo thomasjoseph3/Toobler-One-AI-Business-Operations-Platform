@@ -7,8 +7,8 @@ export type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'destructive'
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** Primary is for the one main action of an area; the others support it (design system 3.1). */
   variant?: ButtonVariant;
-  /** `touch` is 44 px high, for phone layouts. `standard` is 40 px. */
-  size?: 'standard' | 'touch';
+  /** `touch` is 44 px high, for phone layouts. `standard` is 40 px. `compact` is 32 px, for dense toolbars and table footers. */
+  size?: 'standard' | 'touch' | 'compact';
   /** Shows a spinner, keeps the label, and ignores clicks while something is happening. */
   isLoading?: boolean;
   /** An icon shown before the label. */
@@ -16,12 +16,24 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary: 'bg-action text-white hover:bg-action-hover active:bg-action-pressed border border-transparent',
-  secondary: 'bg-surface text-text-primary border border-border-strong hover:bg-surface-hover',
-  tertiary: 'bg-transparent text-text-primary border border-transparent hover:bg-surface-hover',
-  destructive: 'bg-error-bg text-error border border-error-border hover:border-error',
-  link: 'bg-transparent text-action border border-transparent hover:underline underline-offset-2 !h-auto !px-0',
+  primary: 'bg-action text-action-text hover:bg-action-hover active:bg-action-pressed border border-transparent',
+  secondary: 'bg-surface text-text-primary border border-border-default hover:bg-hover',
+  tertiary: 'bg-transparent text-text-primary border border-transparent hover:bg-hover',
+  destructive: 'bg-error-bg text-error border border-transparent hover:border-error',
+  link: 'bg-transparent text-link hover:text-link-hover border border-transparent hover:underline underline-offset-2 !h-auto !px-0',
 };
+
+/** The classes of a button of this variant and size, so a link can be drawn exactly like a button (see ButtonLink). */
+export function buttonClasses(
+  variant: ButtonVariant = 'secondary',
+  size: 'standard' | 'touch' | 'compact' = 'standard',
+): string {
+  return joinClassNames(
+    'text-body-md-semibold inline-flex items-center justify-center gap-2 rounded-md px-4',
+    size === 'touch' ? 'h-11' : size === 'compact' ? 'text-body-xs !h-8 !px-3' : 'h-10',
+    VARIANT_CLASSES[variant],
+  );
+}
 
 /** A button with the design system's five variants and its default, hover, focus, pressed, disabled and loading states. */
 export function Button({
@@ -41,10 +53,8 @@ export function Button({
       disabled={disabled || isLoading}
       aria-busy={isLoading || undefined}
       className={joinClassNames(
-        'text-sm-button inline-flex items-center justify-center gap-2 rounded-md px-4',
-        size === 'touch' ? 'h-11' : 'h-10',
-        VARIANT_CLASSES[variant],
-        'disabled:cursor-not-allowed disabled:border-border disabled:bg-surface-muted disabled:text-text-disabled',
+        buttonClasses(variant, size),
+        'disabled:cursor-not-allowed disabled:border-border-default disabled:bg-surface-subtle disabled:text-text-disabled',
         className,
       )}
       {...rest}

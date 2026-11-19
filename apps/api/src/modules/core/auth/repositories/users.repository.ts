@@ -17,8 +17,8 @@ export async function insertUser(
     accountId: string;
     email: string;
     name: string;
-    mobileE164: string;
-    mobileKey: string;
+    mobileE164: string | null;
+    mobileKey: string | null;
     role: 'manager' | 'staff' | 'staff_own';
     createdBy: { kind: string; id: string | null };
   },
@@ -52,14 +52,29 @@ export interface PersonForSignIn {
   emailVerified: boolean;
 }
 
-/** ACROSS BUSINESSES (runs on the owner connection). The person with this email, or undefined. */
-export async function findPersonByEmail(db: Db, email: string): Promise<PersonForSignIn | undefined> {
-  const row = await db
-    .selectFrom('users')
-    .select(['id', 'account_id', 'name', 'email', 'mobile_e164', 'role', 'status', 'email_verified_at'])
-    .where('email', '=', email)
-    .executeTakeFirst();
-  if (!row) return undefined;
+/** The columns both lookups read, and how a row becomes a PersonForSignIn. */
+const PERSON_COLUMNS = [
+  'id',
+  'account_id',
+  'name',
+  'email',
+  'mobile_e164',
+  'role',
+  'status',
+  'email_verified_at',
+] as const;
+
+/** Turns a database row into a PersonForSignIn. */
+function toPersonForSignIn(row: {
+  id: string;
+  account_id: string;
+  name: string;
+  email: string;
+  mobile_e164: string | null;
+  role: 'manager' | 'staff' | 'staff_own';
+  status: 'active' | 'disabled';
+  email_verified_at: Date | null;
+}): PersonForSignIn {
   return {
     id: row.id,
     accountId: row.account_id,
@@ -70,6 +85,18 @@ export async function findPersonByEmail(db: Db, email: string): Promise<PersonFo
     status: row.status,
     emailVerified: row.email_verified_at !== null,
   };
+}
+
+/** ACROSS BUSINESSES (runs on the owner connection). The person with this email, or undefined. */
+export async function findPersonByEmail(db: Db, email: string): Promise<PersonForSignIn | undefined> {
+  const row = await db.selectFrom('users').select(PERSON_COLUMNS).where('email', '=', email).executeTakeFirst();
+  return row ? toPersonForSignIn(row) : undefined;
+}
+
+/** ACROSS BUSINESSES (runs on the owner connection). The person with this id, or undefined. */
+export async function findPersonById(db: Db, userId: string): Promise<PersonForSignIn | undefined> {
+  const row = await db.selectFrom('users').select(PERSON_COLUMNS).where('id', '=', userId).executeTakeFirst();
+  return row ? toPersonForSignIn(row) : undefined;
 }
 
 /** A person as the profile shows them. */
@@ -139,4 +166,183 @@ export async function findPersonForEmail(
     .executeTakeFirst();
   if (!row) return undefined;
   return { name: row.name, email: row.email, emailVerified: row.email_verified_at !== null };
+}
+
+/**
+ * Changes the person's own name and/or mobile number (only the fields given). Run it inside the business's fence, so it
+ * can only ever reach a person of that business. Returns false when no such person is visible.
+ */
+export async function updateOwnDetails(
+  db: Db,
+  userId: string,
+  changes: { name?: string; mobileE164?: string; mobileKey?: string },
+): Promise<boolean> {
+  const row = await db
+    .updateTable('users')
+    .set({
+      ...(changes.name !== undefined ? { name: changes.name } : {}),
+      ...(changes.mobileE164 !== undefined
+        ? { mobile_e164: changes.mobileE164, mobile_key: changes.mobileKey ?? null }
+        : {}),
+      updated_by: { kind: 'user', id: userId },
+      updated_at: sql`now()`,
+    })
+    .where('id', '=', userId)
+    .returning('id')
+    .executeTakeFirst();
+  return row !== undefined;
+}
+
+/** The phone numbers (as digits) and emails of every person who works in the business, so a conversation from one of them is known to be the team's own. */
+export async function listStaffContactPoints(
+  db: Db,
+  accountId: string,
+): Promise<{ phoneKeys: string[]; emails: string[] }> {
+  const rows = await db
+    .selectFrom('users')
+    .select(['mobile_key', 'email'])
+    .where('account_id', '=', accountId)
+    .execute();
+  return {
+    phoneKeys: rows.flatMap((row) => (row.mobile_key === null ? [] : [row.mobile_key])),
+    emails: rows.map((row) => row.email),
+  };
+}
+
+/** The name and role of some people of the business (unknown ids, and people of other businesses, are simply missing). Run it inside the business's own transaction. */
+export async function listPeopleByIds(
+  db: Db,
+  accountId: string,
+  userIds: string[],
+): Promise<Array<{ id: string; name: string; role: 'manager' | 'staff' | 'staff_own' }>> {
+  if (userIds.length === 0) return [];
+  return db
+    .selectFrom('users')
+    .select(['id', 'name', 'role'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', userIds)
+    .execute();
+}
+
+/** Where to send an email to a person: their name and the address they confirmed. */
+export interface PersonToEmail {
+  id: string;
+  name: string;
+  email: string;
+}
+
+/** The confirmed email addresses of some people of the business (people without a confirmed address, unknown ids and other businesses' people are missing). Run it inside the business's own transaction. */
+export async function listPeopleToEmailByIds(db: Db, accountId: string, userIds: string[]): Promise<PersonToEmail[]> {
+  if (userIds.length === 0) return [];
+  const rows = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email'])
+    .where('account_id', '=', accountId)
+    .where('id', 'in', userIds)
+    .where('email_verified_at', 'is not', null)
+    .execute();
+  return rows.map((row) => ({ id: row.id, name: row.name, email: row.email }));
+}
+
+/** The confirmed email addresses of the business's managers. Run it inside the business's own transaction. */
+export async function listManagersToEmail(db: Db, accountId: string): Promise<PersonToEmail[]> {
+  const rows = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email'])
+    .where('account_id', '=', accountId)
+    .where('role', '=', 'manager')
+    .where('email_verified_at', 'is not', null)
+    .execute();
+  return rows.map((row) => ({ id: row.id, name: row.name, email: row.email }));
+}
+
+/** A person of the business as the Team screen lists them. */
+export interface TeamMemberRow {
+  id: string;
+  name: string;
+  email: string;
+  mobile: string | null;
+  role: 'manager' | 'staff' | 'staff_own';
+  status: 'active' | 'disabled';
+  lastSignedInAt: Date | null;
+}
+
+/** Every person of the business (removed people too), managers first and then by name. Run it inside the business's own transaction. */
+export async function listTeamMembers(db: Db, accountId: string): Promise<TeamMemberRow[]> {
+  const rows = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email', 'mobile_e164', 'role', 'status', 'last_login_at'])
+    .where('account_id', '=', accountId)
+    .orderBy('name')
+    .execute();
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    mobile: row.mobile_e164,
+    role: row.role,
+    status: row.status,
+    lastSignedInAt: row.last_login_at,
+  }));
+}
+
+/** The ids of the business's active managers, locked until the transaction ends, so two managers changing each other at the same moment take turns (the business always keeps one). */
+export async function lockActiveManagerIds(db: Db, accountId: string): Promise<string[]> {
+  const rows = await db
+    .selectFrom('users')
+    .select('id')
+    .where('account_id', '=', accountId)
+    .where('role', '=', 'manager')
+    .where('status', '=', 'active')
+    .forUpdate()
+    .execute();
+  return rows.map((row) => row.id);
+}
+
+/** One person of the business as the Team screen lists them, locked until the transaction ends. Undefined for an unknown id and for a person of another business. */
+export async function findTeamMemberForUpdate(
+  db: Db,
+  accountId: string,
+  userId: string,
+): Promise<TeamMemberRow | undefined> {
+  const row = await db
+    .selectFrom('users')
+    .select(['id', 'name', 'email', 'mobile_e164', 'role', 'status', 'last_login_at'])
+    .where('account_id', '=', accountId)
+    .where('id', '=', userId)
+    .forUpdate()
+    .executeTakeFirst();
+  if (!row) return undefined;
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    mobile: row.mobile_e164,
+    role: row.role,
+    status: row.status,
+    lastSignedInAt: row.last_login_at,
+  };
+}
+
+/** Changes a person's role and/or status, and stamps who did it. Run it inside the business's fence. */
+export async function changeTeamMember(
+  db: Db,
+  options: {
+    accountId: string;
+    userId: string;
+    changes: { role?: 'manager' | 'staff' | 'staff_own'; status?: 'active' | 'disabled' };
+    changedBy: string;
+  },
+): Promise<void> {
+  await db
+    .updateTable('users')
+    .set({
+      ...(options.changes.role !== undefined ? { role: options.changes.role } : {}),
+      ...(options.changes.status !== undefined ? { status: options.changes.status } : {}),
+      updated_by: { kind: 'user', id: options.changedBy },
+      updated_at: sql`now()`,
+    })
+    .where('account_id', '=', options.accountId)
+    .where('id', '=', options.userId)
+    .execute();
 }

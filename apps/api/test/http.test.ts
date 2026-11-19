@@ -188,6 +188,9 @@ describe('route rules', () => {
       role,
       sessionId: newAccountId(),
       isPlatformAdmin: false,
+      industryId: 'general',
+      timeZone: 'Asia/Kolkata',
+      defaultCountry: 'IN',
       emailVerified: true,
     });
     const staffApp = await buildTestApp(database, [rolesModule], { authenticate: authenticateAs('staff') });
@@ -215,6 +218,9 @@ describe('route rules', () => {
       role: 'manager' as const, // even a manager is refused unless the flag is on
       sessionId: newAccountId(),
       isPlatformAdmin,
+      industryId: 'general',
+      timeZone: 'Asia/Kolkata',
+      defaultCountry: 'IN',
       emailVerified: true,
     });
 
@@ -238,7 +244,8 @@ describe('route rules', () => {
     const leadsModule = defineModule({
       id: 'engine.leads',
       kind: 'engine',
-      routes: (app) => void app.get('/leads', { config: { access: 'staff' } }, async () => ({ leads: [] })),
+      // A made-up route name, so it does not clash with the real /leads route of the leads module
+      routes: (app) => void app.get('/engine-sample', { config: { access: 'staff' } }, async () => ({ leads: [] })),
     });
     const authenticate = async () => ({
       accountId,
@@ -246,10 +253,13 @@ describe('route rules', () => {
       role: 'manager' as const,
       sessionId: accountId,
       isPlatformAdmin: false,
+      industryId: 'general',
+      timeZone: 'Asia/Kolkata',
+      defaultCountry: 'IN',
       emailVerified: true,
     });
     const appWithModuleOff = await buildTestApp(database, [leadsModule], { authenticate });
-    const response = await appWithModuleOff.inject('/api/v1/leads');
+    const response = await appWithModuleOff.inject('/api/v1/engine-sample');
     expect(response.statusCode).toBe(404);
     expect(response.json().error.code).toBe('NOT_FOUND');
     await appWithModuleOff.close();
@@ -261,7 +271,7 @@ describe('route rules', () => {
           moduleId === 'engine.leads' || coreOnlyGate(registry).isActive(checkedAccountId, moduleId),
       },
     });
-    expect((await appWithModuleOn.inject('/api/v1/leads')).json()).toEqual({ leads: [] });
+    expect((await appWithModuleOn.inject('/api/v1/engine-sample')).json()).toEqual({ leads: [] });
     await appWithModuleOn.close();
   });
 });

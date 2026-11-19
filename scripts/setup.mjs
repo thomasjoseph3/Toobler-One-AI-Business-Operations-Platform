@@ -63,6 +63,16 @@ function runSetup() {
     console.log('Added a random JWT_SECRET to .env (it signs sign-in tokens; its value is not shown).');
   }
 
+  // The secret that scrambles the AI keys businesses save: made here once, and never printed. Losing it makes saved keys unreadable.
+  const environmentTextAfterJwt = fs.readFileSync(environmentFile, 'utf8');
+  if (!envFileSetsVariable(environmentTextAfterJwt, 'SECRETS_ENCRYPTION_KEY')) {
+    const separator = environmentTextAfterJwt === '' || environmentTextAfterJwt.endsWith('\n') ? '' : '\n';
+    fs.appendFileSync(environmentFile, `${separator}SECRETS_ENCRYPTION_KEY=${randomBytes(32).toString('base64')}\n`);
+    console.log(
+      'Added a random SECRETS_ENCRYPTION_KEY to .env (it scrambles saved AI keys; its value is not shown). Back it up: losing it makes saved keys unreadable.',
+    );
+  }
+
   announce('Installing packages');
   if (fs.existsSync(path.join(repositoryRoot, 'node_modules'))) console.log('Already installed.');
   else if (!runCommand('npm', ['ci'])) stopWith('npm ci failed.');

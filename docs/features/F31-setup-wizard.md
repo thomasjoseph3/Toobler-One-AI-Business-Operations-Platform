@@ -1,0 +1,227 @@
+# F31: Setup wizard and fill from website
+
+**Requirements:** `5-onboarding-and-launch/03-setup-wizard.md`; `3-ai-agents-and-channels/09-business-questions.md`; `requirements/API.md` (Setup wizard, Knowledge base → prefill); docs/plan/PHASE-1.md (F31); docs/SECURITY.md (SSRF, public fetches); docs/CONVERSATION-TYPES.md (not touched)
+**Depends on:** F01, F03, F06, F16, F17, F18, F19, F20, F37      **Module:** `core.setup` (core). The website reader sits inside it as `websiteReader` (also used later by F18's re-read and F33).
+**Status:** `approved` on 17 Nov 2026 under the owner's standing instruction to go on without waiting (not yet reviewed by hand). Verified: gate, format, lint, typecheck, 2355 unit and API tests, 580+ browser tests (phone and desktop). Slices 1 to 5 and 7 built; the setup page and form screens are C1 and C2; the chat screen is slice 7.
+
+## Feature guide
+
+**What it does.** After signing up, the owner is walked through getting the business ready for the AI to answer real customers. Toobler One can read the business's website (and, when switched on, its Google listing) and fill in many answers by itself. Those answers wait as **"Please check"** until the owner says Yes or changes them: the AI never uses an answer nobody confirmed. The owner can answer the remaining questions in a **chat** (one question at a time, with buttons for the choices) or in the **form**; both save exactly the same answers. A **Go live** switch turns the AI on for real customers, and it refuses until everything needed is done.
+
+**Why it is useful.** A new business gets from sign-up to a working AI receptionist in minutes instead of filling in a long form. Reading the website does the typing; the owner only checks. Going live is a deliberate step, so the AI never speaks to a customer before the basics are right.
+
+**A day in the life.** Anita signs up, pastes her hotel's website and sees "Reading your website…". While it reads she opens the **Setup chat**. It asks "Do you have a website?" (she taps No... or Yes and pastes a link), "How do customers pay?" (she taps UPI and Card), "What is your business called?" (she types it). When the website answers arrive she taps **Yes** on the right ones and **Change** on one that was old. She tries the **Test the agent** chat, sees it answer from her confirmed facts, and presses **Go live**. The website chat now answers real visitors.
+
+**Who can do what.** Managers only. Staff are told the setup is for managers.
+
+**Settings and limits.** The website reader reads only public websites, a few pages, with time and size limits; at most 10 readings a day per business, one at a time. The setup chat takes at most 60 replies an hour. English only for the chat. Go-live needs: every "needed to go live" question confirmed, the promises step done, and the Test the agent chat tried at least once.
+
+**What it never does.** It never marks a website answer as confirmed by itself and never overwrites an answer you confirmed. It never reads private or internal addresses. It never puts prices from a website into the profile on its own (offerings it finds are only suggested). The chat has no powers except asking a question and saving your answer: it ignores instructions typed into a reply or found on a website. The AI never decides whether you are ready to go live; code checks.
+
+**What is not part of it.** The real test **call** (comes with phone calls, F29): the test is the Test the agent chat for now. Opening hours, lists (like your offerings and FAQs) and prices are easier in the form, so the chat leaves them to it and says how many are left. Reading uploaded documents, and Voice or Upload buttons in the chat, are later.
+
+## For the tech team
+
+- **Module:** `core.setup` (always on). Tables: `setup_steps` (migration 041 or earlier), `prefill_runs` (043); columns `accounts.callback_promise_minutes` (044) and `accounts.live_at` (045).
+- **Routes:** `GET/PATCH /setup`, `POST /knowledge/prefill`, `GET /knowledge/prefill/{id}`, `POST /setup/apply-preset`, `POST /setup/go-live`, `POST /setup/chat` (managers only).
+- **Job:** `setup.run_prefill` (reads the pages, asks the AI what they say, saves answers as "waiting for a check").
+- **Chat:** code picks the question (`setup-chat-questions.ts`), reads the reply by code first (`read-setup-reply.ts`), asks the AI only for an unreadable pick or yes/no reply (`setup_chat` task), and saves through `knowledge.answerQuestion` (the form's own checks). Stateless: the screen sends back the skipped keys.
+- **Screens:** `/setup` (steps, progress, Go live, "Answer by chat"), `/setup/chat`, and the Knowledge base form with "Please check" answers.
+- **Known limits:** the Google listing and the AI reading a real website have only been tested with stand-ins; the 60-an-hour chat limit counts per address, not per person; the chat does not ask list, hours, price or file questions.
+
+## Owner decisions taken at the start (17 Nov 2026)
+
+1. **Step 12 (test call):** the wizard ends with the existing **Test the agent** chat. The real test call comes with F29 (phone) and is added then.
+2. **Google listing:** built behind a key. Without `GOOGLE_PLACES_API_KEY` the step says reading Google listings is not switched on and the owner types the answers. Tested against a fake Google.
+3. **Go live:** a real switch (`accounts.live_at`) that channels check. Before it, the website chat answers visitors with "we're not open yet".
+4. **The setup chat:** code picks the next question; the AI only phrases it and turns the typed reply into an answer. Language: English only (R9).
+
+## Scope
+- In:
+  - **Website reader:** safe fetch of the business's own website (home page plus the pages most likely to describe it), reduced to text, read by the AI into **unconfirmed** answers (`status = check`, `source = website`). Never prices tax or advance: prices come only as offerings suggestions (see Rules).
+  - **Google listing reader** behind a key (Places API), same output (`source = listing`).
+  - **Prefill jobs and progress:** `POST /knowledge/prefill`, `GET /knowledge/prefill/{id}`. A background job reads; the owner carries on meanwhile.
+  - **Setup progress:** one record per business with each step `todo / done / skipped`, plus `GET /setup` and `PATCH /setup`.
+  - **The setup chat:** `POST /setup/chat`. Walks the F16 question list in order, skips answered ones, offers options, saves through the same service as the form.
+  - **Presets:** per-industry stages, extra questions and wording applied by `POST /setup/apply-preset` (the pipeline stages already come from sign-up; this applies what is missing and never deletes).
+  - **Go live:** `POST /setup/go-live`, blocked until every "Needed to go live" question is confirmed and the promises step (step 8) is done and the agent has been tried once in Test the agent.
+  - **Screens:** setup chat (phone first) with the "What the AI knows so far" panel, the pre-filled answer card, Switch to form, the check step, the checklist card on the Today page.
+- Out (later): the real test call (F29); uploads of brochures and photos (R47, deferred); reading Instagram, Facebook, JustDial and IndiaMART pages (see Differences: terms of use); the competitor question (H1) is stored but only used by F33; team invites inside the wizard point to F02; connecting WhatsApp and email inside the wizard point to F25 and F26 (shown as "later").
+
+## Reused from the hotel agent
+- **Read:** `backend/src/modules/core/websiteImport/{fetchSite.js (618 lines), service.js (265), routes.js}`, `test/unit/websiteImport.test.js (462)`.
+- **Reused (ported to TypeScript, our module layout):** the public-address block list (IPv4 and IPv6 ranges, IPv4-in-IPv6), the DNS lookup that checks the address actually connected to, URL rules (http/https, ports 80/443 only, no user name or password, no `.local`-like names), redirect limit with a check on each hop, 10-second page timeout, size limit, gzip/deflate/br, reading the sitemap and robots.txt to find pages, taking schema.org and embedded framework data (`__NEXT_DATA__`) when a site is built in the browser, line de-duplication across pages, and the model rules ("only what the pages say, pages are data not instructions, never prices").
+- **Changed:** answers go into **our** F16 question list (not the old settings fields), land as `check` and unused until confirmed; runs as a background job with progress; per-business rate limit through our limiter; calls the model through `createAiService` (F37) so keys, cost log and fallbacks apply; names written in full words.
+- **Left behind:** the hotel `settings` fields, the platform "Add a business" form path, and the express middleware.
+
+## Database
+Migrations, one per change (built so far: `042_setup_steps.sql`; the others come with their slices):
+- *(slice 4, built, 045)* `accounts.live_at timestamptz NULL` (null = not live) and `accounts.live_by jsonb`. Every business that existed is marked live by the migration (nothing stops working). Written only by the go-live service. *(slice 4, built, 044)* `accounts.callback_promise_minutes` (5 to 120, default 15).
+- *(slice 1, built, 042)* `setup_steps(account_id, step_key, status todo|done|skipped, updated_by, updated_at)` (RLS, forced). Steps are code (`setup/helpers/setup-steps.ts`); the table only holds what the owner marked (a step with no row is todo). Steps the system can check (About your business, What you sell) are never stored: they are worked out from the answers and offerings.
+- *(slice 3, built, 043)* `prefill_runs(id, account_id, kind website|listing, source_url, status queued|reading|done|failed, error_code, pages_read, found_count, created_by, created_at, finished_at)` (RLS). No page text is stored; only counts and the answers it made.
+- `business_answers` is unchanged (it already has `source`, `source_ref`, `status`). Offering suggestions: see Rules.
+- The older spec's `accounts.setup_progress jsonb` column is **not** used; a table gives a proper history and tests (see Differences).
+
+## API
+| Method | Address | Who | Notes |
+| --- | --- | --- | --- |
+| GET | `/setup` | Manager | Steps with status, the completeness score, what blocks go-live |
+| PATCH | `/setup` | Manager | Mark one step done or skipped (never "done" for steps code can check) |
+| POST | `/knowledge/prefill` | Manager | Body: website link and/or listing link. Queues a job. 202 + run id. Limits: 10 per business per day |
+| GET | `/knowledge/prefill/{id}` | Manager | Status, pages read, found answers (waiting for confirm) |
+| POST | `/setup/chat` | Manager | One owner reply in → next question, options, pre-filled card. Not streamed in the first release (see Differences) |
+| POST | `/setup/apply-preset` | Manager | Adds the industry's missing stages and extra questions; never deletes |
+| POST | `/setup/go-live` | Manager | 409 `NOT_READY` with the list of what is missing; else sets `live_at` |
+
+Seven routes in at least four slices (2 + 2 + 1 + 2, plus the screens), never more than two routes at a time.
+
+## Slices (each ends with the owner testing, then "continue")
+| # | Slice | Routes |
+| --- | --- | --- |
+| 1 | Setup steps and progress: migration, `GET /setup`, `PATCH /setup` | 2 |
+| 2 | The safe website reader (pure SSRF rules + fetch + page text), unit tested with a local fake site. No route. | 0 |
+| 3 | Prefill: AI reads pages into unconfirmed answers, the job, `POST /knowledge/prefill`, `GET /knowledge/prefill/{id}`. Google listing behind the key | 2 |
+| 4 | Presets and go live: `POST /setup/apply-preset`, `POST /setup/go-live`; the webchat "not open yet" check | 2 |
+| 5 | The setup chat: question walker (pure), reply parser (AI), `POST /setup/chat` | 1 |
+| 6 | Screens: setup page shell, steps and progress bar, "What the AI knows" panel, pre-filled card | 0 |
+| 7 | Screens: the chat, Switch to form, check step, test step, Today checklist card | 0 |
+| 8 | Journey tests (API and browser), Feature guide, manual script, security review, `npm run verify` | 0 |
+
+## Screens
+- **Setup page** `/setup`: full-screen on a phone, with a progress bar. Chat on the left, a **What the AI knows so far** panel on a desktop (a tab on a phone).
+- **Chat bubbles**: the AI's questions left, owner answers right; option buttons, a text box; **Switch to form** link. (Upload and microphone buttons from the requirement are not drawn: documents are deferred and the chat is text only.)
+- **Pre-filled answer card:** the answer, "From your website", **Yes** and **Change**.
+- **Reading in progress:** "Reading your website…" with the owner free to carry on; answers arrive in the chat as found.
+- **Check step:** short card list, each with **Change**; **Test the agent** opens the existing test chat.
+- **Go live:** shows what is missing, or a single **Go live** button.
+- **Checklist card on Today:** skipped or unfinished steps with the completeness score.
+- States: loading, empty (no website), error (site unreadable: "We couldn't read that website. You can type the answers instead"), reading, done.
+- No frame from the designer exists: we design in the same style (design system v1.3) and the designer can replace it later.
+
+## Rules to enforce
+- **Unconfirmed answers are never used by the AI** (F16 rule, re-tested end to end here).
+- A prefill run **never** marks an answer confirmed and **never overwrites** a confirmed answer; if one exists it is skipped and counted.
+- The reader fetches **only** public http(s) addresses; every redirect is re-checked; the address actually connected to is the one checked; ports 80/443 only; time, size and page-count limits; no cookies; the text it returns is data for the model, never instructions.
+- The reader never gives prices to the profile. Offerings found on the site appear as **suggested offerings** shown in the chat for the owner to accept (accepting creates them through the F17 service). Money in paise; "from" prices only.
+- Go-live is refused until: every "Needed to go live" question is confirmed, the promises step is done, and the Test the agent chat has had at least one reply. Reading code decides this, not the AI.
+- Business and listing links are validated; a different business's run id is a 404.
+- The setup chat can only ask list questions, offer that question's options, and save the answer; it has **no other tools**. Reply parsing uses a strict schema; an answer that fails the question's own validation is asked again.
+- Rate limits: prefill 10 a day per business; setup chat 60 replies an hour per user.
+- No page text and no owner chat text in the log.
+- English only for text.
+
+## Tests
+- **Unit (pure, no I/O):** address block list (every range, IPv4-in-IPv6, `localhost`, `127.1`, `0x7f.1`, decimal IPs, `.internal`), URL rules, sitemap and page picking, text extraction and de-duplication, embedded-data reading, the question walker (order, skips answered, options, needed-to-go-live), the go-live readiness check, the reply-to-answer parser with a scripted model, preset application plan.
+- **API (every route: works / 401 / 403 staff / 404 other business / 400):** each of the seven routes; prefill with a local fake website (a real HTTP server on an unusual test port) and a scripted model; the SSRF refusals (private address, redirect to a private address, DNS name that resolves to one, big page, slow page); Google behind the key off and on (fake Google); rate limits.
+- **Isolation:** entries for every route; `setup_steps` and `prefill_runs` RLS.
+- **Journey (API):** new business → prefill from the fake site → answers wait as "Please check" → AI cannot use them (Test the agent says it doesn't know) → owner confirms → AI uses them → go-live blocked → complete → go live → webchat now answers real visitors.
+- **Journey (browser, phone 375 and desktop):** the same story through the screens, including Switch to form saving the same answers, leaving mid-way and resuming on another device, the website being unreadable, and no website at all.
+- **Chat = form:** the same set of replies through chat and through the form leaves identical `business_answers`.
+- **Evals:** `npm run eval:agent` extended with a few cases that the setup chat refuses to take instructions from a website's text.
+
+## Manual test script (to be completed at hand-off)
+1. Sign up a new business → you land on Setup with the progress bar at 0%.
+2. Paste a real website → "Reading your website…" appears and you can carry on answering.
+3. Answers arrive as "From your website: … Is this right?" Tap **Yes** on one, **Change** on another.
+4. Ask the test agent a question the unconfirmed answers cover → it says it doesn't know yet. Confirm → it answers.
+5. Try **Go live** early → it lists what is missing.
+6. Finish, **Go live**, open the website chat → it now answers a real visitor.
+7. Switch to form and back → same answers.
+8. Time it from sign-up to go-live (target: under 15 minutes with a website).
+
+## Security checklist (tick at hand-off, using the `api-security` skill)
+- [ ] Account from the session only; every route fenced; RLS on both new tables
+- [ ] SSRF: block list, connection-time address check, redirect checks, ports, limits (tested)
+- [ ] Website text treated as data (prompt-injection eval)
+- [ ] Manager-only routes tested for 403; other business → 404
+- [ ] Rate limits tested; no personal data or page text in logs
+- [ ] `live_at` changeable only through the go-live service (grant test)
+- [ ] Google key only in env, never logged
+
+## Differences from the requirements (to record in REQUIREMENTS-REVIEW.md as R64 after you confirm)
+1. **Step 12:** the Test the agent chat instead of a real call, until F29.
+2. **Instagram, Facebook, JustDial, IndiaMART:** links are saved as the source but not read in F31 (the requirement itself says this may be blocked or against their terms). The owner is asked the questions instead.
+3. **Table instead of `accounts.setup_progress` jsonb** (one row per step, with a history of who changed it).
+4. **`POST /setup/chat` is not streamed** in the first release: one request, one reply. Streaming can be added later without changing the screens.
+5. **Voice and Upload buttons** are not on the setup chat (text only; documents deferred).
+6. **Languages:** English only (R9), over the requirement's "Malayalam, English or Hindi".
+7. **Go-live also needs one Test the agent reply** (so a business cannot go live without ever hearing its AI).
+
+## Open points to confirm (**Confirm**)
+- The seven routes and the slice order above.
+- Whether **suggested offerings** from the website should be shown in the chat for the owner to accept (recommended), or only stored as unconfirmed notes.
+- Whether the "not open yet" reply for the website chat before go-live should be a fixed English sentence (recommended) or editable by the business.
+
+## Review rounds
+(none yet)
+
+## Build log
+
+### Slice 1: setup steps and progress (built 17 Nov 2026, waiting for the owner's check)
+Routes: `GET /setup`, `PATCH /setup` (managers only). Eight steps for now: website, about_business, what_you_sell, situations, goals,
+pipeline, team, channels. `about_business` and `what_you_sell` are checked by the system (400 `STEP_CHECKED_BY_SYSTEM` if marked by
+hand). The promises, check and test-chat steps arrive with the slices that need them (4 and 5). Tests: 5 unit, 12 API (works, 401, 403,
+400, other business, CSRF, activity log, database refuses delete), plus the isolation entries for both routes.
+
+### Slice 2: the safe website reader (built 17 Nov 2026, waiting for the owner's check)
+No routes. Files in `apps/api/src/modules/core/setup/`: `helpers/public-address.ts` (which addresses are public, how a typed address is checked),
+`helpers/html-to-text.ts`, `helpers/read-html-page.ts` (title, text, phone/email/WhatsApp/map links, schema.org facts),
+`helpers/choose-pages-to-read.ts` (which pages are worth reading, sitemap parsing), `services/fetch-web-page.service.ts` (the safe fetch: public
+addresses only, checked on the connection itself, ports 80/443, 4 redirects each re-checked, 10 s, 10 MB), `services/read-website.service.ts`
+(home page, then the best 7 pages from its links and sitemap). Changed from the hotel agent: hotel-only words and facts (check-in times,
+amenities, pets, rooms, ayurveda) left out; errors have codes (`WEBSITE_NOT_PUBLIC`, `WEBSITE_TIMEOUT`, ...); a bug fixed (a first chunk bigger
+than the size limit gave an empty page). Tests: 78 unit (addresses, HTML, schema.org, page choice) and 17 against a real local web server
+(redirects, loops, gzip, errors, timeout, size limit, refusing private addresses and never connecting to them, a name that resolves to a private
+address, whole-site reading with robots.txt and sitemap, page text containing instructions). No new packages (Node built-ins only).
+
+### Slice 3: reading a website or Google listing into answers (built 17 Nov 2026, waiting for the owner's check)
+Routes: `POST /knowledge/prefill` (202, queues the job) and `GET /knowledge/prefill/{id}` (managers only). Migration `043_setup_prefill_runs.sql`.
+Job `setup.run_prefill`. New setting `GOOGLE_PLACES_API_KEY` (optional; empty = Google listings off).
+
+How a reading goes: the route checks the address at once (a private address, a short Google link or Google being off answers 400 before any waiting),
+saves a `queued` run and queues the job. The job reads the website (slice 2), takes what the pages themselves state (schema.org name, address, phones,
+emails, read by code), asks the AI (`extract_from_website` job, temperature 0, only the questions a website can fill in) and saves every answer
+through the knowledge module as **"Please check"** (`status = check`, `source = website` or `listing`, `source_ref` = the address). It never changes an
+answer the owner confirmed (counted as "left alone"). Google's answers (name, address, phone, opening hours, read by code, never by the AI) win over
+the website's for the same question. What the site seems to sell is kept on the run as **suggested offerings** (a price only when a page states one,
+turned into paise by code). Problems are written on the run in plain words with a code; a reading that found something is `done` with the part that
+failed noted (for example `AI_FAILED`), one that found nothing is `failed`.
+
+Limits: 10 readings a day per business (429 `PREFILL_LIMIT_REACHED`), one at a time (409 `PREFILL_ALREADY_RUNNING`; a reading stuck for 10 minutes does
+not block). Google listing input: the business name with its town, or a **long** Google Maps link; short links (`maps.app.goo.gl`) are refused because
+reading the name would mean following a link someone typed. **Not tested against the real Google** (no key yet): the client is tested with a pretend
+Google that answers in the shape Google documents; the first real key needs a real check.
+
+Tests: 24 API tests (`setup-prefill.test.ts`: start, 202, queue, 400 private addresses, 409, 429, queue failure, 401/403/404/400, CSRF; the job against a real
+local web server with a pretend AI and a pretend Google: answers wait for a check and are not counted, confirmed answers are never changed, bad AI
+answers dropped, instructions in a page are only data, AI down, website down, safe to run twice, other business, Google wins, Google off or finds
+nothing), 4 Google client tests, 17 unit tests for the new helpers, 2 new isolation entries (67 pass).
+
+### Slice 4: the industry's words, going live, and the callback promise (built 17 Nov 2026, waiting for the owner's check)
+Owner decisions (17 Nov 2026): the industry words are renames of the three open stages; step 8 is the callback minutes now and the alert number in F23.
+
+Routes: `POST /setup/apply-preset` and `POST /setup/go-live` (managers only). Migrations `044_accounts_callback_promise.sql`, `045_accounts_live.sql`.
+Also changed, with no new route: `GET`/`PUT /knowledge/settings` now carry `callbackPromiseMinutes` (5 to 120, default 15); the AI agent promises "within N minutes"
+with it (it was a fixed 15); two setup steps were added (`promises`, which the owner marks, and `test_agent`, which the system checks); the website chat says
+503 `NOT_OPEN_YET` ("We're not open for chat yet. Please check back soon.") until the business is live.
+
+**Apply preset:** a business of a known industry gets that industry's words for its three open stages (a hotel: New enquiry, Called, Rate sent). Only a stage that
+still has the standard word (New, Contacted, Quoted) is renamed; a stage the owner renamed is never touched; nothing is added or deleted, the stages keep their
+ids and leads; doing it again changes nothing. A general or "other" business keeps the standard words. The pipeline step becomes done. The word table is
+`helpers/industry-pipeline-presets.ts` (13 industries; **edit the words there**).
+
+**Go live:** refused with 409 `NOT_READY` and the list of blockers until every "needed to go live" question has a *confirmed* answer, the `promises` step is
+done (skipped does not count) and the agent has answered at least once in "Test the agent". Going live twice keeps the first moment.
+
+**Changes to earlier features (to record in their guides):** F16 (settings carry the callback promise), F19 (the promise minutes are the business's own),
+F20 (a business that is not live answers 503 `NOT_OPEN_YET`; test helpers mark their businesses live with `makeBusinessLive`).
+
+Tests: 7 new unit tests (readiness, presets), setup-go-live.test.ts (13 API tests), agent-callback-promise.test.ts (3), webchat not-open-yet test, settings tests,
+2 isolation entries (69 pass). A wide run before the fix showed exactly the expected webchat failures (30), now fixed.
+
+### Slice 5: the setup chat (built 17 Nov 2026; the owner said to go on without waiting)
+- **Route (1): `POST /setup/chat`** (managers only; limit 60 a hour). One owner message in, the next question out. Body (strict): `questionKey`, `reply`, `skip`, `skippedQuestionKeys`. Without `questionKey` it only gives the first question. Answer: `saved` (which question the reply was saved for, or null), `problem` (why the reply could not be used, in plain words, and the same question comes back), `next` (the question with its ready options, "Other", max choices, the "Yes" detail label, needed-to-go-live), `formOnlyRemaining` and the profile `progress`. 404 for a question the chat cannot ask; 400 `REPLY_NEEDED` for an empty reply.
+- **How it works (code decides):** `helpers/setup-chat-questions.ts` picks the next question (profile order, unanswered, not skipped, only types a chat can take: text, link, pick, yes/no) and counts the ones that are easier in the form (opening hours, lists, prices). `helpers/read-setup-reply.ts` reads a reply by code first (plain text; yes/no words; an option's number or exact words; several options). Only a pick or yes/no reply code cannot read goes to the AI (`setup_chat` task, `helpers/build-setup-reply-prompt.ts`: fixed instructions, the owner's words between markers as data). Whatever the AI says is checked again by the question's own checks (`answerQuestion`, the same path as the form) before anything is saved, so the chat and the form leave identical answers (tested). The chat has no other tools.
+- **Not an error:** a reply that cannot be read, a bad link or a missing "Yes" detail, or no AI available all come back as `problem` in words with 200.
+- **Tests:** `test/setup-chat.test.ts` (15: first question, plain answers, options by number and words, several options, already answered not asked, checker's words on a bad answer, AI-read replies, AI naming a non-existent option, an instruction in the reply, no AI available, skipping, chat equals form, 401, 403, 404, 400, two businesses) and pure tests for the question picker and the reply reader. The isolation register has an attempt for the route.
+- **Decisions (autonomous, to confirm; also R68):** (1) The question words are the profile's own text, not AI-phrased: it is cheaper, safer and always matches the form (the brief said the AI would phrase it). (2) Questions whose answers are lists, opening hours, prices or files are left to the form; the chat says how many are left. (3) The chat is stateless: the screen sends back the skipped keys. (4) The limit counts per address (the route limit tool), not per person as the brief said.

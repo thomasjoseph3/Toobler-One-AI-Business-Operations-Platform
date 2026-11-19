@@ -50,4 +50,134 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
       'A new owner has no account yet. The password is checked and stored only as an argon2id hash. ' +
       'Each address is limited to 10 sign-ups an hour, and the CSRF check applies.',
   },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/forgot-password',
+    reason:
+      'Someone who forgot their password cannot sign in. It always answers the same, whether or not the email has an ' +
+      'account, and only ever emails the address on the account. Each address is limited to 3 requests per 10 minutes.',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/reset-password',
+    reason:
+      'The link in the email is opened by someone who cannot sign in. The long random token is the proof; it works once, ' +
+      'expires after an hour, and an unknown, used or expired token all get the same answer. Each address is limited ' +
+      'to 10 tries a minute.',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/invitations/preview',
+    reason:
+      'A person invited to a business opens the emailed link before they have an account. The long random token (in the body, so it is ' +
+      'never written to a log) is the proof; an unknown, used, cancelled or expired token all get the same answer. It shows only the ' +
+      "person's own invited name, email and role, the business name and who invited them. Each address is limited to 10 tries a minute.",
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/auth/accept-invitation',
+    reason:
+      'A person invited to a business has no account yet. The long random token from the emailed link is the proof; it works once and ' +
+      'expires after 48 hours. The new person gets exactly the role the manager chose, in the business that invited them (never from the ' +
+      'request). The password is checked and stored only as an argon2id hash. Each address is limited to 10 tries a minute, and the CSRF check applies.',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/public/widget/:key/config',
+    reason:
+      "A visitor's browser on the business's own website asks how the chat bubble should look. The business comes only from the widget key " +
+      "(an unknown key and a switched-off chat both answer 404), and the website must be on the business's allowed list (else 403). It " +
+      'reveals only the look and the contact links the business already shows on that website. Each address is limited to 60 a minute.',
+  },
+  {
+    method: 'OPTIONS',
+    path: '/api/v1/public/widget/:key/config',
+    reason:
+      "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
+      "business's allowed list, and reveals nothing else. Each address is limited to 60 a minute.",
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/public/widget/:key/messages',
+    reason:
+      "A visitor chats with the business's AI agent from the business's own website, with no sign-in. The business comes only from the widget " +
+      "key; the website must be on the business's allowed list; a chat is carried on only with the signed visitor token the server gave for " +
+      'it. A message is limited in size and a chat in length; each address is limited to 20 messages a minute, each key to 120 a minute, ' +
+      'and each address to 10 new chats an hour. The CSRF check does not apply (no cookie is used), the website check and the token take its place.',
+  },
+  {
+    method: 'OPTIONS',
+    path: '/api/v1/public/widget/:key/messages',
+    reason:
+      "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
+      "business's allowed list. Each address is limited to 60 a minute.",
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/public/widget/:key/messages',
+    reason:
+      'A visitor whose page was reloaded gets their own chat back. The business comes only from the widget key, the website must be on the ' +
+      "business's allowed list, and the signed visitor token names the one chat that may be read (401 without a good one, for another " +
+      'business or a test chat). It changes nothing. Each address is limited to 60 a minute.',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/public/widget/:key/end',
+    reason:
+      "The visitor closes the bubble, so their chat ends and is sorted. Same checks as the messages: the widget key, the business's allowed " +
+      'websites and the signed visitor token. Closing a chat that already ended does nothing, so a repeat costs nothing. Each address is ' +
+      'limited to 10 a minute. The CSRF check does not apply (no cookie is used).',
+  },
+  {
+    method: 'OPTIONS',
+    path: '/api/v1/public/widget/:key/end',
+    reason:
+      "The browser's permission check before a call from another website (CORS). It answers with permission only for a website on the " +
+      "business's allowed list. Each address is limited to 60 a minute.",
+  },
+  {
+    method: 'GET',
+    path: '/webhooks/whatsapp',
+    reason:
+      "Meta checks the webhook address once when it is set up, with no sign-in. It must bring the platform's verify token (compared without " +
+      'leaking how much matched); anything else is refused, and while the platform has no Meta app configured the route answers 404. It reveals ' +
+      'nothing but the challenge Meta sent. Each address is limited to 30 a minute.',
+  },
+  {
+    method: 'POST',
+    path: '/webhooks/whatsapp',
+    reason:
+      "Meta delivers customers' WhatsApp messages here, with no sign-in. Every call must carry a valid X-Hub-Signature-256 over the exact body, " +
+      "made with the platform's Meta app secret; an unsigned or wrongly signed call is refused (401) and nothing is read from it. The business is " +
+      'found only from the number the customer wrote to; a number no business uses is ignored; a repeated message id is answered once. ' +
+      'The CSRF check does not apply (the signature takes its place). Each address is limited to 1200 a minute.',
+  },
+  {
+    method: 'GET',
+    path: '/widget/loader.js',
+    reason:
+      'The one line a business pastes into its website loads this script. It is the same file for every business, holds no data, and reads ' +
+      'nothing from the page. Each address is limited to 120 requests a minute.',
+  },
+  {
+    method: 'GET',
+    path: '/widget/assets/:file',
+    reason:
+      "The chat window's own script and styles: built files, the same for every business, read only by plain file name from one folder " +
+      '(no path can leave it). Each address is limited to 120 requests a minute.',
+  },
+  {
+    method: 'GET',
+    path: '/widget/chat',
+    reason:
+      "The chat window's page, shown in an iframe on a business's website. It answers 404 for an unknown key, a switched-off chat, a " +
+      "business with no allowed website, and a page opened on its own (not in a frame); the browser is told that only the business's " +
+      'allowed websites may frame it. Each address is limited to 60 requests a minute.',
+  },
+  {
+    method: 'GET',
+    path: '/widget/test',
+    reason:
+      'A page to try the chat bubble on. It is only registered when the app is not in production, and it shows only the key typed into the address.',
+  },
 ];

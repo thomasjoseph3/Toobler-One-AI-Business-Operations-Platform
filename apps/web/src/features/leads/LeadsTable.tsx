@@ -1,0 +1,238 @@
+import type { ReactNode } from 'react';
+import type { Lead } from '@toobler-one/shared';
+import { TemperatureTag } from './TemperatureTag';
+import {
+  ActionMenu,
+  ActivityIcon,
+  AddNoteIcon,
+  CalendarIcon,
+  Card,
+  Checkbox,
+  IconButton,
+  ManageColumnsIcon,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  Tag,
+} from '@toobler-one/ui';
+import { formatMessage, t } from '../../app/i18n';
+import { LeadNameLink } from './LeadNameLink';
+import {
+  findChannelLabel,
+  findLeadDisplayName,
+  findOwnerLabel,
+  findStageTagTone,
+  formatCallbackDate,
+  pickNextActivityAt,
+} from './lead-display';
+
+export interface LeadsTableProps {
+  leads: readonly Lead[];
+  openStageIdsInOrder: readonly string[];
+  signedInUserId: string;
+  /** The business's time zone, for the callback dates. */
+  timeZone: string;
+  selectedLeadIds: ReadonlySet<string>;
+  onToggleLead: (leadId: string) => void;
+  onToggleAllLeads: () => void;
+  /** Draws the "…" menu of one lead (the page knows the stages, the signed-in person and what each action does). */
+  renderRowMenu: (lead: Lead, displayName: string) => ReactNode;
+  /** Opens the Notes panel of one lead (the add-note icon of its row). */
+  onOpenNotes: (lead: Lead, displayName: string) => void;
+  /** Opens the Add task form for one lead (Create Task in the activity icon's menu). */
+  onCreateTask: (lead: Lead, displayName: string) => void;
+  /** How many notes each lead has (a lead missing here has none shown): a lead with notes shows the orange notes icon all the time. */
+  noteCounts: Readonly<Record<string, number>>;
+  /** When each lead's earliest open task is due (null or missing: none): with the callback it makes the date in the Next activity column. */
+  nextTaskDates: Readonly<Record<string, string | null>>;
+}
+
+/** The chip with the next activity's date (Figma "Next activity": lavender, with the calendar icon and the date written like "Nov 22"). */
+function CallbackChip({ date }: { date: string }) {
+  return (
+    <span className="text-label-xs inline-flex items-center gap-1 rounded-sm bg-card-header-lavender px-2 py-1 whitespace-nowrap text-info">
+      <CalendarIcon size={14} />
+      {date}
+    </span>
+  );
+}
+
+/** The leads as a table for tablets and desktops (Figma "Leads list"): select box, name, email, phone, status, source, owner and next activity. */
+export function LeadsTable({
+  leads,
+  openStageIdsInOrder,
+  signedInUserId,
+  timeZone,
+  selectedLeadIds,
+  onToggleLead,
+  onToggleAllLeads,
+  renderRowMenu,
+  onOpenNotes,
+  onCreateTask,
+  noteCounts,
+  nextTaskDates,
+}: LeadsTableProps) {
+  const areAllSelected = leads.length > 0 && leads.every((lead) => selectedLeadIds.has(lead.id));
+  return (
+    <Table className="min-w-[940px]" containerClassName="min-h-0 flex-1 overflow-auto">
+      <TableHead>
+        <tr>
+          <TableHeaderCell className="w-10 !pr-0">
+            <Checkbox label={t('leads.selectAll')} isLabelHidden checked={areAllSelected} onChange={onToggleAllLeads} />
+          </TableHeaderCell>
+          <TableHeaderCell className="w-28 !px-1">
+            <span className="sr-only">{t('leads.column.nextActivity')}</span>
+          </TableHeaderCell>
+          <TableHeaderCell>{t('leads.column.name')}</TableHeaderCell>
+          <TableHeaderCell>{t('leads.column.email')}</TableHeaderCell>
+          <TableHeaderCell>{t('leads.column.phone')}</TableHeaderCell>
+          <TableHeaderCell>{t('leads.column.status')}</TableHeaderCell>
+          <TableHeaderCell>{t('leads.column.source')}</TableHeaderCell>
+          <TableHeaderCell>{t('leads.column.owner')}</TableHeaderCell>
+          <TableHeaderCell className="w-12">
+            {/* Choosing columns is drawn as designed and does nothing yet */}
+            <IconButton
+              label={t('leads.chooseColumns')}
+              size="compact"
+              icon={<ManageColumnsIcon size={16} />}
+              aria-disabled
+              title={t('leads.notYet')}
+            />
+          </TableHeaderCell>
+        </tr>
+      </TableHead>
+      <TableBody>
+        {leads.map((lead) => {
+          const displayName = findLeadDisplayName(lead.contact);
+          const callbackDate = formatCallbackDate(
+            pickNextActivityAt(lead.callbackAt, nextTaskDates[lead.id]),
+            timeZone,
+          );
+          const noteCount = noteCounts[lead.id] ?? 0;
+          return (
+            <TableRow key={lead.id} isSelected={selectedLeadIds.has(lead.id)}>
+              <TableCell className="w-10 !pr-0">
+                <div className="flex items-center">
+                  <Checkbox
+                    label={formatMessage('leads.selectOne', { name: displayName })}
+                    isLabelHidden
+                    checked={selectedLeadIds.has(lead.id)}
+                    onChange={() => onToggleLead(lead.id)}
+                  />
+                </div>
+              </TableCell>
+              <TableCell className="w-40 min-w-40 !px-1 whitespace-nowrap">
+                {/* Next activity (Figma: right after the select box): the date chip and, next to it, the notes icon, always showing; the quick actions show when the row is hovered or focused */}
+                <div className="flex items-center gap-1">
+                  {callbackDate ? <CallbackChip date={callbackDate} /> : null}
+                  {noteCount > 0 ? (
+                    // A lead with notes shows this small orange icon all the time (Figma), not only on hover; it opens the same Notes panel
+                    <button
+                      type="button"
+                      aria-label={formatMessage('leads.row.notesCount', { name: displayName, count: noteCount })}
+                      title={formatMessage('leads.row.notesCount', { name: displayName, count: noteCount })}
+                      onClick={() => onOpenNotes(lead, displayName)}
+                      className="inline-flex size-7 items-center justify-center rounded-sm bg-card-header-peach text-warning hover:opacity-80"
+                    >
+                      <AddNoteIcon size={16} />
+                    </button>
+                  ) : null}
+                  <div className="invisible flex items-center gap-1 group-focus-within:visible group-hover:visible">
+                    <ActionMenu
+                      triggerLabel={formatMessage('tasks.menu.label', { name: displayName })}
+                      triggerIcon={<ActivityIcon size={20} />}
+                      panelLabel={t('tasks.menu.panel')}
+                      items={[
+                        {
+                          id: 'create-task',
+                          label: t('tasks.menu.create'),
+                          onSelect: () => onCreateTask(lead, displayName),
+                        },
+                      ]}
+                    />
+                    {noteCount > 0 ? null : (
+                      <IconButton
+                        label={formatMessage('leads.row.addNoteFor', { name: displayName })}
+                        size="compact"
+                        icon={<AddNoteIcon size={18} />}
+                        onClick={() => onOpenNotes(lead, displayName)}
+                      />
+                    )}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-text-primary [overflow-wrap:anywhere]">
+                <LeadNameLink lead={lead}>{displayName}</LeadNameLink>
+              </TableCell>
+              <TableCell className="[overflow-wrap:anywhere]">{lead.contact?.email}</TableCell>
+              <TableCell className="whitespace-nowrap">{lead.contact?.phone}</TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
+                  {lead.temperature === 'unscored' ? null : (
+                    <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
+                  )}
+                </div>
+              </TableCell>
+              <TableCell>{findChannelLabel(lead.firstChannel)}</TableCell>
+              <TableCell>{findOwnerLabel(lead.ownerUserId, signedInUserId)}</TableCell>
+              <TableCell className="w-12">{renderRowMenu(lead, displayName)}</TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
+/** The leads as a list of cards for a phone, where a wide table would not fit: the same facts, stacked. */
+export function LeadCards({
+  leads,
+  openStageIdsInOrder,
+  signedInUserId,
+  timeZone,
+  renderRowMenu,
+  nextTaskDates,
+}: Pick<
+  LeadsTableProps,
+  'leads' | 'openStageIdsInOrder' | 'signedInUserId' | 'timeZone' | 'renderRowMenu' | 'nextTaskDates'
+>) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {leads.map((lead) => {
+        const callbackDate = formatCallbackDate(pickNextActivityAt(lead.callbackAt, nextTaskDates[lead.id]), timeZone);
+        return (
+          <li key={lead.id}>
+            <Card isCompact className="flex flex-col gap-2">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-body-md-semibold min-w-0 text-text-primary">
+                  <LeadNameLink lead={lead}>{findLeadDisplayName(lead.contact)}</LeadNameLink>
+                </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Tag tone={findStageTagTone(lead.stage, openStageIdsInOrder)}>{lead.stage.name}</Tag>
+                  {lead.temperature === 'unscored' ? null : (
+                    <TemperatureTag temperature={lead.temperature} reason={lead.temperatureReason} />
+                  )}
+                  {renderRowMenu(lead, findLeadDisplayName(lead.contact))}
+                </div>
+              </div>
+              {lead.contact?.phone ? <p className="text-body-sm text-text-secondary">{lead.contact.phone}</p> : null}
+              {lead.contact?.email ? <p className="text-body-sm text-text-secondary">{lead.contact.email}</p> : null}
+              <p className="text-body-xs text-text-secondary">
+                {findChannelLabel(lead.firstChannel)} · {findOwnerLabel(lead.ownerUserId, signedInUserId)}
+              </p>
+              {callbackDate ? (
+                <div>
+                  <CallbackChip date={callbackDate} />
+                </div>
+              ) : null}
+            </Card>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

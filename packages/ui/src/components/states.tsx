@@ -19,12 +19,12 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
     <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
       <span
         aria-hidden
-        className="flex size-12 items-center justify-center rounded-full bg-surface-muted text-text-secondary"
+        className="flex size-12 items-center justify-center rounded-full bg-surface-subtle text-text-secondary"
       >
         {icon}
       </span>
-      <h2 className="text-base-heading text-text-primary">{title}</h2>
-      <p className="text-sm-body max-w-md text-text-secondary">{description}</p>
+      <h2 className="text-heading-sm text-text-primary">{title}</h2>
+      <p className="text-body-md max-w-md text-text-secondary">{description}</p>
       {action}
     </div>
   );
@@ -45,8 +45,8 @@ export function ErrorState({ title, description, action }: ErrorStateProps) {
       <span aria-hidden className="flex size-12 items-center justify-center rounded-full bg-error-bg text-error">
         <AlertTriangle className="size-6" />
       </span>
-      <h2 className="text-base-heading text-text-primary">{title}</h2>
-      <p className="text-sm-body max-w-md text-text-secondary">{description}</p>
+      <h2 className="text-heading-sm text-text-primary">{title}</h2>
+      <p className="text-body-md max-w-md text-text-secondary">{description}</p>
       {action}
     </div>
   );
@@ -54,7 +54,7 @@ export function ErrorState({ title, description, action }: ErrorStateProps) {
 
 /** A grey placeholder block that pulses while content loads. Keep its size close to the real content. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={joinClassNames('animate-pulse rounded-md bg-surface-muted', className)} />;
+  return <div aria-hidden className={joinClassNames('animate-pulse rounded-md bg-surface-subtle', className)} />;
 }
 
 /** Placeholder rows for a loading list, announced to screen readers as "loading". */

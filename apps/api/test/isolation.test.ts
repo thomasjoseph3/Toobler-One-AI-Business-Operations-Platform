@@ -1,0 +1,1567 @@
+import type { FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
+import { randomUUID } from 'node:crypto';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { Database } from '../src/kernel/database';
+import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
+import { createSignedInPerson, type SignedInPerson } from './support/auth';
+import { createUnansweredQuestionsService } from '../src/modules/core/knowledge';
+import { createContextFactory } from '../src/kernel/context';
+import { detectDuplicatesForBusiness } from '../src/modules/core/duplicates';
+import { openTestDatabase } from './support/harness';
+
+// The shared isolation suite (docs/SECURITY.md, BACKEND.md): one place that proves business B can never reach business A's
+// data through ANY route, and that fails when someone adds a route without deciding how it is kept apart.
+//
+// Three checks:
+//  1. THE REGISTER. Every route in the API's own OpenAPI document must be listed here: either with an attempt by business B
+//     (named below), or on the exemption list with the reason it holds no business data. A new route that is in neither
+//     fails this test, so nobody can forget it.
+//  2. THE ATTEMPTS. Business B signs in and tries each route against A's ids (in the address, in the body, in the query) and
+//     reads every list. Each answers 404 (or 400/403 where the route is stricter), no list shows A's data, and afterwards
+//     A's data is exactly as it was.
+//  3. THE DATABASE. For every table that has an account_id, a connection fenced to B sees none of A's rows.
+
+const DOCS_ORIGIN = 'http://localhost:4000';
+
+let database: Database;
+let app: FastifyInstance;
+
+beforeAll(async () => {
+  database = openTestDatabase();
+  // Built like the development app, so it serves the OpenAPI document that lists every route
+  app = await buildTestApp(database, [], {
+    config: { ...testConfig(), env: 'development', docsOrigin: DOCS_ORIGIN },
+    enqueueJob: async () => {}, // starting a reading queues a job; nothing runs it here
+  });
+});
+afterAll(async () => {
+  await app.close();
+  await database.close();
+});
+
+/** Sends a request as the person (or as nobody), with the headers the web app sends. */
+const send = (person: SignedInPerson | null, method: string, url: string, payload?: unknown) =>
+  app.inject({
+    method: method as 'GET',
+    url: `/api/v1${url}`,
+    headers: { ...unsafeRequestHeaders, ...(person ? { cookie: person.cookieHeader } : {}) },
+    ...(payload === undefined ? {} : { payload: payload as object }),
+  });
+
+/** A phone number nobody else uses: a UAE mobile with random digits. */
+const uniqueUaeNumber = () => `+9715${String(Math.floor(Math.random() * 90_000_000) + 10_000_000)}`;
+
+/** Sends a request that must succeed and returns its body. */
+async function sendOk(person: SignedInPerson, method: string, url: string, payload?: unknown, status = 200) {
+  const response = await send(person, method, url, payload);
+  expect(response.statusCode, `${method} ${url}: ${response.body}`).toBe(status);
+  return response.statusCode === 204 ? undefined : response.json();
+}
+
+/** Uploads a file as this person (a spreadsheet for an import), the way a browser form does. */
+async function uploadAs(person: SignedInPerson, url: string, fileName: string, content: Buffer) {
+  const boundary = '----toobler-isolation-boundary';
+  const head = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: text/csv\r\n\r\n`,
+  );
+  const response = await app.inject({
+    method: 'POST',
+    url: `/api/v1${url}`,
+    headers: {
+      ...unsafeRequestHeaders,
+      'content-type': `multipart/form-data; boundary=${boundary}`,
+      cookie: person.cookieHeader,
+    },
+    payload: Buffer.concat([head, content, Buffer.from(`\r\n--${boundary}--\r\n`)]),
+  });
+  expect(response.statusCode, `upload ${url}: ${response.body}`).toBe(201);
+  return response.json();
+}
+
+/** Everything business A owns that business B will aim at. */
+interface BusinessAData {
+  conversationId: string;
+  /** A reply the AI drafted for A to approve (email). */
+  emailDraftId: string;
+  /** A's test chat ("Test the agent"). */
+  testChatId: string;
+  conversationTypeId: string;
+  contactId: string;
+  leadId: string;
+  ticketId: string;
+  noteId: string;
+  taskId: string;
+  stageId: string;
+  offeringId: string;
+  offerId: string;
+  faqId: string;
+  aiKeyId: string;
+  unansweredQuestionId: string;
+  /** A's reading of its website (the setup wizard). */
+  prefillRunId: string;
+  userId: string;
+  invitationId: string;
+  teamId: string;
+  companyId: string;
+  fieldId: string;
+  viewId: string;
+  listId: string;
+  importId: string;
+  exportId: string;
+  duplicateId: string;
+  secretWords: string;
+}
+
+/** What B owns, for the attempts that mix B's own records with A's ids. */
+interface BusinessBData {
+  contactId: string;
+  /** A contact of B's with no lead, for the attempts that add one. */
+  spareContactId: string;
+  leadId: string;
+  stageId: string;
+}
+
+let businessA: SignedInPerson;
+let businessB: SignedInPerson;
+let dataOfA: BusinessAData;
+let dataOfB: BusinessBData;
+
+beforeAll(async () => {
+  businessA = await createSignedInPerson(app, database);
+  businessB = await createSignedInPerson(app, database);
+
+  const secretWords = `secret-${randomUUID().slice(0, 8)}`;
+  const contact = await sendOk(
+    businessA,
+    'POST',
+    '/contacts',
+    { name: `Alice ${secretWords}`, phone: uniqueUaeNumber() },
+    201,
+  );
+  const lead = await sendOk(businessA, 'POST', '/leads', { contactId: contact.id, interest: secretWords }, 201);
+  const ticket = await sendOk(businessA, 'POST', '/tickets', { contactId: contact.id, title: secretWords }, 201);
+  const stage = await sendOk(businessA, 'POST', '/pipeline/stages', { name: `Stage ${secretWords}` }, 201);
+  await sendOk(businessA, 'PUT', '/knowledge/answers/business_name', { value: `Business ${secretWords}` });
+  await sendOk(businessA, 'PUT', '/knowledge/situations/discount_request', { choice: 'tell_current_offer' });
+  await sendOk(businessA, 'PATCH', '/setup', { step: 'pipeline', status: 'done' });
+  await sendOk(businessA, 'PUT', '/knowledge/settings', { timeZone: 'Asia/Dubai', defaultCountry: 'AE' });
+  const offering = await sendOk(
+    businessA,
+    'POST',
+    '/offerings',
+    { name: `Offering ${secretWords}`, fromPricePaise: 450_000, priceUnit: 'per night', gstMode: 'plus' },
+    201,
+  );
+  const unansweredQuestion = await createUnansweredQuestionsService({ database }).logUnansweredQuestion(
+    businessA.profile.business.id,
+    { kind: 'agent', id: null },
+    `Does it work ${secretWords}?`,
+  );
+  // A starts a reading of its website (the job is not run here: the isolation test only needs A's reading to exist)
+  const prefillRun = await sendOk(
+    businessA,
+    'POST',
+    '/knowledge/prefill',
+    { websiteUrl: `https://${secretWords}.example` },
+    202,
+  );
+  // A saves an AI key of its own; B must never see it, its label, or be able to touch it
+  const aiKey = await sendOk(
+    businessA,
+    'POST',
+    '/ai/keys',
+    { provider: 'gemini', label: `Key ${secretWords}`, key: `AIzaSyIsolation${secretWords}0123456789` },
+    201,
+  );
+  const offer = await sendOk(businessA, 'POST', '/offers', { text: `Offer ${secretWords}`, endsOn: '2099-12-31' }, 201);
+  const faq = await sendOk(
+    businessA,
+    'POST',
+    '/knowledge/faqs',
+    { question: `Question ${secretWords}`, answer: `Answer ${secretWords}` },
+    201,
+  );
+  // An answer of A's that is waiting for a manager's check (what the website reader will leave behind, F31)
+  await database.system
+    .insertInto('business_answers')
+    .values({
+      account_id: businessA.profile.business.id,
+      question_key: 'address',
+      value: JSON.stringify(`Address ${secretWords}`),
+      source: 'website',
+      status: 'check',
+    })
+    .execute();
+  // A blocks a number and an email, with the secret words as the reason; B must never see them
+  await sendOk(
+    businessA,
+    'PUT',
+    '/block-list',
+    { items: [{ phone: uniqueUaeNumber(), reason: secretWords }, { email: `${secretWords}@spam.example` }] },
+    200,
+  );
+  // A adds its own conversation type; B must never see it or its words
+  const conversationType = await sendOk(
+    businessA,
+    'POST',
+    '/conversation-types',
+    { label: `Type ${secretWords}`, description: `Description ${secretWords}`, outcome: 'log' },
+    201,
+  );
+  // A has a conversation with a message and an outcome (no route reads them yet, so the database-level check below is what proves B cannot)
+  const conversationOfA = randomUUID();
+  await database.system
+    .insertInto('conversations')
+    .values({
+      id: conversationOfA,
+      account_id: businessA.profile.business.id,
+      channel: 'webchat',
+      from_phone_key: null,
+      from_email: null,
+      contact_id: null,
+    })
+    .execute();
+  await database.system
+    .insertInto('conversation_messages')
+    .values({
+      id: randomUUID(),
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      sender: 'customer',
+      body: `Message ${secretWords}`,
+      channel_message_id: null,
+    })
+    .execute();
+  await database.system
+    .insertInto('conversation_outcomes')
+    .values({
+      id: randomUUID(),
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      type_key: 'new_enquiry',
+      kind: 'lead',
+      confidence: 0.9,
+    })
+    .execute();
+  // Both businesses have Email in their plan, and A has a reply waiting for approval, which B must not be able to send or discard
+  for (const business of [businessA, businessB]) {
+    await database.system
+      .insertInto('account_modules')
+      .values({ account_id: business.profile.business.id, module_id: 'channel.email', entitled: true, enabled: true })
+      .execute();
+  }
+  const emailDraftOfA = randomUUID();
+  await database.system
+    .insertInto('email_drafts')
+    .values({
+      id: emailDraftOfA,
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      to_email: 'customer@example.com',
+      subject: 'Re: hello',
+      body: `Draft ${secretWords}`,
+    })
+    .execute();
+  // A also has a test chat, which B must not be able to carry on
+  const testChatOfA = randomUUID();
+  await database.system
+    .insertInto('conversations')
+    .values({
+      id: testChatOfA,
+      account_id: businessA.profile.business.id,
+      channel: 'webchat',
+      from_phone_key: null,
+      from_email: null,
+      contact_id: null,
+      is_test: true,
+    })
+    .execute();
+  // A has a note on its lead, which B must not be able to read, change or delete
+  const noteOfA = await sendOk(businessA, 'POST', '/notes', { leadId: lead.id, body: 'A private note' }, 201);
+  // A has a task on its lead, which B must not be able to change or delete
+  const taskOfA = await sendOk(
+    businessA,
+    'POST',
+    '/tasks',
+    { leadId: lead.id, title: 'A private task', dueAt: '2030-01-01T10:00:00Z' },
+    201,
+  );
+  // A has a custom field with a secret label; B must never see it
+  const fieldOfA = await sendOk(
+    businessA,
+    'POST',
+    '/fields',
+    { object: 'lead', label: `Field ${secretWords}`, type: 'text' },
+    201,
+  );
+  // A has a saved view with a secret name; B must never see it
+  const viewOfA = await sendOk(businessA, 'POST', '/views', { object: 'lead', name: `View ${secretWords}` }, 201);
+  // A has a contact list with a secret name; B must never see it
+  const listOfA = await sendOk(businessA, 'POST', '/lists', { name: `List ${secretWords}` }, 201);
+  // A has an import waiting with a secret file; B must never see it
+  const importOfA = await uploadAs(
+    businessA,
+    '/imports',
+    'a.csv',
+    Buffer.from(`Phone,Name\n+971500000001,${secretWords}\n`),
+  );
+  // A has an export of its contacts; B must never read or download it
+  const exportOfA = await sendOk(businessA, 'POST', '/exports', { object: 'contact' }, 202);
+  // A has two contacts that look like one person (a possible duplicate with secret words); B must never see or decide the pair
+  const similarPhone = uniqueUaeNumber();
+  await sendOk(businessA, 'POST', '/contacts', { name: `Twin ${secretWords}`, phone: similarPhone }, 201);
+  await sendOk(
+    businessA,
+    'POST',
+    '/contacts',
+    { name: `Twin ${secretWords}`, phone: `${similarPhone.slice(0, -1)}${(Number(similarPhone.slice(-1)) + 1) % 10}` },
+    201,
+  );
+  await detectDuplicatesForBusiness(
+    createContextFactory(database)(businessA.profile.business.id, { kind: 'system', id: 'test' }),
+  );
+  const duplicateOfA = (await sendOk(businessA, 'GET', '/duplicates?object=contact')).items[0];
+  // A has a company with a secret name; B must never see it
+  const companyOfA = await sendOk(
+    businessA,
+    'POST',
+    '/companies',
+    { name: `Company ${secretWords}`, domain: `${secretWords}.example` },
+    201,
+  );
+  // A has a team with a secret name; B must never see it
+  const teamOfA = await sendOk(
+    businessA,
+    'POST',
+    '/teams',
+    { name: `Team ${secretWords}`, memberIds: [businessA.profile.user.id] },
+    201,
+  );
+  // A has invited a person; B must never see the invitation
+  const invitationOfA = await sendOk(
+    businessA,
+    'POST',
+    '/team/invitations',
+    { name: `Invitee ${secretWords}`, email: `invitee-${randomUUID().slice(0, 8)}@example.com`, role: 'staff' },
+    201,
+  );
+  dataOfA = {
+    conversationId: conversationOfA,
+    emailDraftId: emailDraftOfA,
+    testChatId: testChatOfA,
+    conversationTypeId: conversationType.id,
+    contactId: contact.id,
+    leadId: lead.id,
+    ticketId: ticket.id,
+    noteId: noteOfA.id,
+    taskId: taskOfA.id,
+    stageId: stage.id,
+    offeringId: offering.id,
+    offerId: offer.id,
+    faqId: faq.id,
+    aiKeyId: aiKey.id,
+    unansweredQuestionId: unansweredQuestion?.id ?? '',
+    prefillRunId: prefillRun.id,
+    userId: businessA.profile.user.id,
+    invitationId: invitationOfA.invitation.id,
+    teamId: teamOfA.id,
+    companyId: companyOfA.id,
+    fieldId: fieldOfA.id,
+    viewId: viewOfA.id,
+    listId: listOfA.id,
+    importId: importOfA.id,
+    exportId: exportOfA.id,
+    duplicateId: duplicateOfA.id,
+    secretWords,
+  };
+
+  const bContact = await sendOk(businessB, 'POST', '/contacts', { name: 'Bob', phone: uniqueUaeNumber() }, 201);
+  const bLead = await sendOk(businessB, 'POST', '/leads', { contactId: bContact.id }, 201);
+  const bStage = await sendOk(businessB, 'POST', '/pipeline/stages', { name: 'Bob stage' }, 201);
+  const spareContact = await sendOk(businessB, 'POST', '/contacts', { name: 'Spare', phone: uniqueUaeNumber() }, 201);
+  dataOfB = { spareContactId: spareContact.id, contactId: bContact.id, leadId: bLead.id, stageId: bStage.id };
+});
+
+/** One thing business B tries against A's data, and what it must be told. */
+interface Attempt {
+  /** The route as the OpenAPI document spells it: METHOD and path. This is what the register matches. */
+  route: string;
+  /** What B is trying, in plain words. */
+  what: string;
+  /** Builds the request (it needs A's and B's ids, which exist only after the setup above). */
+  request: () => { method: string; url: string; payload?: unknown };
+  /** The answer that is right for this route. */
+  expectedStatus: number;
+}
+
+const attempts: Attempt[] = [
+  // ---- contacts
+  {
+    route: 'GET /api/v1/contacts/{id}',
+    what: "read A's contact",
+    request: () => ({ method: 'GET', url: `/contacts/${dataOfA.contactId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/contacts/{id}',
+    what: "edit A's contact",
+    request: () => ({ method: 'PATCH', url: `/contacts/${dataOfA.contactId}`, payload: { name: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/contacts/{id}',
+    what: "delete A's contact",
+    request: () => ({ method: 'DELETE', url: `/contacts/${dataOfA.contactId}` }),
+    expectedStatus: 404,
+  },
+  // ---- leads
+  {
+    route: 'GET /api/v1/leads/{id}',
+    what: "read A's lead",
+    request: () => ({ method: 'GET', url: `/leads/${dataOfA.leadId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/leads/{id}',
+    what: "edit A's lead",
+    request: () => ({ method: 'PATCH', url: `/leads/${dataOfA.leadId}`, payload: { interest: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/leads/{id}',
+    what: "delete A's lead",
+    request: () => ({ method: 'DELETE', url: `/leads/${dataOfA.leadId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/leads/{id}/move',
+    what: "move A's lead (into B's own stage)",
+    request: () => ({ method: 'POST', url: `/leads/${dataOfA.leadId}/move`, payload: { stageId: dataOfB.stageId } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/leads/{id}/assign',
+    what: "assign A's lead",
+    request: () => ({ method: 'POST', url: `/leads/${dataOfA.leadId}/assign`, payload: { ownerUserId: null } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/unfilter',
+    what: "move A's filtered conversation back onto the board",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/unfilter` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/leads/{id}/temperature',
+    what: "set the temperature of A's lead",
+    request: () => ({ method: 'PATCH', url: `/leads/${dataOfA.leadId}/temperature`, payload: { temperature: 'hot' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/leads',
+    what: "add a lead for A's contact",
+    request: () => ({ method: 'POST', url: '/leads', payload: { contactId: dataOfA.contactId } }),
+    expectedStatus: 404,
+  },
+  // ---- pipeline
+  {
+    route: 'PATCH /api/v1/pipeline/stages/{id}',
+    what: "rename A's stage",
+    request: () => ({ method: 'PATCH', url: `/pipeline/stages/${dataOfA.stageId}`, payload: { name: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/pipeline/stages/{id}',
+    what: "remove A's stage",
+    request: () => ({ method: 'DELETE', url: `/pipeline/stages/${dataOfA.stageId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/pipeline/stages/reorder',
+    what: "reorder using A's stage ids",
+    request: () => ({ method: 'POST', url: '/pipeline/stages/reorder', payload: { stageIds: [dataOfA.stageId] } }),
+    expectedStatus: 400,
+  },
+  // ---- sharing out new leads
+  {
+    route: 'PUT /api/v1/assignment-rules',
+    what: "name A's person as the one who gets every new lead",
+    request: () => ({
+      method: 'PUT',
+      url: '/assignment-rules',
+      payload: { mode: 'one_person', userId: dataOfA.userId },
+    }),
+    expectedStatus: 404,
+  },
+  // ---- tickets
+  {
+    route: 'GET /api/v1/tickets/{id}',
+    what: "read A's ticket",
+    request: () => ({ method: 'GET', url: `/tickets/${dataOfA.ticketId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/tickets/{id}',
+    what: "close A's ticket with a note",
+    request: () => ({
+      method: 'PATCH',
+      url: `/tickets/${dataOfA.ticketId}`,
+      payload: { status: 'done', note: 'Sneaky', ownerUserId: businessB.profile.user.id },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/tickets',
+    what: "raise a ticket for A's contact",
+    request: () => ({ method: 'POST', url: '/tickets', payload: { contactId: dataOfA.contactId, title: 'Sneaky' } }),
+    expectedStatus: 404,
+  },
+  // ---- the business profile (the question key is a code, not a business's record: B can only ever answer for B)
+  {
+    route: 'PUT /api/v1/knowledge/answers/{question_key}',
+    what: "answer the same question as A, and A's answer must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/answers/business_name',
+      payload: { value: 'Bob Business' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'PUT /api/v1/knowledge/situations/{key}',
+    what: "choose another way for the same situation as A, and A's choice must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/situations/discount_request',
+      payload: { choice: 'prices_are_fixed' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'PATCH /api/v1/setup',
+    what: "mark the same setup step as A, and A's mark must stay as it was",
+    request: () => ({
+      method: 'PATCH',
+      url: '/setup',
+      payload: { step: 'pipeline', status: 'skipped' },
+    }),
+    expectedStatus: 200,
+  },
+  // ---- leads about an offering, and sharing out by offering
+  {
+    route: 'POST /api/v1/leads',
+    what: "add a lead about A's offering",
+    request: () => ({
+      method: 'POST',
+      url: '/leads',
+      payload: { contactId: dataOfB.spareContactId, offeringId: dataOfA.offeringId },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/leads/{id}',
+    what: "point B's own lead at A's offering",
+    request: () => ({ method: 'PATCH', url: `/leads/${dataOfB.leadId}`, payload: { offeringId: dataOfA.offeringId } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PUT /api/v1/assignment-rules',
+    what: "share out by offering with A's person as the fallback",
+    request: () => ({
+      method: 'PUT',
+      url: '/assignment-rules',
+      payload: { mode: 'by_offering', fallbackUserId: dataOfA.userId },
+    }),
+    expectedStatus: 404,
+  },
+  // ---- offerings
+  {
+    route: 'POST /api/v1/offerings/reorder',
+    what: "reorder using A's offering id",
+    request: () => ({ method: 'POST', url: '/offerings/reorder', payload: { offeringIds: [dataOfA.offeringId] } }),
+    expectedStatus: 400,
+  },
+  {
+    route: 'DELETE /api/v1/offers/{id}',
+    what: "remove A's offer",
+    request: () => ({ method: 'DELETE', url: `/offers/${dataOfA.offerId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/offers/{id}',
+    what: "change A's offer",
+    request: () => ({ method: 'PATCH', url: `/offers/${dataOfA.offerId}`, payload: { text: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/offers',
+    what: "add an offer (B's own business only)",
+    request: () => ({ method: 'POST', url: '/offers', payload: { text: 'Bob offer', endsOn: '2099-12-31' } }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'PATCH /api/v1/offerings/{id}',
+    what: "change A's offering",
+    request: () => ({
+      method: 'PATCH',
+      url: `/offerings/${dataOfA.offeringId}`,
+      payload: { name: 'Hacked', active: false },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/offerings/{id}',
+    what: "remove A's offering",
+    request: () => ({ method: 'DELETE', url: `/offerings/${dataOfA.offeringId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/offerings',
+    what: "add an offering owned by A's person",
+    request: () => ({
+      method: 'POST',
+      url: '/offerings',
+      payload: { name: 'Sneaky offering', ownerUserId: dataOfA.userId },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/offerings',
+    what: "add an offering of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/offerings',
+      payload: { name: 'Bob offering' },
+    }),
+    expectedStatus: 201,
+  },
+  // ---- conversation types (every business has its own list; the business comes from the session)
+  {
+    route: 'POST /api/v1/conversation-types',
+    what: "add a conversation type of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/conversation-types',
+      payload: { label: 'Bob type', description: 'Only for Bob', outcome: 'log' },
+    }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'PUT /api/v1/block-list',
+    what: "save B's own block list (it replaces only B's list), and A's list must stay as it was",
+    request: () => ({
+      method: 'PUT',
+      url: '/block-list',
+      payload: { items: [{ email: 'bob-blocks@spam.example' }] },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'GET /api/v1/conversations/{id}',
+    what: "read A's conversation (its messages)",
+    request: () => ({ method: 'GET', url: `/conversations/${dataOfA.conversationId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/agent/test-chat',
+    what: "carry on A's test chat (the AI must never be shown A's messages, and nothing may be added to it)",
+    request: () => ({
+      method: 'POST',
+      url: '/agent/test-chat',
+      payload: { conversationId: dataOfA.testChatId, message: 'Hello' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/channels/email/drafts/{id}/send',
+    what: "send A's waiting reply (nothing may be sent, and A's draft must stay waiting)",
+    request: () => ({ method: 'POST', url: `/channels/email/drafts/${dataOfA.emailDraftId}/send`, payload: {} }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/channels/email/drafts/{id}',
+    what: "discard A's waiting reply",
+    request: () => ({ method: 'DELETE', url: `/channels/email/drafts/${dataOfA.emailDraftId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/channels/webchat',
+    what: "change the chat settings (B's own only, with B's own website), and A's key, greeting and websites must stay as they were",
+    request: () => ({
+      method: 'PATCH',
+      url: '/channels/webchat',
+      payload: { greeting: 'Bob changes his own greeting', allowedWebsites: ['https://bob-hotel.example'] },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'GET /api/v1/agent/test-chats/{conversationId}',
+    what: "read A's test chat back (its messages, what the agent learned, its promise)",
+    request: () => ({ method: 'GET', url: `/agent/test-chats/${dataOfA.testChatId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/agent/test-chats/{conversationId}/summary',
+    what: "summarise A's test chat (the AI must never be shown A's messages)",
+    request: () => ({ method: 'POST', url: `/agent/test-chats/${dataOfA.testChatId}/summary` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/takeover',
+    what: "take over A's conversation",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/takeover` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/handback',
+    what: "hand back A's conversation",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/handback` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/done',
+    what: "mark A's conversation done",
+    request: () => ({ method: 'POST', url: `/conversations/${dataOfA.conversationId}/done` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/reply',
+    what: "reply in A's conversation",
+    request: () => ({
+      method: 'POST',
+      url: `/conversations/${dataOfA.conversationId}/reply`,
+      payload: { body: 'Hello from the other business' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversations/{id}/type',
+    what: "change the type of A's conversation",
+    request: () => ({
+      method: 'POST',
+      url: `/conversations/${dataOfA.conversationId}/type`,
+      payload: { typeKey: 'complaint' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/conversation-types/reorder',
+    what: "put A's conversation type in B's order (B must list only its own types)",
+    request: () => ({
+      method: 'POST',
+      url: '/conversation-types/reorder',
+      payload: { typeIds: [dataOfA.conversationTypeId] },
+    }),
+    expectedStatus: 400,
+  },
+  {
+    route: 'PATCH /api/v1/conversation-types/{id}',
+    what: "change A's conversation type",
+    request: () => ({
+      method: 'PATCH',
+      url: `/conversation-types/${dataOfA.conversationTypeId}`,
+      payload: { label: 'Hacked' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/conversation-types/{id}',
+    what: "remove A's conversation type",
+    request: () => ({ method: 'DELETE', url: `/conversation-types/${dataOfA.conversationTypeId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/knowledge/faqs/{id}',
+    what: "change A's FAQ",
+    request: () => ({ method: 'PATCH', url: `/knowledge/faqs/${dataOfA.faqId}`, payload: { answer: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/knowledge/faqs/{id}',
+    what: "remove A's FAQ",
+    request: () => ({ method: 'DELETE', url: `/knowledge/faqs/${dataOfA.faqId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/knowledge/unanswered/{id}/answer',
+    what: "answer A's unanswered question",
+    request: () => ({
+      method: 'POST',
+      url: `/knowledge/unanswered/${dataOfA.unansweredQuestionId}/answer`,
+      payload: { answer: 'Hacked' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/knowledge/unanswered/{id}/dismiss',
+    what: "ignore A's unanswered question",
+    request: () => ({ method: 'POST', url: `/knowledge/unanswered/${dataOfA.unansweredQuestionId}/dismiss` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/setup/apply-preset',
+    what: "apply the industry's words as B (B's own pipeline changes; A's stages must stay as they were)",
+    request: () => ({ method: 'POST', url: '/setup/apply-preset' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/notes',
+    what: "write a note on A's lead",
+    request: () => ({ method: 'POST', url: '/notes', payload: { leadId: dataOfA.leadId, body: 'Hacked note' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/activities',
+    what: "read A's lead's timeline",
+    request: () => ({ method: 'GET', url: `/activities?lead_id=${dataOfA.leadId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/notes/{id}',
+    what: "change A's note",
+    request: () => ({ method: 'PATCH', url: `/notes/${dataOfA.noteId}`, payload: { body: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/notes/{id}',
+    what: "delete A's note",
+    request: () => ({ method: 'DELETE', url: `/notes/${dataOfA.noteId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/activities/counts',
+    what: "ask how many notes A's lead has (B must get 0, never A's real count)",
+    request: () => ({ method: 'GET', url: `/activities/counts?lead_ids=${dataOfA.leadId}` }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/tasks',
+    what: "add a task on A's lead",
+    request: () => ({
+      method: 'POST',
+      url: '/tasks',
+      payload: { leadId: dataOfA.leadId, title: 'Hacked task', dueAt: '2030-01-01T10:00:00Z' },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/tasks',
+    what: "read the tasks of A's lead",
+    request: () => ({ method: 'GET', url: `/tasks?lead_id=${dataOfA.leadId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/tasks/next-due',
+    what: "ask when A's lead's next task is due (B is told 'none', never the date)",
+    request: () => ({ method: 'GET', url: `/tasks/next-due?lead_ids=${dataOfA.leadId}` }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'PATCH /api/v1/tasks/{id}',
+    what: "tick off A's task",
+    request: () => ({ method: 'PATCH', url: `/tasks/${dataOfA.taskId}`, payload: { done: true } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/tasks/{id}',
+    what: "delete A's task",
+    request: () => ({ method: 'DELETE', url: `/tasks/${dataOfA.taskId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/team',
+    what: "list the team (B must see only its own people, never A's people or A's invitations)",
+    request: () => ({ method: 'GET', url: '/team' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'PATCH /api/v1/team/members/{id}',
+    what: "change the role of A's owner",
+    request: () => ({ method: 'PATCH', url: `/team/members/${dataOfA.userId}`, payload: { role: 'staff' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/team/members/{id}',
+    what: "remove A's owner",
+    request: () => ({ method: 'DELETE', url: `/team/members/${dataOfA.userId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/team/invitations/{id}',
+    what: "cancel A's invitation",
+    request: () => ({ method: 'DELETE', url: `/team/invitations/${dataOfA.invitationId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/team/invitations/{id}/resend',
+    what: "send A's invitation again (it would hand B a working link into A's business)",
+    request: () => ({ method: 'POST', url: `/team/invitations/${dataOfA.invitationId}/resend` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/teams',
+    what: "list the teams (B must see only its own, never A's)",
+    request: () => ({ method: 'GET', url: '/teams' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/teams',
+    what: "add a team with A's owner in it",
+    request: () => ({ method: 'POST', url: '/teams', payload: { name: 'Hijack', memberIds: [dataOfA.userId] } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/teams/{id}',
+    what: "rename A's team",
+    request: () => ({ method: 'PATCH', url: `/teams/${dataOfA.teamId}`, payload: { name: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/teams/{id}',
+    what: "delete A's team",
+    request: () => ({ method: 'DELETE', url: `/teams/${dataOfA.teamId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/audit-log',
+    what: "read the activity log filtered to A's owner (B must see only its own lines, never A's)",
+    request: () => ({ method: 'GET', url: `/audit-log?person=${dataOfA.userId}` }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'GET /api/v1/companies',
+    what: "search the companies for A's secret name and A's domain (B must see none of A's)",
+    request: () => ({ method: 'GET', url: `/companies?q=${dataOfA.secretWords}` }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/companies',
+    what: "add a company with A's owner as its owner",
+    request: () => ({ method: 'POST', url: '/companies', payload: { name: 'Hijack', ownerUserId: dataOfA.userId } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/companies/{id}',
+    what: "read A's company with its people and leads",
+    request: () => ({ method: 'GET', url: `/companies/${dataOfA.companyId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PUT /api/v1/contacts/{id}/company',
+    what: "put A's contact in A's company",
+    request: () => ({
+      method: 'PUT',
+      url: `/contacts/${dataOfA.contactId}/company`,
+      payload: { companyId: dataOfA.companyId },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/companies/{id}',
+    what: "change A's company",
+    request: () => ({ method: 'PATCH', url: `/companies/${dataOfA.companyId}`, payload: { city: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/companies/{id}',
+    what: "delete A's company",
+    request: () => ({ method: 'DELETE', url: `/companies/${dataOfA.companyId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/fields',
+    what: "list the fields (B must see only its own, never A's)",
+    request: () => ({ method: 'GET', url: '/fields' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/fields',
+    what: "add a field as B (it lands in B's business only; A's fields stay as they were)",
+    request: () => ({ method: 'POST', url: '/fields', payload: { object: 'lead', label: 'B only', type: 'text' } }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'POST /api/v1/views',
+    what: "save a view as B (it lands in B's business only; the same name as one of A's is allowed)",
+    request: () => ({ method: 'POST', url: '/views', payload: { object: 'lead', name: 'Isolation view' } }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'POST /api/v1/lists',
+    what: "make a list from A's contact (B cannot put A's contact in a list)",
+    request: () => ({
+      method: 'POST',
+      url: '/lists',
+      payload: { name: 'Isolation list', contactIds: [dataOfA.contactId] },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/lists/{id}/members',
+    what: "read the people of A's list",
+    request: () => ({ method: 'GET', url: `/lists/${dataOfA.listId}/members` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/lists/{id}/members',
+    what: "add people to A's list",
+    request: () => ({
+      method: 'POST',
+      url: `/lists/${dataOfA.listId}/members`,
+      payload: { contactIds: [dataOfA.contactId] },
+    }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/lists/{id}/members/{contactId}',
+    what: "take a person out of A's list",
+    request: () => ({ method: 'DELETE', url: `/lists/${dataOfA.listId}/members/${dataOfA.contactId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/lists/{id}',
+    what: "delete A's list",
+    request: () => ({ method: 'DELETE', url: `/lists/${dataOfA.listId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/imports/{id}',
+    what: "read A's import (its report and counts)",
+    request: () => ({ method: 'GET', url: `/imports/${dataOfA.importId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/imports/{id}',
+    what: "set the columns of A's import",
+    request: () => ({ method: 'PATCH', url: `/imports/${dataOfA.importId}`, payload: { targets: ['phone', 'name'] } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/imports/{id}/run',
+    what: "run A's import",
+    request: () => ({ method: 'POST', url: `/imports/${dataOfA.importId}/run` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/exports/{id}',
+    what: "read the status of A's export",
+    request: () => ({ method: 'GET', url: `/exports/${dataOfA.exportId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'GET /api/v1/exports/{id}/download',
+    what: "download A's export file",
+    request: () => ({ method: 'GET', url: `/exports/${dataOfA.exportId}/download` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/exports',
+    what: "ask for an export as B (it is B's own list, never A's: the business comes from the session)",
+    request: () => ({ method: 'POST', url: '/exports', payload: { object: 'contact' } }),
+    expectedStatus: 202,
+  },
+  {
+    route: 'GET /api/v1/duplicates',
+    what: "list the possible duplicates (B sees only its own; the leak scan below proves none of A's show)",
+    request: () => ({ method: 'GET', url: '/duplicates?object=contact' }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/duplicates/{id}/merge',
+    what: "merge A's pair of contacts",
+    request: () => ({ method: 'POST', url: `/duplicates/${dataOfA.duplicateId}/merge`, payload: { keep: 'a' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/duplicates/{id}/dismiss',
+    what: 'say "Not the same" about A\'s pair',
+    request: () => ({ method: 'POST', url: `/duplicates/${dataOfA.duplicateId}/dismiss` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/fields/reorder',
+    what: "reorder with A's field id (B's own fields do not include it)",
+    request: () => ({ method: 'POST', url: '/fields/reorder', payload: { object: 'lead', ids: [dataOfA.fieldId] } }),
+    expectedStatus: 409,
+  },
+  {
+    route: 'PATCH /api/v1/fields/{id}',
+    what: "change A's field",
+    request: () => ({ method: 'PATCH', url: `/fields/${dataOfA.fieldId}`, payload: { label: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/fields/{id}',
+    what: "remove A's field",
+    request: () => ({ method: 'DELETE', url: `/fields/${dataOfA.fieldId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PATCH /api/v1/views/{id}',
+    what: "rename A's view",
+    request: () => ({ method: 'PATCH', url: `/views/${dataOfA.viewId}`, payload: { name: 'Hacked' } }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/views/{id}',
+    what: "delete A's view",
+    request: () => ({ method: 'DELETE', url: `/views/${dataOfA.viewId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/team/invitations',
+    what: 'invite the owner of A (an email that already has an account anywhere is refused)',
+    request: () => ({
+      method: 'POST',
+      url: '/team/invitations',
+      payload: { name: 'Hacker', email: businessA.email, role: 'manager' },
+    }),
+    expectedStatus: 409,
+  },
+  {
+    route: 'POST /api/v1/setup/chat',
+    what: "answer a question in the setup chat as B (B's own answer is saved; A's answers must stay as they were)",
+    request: () => ({
+      method: 'POST',
+      url: '/setup/chat',
+      payload: { questionKey: 'business_name', reply: 'B Stays' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/setup/go-live',
+    what: 'go live as B (B is not ready, so 409; A must not be made live)',
+    request: () => ({ method: 'POST', url: '/setup/go-live' }),
+    expectedStatus: 409,
+  },
+  {
+    route: 'GET /api/v1/knowledge/prefill/{id}',
+    what: "read A's reading of its website",
+    request: () => ({ method: 'GET', url: `/knowledge/prefill/${dataOfA.prefillRunId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/knowledge/prefill',
+    what: "start a reading as B (B gets its own; A's reading and answers must stay as they were)",
+    request: () => ({
+      method: 'POST',
+      url: '/knowledge/prefill',
+      payload: { websiteUrl: 'https://bobs-business.example' },
+    }),
+    expectedStatus: 202,
+  },
+  {
+    route: 'DELETE /api/v1/ai/keys/{id}',
+    what: "remove A's AI key",
+    request: () => ({ method: 'DELETE', url: `/ai/keys/${dataOfA.aiKeyId}` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/ai/keys/{id}/test',
+    what: "test A's AI key (which would spend A's quota)",
+    request: () => ({ method: 'POST', url: `/ai/keys/${dataOfA.aiKeyId}/test` }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'PUT /api/v1/ai/settings',
+    what: "change the AI settings (B's own business only), and A's must stay as they were",
+    request: () => ({ method: 'PUT', url: '/ai/settings', payload: { keyMode: 'platform' } }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/ai/keys',
+    what: "save an AI key of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/ai/keys',
+      payload: { provider: 'gemini', label: 'Bob key', key: 'AIzaSyBobsOwnKey0123456789abcdef' },
+    }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'POST /api/v1/knowledge/faqs',
+    what: "add an FAQ of its own (B's own business only), and A's list must stay as it was",
+    request: () => ({
+      method: 'POST',
+      url: '/knowledge/faqs',
+      payload: { question: 'Bob question', answer: 'Bob answer' },
+    }),
+    expectedStatus: 201,
+  },
+  {
+    route: 'PUT /api/v1/knowledge/settings',
+    what: "change the time zone and country (B's own business only), and A's must stay as they were",
+    request: () => ({
+      method: 'PUT',
+      url: '/knowledge/settings',
+      payload: { timeZone: 'Europe/London', defaultCountry: 'GB' },
+    }),
+    expectedStatus: 200,
+  },
+  {
+    route: 'POST /api/v1/knowledge/answers/confirm',
+    what: "confirm A's answer that is waiting for a check (B has no such answer)",
+    request: () => ({ method: 'POST', url: '/knowledge/answers/confirm', payload: { questionKeys: ['address'] } }),
+    expectedStatus: 404,
+  },
+  // ---- the platform (only a platform admin; B is an ordinary business)
+  {
+    route: 'POST /api/v1/platform/businesses/{id}/modules',
+    what: "put a module into A's plan",
+    request: () => ({
+      method: 'POST',
+      url: `/platform/businesses/${businessA.profile.business.id}/modules`,
+      payload: { moduleId: 'channel.whatsapp', entitled: true },
+    }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'GET /api/v1/platform/businesses/{id}/ai-access',
+    what: "look at what the platform allowed A's business",
+    request: () => ({ method: 'GET', url: `/platform/businesses/${businessA.profile.business.id}/ai-access` }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'PUT /api/v1/platform/businesses/{id}/ai-access',
+    what: "give A's business (or itself) the platform's AI keys",
+    request: () => ({
+      method: 'PUT',
+      url: `/platform/businesses/${businessA.profile.business.id}/ai-access`,
+      payload: { enabled: true },
+    }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'PATCH /api/v1/platform/ai/models/{id}',
+    what: 'retire an AI model for every business',
+    request: () => ({ method: 'PATCH', url: `/platform/ai/models/${randomUUID()}`, payload: { status: 'retired' } }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'PUT /api/v1/platform/ai/tasks/{taskId}/models',
+    what: "change the platform's model order for a job",
+    request: () => ({
+      method: 'PUT',
+      url: '/platform/ai/tasks/chat_reply/models',
+      payload: { modelIds: [randomUUID()] },
+    }),
+    expectedStatus: 403,
+  },
+  {
+    route: 'POST /api/v1/platform/ai/models',
+    what: 'add a model to the platform list',
+    request: () => ({
+      method: 'POST',
+      url: '/platform/ai/models',
+      payload: { provider: 'gemini', modelName: 'sneaky-model', label: 'Sneaky' },
+    }),
+    expectedStatus: 403,
+  },
+];
+
+/** Lists B reads. Each must show none of A's ids or words. */
+const listsBReads: Array<{ route: string; url: string }> = [
+  { route: 'GET /api/v1/contacts', url: '/contacts?limit=100' },
+  { route: 'GET /api/v1/leads', url: '/leads?limit=100' },
+  { route: 'GET /api/v1/leads', url: '/leads?view=board' },
+  { route: 'GET /api/v1/tickets', url: '/tickets?limit=100' },
+  { route: 'GET /api/v1/lists', url: '/lists' },
+  { route: 'GET /api/v1/duplicates', url: '/duplicates?object=contact' },
+  { route: 'GET /api/v1/conversations', url: '/conversations?limit=100' },
+  { route: 'GET /api/v1/views', url: '/views?object=lead' },
+  { route: 'GET /api/v1/search', url: '/search?q=Contact' },
+  { route: 'GET /api/v1/conversations', url: '/conversations?filtered=true&limit=100' },
+  { route: 'GET /api/v1/conversation-types', url: '/conversation-types' },
+  { route: 'GET /api/v1/block-list', url: '/block-list' },
+  { route: 'GET /api/v1/pipeline', url: '/pipeline' },
+  { route: 'GET /api/v1/lost-reasons', url: '/lost-reasons' },
+  { route: 'GET /api/v1/assignment-rules', url: '/assignment-rules' },
+  { route: 'GET /api/v1/modules', url: '/modules' },
+  { route: 'GET /api/v1/knowledge/questions', url: '/knowledge/questions' },
+  { route: 'GET /api/v1/knowledge/situations', url: '/knowledge/situations' },
+  { route: 'GET /api/v1/setup', url: '/setup' },
+  { route: 'GET /api/v1/knowledge/settings', url: '/knowledge/settings' },
+  { route: 'GET /api/v1/offerings', url: '/offerings' },
+  { route: 'GET /api/v1/knowledge/faqs', url: '/knowledge/faqs' },
+  { route: 'GET /api/v1/ai/keys', url: '/ai/keys' },
+  { route: 'GET /api/v1/knowledge/unanswered', url: '/knowledge/unanswered?include=history' },
+  { route: 'GET /api/v1/knowledge/search', url: '/knowledge/search?q=question%20answer%20does%20it%20work' },
+  { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
+  { route: 'GET /api/v1/me', url: '/me' },
+  { route: 'GET /api/v1/today', url: '/today?scope=team' },
+];
+
+/**
+ * Routes that hold no business data by id, with the reason. Everything here either has no business data, or takes the
+ * business only from the session, or is global. Adding a route to this list is a decision to be made on purpose.
+ */
+const exemptRoutes: Record<string, string> = {
+  'GET /api/v1/events':
+    "an open stream of the caller's own business's events (kinds and ids only); the business comes from the session. Tested with real streams in live-updates.test.ts",
+  'POST /api/v1/auth/signup': 'creates a new business; nothing of another business is named',
+  'POST /api/v1/auth/login': "checks the caller's own credentials",
+  'POST /api/v1/auth/logout': "ends the caller's own session",
+  'POST /api/v1/auth/refresh':
+    "rotates the caller's own refresh token (a stolen old token ends the session; tested in auth-refresh)",
+  'POST /api/v1/auth/verify-email': 'a one-time token, hashed, tied to one person (tested in auth-email-verification)',
+  'POST /api/v1/auth/resend-email': 'acts on the signed-in caller only',
+  'POST /api/v1/auth/forgot-password':
+    'answers the same whether the email exists or not (tested in auth-password-reset)',
+  'POST /api/v1/auth/reset-password': 'a one-time token tied to one person (tested in auth-password-reset)',
+  'POST /api/v1/auth/invitations/preview':
+    'a one-time token tied to one invitation; unknown, used, cancelled and expired links answer the same (tested in team-accept-invitation)',
+  'POST /api/v1/auth/accept-invitation':
+    'a one-time token tied to one invitation; the new person joins only the business that invited them (tested in team-accept-invitation)',
+  'GET /api/v1/health': 'public, no data',
+  'GET /api/v1/industries': 'a global list, the same for every business',
+  'GET /api/v1/ai/models':
+    'the list of AI models is the same for every business and holds no business data and no keys (tested in ai-models)',
+  'POST /api/v1/industries': 'platform admin only, adds to the global list (tested in industries-add)',
+  'PATCH /api/v1/me': "changes the caller's own profile; the person comes from the session",
+  'POST /api/v1/me/password': "changes the caller's own password; the person comes from the session",
+  'PATCH /api/v1/modules/{id}':
+    'the id is a global module code, not a business row; the business comes from the session (tested in modules)',
+  'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
+  'GET /api/v1/leads': 'covered by the list check',
+  'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/today':
+    "covered by the list check (GET /today?scope=team shows none of A's data); the business comes from the session",
+  'POST /api/v1/imports':
+    'the file lands in the caller’s own business only and names no other record (the business comes from the session); managers only, tested in imports.test.ts',
+  'GET /api/v1/lists': 'covered by the list check, and by lists.test.ts',
+  'GET /api/v1/views': 'covered by the list check, and by views.test.ts',
+  'GET /api/v1/search':
+    'covered by the list check (a search that matches A’s people finds none of them), and by search.test.ts',
+  'GET /api/v1/conversations': 'covered by the list check (the Filtered list shows none of A’s conversations)',
+  'GET /api/v1/conversation-types': 'covered by the list check',
+  'GET /api/v1/block-list': 'covered by the list check',
+  'GET /api/v1/channels/webchat':
+    "shows only the caller's own chat settings and key: the business comes from the session, nothing in the request names one (tested in webchat-settings, including that two businesses never share a key)",
+  'GET /api/v1/public/widget/{key}/config':
+    "public: the business comes only from the widget key and nothing in the request can name another; it shows only that business's own look (tested in webchat-widget, including that a key never reaches another business)",
+  'POST /api/v1/public/widget/{key}/messages':
+    "public: the business comes only from the widget key, and a visitor token made for another business or chat is refused with 401 (tested in webchat-widget: another business's token, a test chat, another channel, an unknown chat)",
+  'GET /api/v1/public/widget/{key}/messages':
+    'public: reads only the one chat the visitor token names, and a token made for another business, a test chat or another channel is refused with 401 (tested in webchat-chat-end)',
+  'POST /api/v1/public/widget/{key}/end':
+    "public: ends only the one chat the visitor token names; another business's token is refused with 401 and ends nothing (tested in webchat-chat-end)",
+  'GET /api/v1/channels/email':
+    "shows only the caller's own mailbox settings (the business comes from the session); never the password (tested in email-settings)",
+  'PUT /api/v1/channels/email':
+    "saves only the caller's own mailbox (the business comes from the session; nothing in the request names one) (tested in email-settings)",
+  'DELETE /api/v1/channels/email':
+    "removes only the caller's own mailbox connection (the business comes from the session) (tested in email-settings)",
+  'POST /api/v1/channels/email/check':
+    "signs in to the caller's own saved mailbox only (the business comes from the session) (tested in email-settings)",
+  'GET /api/v1/channels/email/drafts':
+    "lists only the caller's own waiting replies (the business comes from the session) (tested in email-reader)",
+  'GET /api/v1/channels/whatsapp':
+    "shows only the caller's own connection (the business comes from the session); never the token (tested in whatsapp-settings)",
+  'PUT /api/v1/channels/whatsapp':
+    "saves only the caller's own connection (the business comes from the session); a number another business uses answers 409 and changes nothing (tested in whatsapp-settings)",
+  'DELETE /api/v1/channels/whatsapp':
+    "removes only the caller's own connection (the business comes from the session; nothing in the request names one) (tested in whatsapp-settings)",
+  'POST /api/v1/channels/whatsapp/check':
+    "asks Meta about the caller's own saved number only (the business comes from the session) (tested in whatsapp-settings)",
+  'GET /webhooks/whatsapp':
+    "public: Meta's one-time check; needs the platform's verify token and reveals nothing but the challenge it sent (tested in whatsapp-webhook)",
+  'POST /webhooks/whatsapp':
+    'public: signed by Meta (401 otherwise); the business comes only from the number the customer wrote to, so a message can never reach another business, and a repeated message id is answered once (tested in whatsapp-webhook)',
+  'GET /widget/loader.js': 'public file, the same for every business, holds no business data',
+  'GET /widget/assets/{file}':
+    'public built files, the same for every business, plain file names from one folder only (tested in webchat-widget-files)',
+  'GET /widget/chat':
+    "public page: the business comes only from the widget key and the page holds no business data (the chat window then reads the business's own look through the key); 404 unless the business has the chat on and has listed websites (tested in webchat-widget-files)",
+  'GET /widget/test':
+    'development-only test page: shows only the key typed into the address, and is not registered in production (tested in webchat-widget-files)',
+  'POST /api/v1/conversation-types/test':
+    "answers only about the caller's own types: the business comes from the session, nothing is saved, and the AI is only told the caller's own types (tested in conversation-types-try-it)",
+  'GET /api/v1/pipeline': 'covered by the list check',
+  'GET /api/v1/lost-reasons': 'covered by the list check',
+  'GET /api/v1/assignment-rules': 'covered by the list check',
+  'GET /api/v1/modules': 'covered by the list check',
+  'GET /api/v1/knowledge/questions': 'covered by the list check',
+  'GET /api/v1/knowledge/situations': 'covered by the list check',
+  'GET /api/v1/setup': 'covered by the list check',
+  'GET /api/v1/knowledge/settings': 'covered by the list check',
+  'GET /api/v1/offerings': 'covered by the list check',
+  'GET /api/v1/offers': 'covered by the list check',
+  'GET /api/v1/knowledge/faqs': 'covered by the list check',
+  'GET /api/v1/ai/keys': 'covered by the list check',
+  'GET /api/v1/ai/usage':
+    "shows only the caller's own numbers: the business comes from the session (tested in ai-usage)",
+  'GET /api/v1/ai/status':
+    "shows only the caller's own state: the business comes from the session (tested in ai-usage)",
+  'GET /api/v1/ai/calls':
+    "shows only the caller's own calls: the business comes from the session (tested in ai-call-log)",
+  'GET /api/v1/platform/ai/keys':
+    "platform admins only, and it holds no business data: only the places of the platform's own keys (tested in platform-ai-keys)",
+  'GET /api/v1/platform/ai/models':
+    'platform admins only, and the list of models is the same for every business (tested in platform-ai-models)',
+  'GET /api/v1/ai/settings':
+    "shows only the caller's own settings: the business comes from the session (tested in ai-settings)",
+  'GET /api/v1/knowledge/unanswered': 'covered by the list check',
+  'GET /api/v1/knowledge/search': 'covered by the list check',
+  'GET /api/v1/me': 'covered by the list check',
+  'POST /api/v1/contacts':
+    "creates in the caller's business; the business comes from the session only (the body schema refuses an accountId)",
+  'POST /api/v1/pipeline/stages': "creates in the caller's business; same reason",
+  'PUT /api/v1/lost-reasons': "replaces the caller's own list; takes no ids",
+};
+
+/** METHOD and path for every route in the OpenAPI document, as "GET /api/v1/contacts/{id}". */
+async function readAllRoutes(): Promise<string[]> {
+  const response = await app.inject({ url: '/docs/json' });
+  expect(response.statusCode, response.body).toBe(200);
+  const document = response.json() as { paths: Record<string, Record<string, unknown>> };
+  const httpMethods = ['get', 'post', 'put', 'patch', 'delete'];
+  return Object.entries(document.paths).flatMap(([path, operations]) =>
+    Object.keys(operations)
+      .filter((method) => httpMethods.includes(method))
+      .map((method) => `${method.toUpperCase()} ${path}`),
+  );
+}
+
+describe('isolation: the register of routes', () => {
+  it('has a decision for every route in the API: an attempt by the other business, or an exemption with a reason', async () => {
+    const decided = new Set([...attempts.map((attempt) => attempt.route), ...Object.keys(exemptRoutes)]);
+    const undecided = (await readAllRoutes()).filter((route) => !decided.has(route));
+    expect(
+      undecided,
+      'A route was added without an isolation decision. Add an attempt for it in test/isolation.test.ts (what the OTHER ' +
+        'business tries, and what it must be told) or, if it holds no business data, an entry in exemptRoutes with the reason.',
+    ).toEqual([]);
+  });
+
+  it('does not list routes that no longer exist (so the register stays honest)', async () => {
+    const real = new Set(await readAllRoutes());
+    const stale = [...attempts.map((attempt) => attempt.route), ...Object.keys(exemptRoutes)].filter(
+      (route) => !real.has(route),
+    );
+    expect(stale).toEqual([]);
+  });
+
+  it('never exempts a route that takes an id of a business record in its address without an attempt', async () => {
+    // A path like /contacts/{id} names one business record, so it must have a real attempt, not an exemption
+    const exemptWithAnId = Object.keys(exemptRoutes).filter(
+      (route) => route.includes('{id}') && route !== 'PATCH /api/v1/modules/{id}',
+    );
+    expect(exemptWithAnId).toEqual([]);
+  });
+});
+
+describe('isolation: business B tries to reach business A', () => {
+  for (const attempt of attempts) {
+    it(`${attempt.route}: B tries to ${attempt.what} and is told ${attempt.expectedStatus}`, async () => {
+      const { method, url, payload } = attempt.request();
+      const response = await send(businessB, method, url, payload);
+      expect(response.statusCode, response.body).toBe(attempt.expectedStatus);
+      // Whatever the refusal says, it must not repeat A's words
+      expect(response.body).not.toContain(dataOfA.secretWords);
+    });
+  }
+
+  it("shows B none of A's ids or words in any list", async () => {
+    for (const list of listsBReads) {
+      const response = await send(businessB, 'GET', list.url);
+      expect(response.statusCode, `${list.url}: ${response.body}`).toBe(200);
+      const body = response.body;
+      for (const secret of [
+        dataOfA.contactId,
+        dataOfA.leadId,
+        dataOfA.ticketId,
+        dataOfA.stageId,
+        dataOfA.secretWords,
+        businessA.profile.business.id,
+      ]) {
+        expect(body, `${list.url} must not contain ${secret}`).not.toContain(secret);
+      }
+    }
+  });
+
+  it("leaves every one of A's records exactly as it was after all the attempts", async () => {
+    const contact = await sendOk(businessA, 'GET', `/contacts/${dataOfA.contactId}`);
+    expect(contact.name).toBe(`Alice ${dataOfA.secretWords}`);
+    const lead = await sendOk(businessA, 'GET', `/leads/${dataOfA.leadId}`);
+    expect(lead).toMatchObject({ interest: dataOfA.secretWords, stage: { name: 'New' } });
+    const ticket = await sendOk(businessA, 'GET', `/tickets/${dataOfA.ticketId}`);
+    expect(ticket).toMatchObject({ title: dataOfA.secretWords, status: 'open', ownerUserId: null, notes: [] });
+    const pipeline = await sendOk(businessA, 'GET', '/pipeline');
+    expect(pipeline.stages.map((stage: { id: string }) => stage.id)).toContain(dataOfA.stageId);
+    expect(pipeline.stages.find((stage: { id: string }) => stage.id === dataOfA.stageId).name).toBe(
+      `Stage ${dataOfA.secretWords}`,
+    );
+    const questions = await sendOk(businessA, 'GET', '/knowledge/questions');
+    const nameAnswer = questions.questions.find((question: { key: string }) => question.key === 'business_name').answer;
+    expect(nameAnswer.value).toBe(`Business ${dataOfA.secretWords}`);
+    const addressAnswer = questions.questions.find((question: { key: string }) => question.key === 'address').answer;
+    expect(addressAnswer).toMatchObject({ status: 'check', source: 'website' });
+    const situations = await sendOk(businessA, 'GET', '/knowledge/situations');
+    expect(situations.items.find((item: { key: string }) => item.key === 'discount_request').selectedChoiceKey).toBe(
+      'tell_current_offer',
+    );
+    expect(await sendOk(businessA, 'GET', '/knowledge/settings')).toEqual({
+      timeZone: 'Asia/Dubai',
+      defaultCountry: 'AE',
+      callbackPromiseMinutes: 15,
+    });
+    const offeringsOfA = await sendOk(businessA, 'GET', '/offerings');
+    expect(offeringsOfA.items).toHaveLength(1);
+    expect(offeringsOfA.items[0]).toMatchObject({
+      name: `Offering ${dataOfA.secretWords}`,
+      priceInWords: 'from ₹4,500 a night plus GST',
+    });
+    const offersOfA = await sendOk(businessA, 'GET', '/offers');
+    expect(offersOfA.items).toHaveLength(1);
+    expect(offersOfA.items[0].text).toBe(`Offer ${dataOfA.secretWords}`);
+    expect((await sendOk(businessA, 'GET', '/ai/settings')).keyMode).toBe('own_then_platform'); // B's change did not reach A
+    const keysOfA = await sendOk(businessA, 'GET', '/ai/keys');
+    expect(keysOfA.items).toHaveLength(1);
+    expect(keysOfA.items[0].label).toBe(`Key ${dataOfA.secretWords}`);
+    const rules = await sendOk(businessA, 'GET', '/assignment-rules');
+    expect(JSON.stringify(rules)).toContain(dataOfA.userId); // still A's own manager
+    // B's own records are untouched too
+    expect((await sendOk(businessB, 'GET', `/leads/${dataOfB.leadId}`)).contactId).toBe(dataOfB.contactId);
+  });
+
+  it('answers a signed-out caller 401 on every attempt', async () => {
+    for (const attempt of attempts) {
+      const { method, url, payload } = attempt.request();
+      const response = await send(null, method, url, payload);
+      expect(response.statusCode, `${attempt.route}: ${response.body}`).toBe(401);
+    }
+  });
+});
+
+describe('isolation: the database itself', () => {
+  it("shows a connection fenced to B none of A's rows in any table that has an account_id", async () => {
+    const tables = await sql<{ table_name: string }>`
+      select c.table_name
+      from information_schema.columns c
+      join information_schema.tables t
+        on t.table_schema = c.table_schema and t.table_name = c.table_name and t.table_type = 'BASE TABLE'
+      where c.table_schema = 'app' and c.column_name = 'account_id'
+      order by c.table_name`.execute(database.system);
+    expect(tables.rows.length).toBeGreaterThan(10);
+
+    const accountOfA = businessA.profile.business.id;
+    const rowsOfAThatBusinessBSees: Array<{ table: string; rows: number }> = [];
+    let tablesWhereAHasRows = 0;
+    for (const { table_name: tableName } of tables.rows) {
+      const countForA = (connection: Database['system']) =>
+        sql<{
+          total: number;
+        }>`select count(*)::int as total from app.${sql.id(tableName)} where account_id = ${accountOfA}`
+          .execute(connection)
+          .then((result) => result.rows[0]!.total);
+      const rowsOfA = await countForA(database.system);
+      if (rowsOfA > 0) tablesWhereAHasRows += 1;
+      const rowsSeenByB = await database.runInAccountTransaction(businessB.profile.business.id, countForA);
+      if (rowsSeenByB !== 0) rowsOfAThatBusinessBSees.push({ table: tableName, rows: rowsSeenByB });
+    }
+    expect(rowsOfAThatBusinessBSees).toEqual([]);
+    // The check means something only if A really has rows in many of those tables
+    expect(tablesWhereAHasRows).toBeGreaterThan(8);
+  });
+});

@@ -145,8 +145,8 @@ Besides endpoints, the AI agents use **tools**. These are listed at the end, wit
 | Method | Address | What it does | Who |
 | --- | --- | --- | --- |
 | PATCH | `/leads/{id}/temperature` | Set hot, warm or cold by hand | Staff |
-| GET | `/leads?filtered=true` | The Filtered list | Staff |
-| POST | `/leads/{id}/unfilter` | Move back onto the board | Staff |
+| GET | `/conversations?filtered=true` | The Filtered list (conversations, not leads: decision R76) | Staff |
+| POST | `/conversations/{id}/unfilter` | Move back onto the board (decision R76) | Staff |
 
 ### Views, filters and search
 
@@ -215,13 +215,16 @@ Besides endpoints, the AI agents use **tools**. These are listed at the end, wit
 | PATCH | `/knowledge/documents/{id}` | Use for answers or not, rename | Manager |
 | DELETE | `/knowledge/documents/{id}` | Delete (asks first) | Manager |
 | POST | `/knowledge/website/reread` | Read the website again and list what changed | Manager |
-| GET, POST | `/knowledge/faqs` | List, add | Staff, Manager |
-| PATCH, DELETE | `/knowledge/faqs/{id}` | Edit, delete | Manager |
-| GET | `/knowledge/unanswered` | Questions the AI couldn't answer, grouped, with counts | Manager |
-| POST | `/knowledge/unanswered/{id}/answer` | Answer; it becomes an FAQ | Manager |
-| POST | `/knowledge/unanswered/{id}/dismiss` | Ignore | Manager |
+| GET, POST | `/knowledge/faqs` | List, add. Anyone signed in may add (owner decision, 13 Nov 2026) | Staff |
+| PATCH, DELETE | `/knowledge/faqs/{id}` | Edit, delete | Staff |
+| GET | `/knowledge/unanswered` | Questions the AI couldn't answer, grouped, with counts; `?include=history` adds the answered and ignored ones | Staff |
+| GET | `/knowledge/search` | Try the search the AI uses: `?q=` (a customer's question) and `?limit=` (1 to 10); gives the matching FAQs with their source | Staff |
+| POST | `/knowledge/unanswered/{id}/answer` | Answer; it becomes an FAQ | Staff |
+| POST | `/knowledge/unanswered/{id}/dismiss` | Ignore | Staff |
 | GET | `/knowledge/conflicts` | "These don't match" warnings | Manager |
 | POST | `/knowledge/conflicts/{id}/resolve` | Pick the right value | Manager |
+
+*On hold (decision R47, 13 Nov 2026): the document routes (`/knowledge/documents*`), `/knowledge/website/reread` and the conflict routes (`/knowledge/conflicts*`) are not built in Phase 1 for now; the owner decides at the end of Phase 1 whether to build them.*
 
 ### How the AI agent behaves
 

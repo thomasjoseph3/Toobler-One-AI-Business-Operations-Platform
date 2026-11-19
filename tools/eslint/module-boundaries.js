@@ -32,7 +32,8 @@ function findModule(modulesRoot, somePath) {
   const kind = KIND_BY_FOLDER[parts[0]];
   if (!kind || parts.length < 2 || parts[1] === '') return null;
   return {
-    id: `${kind}.${parts[1]}`,
+    // A folder may use hyphens (`module-switches`); the module id uses underscores (`core.module_switches`)
+    id: `${kind}.${parts[1].replace(/-/g, '_')}`,
     folder: path.join(modulesRoot, parts[0], parts[1]),
     kind,
     innerPath: parts.slice(2).join('/'),

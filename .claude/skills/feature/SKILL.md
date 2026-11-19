@@ -43,6 +43,11 @@ All must pass; fix and re-run until they do. Never hand off with a red check.
 5. Check nothing was built for a later feature or phase.
 
 ## handoff
+0. **Write the Feature guide** at the top of the feature's file in `docs/features/` (a `## Feature guide` section above the build log;
+   F18's is the model). Plain English first, for the application's users: what it does, why it is useful, a day-in-the-life example, who
+   can do what, settings and limits, what it never does, what is not part of it. Then a clearly marked "For the tech team" part: module,
+   tables, routes, jobs, events, how it works inside, known limits. No jargon in the first part. If the feature changes an earlier
+   feature's behaviour, update that feature's guide too.
 1. Set the feature to `in_review` in STATUS.md.
 2. Reply to the owner with: what was built (short); **how to test it yourself** (numbered steps, logins, expected
    results, URLs); test counts; screenshot paths; differences from the requirements; known limits.

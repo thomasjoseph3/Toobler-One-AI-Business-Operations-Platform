@@ -11,6 +11,9 @@ export interface LivePrincipal {
   role: 'manager' | 'staff' | 'staff_own';
   sessionId: string;
   isPlatformAdmin: boolean;
+  industryId: string;
+  timeZone: string;
+  defaultCountry: string;
   emailVerified: boolean;
 }
 
@@ -23,12 +26,16 @@ export async function findLivePrincipal(db: Db, sessionId: string, userId: strin
   const row = await db
     .selectFrom('sessions')
     .innerJoin('users', 'users.id', 'sessions.user_id')
+    .innerJoin('accounts', 'accounts.id', 'users.account_id')
     .select([
       'users.account_id',
       'users.id as user_id',
       'users.role',
       'users.is_platform_admin',
       'users.email_verified_at',
+      'accounts.industry',
+      'accounts.time_zone',
+      'accounts.default_country',
       'sessions.id as session_id',
     ])
     .where('sessions.id', '=', sessionId)
@@ -44,6 +51,9 @@ export async function findLivePrincipal(db: Db, sessionId: string, userId: strin
     role: row.role,
     sessionId: row.session_id,
     isPlatformAdmin: row.is_platform_admin,
+    industryId: row.industry,
+    timeZone: row.time_zone,
+    defaultCountry: row.default_country,
     emailVerified: row.email_verified_at !== null,
   };
 }
@@ -56,6 +66,27 @@ export async function revokeSession(db: Db, sessionId: string, reason: string): 
     .where('id', '=', sessionId)
     .where('revoked_at', 'is', null)
     .execute();
+}
+
+/**
+ * Ends every live session of a person, on every device, with the reason. Pass `exceptSessionId` to keep one session (the
+ * device the person is using right now). Returns how many it ended.
+ */
+export async function revokeAllSessionsForUser(
+  db: Db,
+  userId: string,
+  reason: string,
+  exceptSessionId?: string,
+): Promise<number> {
+  const rows = await db
+    .updateTable('sessions')
+    .set({ revoked_at: sql`now()`, revoked_reason: reason })
+    .where('user_id', '=', userId)
+    .where('revoked_at', 'is', null)
+    .$if(exceptSessionId !== undefined, (query) => query.where('id', '<>', exceptSessionId as string))
+    .returning('id')
+    .execute();
+  return rows.length;
 }
 
 /** Opens a session. It ends `maxDays` from now at the latest. */

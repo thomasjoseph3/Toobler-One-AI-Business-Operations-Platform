@@ -44,6 +44,8 @@ the hotel agent's `api-security` rules, OWASP ASVS level 2 and India's DPDP Act 
 - One-time codes (WhatsApp sign-in, free check; **not in F01**: no OTP service yet, they arrive with F25): 6 digits, hashed, 10-minute expiry, 5 tries, then a 15-minute lock;
   send limits per phone (3 per 15 min) and per IP.
 - Lockout: 5 wrong passwords for an email → 15 minutes (requirement). Counted for every email typed, known or not, so a lockout never reveals whether an account exists (`login_attempts`). Per-address limits on the open routes and on resend-email are in `kernel/http/route-limits.ts`.
+- Password reset: the link is single-use, valid 1 hour, stored only as a hash; forgot-password answers the same for any email; resetting ends every session of the person, clears their lockout, and a refused (weak) password does not use up the link.
+- Changing a password while signed in needs the current password (5 tries per 10 minutes per address), ends the person's other sessions but not this one. `PATCH /me` accepts only name and mobile: any other field (email, role, business, admin flag) is refused.
 - CSRF: state-changing requests need a matching `Origin` (our web address only), a custom `X-Requested-With` style header
   that cross-site forms cannot send, and the SameSite cookie. The API's CORS allows only our own web addresses.
 - Invitations and password resets: single-use, 48 h / 1 h, hashed tokens.

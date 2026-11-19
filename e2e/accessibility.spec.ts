@@ -10,15 +10,17 @@ const KNOWN_CONTRAST_EXCEPTIONS = ['[aria-current="page"]', '.bg-action'];
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
 
-const pagesToCheck = [
+const pagesToCheck: { name: string; path: string; isSignedOut?: boolean }[] = [
   ...PAGES.map((pageEntry) => ({ name: pageEntry.label, path: pageEntry.path })),
+  { name: 'Sign in', path: '/sign-in', isSignedOut: true },
   { name: 'Not found', path: '/nothing-here' },
   { name: 'UI gallery', path: '/dev/ui' },
 ];
 
 for (const theme of ['light', 'dark'] as const) {
   for (const pageEntry of pagesToCheck) {
-    test(`${pageEntry.name} has no accessibility violations (${theme})`, async ({ page }) => {
+    test(`${pageEntry.name} has no accessibility violations (${theme})`, async ({ page, pretendApi }) => {
+      pretendApi.signedIn = !pageEntry.isSignedOut;
       await page.addInitScript((chosenTheme) => window.localStorage.setItem('toobler-theme', chosenTheme), theme);
       await page.goto(pageEntry.path);
       await expect(

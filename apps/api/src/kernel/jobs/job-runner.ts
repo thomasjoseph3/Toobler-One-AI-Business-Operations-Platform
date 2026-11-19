@@ -6,7 +6,7 @@ import { buildSslOptions } from '../database';
 import type { HealthCheck } from '../health';
 import { isUuid } from '../ids';
 import type { ModuleGate, Registry } from '../module-system/registry';
-import type { JobData, JobDefinition } from './jobs';
+import type { JobData, JobDefinition, JobServices } from './jobs';
 
 export interface JobRunnerOptions {
   /** Where pg-boss keeps its own tables. */
@@ -46,10 +46,14 @@ export function createJobRunner(dependencies: {
   registry: Registry;
   gate: ModuleGate;
   contextFor: ContextFactory;
+  /** The ids of every business (nothing else), for scheduled jobs that queue one job per business. */
+  listAccountIds: () => Promise<string[]>;
+  /** What jobs may use besides their business context: settings, database, mail and the AI layer. */
+  services: JobServices;
   logger: FastifyBaseLogger;
   options?: Partial<JobRunnerOptions>;
 }): JobRunner {
-  const { config, registry, gate, contextFor, logger } = dependencies;
+  const { config, registry, gate, contextFor, listAccountIds, services, logger } = dependencies;
   const options: JobRunnerOptions = { ...DEFAULT_OPTIONS, ...dependencies.options };
 
   const boss = new PgBoss({
@@ -74,7 +78,7 @@ export function createJobRunner(dependencies: {
 
   const enqueueJob = async (jobName: string, data: JobData): Promise<void> => {
     if (!declaredJobsByName.has(jobName)) throw new Error(`Job "${jobName}" is not declared by any module.`);
-    if (data.accountId !== undefined && !isUuid(data.accountId))
+    if (data?.accountId !== undefined && !isUuid(data.accountId))
       throw new Error(`Job "${jobName}" needs a valid accountId.`);
     await boss.send(jobName, data);
   };
@@ -82,7 +86,8 @@ export function createJobRunner(dependencies: {
   // Runs one declared job: skips it when its module is off for the business, otherwise gives it its context.
   const runDeclaredJob = async (jobName: string, data: JobData): Promise<void> => {
     const declared = declaredJobsByName.get(jobName)!;
-    const accountId = data.accountId;
+    // A cron-scheduled job arrives from pg-boss with no data at all (null), so read it carefully.
+    const accountId = data?.accountId;
     if (accountId !== undefined) {
       if (!isUuid(accountId)) throw new Error(`Job "${jobName}" has no valid accountId.`);
       if (!(await gate.isActive(accountId, declared.moduleId))) {
@@ -91,10 +96,14 @@ export function createJobRunner(dependencies: {
       }
     }
     await declared.definition.run({
-      data,
+      data: data ?? {},
       accountContext: accountId === undefined ? undefined : contextFor(accountId, { kind: 'system', id: jobName }),
       enqueueJob,
+      listAccountIds,
       logger,
+      services,
+      registry,
+      gate,
     });
   };
 

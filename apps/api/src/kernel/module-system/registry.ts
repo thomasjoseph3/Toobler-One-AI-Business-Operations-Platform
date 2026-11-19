@@ -108,14 +108,16 @@ export function createRegistry(moduleManifests: readonly ModuleManifest[]): Regi
 }
 
 /**
- * Whether a module is on for a business. Three switches in the end (entitled by the plan, enabled by the manager, ready
- * when connected): that arrives with F03. Until then only core modules are on.
+ * Whether a module is on for a business: entitled by the plan, enabled by the manager (and ready, for channels). The real
+ * gate is `createModuleGate` in the module-switches module; tests and the kernel can use `coreOnlyGate` below.
  */
 export interface ModuleGate {
   isActive(accountId: string, moduleId: string): Promise<boolean>;
+  /** Optional: a gate that remembers answers for a few seconds drops what it knows about a business after its modules change. */
+  forget?(accountId: string): void;
 }
 
-/** The temporary gate used until F03: a module is on for every business if it is a core module, otherwise off. */
+/** The simplest gate: a module is on for every business if it is a core module, otherwise off. Used where no database is wanted. */
 export const coreOnlyGate = (registry: Registry): ModuleGate => ({
   isActive: async (_accountId, moduleId) => registry.get(moduleId)?.kind === 'core',
 });

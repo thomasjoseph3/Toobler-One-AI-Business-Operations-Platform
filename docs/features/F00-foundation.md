@@ -3,6 +3,51 @@
 **Requirements:** `1-foundation/01-project-setup.md`; docs/ARCHITECTURE.md, BACKEND.md, FRONTEND.md, SECURITY.md, DEPENDENCIES.md; designer's Design System v1.0
 **Depends on:** nothing      **Module:** `core.health` (infrastructure, not a business feature)
 
+## Feature guide
+
+*Written for the people who use Toobler One and for the team that builds it. The first parts need no technical knowledge; the part marked "For the tech team" is for developers.*
+
+### What it does
+This is the groundwork everything else stands on. It is not something a customer or staff member sees as a "feature", but nothing else could be built safely without it. It gives Toobler One:
+- **A safe place for each business's data.** Every business's information is kept apart, so one business can never see another's.
+- **The basic app shell.** The menu (Today, Leads, Contacts, Companies, Inbox, Tasks, Tickets, Reports, Knowledge base, Channels, Settings), light and dark looks, and the designer's colours, fonts and building blocks. On a computer the menu is on the side; on a phone it is at the bottom.
+- **A health check** that says whether the system is running.
+- **The rules and checks** that keep the code tidy and safe: automatic tests, a style checker, and a rule that features are built one at a time.
+
+### Why it is useful
+- **Trust.** A small business can put customer details into the system knowing they are kept separate from every other business.
+- **Speed later.** Every later feature (contacts, leads, the AI agent) reuses the same building blocks, so they look and behave the same.
+- **Safety for the team.** Mistakes such as one business seeing another's data, or a secret ending up in a log, are caught by automatic checks before they reach anyone.
+
+### What you can try
+Open the app: every menu item has its own page with an empty state that explains what will appear there. Press the round button at the top right to switch between System, Light and Dark. On a phone-sized window, the menu moves to the bottom. Open `/dev/ui` (development only) to see every building block in both looks.
+
+### What it will never do
+- Show one business's data to another.
+- Write passwords, tokens or personal details into the logs.
+- Start in production with a missing or weak secret.
+
+### Not part of this feature
+Accounts and sign-in (F01), the module switches (F03), and any business data such as contacts or leads.
+
+### For the tech team
+- **Monorepo:** `apps/api` (Fastify 5, TypeScript, Kysely on `pg`, pg-boss for jobs), `apps/web` (React staff app), `packages/ui` (design tokens and components), `packages/shared` (shapes shared by API and web, written with zod).
+- **The account fence:** every business query runs through `runInAccountTransaction`, which sets the role `app_user` (no `BYPASSRLS`) and the account **inside each transaction** (`SET LOCAL ROLE`, `set_config(..., true)`), so no state leaks between pooled connections. Every business table has `account_id` with forced row-level security (`app.enable_tenant_rls`). Tables from migration `001_kernel.sql`: `domain_events` (the outbox) and `activity_log` (append only).
+- **Modules:** every part of the system is a module with a manifest (`module.ts`). Layers are `routes/` → `services/` → `repositories/` → database, enforced by lint rules and `module-structure.test.ts`. Core never imports engines, channels or features; modules talk through `index.ts` and events.
+- **Events and jobs:** changes publish events into the outbox, delivered at least once to the modules that listen; scheduled and queued jobs run through pg-boss with retries.
+- **Errors and logs:** one error shape `{ error: { code, message, details? } }`; one JSON log line per request with a request id, never a query string, body or header; a redaction list for sensitive fields.
+- **Config:** validated with zod; production refuses to start on a missing or weak secret.
+- **Checks:** `npm run verify` runs the one-feature gate, formatting, lint, types, unit and API tests, and browser tests. Tests use the local Docker database, never the Supabase one.
+- **Health:** `GET /api/v1/health` (public, rate-limited) answers when the database responds and the job runner's heartbeat is fresh; otherwise 503.
+
+### Known limits
+- Delivered events are never deleted yet (a clean-up and alerts belong to F35).
+- The job heartbeat assumes one app instance.
+- Hosting is undecided (R14); the staff app and API are designed to be served from one address.
+- The menu is a fixed list until F03 makes it data from `/me`.
+
+---
+
 ## Scope
 - In: monorepo and tooling; API kernel (config, logging, errors, database with the account fence, module registry and
   guard, event outbox, job runner, health); first migration; lint rules for the layers and module boundaries; test

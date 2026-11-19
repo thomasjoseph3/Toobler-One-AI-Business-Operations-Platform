@@ -1,7 +1,61 @@
 import type { ModuleManifest } from '../kernel/module-system/define';
 import auth from './core/auth/module';
+import contacts from './core/contacts/module';
 import health from './core/health/module';
+import leads from './core/leads/module';
+import tickets from './core/tickets/module';
+import activities from './core/activities/module';
+import tasks from './core/tasks/module';
+import companies from './core/companies/module';
+import fields from './core/fields/module';
+import search from './core/search/module';
+import views from './core/views/module';
+import lists from './core/lists/module';
+import imports from './core/imports/module';
+import exportsModule from './core/exports/module';
+import duplicates from './core/duplicates/module';
+import conversations from './core/conversations/module';
+import liveUpdates from './core/live-updates/module';
+import knowledge from './core/knowledge/module';
+import offerings from './core/offerings/module';
 import industries from './core/industries/module';
+import ai from './core/ai/module';
+import agents from './core/agents/module';
+import setup from './core/setup/module';
+import today from './core/today/module';
+import webchat from './channels/webchat/module';
+import whatsapp from './channels/whatsapp/module';
+import email from './channels/email/module';
+import accountModules from './core/module-switches/module';
 
 // Every module in the product. Adding a module = one line here (see the plug-in-module skill).
-export const modules: readonly ModuleManifest[] = [health, industries, auth];
+export const modules: readonly ModuleManifest[] = [
+  health,
+  industries,
+  accountModules,
+  auth,
+  contacts,
+  leads,
+  tickets,
+  activities,
+  tasks,
+  companies,
+  fields,
+  search,
+  views,
+  lists,
+  imports,
+  exportsModule,
+  duplicates,
+  conversations,
+  liveUpdates,
+  knowledge,
+  offerings,
+  ai,
+  agents,
+  setup,
+  today,
+  webchat,
+  whatsapp,
+  email,
+];

@@ -148,7 +148,9 @@ channel-agnostic (see [REQUIREMENTS-REVIEW.md](REQUIREMENTS-REVIEW.md)).
 ```text
 agents/
   runtime/     prompt builder (business profile + types + playbook + industry words), model calls, the tool loop,
-               summaries, final classification
+               summaries. (Final classification is NOT here: it is a one-shot call that needs the business's types and the
+               router, so it lives in `core.conversations` (helpers/classifier-prompt.ts, services/conversation-classifier.service.ts).
+               The runtime starts it when a conversation ends, through that module's index.ts. See R58.)
   tools/       every tool defined once: zod input schema, effect (reads | writes | sends | ticket), module owner
   languages/   voice only: detection, language lock, number words (Malayalam, Hindi, English). Text agents are English only.
   voice/       live phone sessions (Gemini Live)
@@ -158,8 +160,8 @@ agents/
   setup/       the setup chat
 ```
 
-- **The model is behind an interface** (`LlmProvider`: `generate`, `generateObject`, `stream`), so Gemini or Claude
-  is a setting per task, chosen by evals. Tests use a scripted fake provider, so unit and API tests never call a model.
+- **The model is behind an interface** (`LlmProvider`: `generateText`, `generateObject`, `generateWithTools`; all in `providers/llm`, reached through `core.ai`'s `createAiService`), so Gemini, OpenAI or Claude
+  is a setting per task, chosen by evals. The model layer is LangChain; the tool loop is LangGraph's core graph API (R49, R61). Tests use a scripted fake provider, so unit and API tests never call a model.
 - **Tool identity comes from the server, never the model.** The runtime calls a tool with a `ToolContext`
   (`accountId`, `conversationId`, `contactId`, `channel`) that it built itself; the model only supplies the
   arguments, which are validated like a form.
@@ -175,7 +177,8 @@ Phase 1 tools (from the requirements, with the conversation-types change):
 | `get_business_info`, `list_offerings`, `search_knowledge` | core.knowledge | reads |
 | `log_unanswered_question` | core.knowledge | writes |
 | `set_conversation_type` | core.conversations | writes (live type, playbook switch, urgent alerts) |
-| `save_details` (requirement name `save_lead`) | core.conversations | writes facts to the conversation; the router makes the contact, lead or ticket |
+| `save_details` (requirement name `save_lead`) | core.conversations | writes facts to the conversation (including `askedPrice` and dates, which score the lead after the conversation); the router makes the contact, lead or ticket |
+| `save_custom_answers` | core.agents (only when the business has "AI should ask" fields) | writes the customer's answers for the business's own contact and lead fields to the conversation; added to the records after it |
 | `request_human_callback` | core.tickets | ticket |
 | `send_details_whatsapp` | channel.whatsapp | sends |
 | `transfer_call`, `end_call` | channel.phone | call control |
@@ -284,7 +287,7 @@ The same recipe works for service (tickets pipeline, portal), marketing (consent
 | DB access | `pg` + Kysely (typed SQL builder, not an ORM), raw `.sql` migrations | Typed queries, SQL stays visible, repository pattern stays simple |
 | Validation | zod 4, shared in `packages/shared` | One schema for API, forms and agent tools |
 | Jobs | pg-boss | Postgres only, survives restarts, cron + retries |
-| AI | Vercel AI SDK (provider-agnostic: Gemini, Claude), `@google/genai` for Gemini Live voice | Swap models by evals, structured output, tool calling |
+| AI | LangChain + LangGraph behind `core.ai` (decided 13 Nov 2026, R49; the Vercel AI SDK idea of R22 was not used), `@google/genai` for Gemini Live voice | Swap models by evals, structured output, tool calling |
 | Staff app, site | React 19 + Vite, react-router, Tailwind 4, lucide icons, dnd-kit (board) | Owner's choice: React only, no Next.js. Single-page apps suit logged-in dashboards. |
 | Live updates | Server-sent events | Requirements |
 | Tests | Vitest (unit + API against a throwaway Postgres in Docker), Playwright (click-through), evals | Requirements |

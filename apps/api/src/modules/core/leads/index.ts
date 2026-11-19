@@ -1,0 +1,29 @@
+// The public face of the leads module: the only file other modules may import from it.
+// Sign-up uses it to give a new business its starting pipeline.
+export { createDefaultPipelineSetup } from './services/default-setup.service';
+// The conversation engine gives a new enquiry to the right lead (a new one, the open one, or a recently lost one reopened).
+export { applyLeadFromConversation } from './services/lead-from-conversation.service';
+export type { ConversationChannelForLead, LeadFromConversationResult } from './services/lead-from-conversation.service';
+// The setup wizard gives a business its industry's stage names through the pipeline service.
+export { createPipelineService } from './services/pipeline.service';
+// A staff correction ("this was not a sale") takes the lead off the board without deleting it.
+export { closeLeadAsReclassified } from './services/lead-reclassify.service';
+export { DEFAULT_STAGES } from './helpers/default-pipeline';
+// The notes module (F07) checks a lead exists, and is the person's to see, before it saves a note on it.
+export { findLeadReference, findVisibleLeadIds } from './services/lead-reference.service';
+export type { LeadReference } from './services/lead-reference.service';
+// The companies module (F05) adds up the open and won leads of a company's people and lists them on the company page.
+export { findLeadsOfContacts, findLeadTotalsForContacts } from './services/lead-totals.service';
+export type { ContactLeadTotals, LeadListEntry } from './services/lead-totals.service';
+// The agents module adds what the AI heard for the business's own lead fields to the lead.
+export { addCustomAnswersToLeadWhereEmpty } from './services/lead-custom-answers.service';
+// The agents module gives a lead what its conversation taught us, and the lead is scored by the fixed rules.
+export { scoreLeadFromConversation } from './services/lead-scoring.service';
+export type { ConversationFactsForScoring } from './services/lead-scoring.service';
+// The exports module (F12) writes the leads a list shows as a CSV file.
+export { findLeadsForExport } from './services/leads.service';
+// The duplicates module (F13) moves a merged-away contact's leads to the kept contact, and checks that both do not have an open lead.
+export { moveLeadsToContact, contactHasOpenLead } from './services/contact-merge.service';
+// The Today module (F22) reads the leads that feed its sections (open, or created/closed this week).
+export { findLeadsForToday } from './services/lead-today.service';
+export type { LeadForTodayRow } from './services/lead-today.service';

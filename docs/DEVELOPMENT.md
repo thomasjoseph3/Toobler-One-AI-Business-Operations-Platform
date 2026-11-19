@@ -129,7 +129,7 @@ Migration NNN: tables, columns, indexes, RLS.
 | `npm run setup` | Install, create `.env` files from examples, start the Docker test database and Mailpit |
 | `npm run dev` | API, worker, staff app, public site (and MCP once built) |
 | `npm run db:migrate` | Apply migrations to `DATABASE_URL` |
-| `npm run db:seed:local` | Local demo data, **refuses** to run against a non-local database |
+| `npm run db:seed:demo` | One demo business ("Demo: Nair Stays", login `manager@demo.toobler.example`) with contacts, leads in every stage, tickets, offerings and FAQs, added through the app's own routes. Safe to run again (adds only what is missing). **Refuses** a database that is not on this computer unless you add `-- --allow-remote` on purpose (owner allowed this for the current development database on 13 Nov 2026, until a separate development database exists) |
 | `npm test` | Unit + API tests on the throwaway database |
 | `npm run e2e` | Playwright at phone and desktop sizes |
 | `npm run eval:agent`, `npm run eval:types` | Agent and classification evals (real model, needs keys) |

@@ -27,6 +27,11 @@ const EnvironmentVariablesSchema = z.object({
   TRUST_PROXY: z.string().default('loopback'),
   WEB_URL: z.url().default('http://localhost:3000'),
   PUBLIC_BASE_URL: z.url().default('http://localhost:4000'),
+  // Development only: the address the API docs page (/docs) runs on. Requests from it are allowed to change data so
+  // "Try it out" works. Ignored outside development, and production refuses to start when it is set.
+  // Where the built website-chat files are (the apps/site build). Empty means the build next to the API in this repository.
+  WIDGET_FILES_DIRECTORY: z.preprocess((value) => (value === '' ? undefined : value), z.string().optional()),
+  API_DOCS_ORIGIN: z.preprocess((value) => (value === '' ? undefined : value), z.url().optional()),
   // Sign-in. The secret signs the access tokens: at least 32 characters, only ever in the environment, never shared.
   JWT_SECRET: z
     .string({ error: 'JWT_SECRET is missing. Run `npm run setup`, which adds a random one to .env.' })
@@ -49,6 +54,26 @@ const EnvironmentVariablesSchema = z.object({
   SMTP_PASS: z.string().default(''),
   // The "From" line of every email, like: Toobler One <no-reply@yourdomain.com>
   EMAIL_FROM: z.string().default(''),
+  // The platform's own AI keys, used for demos. Each may hold several keys separated by commas; a provider with no key is
+  // simply not available. (GEMINI_API_KEY, with one key, is still read.) Never logged, never shown.
+  GEMINI_API_KEYS: z.string().default(''),
+  GEMINI_API_KEY: z.string().default(''),
+  OPEN_AI_API_KEY: z.string().default(''),
+  CLAUDE_API_KEY: z.string().default(''),
+  // Scrambles the AI keys that businesses save (AES-256-GCM): 32 random bytes written in base64. `npm run setup` adds one. Lose it and
+  // every saved business key becomes unreadable (the keys would have to be entered again). Never log it, never share it.
+  SECRETS_ENCRYPTION_KEY: z.string().default(''),
+  // Google Places (New) API key, used by the setup wizard to read a business's Google listing. Empty switches that off (the owner types the answers instead).
+  GOOGLE_PLACES_API_KEY: z.string().default(''),
+  // WhatsApp (Meta). The app secret signs every message Meta sends to us (we refuse anything that is not signed with it); the verify token is
+  // what Meta sends once when the webhook address is set up. Both belong to the platform's Meta app, never to a business. Empty switches the
+  // WhatsApp webhook off (it answers 404).
+  WHATSAPP_APP_SECRET: z.string().default(''),
+  WHATSAPP_VERIFY_TOKEN: z.string().default(''),
+  // How long a WhatsApp or email conversation must be quiet before it counts as ended (then it is sorted: this is when the contact and the
+  // lead are made). Short values let testers see a lead within minutes; real customers need longer ones.
+  WHATSAPP_IDLE_MINUTES: z.coerce.number().int().min(1).max(10080).default(30),
+  EMAIL_IDLE_MINUTES: z.coerce.number().int().min(1).max(10080).default(120),
 });
 
 export interface Config {
@@ -60,15 +85,48 @@ export interface Config {
   trustProxy: boolean | string | string[];
   webUrl: string;
   publicBaseUrl: string;
+  /** The address of the API docs page (development only). Null everywhere else: the docs page does not exist there. */
+  docsOrigin: string | null;
+  /** Where the built website-chat files are, or null for the build next to the API in this repository. */
+  widgetFilesDirectory: string | null;
   auth: { jwtSecret: string; accessTokenMinutes: number; sessionMaxDays: number; sessionIdleDays: number };
   mail: {
     provider: 'smtp' | 'console';
     from: string;
     smtp: { host: string; port: number; user: string; password: string };
   };
+  /** The platform's own AI keys per provider (possibly none). The values are secrets: never log or return them. */
+  ai: { platformKeys: { gemini: string[]; openai: string[]; anthropic: string[] } };
+  /** The server's secret for scrambling saved keys, or null when none is set (then saving a key answers 503). */
+  secrets: { encryptionKey: Buffer | null };
+  /** The Google Places key for reading a business's Google listing, or null when it is not switched on. A secret: never log or return it. */
+  googlePlaces: { apiKey: string | null };
+  /** The platform's Meta app: the secret that signs incoming messages and the token Meta uses to verify the webhook address. Null when not set. Secrets: never log or return them. */
+  whatsapp: { appSecret: string | null; verifyToken: string | null };
+  /** Minutes of quiet after which a WhatsApp or email conversation ends and is sorted into a lead, ticket or nothing. */
+  channelIdleMinutes: { whatsapp: number; email: number };
 }
 
 export class ConfigError extends Error {}
+
+/** Turns "keyA, keyB,,keyA" into ["keyA", "keyB"]: split on commas, trimmed, no blanks, no repeats. */
+function parseKeyList(...rawValues: string[]): string[] {
+  const keys = rawValues.flatMap((rawValue) => rawValue.split(',')).map((key) => key.trim());
+  return [...new Set(keys.filter((key) => key !== ''))];
+}
+
+/** Turns the SECRETS_ENCRYPTION_KEY setting into 32 bytes, or null when it is empty. Throws a ConfigError when it is the wrong size. */
+function parseEncryptionKey(rawValue: string): Buffer | null {
+  if (rawValue.trim() === '') return null;
+  const keyBytes = Buffer.from(rawValue.trim(), 'base64');
+  if (keyBytes.length !== 32) {
+    // The value itself is never repeated in the message
+    throw new ConfigError(
+      'Bad configuration:\n  SECRETS_ENCRYPTION_KEY must be 32 random bytes written in base64 (npm run setup makes one)',
+    );
+  }
+  return keyBytes;
+}
 
 /** Turns the TRUST_PROXY setting into what Fastify expects: false, a single address, or a list of addresses. */
 function parseTrustProxy(rawValue: string): boolean | string | string[] {
@@ -106,6 +164,11 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
     trustProxy: parseTrustProxy(validEnvironment.TRUST_PROXY),
     webUrl: validEnvironment.WEB_URL.replace(/\/$/, ''),
     publicBaseUrl: validEnvironment.PUBLIC_BASE_URL.replace(/\/$/, ''),
+    widgetFilesDirectory: validEnvironment.WIDGET_FILES_DIRECTORY ?? null,
+    docsOrigin:
+      validEnvironment.NODE_ENV === 'development'
+        ? (validEnvironment.API_DOCS_ORIGIN ?? 'http://localhost:4000').replace(/\/$/, '')
+        : null,
     auth: {
       jwtSecret: validEnvironment.JWT_SECRET,
       accessTokenMinutes: validEnvironment.ACCESS_TOKEN_MINUTES,
@@ -122,16 +185,41 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
         password: validEnvironment.SMTP_PASS,
       },
     },
+    ai: {
+      platformKeys: {
+        gemini: parseKeyList(validEnvironment.GEMINI_API_KEYS, validEnvironment.GEMINI_API_KEY),
+        openai: parseKeyList(validEnvironment.OPEN_AI_API_KEY),
+        anthropic: parseKeyList(validEnvironment.CLAUDE_API_KEY),
+      },
+    },
+    secrets: { encryptionKey: parseEncryptionKey(validEnvironment.SECRETS_ENCRYPTION_KEY) },
+    googlePlaces: { apiKey: validEnvironment.GOOGLE_PLACES_API_KEY.trim() || null },
+    whatsapp: {
+      appSecret: validEnvironment.WHATSAPP_APP_SECRET.trim() || null,
+      verifyToken: validEnvironment.WHATSAPP_VERIFY_TOKEN.trim() || null,
+    },
+    channelIdleMinutes: {
+      whatsapp: validEnvironment.WHATSAPP_IDLE_MINUTES,
+      email: validEnvironment.EMAIL_IDLE_MINUTES,
+    },
   };
   if (config.mail.provider === 'smtp' && (!config.mail.smtp.host || !config.mail.from)) {
     throw new ConfigError('Bad configuration:\n  MAIL_PROVIDER=smtp needs SMTP_HOST and EMAIL_FROM to be set');
   }
   if (config.env === 'production') {
     const unsafeSettings: string[] = [];
+    if (validEnvironment.API_DOCS_ORIGIN) {
+      unsafeSettings.push('API_DOCS_ORIGIN must not be set in production (it opens the API docs page to changes)');
+    }
     if (config.db.ssl === 'off') unsafeSettings.push('DATABASE_SSL must be require or verify in production');
     if (!config.publicBaseUrl.startsWith('https://'))
       unsafeSettings.push('PUBLIC_BASE_URL must be https in production');
     if (!config.webUrl.startsWith('https://')) unsafeSettings.push('WEB_URL must be https in production');
+    if (!config.secrets.encryptionKey) {
+      unsafeSettings.push(
+        'SECRETS_ENCRYPTION_KEY must be set in production (it scrambles the AI keys businesses save)',
+      );
+    }
     if (config.mail.provider === 'console') {
       unsafeSettings.push('MAIL_PROVIDER must be smtp in production (console would print working links in the log)');
     }

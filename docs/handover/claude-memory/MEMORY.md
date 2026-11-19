@@ -1,0 +1,41 @@
+- [Feature gate workflow](feature-gate-workflow.md) — one feature at a time, manual test, wait for owner approval
+- [Lead engine rebuild](lead-engine-rebuild.md) — product context, Phase 1 scope, DB/env cautions, where decisions live
+- [Git repo and branches](git-repo-and-branches.md) — GitHub URL; main = production, dev = development
+- [Readable code naming](readable-code-naming.md) — full descriptive names and comments, owner is learning TypeScript
+- [Future AWS RDS](future-aws-postgres.md) — later move from Supabase to RDS, app on EC2
+- [Small API slices](small-api-slices.md) — max 2 routes at a time, explain every file, owner verifies each slice
+- [Voice uses business's own keys](voice-uses-business-own-keys.md) — web call/voice/WhatsApp run on each business's own encrypted keys, decided 2026-11-11
+- [Ask before committing](ask-before-committing.md) — commit only when the owner says 'commit' (one per slice); push and merge need their own word
+- [Plan, then go](plan-then-go.md) — short plan, ask only unclear decisions, then build; 'continue' moves to the next slice
+- [Postman MCP and collections](postman-mcp-and-collections.md) — Postman MCP connected; where the Toobler One collections and environment are; tools cannot send requests
+- [Known limits watchlist](known-limits-watchlist.md) — owner wants limits R39-R45 and the later-notes R51-R54 tracked; re-check at every feature start and hand-off
+- [Test scope per slice](test-scope-per-slice.md) — only relevant tests per slice; full suite once per feature hand-off
+- [Don't over-engineer](dont-overengineer-means-no-extra-complexity.md) — means no unnecessary complexity, never skip proper errors, validation, security, tests, optimisation
+- [Feature guides](feature-guides-in-feature-files.md) — every docs/features file starts with a plain-English Feature guide (rule in CLAUDE.md); all backfilled 13 Nov 2026
+- [F37 batched slices](f37-batched-slices-permission.md) — owner allowed all F37 slices before one hand-off (only F37); AI design decisions; F15/F19 use createAiService
+- [Backend names stay exact](backend-names-stay-exact.md) — never rename/map API names to match UI without telling owner first
+- [Dev DB demo data allowed](dev-database-demo-data-allowed.md) — owner OK’d demo seed in current DATABASE_URL (13 Nov 2026) and said I may run it myself; ends when a separate dev DB exists
+- [Dev DB ok to use](dev-database-ok-to-use.md) — owner allows ordinary reads/writes in the Supabase dev DB through repo commands (13 Nov 2026)
+- [UI rebuild v1.3](ui-rebuild-v1-3.md) — branch, Figma file, slices 1-9 done, conventions, what is left
+- [Ask when unclear](ask-when-unclear.md) — ask the owner (with a recommendation, plain words) whenever data or design is missing
+- [Measure before optimising](measure-before-optimising.md) — report measured re-renders, bundle and API timing; change only what shows
+- [F15 conversation types](f15-conversation-types.md) — branch, slices built, decisions R56-R60, how to try it (simulate script, Postman folders 9-10)
+- [F19 AI agent (text)](f19-ai-agent-text.md) — approved 16 Nov 2026 (branch not merged yet); routes, decisions R61/R62, eval command, what waits for F20
+- [Check old project, plug and play](check-old-project-and-plug-and-play.md) — read all the hotel agent code for an area; channels must plug in through manifest hooks
+- [Never kill unknown processes](never-kill-unknown-processes-or-take-fixed-ports.md) — owner runs other apps (port 3100); check before killing, ask first, use unusual test ports
+- [F20 website chat](f20-website-chat.md) — in_review 16 Nov 2026; slices committed, slice 5 uncommitted; how to test, ports, leftover test business
+- [UI catch-up before backend](ui-catchup-before-backend.md) — block C1-C11: C1-C7 built+committed (17 Nov 2026), next C8 Contacts; F31 paused after slice 4; how each slice is built
+- [F31 setup wizard](f31-setup-wizard.md) — slices 1-4 built+committed, slice 5 setup chat paused; routes, decisions, what is untested
+- [C8 Contacts](c8-contacts.md) — slice 1 (list + add) built 17 Nov 2026, waiting for check; token-cap slice built
+- [Autonomous slices](autonomous-slices-phase-one.md) — 17 Nov 2026: finish Phase 1 without waiting; 2 APIs per slice, test, verify, commit locally, next
+- [F07 notes and timeline](f07-notes-and-timeline.md) — 17 Nov 2026: all 4 slices done (b08600e), F08 tasks next; how to run tests/ports, Figma limit
+- [F08 tasks and reminders](f08-tasks-and-reminders.md) — 17 Nov 2026: slices 1-4 done+approved (standing instruction), AI-promise-to-task open, F02 next
+- [F02 team and roles](f02-team-and-roles.md) — 18 Nov 2026: 7 slices built (invitations, accept, roles, remove+hand-over, teams, activity log), R70-R73, next F05
+- [F05 companies](f05-companies.md) — 18 Nov 2026: 4 slices done+approved, R74 gap (AI facts → records), next F09
+- [F09 custom fields](f09-custom-fields.md) — approved 18 Nov 2026, all 5 slices done (a1b2554); F10 next
+- [F10 scoring + Filtered tab](f10-lead-scoring-filtered.md) — approved 18 Nov 2026; origin is now the office repo (toobler-tone); F11 next
+- [F11 + F12 state](f11-f12-views-lists-import-export.md) — F11 approved, F12 approved; branch, packages, next is F13, 16 features left
+- [Feature as one unit](feature-as-one-unit.md) — 18 Nov 2026: no 2-route slice limit any more; one feature = one unit with all tests
+- [F13 duplicates and merging](f13-duplicates-and-merging.md) — approved 18 Nov 2026 (85906b0); R79; F21 inbox next
+- [F29 web call first, Twilio later](f29-web-call-first-twilio-later.md) — web call now; phone code written but unconnected; port WhatsApp/email from hotel agent
+- [F21 inbox and takeover](f21-inbox-and-takeover.md) — approved 18 Nov 2026; R80; next F22; handover in docs/HANDOVER.md

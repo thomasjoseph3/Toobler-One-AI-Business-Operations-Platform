@@ -1,0 +1,22 @@
+{
+  "name": "@toobler-one/site",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "What visitors see on a business's own website: the chat window (React, shown in an iframe) and the tiny loader that adds the chat bubble to the page.",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@toobler-one/shared": "*",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "vite": "8.3.5"
+  }
+}

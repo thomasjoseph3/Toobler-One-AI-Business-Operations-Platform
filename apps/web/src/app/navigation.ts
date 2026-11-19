@@ -1,17 +1,16 @@
+import { BookOpen, ListChecks, Plug } from 'lucide-react';
 import {
-  BookOpen,
-  Building2,
-  CalendarCheck,
-  ChartColumn,
-  Inbox,
-  ListChecks,
-  Plug,
-  Settings,
-  Target,
-  Ticket,
-  Users,
-  type LucideIcon,
-} from 'lucide-react';
+  CompaniesIcon,
+  ContactsIcon,
+  LeadsIcon,
+  ReportsIcon,
+  SettingsIcon,
+  SharedInboxIcon,
+  TasksIcon,
+  TicketsIcon,
+  TodayIcon,
+} from '@toobler-one/ui';
+import type { ComponentType } from 'react';
 import type { MessageKey, PageId } from './i18n';
 
 /**
@@ -24,10 +23,16 @@ export interface NavigationItem {
   /** One line shown under the page title. */
   descriptionKey: MessageKey;
   path: string;
-  icon: LucideIcon;
-  group: 'work' | 'insight' | 'admin';
+  /** Icons come from the designer's Figma frame; Knowledge base and Channels have none yet, so they keep a Lucide icon. */
+  icon: ComponentType<{ className?: string }>;
+  group: 'workspace' | 'crm' | 'aiAndCommunication' | 'footer';
   /** Phone: the four most-used pages sit in the bottom bar; everything else is under "More". */
   isInBottomBar: boolean;
+  /**
+   * True for a page that has a route and a title but no place in the menus: the sidebar has no room for more (the designer's frame fits a
+   * 640 px window exactly), so the page is reached from where it is needed (the Today card, the business profile).
+   */
+  isHiddenFromMenu?: boolean;
 }
 
 export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
@@ -36,17 +41,27 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.today',
     descriptionKey: 'page.today.description',
     path: '/',
-    icon: CalendarCheck,
-    group: 'work',
+    icon: TodayIcon,
+    group: 'workspace',
     isInBottomBar: true,
+  },
+  {
+    id: 'setup',
+    labelKey: 'nav.setup',
+    descriptionKey: 'page.setup.description',
+    path: '/setup',
+    icon: ListChecks,
+    group: 'workspace',
+    isInBottomBar: false,
+    isHiddenFromMenu: true,
   },
   {
     id: 'leads',
     labelKey: 'nav.leads',
     descriptionKey: 'page.leads.description',
     path: '/leads',
-    icon: Target,
-    group: 'work',
+    icon: LeadsIcon,
+    group: 'crm',
     isInBottomBar: true,
   },
   {
@@ -54,8 +69,8 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.contacts',
     descriptionKey: 'page.contacts.description',
     path: '/contacts',
-    icon: Users,
-    group: 'work',
+    icon: ContactsIcon,
+    group: 'crm',
     isInBottomBar: false,
   },
   {
@@ -63,8 +78,8 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.companies',
     descriptionKey: 'page.companies.description',
     path: '/companies',
-    icon: Building2,
-    group: 'work',
+    icon: CompaniesIcon,
+    group: 'crm',
     isInBottomBar: false,
   },
   {
@@ -72,8 +87,8 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.inbox',
     descriptionKey: 'page.inbox.description',
     path: '/inbox',
-    icon: Inbox,
-    group: 'work',
+    icon: SharedInboxIcon,
+    group: 'crm',
     isInBottomBar: true,
   },
   {
@@ -81,8 +96,8 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.tasks',
     descriptionKey: 'page.tasks.description',
     path: '/tasks',
-    icon: ListChecks,
-    group: 'work',
+    icon: TasksIcon,
+    group: 'crm',
     isInBottomBar: true,
   },
   {
@@ -90,8 +105,8 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.tickets',
     descriptionKey: 'page.tickets.description',
     path: '/tickets',
-    icon: Ticket,
-    group: 'work',
+    icon: TicketsIcon,
+    group: 'crm',
     isInBottomBar: false,
   },
   {
@@ -99,8 +114,8 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.reports',
     descriptionKey: 'page.reports.description',
     path: '/reports',
-    icon: ChartColumn,
-    group: 'insight',
+    icon: ReportsIcon,
+    group: 'workspace',
     isInBottomBar: false,
   },
   {
@@ -109,7 +124,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     descriptionKey: 'page.knowledge.description',
     path: '/knowledge',
     icon: BookOpen,
-    group: 'insight',
+    group: 'aiAndCommunication',
     isInBottomBar: false,
   },
   {
@@ -118,7 +133,7 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     descriptionKey: 'page.channels.description',
     path: '/channels',
     icon: Plug,
-    group: 'admin',
+    group: 'aiAndCommunication',
     isInBottomBar: false,
   },
   {
@@ -126,15 +141,16 @@ export const NAVIGATION_ITEMS: readonly NavigationItem[] = [
     labelKey: 'nav.settings',
     descriptionKey: 'page.settings.description',
     path: '/settings',
-    icon: Settings,
-    group: 'admin',
+    icon: SettingsIcon,
+    group: 'footer',
     isInBottomBar: false,
   },
 ];
 
-/** The menu groups in the order they appear in the side rail, with their heading text. */
-export const NAVIGATION_GROUPS: readonly { id: NavigationItem['group']; labelKey: MessageKey }[] = [
-  { id: 'work', labelKey: 'nav.group.work' },
-  { id: 'insight', labelKey: 'nav.group.insight' },
-  { id: 'admin', labelKey: 'nav.group.admin' },
+/** The menu groups in the order they appear in the sidebar. A group without a heading (Workspace) shows no label; the footer group sits at the bottom. */
+export const NAVIGATION_GROUPS: readonly { id: NavigationItem['group']; labelKey?: MessageKey }[] = [
+  { id: 'workspace' },
+  { id: 'crm', labelKey: 'nav.group.crm' },
+  { id: 'aiAndCommunication', labelKey: 'nav.group.aiAndCommunication' },
+  { id: 'footer' },
 ];

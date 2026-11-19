@@ -10,6 +10,8 @@ import { modules } from '../../src/modules';
 import type { ModuleManifest } from '../../src/kernel/module-system/define';
 import { testDatabaseConfig } from './database';
 import { createRecordingMailSender } from './mail';
+import { unusedMailboxProvider } from './mailbox';
+import { unusedWhatsappProvider } from './whatsapp';
 
 /** The web address the app accepts changes from (the CSRF check), the same as the app's default setting. */
 export const TEST_WEB_ORIGIN = 'http://localhost:3000';
@@ -23,7 +25,12 @@ export const testConfig = () =>
     NODE_ENV: 'test',
     DATABASE_URL: testDatabaseConfig().url,
     JWT_SECRET: 'test-only-secret-test-only-secret-test-only',
+    // A fixed, made-up secret for the tests (never a real one)
+    SECRETS_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     WEB_URL: TEST_WEB_ORIGIN,
+    // Made-up Meta app values for the WhatsApp webhook tests
+    WHATSAPP_APP_SECRET: 'test-meta-app-secret',
+    WHATSAPP_VERIFY_TOKEN: 'test-meta-verify-token',
   });
 
 /** A logger that keeps its lines, so a test can check what was (and was not) written to the log. */
@@ -50,14 +57,22 @@ export async function buildTestApp(
   const publicRoutes = [...PUBLIC_ROUTES, ...(overrides.publicRoutes ?? [])];
   // No test sends a real email: unless a test brings its own recorder, emails are kept and thrown away.
   const mailSender = overrides.mailSender ?? createRecordingMailSender();
+  // No test calls Meta: unless a test brings its own recorder, any use of the WhatsApp provider is a mistake and fails loudly.
+  const whatsappProvider = overrides.whatsappProvider ?? unusedWhatsappProvider;
+  const mailboxProvider = overrides.mailboxProvider ?? unusedMailboxProvider;
   // Per-route limits are off unless a test asks for them: most tests create many people from one address.
   return buildApp({
     config: testConfig(),
     database,
     registry,
     strictRouteLimits: false,
+    // The app-wide limit (300 a minute) is far out of reach for real people but not for a long test file; a test that checks
+    // the limit itself passes its own `rateLimit`.
+    rateLimit: { max: 100_000, timeWindow: '1 minute' },
     ...overrides,
     mailSender,
+    whatsappProvider,
+    mailboxProvider,
     publicRoutes,
   });
 }
