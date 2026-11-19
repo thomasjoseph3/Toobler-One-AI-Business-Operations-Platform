@@ -13,7 +13,7 @@ test.describe('Website chat: putting it on your website', () => {
     await expect(page.getByLabel('The line to paste')).toHaveValue(SNIPPET);
     await expect(page.getByText('https://nairstays.example', { exact: true })).toBeVisible();
     await expect(page.getByText(/We have not seen the chat working yet/)).toBeVisible();
-    await expect(page.getByText('WhatsApp: the AI answers on your WhatsApp number.')).toBeVisible(); // the other channels are listed as coming
+    await expect(page.getByText('Phone: the AI answers your calls, in Malayalam, English and Hindi.')).toBeVisible(); // the other channels are listed as coming
   });
 
   test('copies the line', async ({ page, context }) => {

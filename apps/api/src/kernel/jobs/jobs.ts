@@ -4,6 +4,8 @@ import type { AccountContext } from '../context';
 import type { Database } from '../database';
 import type { LlmProvider } from '../../providers/llm';
 import type { MailSender } from '../../providers/mail';
+import type { MailboxProvider } from '../../providers/mailbox';
+import type { ModuleGate, Registry } from '../module-system/registry';
 
 /** What is stored with a job. `accountId` (when present) is the business the job is for. */
 export type JobData = { accountId?: string } & Record<string, unknown>;
@@ -17,6 +19,8 @@ export interface JobServices {
   database: Database;
   mail: MailSender;
   llm: LlmProvider;
+  /** Reads and answers a business's own mailbox (the email channel's polling job). Always set by the real server; left out by tests that never run that job. */
+  mailbox?: MailboxProvider;
 }
 
 /** What a job's code receives when it runs. */
@@ -30,6 +34,9 @@ export interface JobRun {
   listAccountIds(): Promise<string[]>;
   logger: FastifyBaseLogger;
   services: JobServices;
+  /** The modules and the gate, for a job that runs the AI agent (it offers each active module's tools). */
+  registry?: Registry;
+  gate?: ModuleGate;
 }
 
 /**

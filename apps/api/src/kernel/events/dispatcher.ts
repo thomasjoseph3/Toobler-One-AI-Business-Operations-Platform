@@ -3,7 +3,7 @@ import type { ContextFactory } from '../context';
 import type { Database } from '../database';
 import type { HealthCheck } from '../health';
 import type { ModuleGate, Registry } from '../module-system/registry';
-import type { DomainEvent } from './events';
+import type { DomainEvent, EventServices } from './events';
 import { claimDueEvents, markEventDeliveryFailed, markEventDispatched, type ClaimedEvent } from './outbox-repository';
 
 export interface EventDispatcherOptions {
@@ -54,9 +54,11 @@ export function createEventDispatcher(dependencies: {
   gate: ModuleGate;
   contextFor: ContextFactory;
   logger: FastifyBaseLogger;
+  /** What handlers may use besides their business context (the channels need the providers that send messages out). */
+  services: EventServices;
   options?: Partial<EventDispatcherOptions>;
 }): EventDispatcher {
-  const { database, registry, gate, contextFor, logger } = dependencies;
+  const { database, registry, gate, contextFor, logger, services } = dependencies;
   const options: EventDispatcherOptions = { ...DEFAULT_OPTIONS, ...dependencies.options };
 
   // Delivers one event to every active subscriber, then marks it done, or schedules a retry, or gives up.
@@ -76,7 +78,7 @@ export function createEventDispatcher(dependencies: {
       if (!handler) continue;
       try {
         if (!(await gate.isActive(event.accountId, moduleManifest.id))) continue;
-        await handler(event, contextFor(event.accountId, { kind: 'system', id: moduleManifest.id }));
+        await handler(event, contextFor(event.accountId, { kind: 'system', id: moduleManifest.id }), services);
       } catch (error) {
         failedModuleIds.push(moduleManifest.id);
         firstErrorMessage ||= `${moduleManifest.id}: ${error instanceof Error ? error.message : String(error)}`;

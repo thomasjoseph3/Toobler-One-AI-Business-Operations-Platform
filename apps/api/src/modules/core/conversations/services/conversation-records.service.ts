@@ -180,6 +180,79 @@ export function createConversationRecordsService({ database }: { database: Datab
       });
     },
 
+    /** The id of the customer's open conversation on a channel (matched by their phone number), or undefined when they have none. */
+    async findOpenChatOfPhone(
+      accountId: string,
+      channel: ConversationChannel,
+      phoneKey: string,
+    ): Promise<string | undefined> {
+      return database.runInAccountTransaction(accountId, (transaction) =>
+        conversationsRepository.findOpenConversationOfPhone(transaction, { accountId, channel, phoneKey }),
+      );
+    },
+
+    /** The id of the open conversation that holds one of these channel message ids (an email thread, found from a reply's headers), or undefined. */
+    async findOpenChatByMessageIds(
+      accountId: string,
+      channel: ConversationChannel,
+      channelMessageIds: string[],
+    ): Promise<string | undefined> {
+      return database.runInAccountTransaction(accountId, (transaction) =>
+        conversationMessagesRepository.findOpenConversationHoldingMessageId(transaction, {
+          accountId,
+          channel,
+          channelMessageIds,
+        }),
+      );
+    },
+
+    /**
+     * What a channel needs to send a staff member's reply to the customer: where the conversation is, who is on the other end, the words,
+     * and when the customer last wrote (WhatsApp allows free text only for 24 hours after that). Undefined when the message is unknown,
+     * another business's, a test chat, or not a staff message.
+     */
+    async readStaffMessageForDelivery(
+      accountId: string,
+      conversationId: string,
+      messageId: string,
+    ): Promise<
+      | {
+          channel: ConversationChannel;
+          fromPhoneKey: string | null;
+          fromEmail: string | null;
+          body: string;
+          lastCustomerMessageAt: Date | null;
+          /** The channel's own id of the customer's last message (an email's Message-ID), so a reply stays in the customer's thread. */
+          lastCustomerChannelMessageId: string | null;
+          /** The words of the customer's first message (an email's first line holds its subject). */
+          firstCustomerBody: string | null;
+        }
+      | undefined
+    > {
+      return database.runInAccountTransaction(accountId, async (transaction) => {
+        const conversation = await conversationsRepository.findConversationById(transaction, accountId, conversationId);
+        if (!conversation || conversation.isTest) return undefined;
+        const messages = await conversationMessagesRepository.listMessagesOfConversation(
+          transaction,
+          accountId,
+          conversationId,
+        );
+        const staffMessage = messages.find((message) => message.id === messageId && message.sender === 'staff');
+        if (!staffMessage) return undefined;
+        const customerMessages = messages.filter((message) => message.sender === 'customer');
+        const lastCustomerMessage = customerMessages[customerMessages.length - 1];
+        return {
+          channel: conversation.channel,
+          fromPhoneKey: conversation.fromPhoneKey,
+          fromEmail: conversation.fromEmail,
+          body: staffMessage.body,
+          lastCustomerMessageAt: lastCustomerMessage ? lastCustomerMessage.createdAt : null,
+          lastCustomerChannelMessageId: lastCustomerMessage ? lastCustomerMessage.channelMessageId : null,
+          firstCustomerBody: customerMessages[0] ? customerMessages[0].body : null,
+        };
+      });
+    },
+
     /** The businesses that have a real chat of the channel gone quiet since `idleSince` (ids only). For a scheduled job with no business. */
     async listAccountsWithIdleChats(channel: ConversationChannel, idleSince: Date): Promise<string[]> {
       return conversationsRepository.listAccountIdsWithIdleChats(database.system, { channel, idleSince });
@@ -241,7 +314,7 @@ export function createConversationRecordsService({ database }: { database: Datab
     async saveCustomerMessageAndAgentReply(
       accountId: string,
       conversationId: string,
-      input: { customerBody: string; agentBody: string },
+      input: { customerBody: string; agentBody: string; customerChannelMessageId?: string | undefined },
     ): Promise<{ agentReplySaved: boolean }> {
       return database.runInAccountTransaction(accountId, async (transaction) => {
         const conversation = await conversationsRepository.lockConversationById(transaction, accountId, conversationId);
@@ -252,7 +325,7 @@ export function createConversationRecordsService({ database }: { database: Datab
           accountId,
           sender: 'customer',
           body: input.customerBody,
-          channelMessageId: null,
+          channelMessageId: input.customerChannelMessageId ?? null,
           createdAt: customerWrittenAt,
         });
         if (conversationsRepository.isHeldNow(conversation, new Date())) return { agentReplySaved: false };
@@ -294,8 +367,9 @@ async function writeMessageAndAnnounce(
     createdAt?: Date;
   },
 ): Promise<boolean> {
+  const messageId = message.id ?? uuidv7();
   const wasAdded = await conversationMessagesRepository.insertMessageIfNew(transaction, {
-    id: message.id ?? uuidv7(),
+    id: messageId,
     accountId: message.accountId,
     conversationId: conversation.id,
     sender: message.sender,
@@ -316,7 +390,7 @@ async function writeMessageAndAnnounce(
   await publishEvent(transaction, {
     accountId: message.accountId,
     eventName: 'conversation.message',
-    payload: { conversationId: conversation.id, sender: message.sender },
+    payload: { conversationId: conversation.id, sender: message.sender, messageId },
   });
   return wasAdded;
 }

@@ -184,6 +184,16 @@ export interface AccountsTable {
   task_reminder_minutes: Generated<number>;
   /** How many minutes after a task was due, still open, the managers are told (1 to 1440). */
   task_late_alert_minutes: Generated<number>;
+  /** Opening time in the business's local clock (default 09:00); staff alerts hold outside office hours. */
+  opens_at: Generated<string>;
+  /** Closing time in the business's local clock (default 18:00); F22's "overnight"/"closing" use it. */
+  closes_at: Generated<string>;
+  /** When on, alerts go out at any hour; when off, only between opening and closing. */
+  night_alerts_on: Generated<boolean>;
+  /** The number "needs a person" alerts go to (E.164), or null. */
+  alert_phone_e164: string | null;
+  /** The email "needs a person" alerts fall back to, or null. */
+  alert_email: string | null;
   /** When the business went live (started answering real customers); null until then. */
   live_at: Date | null;
   live_by: Json | null;
@@ -676,6 +686,75 @@ export interface WebchatSettingsTable {
   updated_at: Generated<Date>;
 }
 
+/** A business's WhatsApp connection: one row per business. The access token is stored encrypted and never leaves the server. Fenced by account_id. */
+export interface WhatsappConnectionsTable {
+  account_id: string;
+  /** Meta's id of the number customers write to: finds the business for an incoming message. Unique across businesses. */
+  phone_number_id: string;
+  business_account_id: string | null;
+  display_phone_number: Generated<string | null>;
+  encrypted_access_token: string;
+  token_last_four: string;
+  answer_messages: Generated<boolean>;
+  status: Generated<'unchecked' | 'working' | 'failed'>;
+  status_note: Generated<string | null>;
+  status_checked_at: Generated<Date | null>;
+  last_message_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One row per channel message already received (a WhatsApp message id, an email Message-ID), so a repeated delivery is answered once. Fenced by account_id. */
+export interface ChannelMessageReceiptsTable {
+  account_id: string;
+  channel: 'whatsapp' | 'email';
+  external_id: string;
+  received_at: Generated<Date>;
+}
+
+/** A business's email connection: one row per business. The mailbox password is stored encrypted and never leaves the server. Fenced by account_id. */
+export interface EmailConnectionsTable {
+  account_id: string;
+  address: string;
+  username: string;
+  encrypted_password: string;
+  password_last_four: string;
+  imap_host: string;
+  imap_port: Generated<number>;
+  smtp_host: string;
+  smtp_port: Generated<number>;
+  reply_mode: Generated<'send' | 'draft'>;
+  read_emails: Generated<boolean>;
+  checked_up_to: Generated<Date>;
+  status: Generated<'unchecked' | 'working' | 'failed'>;
+  status_note: Generated<string | null>;
+  status_checked_at: Generated<Date | null>;
+  last_email_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** A reply the AI wrote that waits for a team member to approve it. Fenced by account_id. */
+export interface EmailDraftsTable {
+  id: string;
+  account_id: string;
+  conversation_id: string;
+  to_email: string;
+  subject: string;
+  body: string;
+  in_reply_to: string | null;
+  /** A list of message ids. Written as JSON text, read back as a list. */
+  thread_references: ColumnType<string[], string | undefined, string>;
+  status: Generated<'waiting' | 'sent' | 'discarded'>;
+  decided_at: Generated<Date | null>;
+  decided_by: Generated<Json | null>;
+  created_at: Generated<Date>;
+}
+
 /** What the AI agent learned in one conversation: the details, the one promise. One row per conversation. Fenced by account_id. */
 export interface ConversationFactsTable {
   conversation_id: string;
@@ -947,6 +1026,36 @@ export interface OffersTable {
   updated_at: Generated<Date>;
 }
 
+/** A person's on/off choice for an optional alert kind (F23). No row means on. Fenced by account_id. */
+export interface AlertPreferencesTable {
+  account_id: string;
+  user_id: string;
+  kind: 'hot_lead' | 'callback_due' | 'callback_late' | 'morning_summary';
+  is_on: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One staff alert that went out (F23): who it is for, what kind, what about, how sent, and whether read. Fenced by account_id. */
+export interface NotificationsTable {
+  id: string;
+  account_id: string;
+  /** The recipient; null when the alert went to the business's alert number (needs_person). */
+  user_id: string | null;
+  kind: 'hot_lead' | 'callback_due' | 'callback_late' | 'needs_person' | 'morning_summary';
+  lead_id: string | null;
+  task_id: string | null;
+  conversation_id: string | null;
+  channel: 'whatsapp' | 'email' | 'console';
+  status: Generated<'sent' | 'failed'>;
+  /** The same for repeats of one event, so a burst is grouped into one row (its count goes up). */
+  group_key: string;
+  grouped_count: Generated<number>;
+  read_at: Date | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
 /** Tables are added here by the migration that creates them. */
 export interface DB {
   schema_migrations: SchemaMigrationsTable;
@@ -996,6 +1105,10 @@ export interface DB {
   conversation_messages: ConversationMessagesTable;
   conversation_facts: ConversationFactsTable;
   webchat_settings: WebchatSettingsTable;
+  whatsapp_connections: WhatsappConnectionsTable;
+  email_connections: EmailConnectionsTable;
+  email_drafts: EmailDraftsTable;
+  channel_message_receipts: ChannelMessageReceiptsTable;
   conversation_outcomes: ConversationOutcomesTable;
   classification_corrections: ClassificationCorrectionsTable;
   business_answers: BusinessAnswersTable;
@@ -1006,4 +1119,6 @@ export interface DB {
   offers: OffersTable;
   faqs: FaqsTable;
   unanswered_questions: UnansweredQuestionsTable;
+  alert_preferences: AlertPreferencesTable;
+  notifications: NotificationsTable;
 }

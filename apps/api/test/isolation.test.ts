@@ -82,6 +82,8 @@ async function uploadAs(person: SignedInPerson, url: string, fileName: string, c
 /** Everything business A owns that business B will aim at. */
 interface BusinessAData {
   conversationId: string;
+  /** A reply the AI drafted for A to approve (email). */
+  emailDraftId: string;
   /** A's test chat ("Test the agent"). */
   testChatId: string;
   conversationTypeId: string;
@@ -242,6 +244,25 @@ beforeAll(async () => {
       confidence: 0.9,
     })
     .execute();
+  // Both businesses have Email in their plan, and A has a reply waiting for approval, which B must not be able to send or discard
+  for (const business of [businessA, businessB]) {
+    await database.system
+      .insertInto('account_modules')
+      .values({ account_id: business.profile.business.id, module_id: 'channel.email', entitled: true, enabled: true })
+      .execute();
+  }
+  const emailDraftOfA = randomUUID();
+  await database.system
+    .insertInto('email_drafts')
+    .values({
+      id: emailDraftOfA,
+      account_id: businessA.profile.business.id,
+      conversation_id: conversationOfA,
+      to_email: 'customer@example.com',
+      subject: 'Re: hello',
+      body: `Draft ${secretWords}`,
+    })
+    .execute();
   // A also has a test chat, which B must not be able to carry on
   const testChatOfA = randomUUID();
   await database.system
@@ -327,6 +348,7 @@ beforeAll(async () => {
   );
   dataOfA = {
     conversationId: conversationOfA,
+    emailDraftId: emailDraftOfA,
     testChatId: testChatOfA,
     conversationTypeId: conversationType.id,
     contactId: contact.id,
@@ -649,6 +671,18 @@ const attempts: Attempt[] = [
       url: '/agent/test-chat',
       payload: { conversationId: dataOfA.testChatId, message: 'Hello' },
     }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'POST /api/v1/channels/email/drafts/{id}/send',
+    what: "send A's waiting reply (nothing may be sent, and A's draft must stay waiting)",
+    request: () => ({ method: 'POST', url: `/channels/email/drafts/${dataOfA.emailDraftId}/send`, payload: {} }),
+    expectedStatus: 404,
+  },
+  {
+    route: 'DELETE /api/v1/channels/email/drafts/{id}',
+    what: "discard A's waiting reply",
+    request: () => ({ method: 'DELETE', url: `/channels/email/drafts/${dataOfA.emailDraftId}` }),
     expectedStatus: 404,
   },
   {
@@ -1255,6 +1289,7 @@ const listsBReads: Array<{ route: string; url: string }> = [
   { route: 'GET /api/v1/knowledge/search', url: '/knowledge/search?q=question%20answer%20does%20it%20work' },
   { route: 'GET /api/v1/offers', url: '/offers?include=expired' },
   { route: 'GET /api/v1/me', url: '/me' },
+  { route: 'GET /api/v1/today', url: '/today?scope=team' },
 ];
 
 /**
@@ -1290,6 +1325,8 @@ const exemptRoutes: Record<string, string> = {
   'GET /api/v1/contacts': "covered by the list check (GET /contacts?limit=100 shows none of A's data)",
   'GET /api/v1/leads': 'covered by the list check',
   'GET /api/v1/tickets': 'covered by the list check',
+  'GET /api/v1/today':
+    "covered by the list check (GET /today?scope=team shows none of A's data); the business comes from the session",
   'POST /api/v1/imports':
     'the file lands in the caller’s own business only and names no other record (the business comes from the session); managers only, tested in imports.test.ts',
   'GET /api/v1/lists': 'covered by the list check, and by lists.test.ts',
@@ -1309,6 +1346,28 @@ const exemptRoutes: Record<string, string> = {
     'public: reads only the one chat the visitor token names, and a token made for another business, a test chat or another channel is refused with 401 (tested in webchat-chat-end)',
   'POST /api/v1/public/widget/{key}/end':
     "public: ends only the one chat the visitor token names; another business's token is refused with 401 and ends nothing (tested in webchat-chat-end)",
+  'GET /api/v1/channels/email':
+    "shows only the caller's own mailbox settings (the business comes from the session); never the password (tested in email-settings)",
+  'PUT /api/v1/channels/email':
+    "saves only the caller's own mailbox (the business comes from the session; nothing in the request names one) (tested in email-settings)",
+  'DELETE /api/v1/channels/email':
+    "removes only the caller's own mailbox connection (the business comes from the session) (tested in email-settings)",
+  'POST /api/v1/channels/email/check':
+    "signs in to the caller's own saved mailbox only (the business comes from the session) (tested in email-settings)",
+  'GET /api/v1/channels/email/drafts':
+    "lists only the caller's own waiting replies (the business comes from the session) (tested in email-reader)",
+  'GET /api/v1/channels/whatsapp':
+    "shows only the caller's own connection (the business comes from the session); never the token (tested in whatsapp-settings)",
+  'PUT /api/v1/channels/whatsapp':
+    "saves only the caller's own connection (the business comes from the session); a number another business uses answers 409 and changes nothing (tested in whatsapp-settings)",
+  'DELETE /api/v1/channels/whatsapp':
+    "removes only the caller's own connection (the business comes from the session; nothing in the request names one) (tested in whatsapp-settings)",
+  'POST /api/v1/channels/whatsapp/check':
+    "asks Meta about the caller's own saved number only (the business comes from the session) (tested in whatsapp-settings)",
+  'GET /webhooks/whatsapp':
+    "public: Meta's one-time check; needs the platform's verify token and reveals nothing but the challenge it sent (tested in whatsapp-webhook)",
+  'POST /webhooks/whatsapp':
+    'public: signed by Meta (401 otherwise); the business comes only from the number the customer wrote to, so a message can never reach another business, and a repeated message id is answered once (tested in whatsapp-webhook)',
   'GET /widget/loader.js': 'public file, the same for every business, holds no business data',
   'GET /widget/assets/{file}':
     'public built files, the same for every business, plain file names from one folder only (tested in webchat-widget-files)',

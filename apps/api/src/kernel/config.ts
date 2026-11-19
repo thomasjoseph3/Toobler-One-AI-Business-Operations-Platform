@@ -65,6 +65,15 @@ const EnvironmentVariablesSchema = z.object({
   SECRETS_ENCRYPTION_KEY: z.string().default(''),
   // Google Places (New) API key, used by the setup wizard to read a business's Google listing. Empty switches that off (the owner types the answers instead).
   GOOGLE_PLACES_API_KEY: z.string().default(''),
+  // WhatsApp (Meta). The app secret signs every message Meta sends to us (we refuse anything that is not signed with it); the verify token is
+  // what Meta sends once when the webhook address is set up. Both belong to the platform's Meta app, never to a business. Empty switches the
+  // WhatsApp webhook off (it answers 404).
+  WHATSAPP_APP_SECRET: z.string().default(''),
+  WHATSAPP_VERIFY_TOKEN: z.string().default(''),
+  // How long a WhatsApp or email conversation must be quiet before it counts as ended (then it is sorted: this is when the contact and the
+  // lead are made). Short values let testers see a lead within minutes; real customers need longer ones.
+  WHATSAPP_IDLE_MINUTES: z.coerce.number().int().min(1).max(10080).default(30),
+  EMAIL_IDLE_MINUTES: z.coerce.number().int().min(1).max(10080).default(120),
 });
 
 export interface Config {
@@ -92,6 +101,10 @@ export interface Config {
   secrets: { encryptionKey: Buffer | null };
   /** The Google Places key for reading a business's Google listing, or null when it is not switched on. A secret: never log or return it. */
   googlePlaces: { apiKey: string | null };
+  /** The platform's Meta app: the secret that signs incoming messages and the token Meta uses to verify the webhook address. Null when not set. Secrets: never log or return them. */
+  whatsapp: { appSecret: string | null; verifyToken: string | null };
+  /** Minutes of quiet after which a WhatsApp or email conversation ends and is sorted into a lead, ticket or nothing. */
+  channelIdleMinutes: { whatsapp: number; email: number };
 }
 
 export class ConfigError extends Error {}
@@ -181,6 +194,11 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
     },
     secrets: { encryptionKey: parseEncryptionKey(validEnvironment.SECRETS_ENCRYPTION_KEY) },
     googlePlaces: { apiKey: validEnvironment.GOOGLE_PLACES_API_KEY.trim() || null },
+    whatsapp: {
+      appSecret: validEnvironment.WHATSAPP_APP_SECRET.trim() || null,
+      verifyToken: validEnvironment.WHATSAPP_VERIFY_TOKEN.trim() || null,
+    },
+    channelIdleMinutes: { whatsapp: validEnvironment.WHATSAPP_IDLE_MINUTES, email: validEnvironment.EMAIL_IDLE_MINUTES },
   };
   if (config.mail.provider === 'smtp' && (!config.mail.smtp.host || !config.mail.from)) {
     throw new ConfigError('Bad configuration:\n  MAIL_PROVIDER=smtp needs SMTP_HOST and EMAIL_FROM to be set');

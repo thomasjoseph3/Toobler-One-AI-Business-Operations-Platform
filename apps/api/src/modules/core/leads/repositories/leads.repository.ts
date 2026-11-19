@@ -314,6 +314,67 @@ export async function listLeadRows(
   return { rows: [], total: Number(countRow.total) };
 }
 
+/** A lead trimmed to only what the Today page needs to sort and count it (F22). `contactedAt` is added later from activities. */
+export interface LeadForTodayRow {
+  id: string;
+  contactId: string;
+  ownerUserId: string | null;
+  temperature: LeadRow['temperature'];
+  stageKind: StageKind;
+  interest: string | null;
+  createdAt: Date;
+  callbackAt: Date | null;
+  closedAt: Date | null;
+}
+
+/**
+ * The leads the Today page may need (F22): every live lead of the business that is still open, OR was created this week,
+ * OR was closed this week — so the open sections and the "this week" counts both have their leads in one read. Narrowed
+ * to one owner when `ownerUserId` is given (the "me" scope and the own-leads-only role).
+ */
+export async function listLeadsForToday(
+  db: Db,
+  options: { accountId: string; ownerUserId?: string | undefined; sinceWeekStart: Date },
+): Promise<LeadForTodayRow[]> {
+  let query = db
+    .selectFrom('leads as lead')
+    .innerJoin('pipeline_stages as stage', 'stage.id', 'lead.stage_id')
+    .where('lead.account_id', '=', options.accountId)
+    .where('lead.deleted_at', 'is', null)
+    .where((expression) =>
+      expression.or([
+        expression('lead.closed_at', 'is', null),
+        expression('lead.closed_at', '>=', options.sinceWeekStart),
+        expression('lead.created_at', '>=', options.sinceWeekStart),
+      ]),
+    );
+  if (options.ownerUserId) query = query.where('lead.owner_user_id', '=', options.ownerUserId);
+  const rows = await query
+    .select([
+      'lead.id',
+      'lead.contact_id',
+      'lead.owner_user_id',
+      'lead.temperature',
+      'stage.kind as stage_kind',
+      'lead.interest',
+      'lead.created_at',
+      'lead.callback_at',
+      'lead.closed_at',
+    ])
+    .execute();
+  return rows.map((row) => ({
+    id: row.id,
+    contactId: row.contact_id,
+    ownerUserId: row.owner_user_id,
+    temperature: row.temperature,
+    stageKind: row.stage_kind,
+    interest: row.interest,
+    createdAt: row.created_at,
+    callbackAt: row.callback_at,
+    closedAt: row.closed_at,
+  }));
+}
+
 /**
  * The person's newest lead for the one-open-lead rule: their open lead if they have one, otherwise the one closed most
  * recently. Undefined if they have never had a lead.

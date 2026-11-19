@@ -205,6 +205,28 @@ export async function listIdleChatIds(
   return rows.map((row) => row.id);
 }
 
+/**
+ * The customer's open conversation on a channel (not ended, not a test chat): the newest one for that phone number, or undefined when
+ * there is none. A WhatsApp message carries on this conversation; with none, it starts a new one.
+ */
+export async function findOpenConversationOfPhone(
+  db: Db,
+  options: { accountId: string; channel: ConversationChannelWord; phoneKey: string },
+): Promise<string | undefined> {
+  const row = await db
+    .selectFrom('conversations')
+    .select('id')
+    .where('account_id', '=', options.accountId)
+    .where('channel', '=', options.channel)
+    .where('from_phone_key', '=', options.phoneKey)
+    .where('is_test', '=', false)
+    .where('ended_at', 'is', null)
+    .orderBy('created_at', 'desc')
+    .limit(1)
+    .executeTakeFirst();
+  return row?.id;
+}
+
 /** What sorting decided about a conversation. */
 export interface SortedConversation {
   typeKey: string;

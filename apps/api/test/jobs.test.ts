@@ -7,6 +7,7 @@ import type { JobData, JobRun } from '../src/kernel/jobs/jobs';
 import { defineModule } from '../src/kernel/module-system/define';
 import { createRegistry, type ModuleGate } from '../src/kernel/module-system/registry';
 import { createScriptedLlmProvider } from '../src/providers/llm';
+import { unusedMailboxProvider } from './support/mailbox';
 import { newAccountId, openTestDatabase, waitFor } from './support/harness';
 import { testConfig } from './support/app';
 
@@ -16,6 +17,7 @@ const jobServices = () => ({
   database,
   mail: { send: async () => {} },
   llm: createScriptedLlmProvider(() => ({ answer: 'unused' })),
+  mailbox: unusedMailboxProvider,
 });
 
 let database: Database;

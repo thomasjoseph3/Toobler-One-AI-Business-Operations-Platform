@@ -19,8 +19,15 @@ describe('describeLiveEvent', () => {
 });
 
 describe('listEventNamesForRole', () => {
-  it('tells the "own leads only" role about no conversation events', () => {
-    expect(listEventNamesForRole('staff_own')).toEqual([]);
-    expect(listEventNamesForRole('manager')).toContain('conversation.message');
+  it('tells the "own leads only" role about its leads and tasks, but not conversations', () => {
+    const ownLeadsOnly = listEventNamesForRole('staff_own');
+    expect(ownLeadsOnly).not.toContain('conversation.message');
+    expect(ownLeadsOnly).toContain('lead.created');
+    expect(ownLeadsOnly).toContain('task.updated');
+  });
+  it('tells a manager about conversations and about leads and tasks', () => {
+    const manager = listEventNamesForRole('manager');
+    expect(manager).toContain('conversation.message');
+    expect(manager).toContain('lead.created');
   });
 });

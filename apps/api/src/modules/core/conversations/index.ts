@@ -11,3 +11,6 @@ export { refuseOwnLeadsOnlyRole } from './services/conversation-reader.service';
 export { hasTriedTheAgent } from './services/test-chat-facts.service';
 // The duplicates module (F13) moves a merged-away contact's conversations to the kept contact.
 export { moveConversationsToContact } from './services/contact-merge.service';
+// The email channel asks this before an email that starts a new thread is let into the Inbox (only real enquiries get in).
+export { createEnquiryGate } from './services/enquiry-gate.service';
+export type { EnquiryGateResult } from './services/enquiry-gate.service';

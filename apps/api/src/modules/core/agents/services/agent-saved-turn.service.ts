@@ -22,6 +22,8 @@ export interface SavedTurnInput {
   earlierMessages: ReadonlyArray<{ sender: 'customer' | 'agent' | 'staff'; body: string }>;
   /** The customer's new message. */
   message: string;
+  /** The channel's own id of the customer's message (an email's Message-ID), kept so a later reply can be matched to this conversation. */
+  customerChannelMessageId?: string;
   channel: ConversationChannel;
   /** What the channel says about itself, put into the agent's prompt. */
   channelNote?: string;
@@ -98,6 +100,9 @@ export function createAgentSavedTurnService(input: { database: Database; runtime
         {
           customerBody: turnInput.message,
           agentBody: turn.reply,
+          ...(turnInput.customerChannelMessageId === undefined
+            ? {}
+            : { customerChannelMessageId: turnInput.customerChannelMessageId }),
         },
       );
       if (!agentReplySaved) return { conversationId, turn: null, heldByPerson: true };

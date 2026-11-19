@@ -402,3 +402,21 @@ export async function moveTasksToContact(
     .execute();
   return rows.length;
 }
+
+/**
+ * The open tasks the Today page (F22) needs: every not-done, not-deleted task of the business, narrowed to one owner for
+ * the "me" scope (and the own-leads-only role). The Today service decides which are late and which are due later today.
+ */
+export async function listOpenTasksForToday(
+  db: Db,
+  options: { accountId: string; ownerUserId?: string | undefined },
+): Promise<TaskRow[]> {
+  let query = db
+    .selectFrom('tasks')
+    .where('account_id', '=', options.accountId)
+    .where('deleted_at', 'is', null)
+    .where('done_at', 'is', null);
+  if (options.ownerUserId) query = query.where('owner_user_id', '=', options.ownerUserId);
+  const rows = await query.select(TASK_COLUMNS).execute();
+  return rows.map(toTaskRow);
+}
