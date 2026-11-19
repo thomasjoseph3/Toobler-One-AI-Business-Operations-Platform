@@ -39,7 +39,7 @@ export function createEnquiryGate({ database, classifier }: { database: Database
         const industryId = (await findBusinessIndustry(transaction, accountId)) ?? 'general';
         await ensureStartingConversationTypes(transaction, { accountId, industryId });
         const types = (await conversationTypesRepository.listConversationTypes(transaction, accountId)).filter(
-          (type) => type.isActive,
+          (candidate) => candidate.isActive,
         );
         const blockRows = await blockListRepository.listBlockListRows(transaction, accountId);
         const staff = await findStaffContactPoints(transaction, accountId);
@@ -62,19 +62,21 @@ export function createEnquiryGate({ database, classifier }: { database: Database
       const answer = await classifier.classifyConversation({
         accountId,
         channel: 'email',
-        types: gathered.types.map((type) => ({
-          key: type.key,
-          label: type.label,
-          description: type.description,
-          examples: type.examples,
+        types: gathered.types.map((conversationType) => ({
+          key: conversationType.key,
+          label: conversationType.label,
+          description: conversationType.description,
+          examples: conversationType.examples,
         })),
         transcript: [{ speaker: 'customer', text: `Subject: ${email.subject}\n\n${email.text}` }],
       });
       const typeKey = answer.classification.primary.typeKey;
-      const type = gathered.types.find((candidate) => candidate.key === typeKey);
+      const matchedType = gathered.types.find((candidate) => candidate.key === typeKey);
       // A type the business no longer has (or none found) is treated as worth a person's look: never lose a possible customer
       const worthAnswering =
-        type === undefined || answer.classification.needsPerson || OUTCOMES_THAT_NEED_THE_BUSINESS.has(type.outcome);
+        matchedType === undefined ||
+        answer.classification.needsPerson ||
+        OUTCOMES_THAT_NEED_THE_BUSINESS.has(matchedType.outcome);
       return { worthAnswering, typeKey, reason: answer.reason };
     },
   };
