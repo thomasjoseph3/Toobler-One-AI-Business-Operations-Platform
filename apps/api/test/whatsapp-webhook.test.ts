@@ -7,6 +7,7 @@ import type { Database } from '../src/kernel/database';
 import { createEventDispatcher } from '../src/kernel/events/dispatcher';
 import { createRegistry } from '../src/kernel/module-system/registry';
 import { modules } from '../src/modules';
+import { sendStaffReplyOnWhatsapp } from '../src/modules/channels/whatsapp/services/whatsapp-staff-reply.service';
 import { signLikeMeta } from '../src/modules/channels/whatsapp/helpers/meta-signature';
 import { createIdleConversationsService } from '../src/modules/channels/whatsapp/services/idle-conversations.service';
 import { createScriptedLlmProvider, type LlmScript } from '../src/providers/llm';
@@ -386,6 +387,41 @@ describe('a customer writes on WhatsApp', () => {
       return (connection.status_note ?? '').includes('24 hours');
     });
     expect(sentTo(phone)).toHaveLength(1);
+  });
+});
+
+describe('a staff reply event delivered twice', () => {
+  it('sends the reply only once', async () => {
+    const { person, accountId, phoneNumberId } = await newBusinessOnWhatsapp();
+    const phone = customerPhone();
+    script = () => ({ answer: 'AI answer.' });
+    await deliver(metaDelivery(phoneNumberId, { id: 'wamid.twice', from: phone, text: 'Hello' }));
+    await waitFor(async () => sentTo(phone).length === 1);
+    const conversation = await database.system
+      .selectFrom('conversations')
+      .select('id')
+      .where('account_id', '=', accountId)
+      .executeTakeFirstOrThrow();
+    await asStaff(person, 'POST', `/conversations/${conversation.id}/takeover`);
+    await asStaff(person, 'POST', `/conversations/${conversation.id}/reply`, { body: 'Once only please.' });
+    const staffMessage = await database.system
+      .selectFrom('conversation_messages')
+      .select('id')
+      .where('conversation_id', '=', conversation.id)
+      .where('sender', '=', 'staff')
+      .executeTakeFirstOrThrow();
+    const sendAgain = () =>
+      sendStaffReplyOnWhatsapp({
+        database,
+        config,
+        whatsapp: whatsappRecorder.provider,
+        accountContext: createContextFactory(database)(accountId, { kind: 'system', id: 'test' }),
+        conversationId: conversation.id,
+        messageId: staffMessage.id,
+      });
+    await sendAgain();
+    await sendAgain();
+    expect(sentTo(phone).filter((message) => message.text === 'Once only please.')).toHaveLength(1);
   });
 });
 

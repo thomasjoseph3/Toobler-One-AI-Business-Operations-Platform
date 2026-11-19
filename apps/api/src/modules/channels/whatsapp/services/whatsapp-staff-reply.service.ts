@@ -12,7 +12,7 @@ import * as whatsappConnectionRepository from '../repositories/whatsapp-connecti
  * Sends a team member's reply (saved in the inbox) to the customer on WhatsApp. Runs when the "conversation.message" event for a staff
  * message arrives. Free text is allowed only for 24 hours after the customer's last message (WhatsApp's rule); after that the reply stays
  * in the inbox and the failure is noted on the connection, because only approved templates may be sent (a later step).
- * Safe to run twice for the same event: the worst case is the same reply sent again, so it is kept to one try per event by the caller.
+ * Safe to run twice for the same event: the first run claims the message id, so a repeat sends nothing.
  */
 export async function sendStaffReplyOnWhatsapp(input: {
   database: Database;
@@ -31,6 +31,11 @@ export async function sendStaffReplyOnWhatsapp(input: {
   if (!staffMessage || staffMessage.channel !== 'whatsapp' || staffMessage.fromPhoneKey === null) return;
   const secretKey = config.secrets.encryptionKey;
   if (!secretKey) return;
+  // Events are delivered at least once (and again when another module's handler for the same event fails): the reply goes out only once
+  const isFirstTry = await database.runInAccountTransaction(accountId, (transaction) =>
+    whatsappConnectionRepository.claimMessageId(transaction, accountId, `staff:${input.messageId}`),
+  );
+  if (!isFirstTry) return;
   const access = await database.runInAccountTransaction(accountId, (transaction) =>
     whatsappConnectionRepository.findAccessForSending(transaction, accountId),
   );

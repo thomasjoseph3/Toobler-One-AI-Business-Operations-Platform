@@ -41,10 +41,10 @@ channels. Feature numbers stay as they were, so the briefs and links do not chan
 | F22 | Today page | approved | [brief](../features/F22-today-page.md) | 2026-11-19 |
 | F23 | Staff alerts and the morning summary | deferred | [brief](../features/F23-staff-alerts.md) | |
 | F24 | Privacy and support access | deferred | | |
-| F25 | WhatsApp | in_progress | [brief](../features/F25-whatsapp.md) | |
-| F26 | Email | planned | | |
-| F27 | Follow-ups | planned | | |
-| F28 | Reports | planned | | |
+| F25 | WhatsApp | approved | [brief](../features/F25-whatsapp.md) | 2026-11-19 |
+| F26 | Email | in_review | [brief](../features/F26-email.md) | |
+| F27 | Follow-ups | deferred | | |
+| F28 | Reports | deferred | | |
 | F29 | Phone calls (voice) | planned | | |
 | F30 | Staff assistant and MCP | planned | | |
 | F32 | Free "what you're missing" check | planned | | |

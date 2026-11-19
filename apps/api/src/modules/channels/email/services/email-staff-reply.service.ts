@@ -5,6 +5,7 @@ import type { MailboxProvider } from '../../../../providers/mailbox';
 import { replySubject } from '../../../../providers/mailbox/mail-parsing';
 import { createConversationRecordsService } from '../../../core/conversations';
 import { readSubjectOfCustomerEmail } from '../helpers/email-words';
+import * as emailConnectionRepository from '../repositories/email-connection.repository';
 import { sendReplyFromMailbox } from './email-sender.service';
 import { openMailboxAccess } from './mailbox-access.service';
 
@@ -31,6 +32,11 @@ export async function sendStaffReplyByEmail(input: {
   if (!staffMessage || staffMessage.channel !== 'email' || staffMessage.fromEmail === null) return;
   const opened = await openMailboxAccess(database, config, accountId);
   if (!opened) return;
+  // Events are delivered at least once (and again when another module's handler for the same event fails): the reply goes out only once
+  const isFirstTry = await database.runInAccountTransaction(accountId, (transaction) =>
+    emailConnectionRepository.claimEmailId(transaction, accountId, `staff:${input.messageId}`),
+  );
+  if (!isFirstTry) return;
   try {
     await sendReplyFromMailbox({
       database,

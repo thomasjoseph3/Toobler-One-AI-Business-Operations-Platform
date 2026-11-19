@@ -1,6 +1,6 @@
 # F25 WhatsApp
 
-**Status:** in_review · **Branch:** `feature/F23-staff-alerts` (built on the owner's F22/F23 branch; F23 itself is deferred, R81) · **Requirement:** `requirements/phase-1-lead-engine/3-ai-agents-and-channels/04-whatsapp.md`
+**Status:** approved 19 Nov 2026 by Claude under the standing instruction after the checks passed (the owner has not tested it by hand) · **Branch:** `feature/F23-staff-alerts` (built on the owner's F22/F23 branch; F23 itself is deferred, R81) · **Requirement:** `requirements/phase-1-lead-engine/3-ai-agents-and-channels/04-whatsapp.md`
 
 ## Feature guide
 

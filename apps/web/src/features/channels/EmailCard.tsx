@@ -255,7 +255,19 @@ export function EmailCard(props: { timeZone: string }) {
       ) : null}
 
       <h3 className="text-label-md mb-2 mt-6 text-text-primary">{t('channels.email.drafts.title')}</h3>
-      {drafts.length === 0 ? (
+      {draftsKept.isFirstLoad ? (
+        <LoadingState label={t('channels.email.drafts.loading')} />
+      ) : draftsKept.hasFailed ? (
+        <ErrorState
+          title={t('channels.email.drafts.error')}
+          description={t('knowledge.error.description')}
+          action={
+            <Button variant="secondary" onClick={draftsResource.reload}>
+              {t('knowledge.retry')}
+            </Button>
+          }
+        />
+      ) : drafts.length === 0 ? (
         <p className="text-body-md text-text-secondary">{t('channels.email.drafts.empty')}</p>
       ) : (
         <ul className="flex flex-col gap-4">
