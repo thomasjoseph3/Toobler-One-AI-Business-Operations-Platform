@@ -42,6 +42,7 @@ export default defineModule({
         const idleConversations = createIdleConversationsService({
           database: job.services.database,
           enqueueJob: job.enqueueJob,
+          idleMinutes: job.services.config.channelIdleMinutes.whatsapp,
         });
         for (const accountId of await idleConversations.findBusinessesWithIdleConversations()) {
           await job.enqueueJob('whatsapp.end_idle_conversations', { accountId });
@@ -57,6 +58,7 @@ export default defineModule({
         const idleConversations = createIdleConversationsService({
           database: job.services.database,
           enqueueJob: job.enqueueJob,
+          idleMinutes: job.services.config.channelIdleMinutes.whatsapp,
         });
         await idleConversations.endIdleConversationsOfBusiness(job.accountContext.accountId);
       },

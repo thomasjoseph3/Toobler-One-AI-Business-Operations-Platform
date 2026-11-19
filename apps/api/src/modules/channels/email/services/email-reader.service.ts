@@ -8,13 +8,14 @@ import type { IncomingEmail, MailboxProvider } from '../../../../providers/mailb
 import { replySubject } from '../../../../providers/mailbox/mail-parsing';
 import type { createAgentSavedTurnService } from '../../../core/agents';
 import { findBusinessLiveAt } from '../../../core/auth';
-import { createConversationRecordsService } from '../../../core/conversations';
+import { createConversationRecordsService, type createEnquiryGate } from '../../../core/conversations';
 import { EMAIL_CHANNEL_NOTE, writeCustomerEmail } from '../helpers/email-words';
 import * as emailConnectionRepository from '../repositories/email-connection.repository';
 import { openMailboxAccess } from './mailbox-access.service';
 import { sendReplyFromMailbox } from './email-sender.service';
 
 type SavedTurnService = ReturnType<typeof createAgentSavedTurnService>;
+type EnquiryGate = ReturnType<typeof createEnquiryGate>;
 
 /** What this module stamps on the conversations and messages it writes (no signed-in person is involved). */
 const MODULE_ACTOR: Actor = { kind: 'system', id: 'channel.email' };
@@ -30,6 +31,8 @@ export interface ReadResult {
   leftForPerson: number;
   /** Emails already seen. */
   alreadySeen: number;
+  /** Emails the business does not need to deal with (suppliers, job seekers, spam, its own team): not answered and not shown in the Inbox. */
+  ignored: number;
 }
 
 /**
@@ -43,10 +46,12 @@ export function createEmailReaderService(dependencies: {
   config: Config;
   mailbox: MailboxProvider;
   savedTurns: SavedTurnService;
+  /** Lets only real enquiries (and customers' mail) into the Inbox when an email starts a new thread. */
+  enquiryGate: EnquiryGate;
   logger: FastifyBaseLogger;
   now?: () => Date;
 }) {
-  const { database, config, mailbox, savedTurns, logger } = dependencies;
+  const { database, config, mailbox, savedTurns, enquiryGate, logger } = dependencies;
   const now = dependencies.now ?? (() => new Date());
   const conversationRecords = createConversationRecordsService({ database });
 
@@ -56,7 +61,7 @@ export function createEmailReaderService(dependencies: {
     email: IncomingEmail,
     replyMode: 'send' | 'draft',
     access: Parameters<typeof sendReplyFromMailbox>[0]['access'],
-  ): Promise<'answered' | 'left_for_person' | 'already_seen'> {
+  ): Promise<'answered' | 'left_for_person' | 'already_seen' | 'ignored'> {
     const isFirstTime = await database.runInAccountTransaction(accountId, (transaction) =>
       emailConnectionRepository.claimEmailId(transaction, accountId, email.messageId),
     );
@@ -67,6 +72,17 @@ export function createEmailReaderService(dependencies: {
     const threadIds = [...(email.inReplyTo ? [email.inReplyTo] : []), ...[...email.references].reverse()];
     const existingConversationId =
       (await conversationRecords.findOpenChatByMessageIds(accountId, 'email', threadIds)) ?? null;
+
+    // A new thread is let into the Inbox only when it is something the business should deal with: not a supplier, a job seeker, spam, a
+    // blocked sender or the team's own mail. (A reply in a thread we already have is always let in.) Nothing is saved for an ignored email.
+    if (existingConversationId === null) {
+      const verdict = await enquiryGate.checkEmail(accountId, {
+        fromEmail: email.fromEmail,
+        subject: email.subject,
+        text: email.text,
+      });
+      if (!verdict.worthAnswering) return 'ignored';
+    }
 
     // An email that cannot be proven to come from who it says is saved for the team but never answered by the AI
     if (email.senderCheck === 'fail') {
@@ -134,7 +150,7 @@ export function createEmailReaderService(dependencies: {
      * mailbox cannot be read the reason is kept on the connection (the Email screen shows it) and the next run tries again from the same point.
      */
     async readMailboxOfBusiness(accountId: string): Promise<ReadResult> {
-      const result: ReadResult = { answered: 0, leftForPerson: 0, alreadySeen: 0 };
+      const result: ReadResult = { answered: 0, leftForPerson: 0, alreadySeen: 0, ignored: 0 };
       const opened = await openMailboxAccess(database, config, accountId);
       if (!opened || !opened.connection.readEmails) return result;
       const liveAt = await database.runInAccountTransaction(accountId, (transaction) =>
@@ -168,6 +184,7 @@ export function createEmailReaderService(dependencies: {
           const outcome = await dealWithEmail(accountId, email, opened.connection.replyMode, opened.access);
           if (outcome === 'answered') result.answered += 1;
           else if (outcome === 'left_for_person') result.leftForPerson += 1;
+          else if (outcome === 'ignored') result.ignored += 1;
           else result.alreadySeen += 1;
           if (newestEmailAt === null || email.receivedAt > newestEmailAt) newestEmailAt = email.receivedAt;
         } catch (error) {

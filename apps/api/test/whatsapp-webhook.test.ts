@@ -435,6 +435,7 @@ describe('ending quiet WhatsApp conversations', () => {
     await waitFor(async () => sentTo(phone).length === 1);
     const idle = createIdleConversationsService({
       database,
+      idleMinutes: 360,
       enqueueJob: async (jobName, data) => {
         queuedJobs.push({ jobName, data });
       },

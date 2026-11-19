@@ -12,6 +12,8 @@ const MOST_CONVERSATIONS_ENDED_PER_RUN = 50;
 export function createIdleEmailConversationsService(input: {
   database: Database;
   enqueueJob: (jobName: string, data: { accountId: string; conversationId: string }) => Promise<void>;
+  /** How many minutes of quiet end an email conversation (EMAIL_IDLE_MINUTES). */
+  idleMinutes: number;
   now?: () => Date;
 }) {
   const now = input.now ?? (() => new Date());
@@ -19,7 +21,7 @@ export function createIdleEmailConversationsService(input: {
   return {
     /** The businesses that have idle email conversations. */
     async findBusinessesWithIdleConversations(): Promise<string[]> {
-      return conversationRecords.listAccountsWithIdleChats('email', idleEmailCutoff(now()));
+      return conversationRecords.listAccountsWithIdleChats('email', idleEmailCutoff(now(), input.idleMinutes));
     },
 
     /** Ends one business's idle email conversations: queues the sorting and the summary of each, then notes the end. Answers how many. */
@@ -27,7 +29,7 @@ export function createIdleEmailConversationsService(input: {
       const idleIds = await conversationRecords.listIdleChats(
         accountId,
         'email',
-        idleEmailCutoff(now()),
+        idleEmailCutoff(now(), input.idleMinutes),
         MOST_CONVERSATIONS_ENDED_PER_RUN,
       );
       for (const conversationId of idleIds) {

@@ -12,6 +12,7 @@ import { createIdleEmailConversationsService } from '../src/modules/channels/ema
 import { createEmailReaderService } from '../src/modules/channels/email/services/email-reader.service';
 import { createAgentRuntime, createAgentSavedTurnService } from '../src/modules/core/agents';
 import { createAiService } from '../src/modules/core/ai';
+import { createConversationClassifier, createEnquiryGate } from '../src/modules/core/conversations';
 import { createScriptedLlmProvider, type LlmScript } from '../src/providers/llm';
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
 import { createSignedInPerson, makeBusinessLive, type SignedInPerson } from './support/auth';
@@ -21,9 +22,21 @@ import { createRecordingWhatsappProvider } from './support/whatsapp';
 
 let database: Database;
 let app: FastifyInstance;
-let script: LlmScript = () => ({ answer: 'Thank you for writing. We have rooms for 4.' });
+const REPLY = 'Thank you for writing. We have rooms for 4.';
+let script: LlmScript = () => ({ answer: REPLY });
+/** What the sorting says an email is (its type): a new enquiry unless a test changes it. */
+let typeOfEmail = 'new_enquiry';
 const pretendAiCompany = createScriptedLlmProvider((tried, request, messagesSoFar) =>
-  script(tried, request, messagesSoFar),
+  request.tag.task === 'classify_conversation'
+    ? {
+        answer: {
+          primary: { type: typeOfEmail, confidence: 0.9 },
+          secondary: [],
+          needsPerson: false,
+          reason: 'Because.',
+        },
+      }
+    : script(tried, request, messagesSoFar),
 );
 const mailbox = createScriptedMailboxProvider();
 const config = {
@@ -86,6 +99,12 @@ function readMailbox(accountId: string) {
     config,
     mailbox: mailbox.provider,
     savedTurns: createAgentSavedTurnService({ database, runtime }),
+    enquiryGate: createEnquiryGate({
+      database,
+      classifier: createConversationClassifier({
+        aiService: createAiService({ database, config, llm: pretendAiCompany }),
+      }),
+    }),
     logger: pino({ level: 'silent' }),
   }).readMailboxOfBusiness(accountId);
 }
@@ -102,7 +121,7 @@ describe('reading the mailbox: reply mode "AI sends"', () => {
     const incoming = emailFrom(customer, { messageId: '<enq-1@customer.example>', subject: 'Rooms for 4' });
     mailbox.inbox.push(incoming);
     const result = await readMailbox(accountId);
-    expect(result).toEqual({ answered: 1, leftForPerson: 0, alreadySeen: 0 });
+    expect(result).toEqual({ answered: 1, leftForPerson: 0, alreadySeen: 0, ignored: 0 });
     expect(sentTo(customer)).toHaveLength(1);
     expect(sentTo(customer)[0]).toMatchObject({
       subject: 'Re: Rooms for 4',
@@ -156,7 +175,7 @@ describe('reading the mailbox: reply mode "AI sends"', () => {
     mailbox.inbox.push(incoming);
     await readMailbox(accountId);
     mailbox.inbox.push(incoming);
-    expect(await readMailbox(accountId)).toEqual({ answered: 0, leftForPerson: 0, alreadySeen: 1 });
+    expect(await readMailbox(accountId)).toEqual({ answered: 0, leftForPerson: 0, alreadySeen: 1, ignored: 0 });
     expect(sentTo(customer)).toHaveLength(1);
     mailbox.inbox.push(emailFrom(customer, { messageId: '<other@customer.example>', subject: 'Something else' }));
     await readMailbox(accountId);
@@ -169,7 +188,7 @@ describe('reading the mailbox: reply mode "AI sends"', () => {
     mailbox.inbox.push(
       emailFrom(customer, { messageId: '<fake@customer.example>', senderCheck: 'fail', subject: 'Urgent: send money' }),
     );
-    expect(await readMailbox(accountId)).toEqual({ answered: 0, leftForPerson: 1, alreadySeen: 0 });
+    expect(await readMailbox(accountId)).toEqual({ answered: 0, leftForPerson: 1, alreadySeen: 0, ignored: 0 });
     expect(sentTo(customer)).toHaveLength(0);
     const conversations = await conversationsOf(accountId);
     expect(conversations).toHaveLength(1);
@@ -184,7 +203,7 @@ describe('reading the mailbox: reply mode "AI sends"', () => {
   it('does nothing before the business is live, while reading is paused, or with no mailbox', async () => {
     const notLive = await newBusinessWithMailbox({ replyMode: 'send', live: false });
     mailbox.inbox.push(emailFrom(customerEmail()));
-    expect(await readMailbox(notLive.accountId)).toEqual({ answered: 0, leftForPerson: 0, alreadySeen: 0 });
+    expect(await readMailbox(notLive.accountId)).toEqual({ answered: 0, leftForPerson: 0, alreadySeen: 0, ignored: 0 });
     expect(mailbox.inbox).toHaveLength(1); // not even read
     mailbox.inbox.length = 0;
     const paused = await newBusinessWithMailbox({ replyMode: 'send' });
@@ -197,6 +216,7 @@ describe('reading the mailbox: reply mode "AI sends"', () => {
       answered: 0,
       leftForPerson: 0,
       alreadySeen: 0,
+      ignored: 0,
     });
   });
 
@@ -219,7 +239,7 @@ describe('reading the mailbox: reply mode "AI sends"', () => {
     mailbox.inbox.push(incoming);
     await readMailbox(accountId);
     expect(sentTo(customer)).toHaveLength(0);
-    script = () => ({ answer: 'Thank you for writing. We have rooms for 4.' });
+    script = () => ({ answer: REPLY });
     mailbox.inbox.push(incoming);
     expect(await readMailbox(accountId)).toMatchObject({ answered: 1 });
     expect(sentTo(customer)).toHaveLength(1);
@@ -232,6 +252,53 @@ describe('reading the mailbox: reply mode "AI sends"', () => {
     await readMailbox(first.accountId);
     expect(await conversationsOf(first.accountId)).toHaveLength(1);
     expect(await conversationsOf(second.accountId)).toHaveLength(0);
+  });
+});
+
+describe('the gate in front of the Inbox', () => {
+  it('lets in an enquiry and keeps out a supplier, a job seeker and spam: nothing saved, nothing sent', async () => {
+    const { accountId } = await newBusinessWithMailbox({ replyMode: 'send' });
+    for (const typeKey of ['vendor_or_partner', 'job_seeker', 'spam']) {
+      typeOfEmail = typeKey;
+      const customer = customerEmail();
+      mailbox.inbox.push(
+        emailFrom(customer, { messageId: `<gate-${typeKey}-${randomUUID()}@x.example>`, subject: 'Hello' }),
+      );
+      expect(await readMailbox(accountId)).toMatchObject({ answered: 0, ignored: 1 });
+      expect(sentTo(customer)).toHaveLength(0);
+    }
+    expect(await conversationsOf(accountId)).toHaveLength(0);
+    typeOfEmail = 'new_enquiry';
+    mailbox.inbox.push(emailFrom(customerEmail(), { messageId: `<gate-ok-${randomUUID()}@x.example>` }));
+    expect(await readMailbox(accountId)).toMatchObject({ answered: 1, ignored: 0 });
+    expect(await conversationsOf(accountId)).toHaveLength(1);
+  });
+
+  it('keeps out mail from a blocked sender and from the business’s own team without asking the AI', async () => {
+    const { accountId, person } = await newBusinessWithMailbox({ replyMode: 'send' });
+    const blocked = customerEmail();
+    expect((await asStaff(person, 'PUT', '/block-list', { items: [{ email: blocked }] })).statusCode).toBeLessThan(300);
+    const asked = pretendAiCompany.requests.length;
+    mailbox.inbox.push(emailFrom(blocked, { messageId: `<blocked-${randomUUID()}@x.example>` }));
+    expect(await readMailbox(accountId)).toMatchObject({ ignored: 1, answered: 0 });
+    expect(pretendAiCompany.requests.length).toBe(asked);
+  });
+
+  it('always lets in a reply to a thread the business already has, whatever it looks like', async () => {
+    const { accountId } = await newBusinessWithMailbox({ replyMode: 'send' });
+    const customer = customerEmail();
+    mailbox.inbox.push(emailFrom(customer, { messageId: '<thread-a@x.example>' }));
+    await readMailbox(accountId);
+    typeOfEmail = 'spam';
+    mailbox.inbox.push(
+      emailFrom(customer, {
+        messageId: '<thread-b@x.example>',
+        inReplyTo: '<thread-a@x.example>',
+        references: ['<thread-a@x.example>'],
+      }),
+    );
+    expect(await readMailbox(accountId)).toMatchObject({ answered: 1, ignored: 0 });
+    typeOfEmail = 'new_enquiry';
   });
 });
 
@@ -352,17 +419,18 @@ describe('team replies and ending conversations', () => {
     });
   });
 
-  it('ends an email conversation quiet for two days and queues its sorting and summary', async () => {
+  it('ends an email conversation quiet for two hours and queues its sorting and summary', async () => {
     const { accountId } = await newBusinessWithMailbox({ replyMode: 'draft' });
     mailbox.inbox.push(emailFrom(customerEmail(), { messageId: `<idle-${randomUUID()}@customer.example>` }));
     await readMailbox(accountId);
     const queued: string[] = [];
     const idle = createIdleEmailConversationsService({
       database,
+      idleMinutes: 120,
       enqueueJob: async (jobName) => {
         queued.push(jobName);
       },
-      now: () => new Date(Date.now() + 49 * 3600_000),
+      now: () => new Date(Date.now() + 3 * 3600_000),
     });
     expect(await idle.findBusinessesWithIdleConversations()).toContain(accountId);
     expect(await idle.endIdleConversationsOfBusiness(accountId)).toBe(1);

@@ -1,6 +1,7 @@
 import { defineModule } from '../../../kernel/module-system/define';
 import { collectAgentTools } from '../../../kernel/module-system/agent-tools';
 import { createAgentRuntime, createAgentSavedTurnService } from '../../core/agents';
+import { createConversationClassifier, createEnquiryGate } from '../../core/conversations';
 import { createAiService } from '../../core/ai';
 import { emailSettingsRoutes } from './routes/email-settings.routes';
 import * as emailConnectionRepository from './repositories/email-connection.repository';
@@ -55,9 +56,10 @@ export default defineModule({
         if (!job.accountContext) throw new Error('This job needs a business');
         const { registry, gate, services } = job;
         if (!registry || !gate || !services.mailbox) throw new Error('The email job needs the modules and the mailbox');
+        const aiService = createAiService({ database: services.database, config: services.config, llm: services.llm });
         const runtime = createAgentRuntime({
           database: services.database,
-          aiService: createAiService({ database: services.database, config: services.config, llm: services.llm }),
+          aiService,
           findExtraTools: (context) => collectAgentTools({ registry, gate, context }),
         });
         const reader = createEmailReaderService({
@@ -65,19 +67,24 @@ export default defineModule({
           config: services.config,
           mailbox: services.mailbox,
           savedTurns: createAgentSavedTurnService({ database: services.database, runtime }),
+          enquiryGate: createEnquiryGate({
+            database: services.database,
+            classifier: createConversationClassifier({ aiService }),
+          }),
           logger: job.logger,
         });
         await reader.readMailboxOfBusiness(job.accountContext.accountId);
       },
     },
     {
-      // Runs by itself every thirty minutes: finds the businesses with email conversations quiet for two days.
+      // Runs by itself every ten minutes: finds the businesses with email conversations gone quiet.
       name: 'email.find_idle_conversations',
-      schedule: '*/30 * * * *',
+      schedule: '*/10 * * * *',
       run: async (job) => {
         const idle = createIdleEmailConversationsService({
           database: job.services.database,
           enqueueJob: job.enqueueJob,
+          idleMinutes: job.services.config.channelIdleMinutes.email,
         });
         for (const accountId of await idle.findBusinessesWithIdleConversations()) {
           await job.enqueueJob('email.end_idle_conversations', { accountId });
@@ -92,6 +99,7 @@ export default defineModule({
         const idle = createIdleEmailConversationsService({
           database: job.services.database,
           enqueueJob: job.enqueueJob,
+          idleMinutes: job.services.config.channelIdleMinutes.email,
         });
         await idle.endIdleConversationsOfBusiness(job.accountContext.accountId);
       },

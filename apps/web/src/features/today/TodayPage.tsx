@@ -152,10 +152,10 @@ export function TodayPage() {
 
   const header = (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-heading-md font-semibold">
+      <h2 className="text-heading-md font-semibold">
         {t(greetingKey(business.timeZone))}
         {user.name !== null ? `, ${user.name.split(' ')[0]}` : ''}
-      </h1>
+      </h2>
       {canSeeTeam ? (
         <SegmentedControl
           ariaLabel={t('today.scope.label')}

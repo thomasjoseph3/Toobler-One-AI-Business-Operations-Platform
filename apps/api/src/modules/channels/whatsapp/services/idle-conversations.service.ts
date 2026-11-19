@@ -16,6 +16,8 @@ const RECEIPT_KEPT_DAYS = 7;
 export function createIdleConversationsService(input: {
   database: Database;
   enqueueJob: (jobName: string, data: { accountId: string; conversationId: string }) => Promise<void>;
+  /** How many minutes of quiet end a conversation (WHATSAPP_IDLE_MINUTES). */
+  idleMinutes: number;
   now?: () => Date;
 }) {
   const { database } = input;
@@ -25,7 +27,10 @@ export function createIdleConversationsService(input: {
   return {
     /** The businesses that have idle WhatsApp conversations. */
     async findBusinessesWithIdleConversations(): Promise<string[]> {
-      return conversationRecords.listAccountsWithIdleChats('whatsapp', idleConversationCutoff(now()));
+      return conversationRecords.listAccountsWithIdleChats(
+        'whatsapp',
+        idleConversationCutoff(now(), input.idleMinutes),
+      );
     },
 
     /**
@@ -37,7 +42,7 @@ export function createIdleConversationsService(input: {
       const idleIds = await conversationRecords.listIdleChats(
         accountId,
         'whatsapp',
-        idleConversationCutoff(now()),
+        idleConversationCutoff(now(), input.idleMinutes),
         MOST_CONVERSATIONS_ENDED_PER_RUN,
       );
       for (const conversationId of idleIds) {
