@@ -686,6 +686,34 @@ export interface WebchatSettingsTable {
   updated_at: Generated<Date>;
 }
 
+/** A business's WhatsApp connection: one row per business. The access token is stored encrypted and never leaves the server. Fenced by account_id. */
+export interface WhatsappConnectionsTable {
+  account_id: string;
+  /** Meta's id of the number customers write to: finds the business for an incoming message. Unique across businesses. */
+  phone_number_id: string;
+  business_account_id: string | null;
+  display_phone_number: Generated<string | null>;
+  encrypted_access_token: string;
+  token_last_four: string;
+  answer_messages: Generated<boolean>;
+  status: Generated<'unchecked' | 'working' | 'failed'>;
+  status_note: Generated<string | null>;
+  status_checked_at: Generated<Date | null>;
+  last_message_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** One row per channel message already received (a WhatsApp message id, an email Message-ID), so a repeated delivery is answered once. Fenced by account_id. */
+export interface ChannelMessageReceiptsTable {
+  account_id: string;
+  channel: 'whatsapp' | 'email';
+  external_id: string;
+  received_at: Generated<Date>;
+}
+
 /** What the AI agent learned in one conversation: the details, the one promise. One row per conversation. Fenced by account_id. */
 export interface ConversationFactsTable {
   conversation_id: string;
@@ -1036,6 +1064,8 @@ export interface DB {
   conversation_messages: ConversationMessagesTable;
   conversation_facts: ConversationFactsTable;
   webchat_settings: WebchatSettingsTable;
+  whatsapp_connections: WhatsappConnectionsTable;
+  channel_message_receipts: ChannelMessageReceiptsTable;
   conversation_outcomes: ConversationOutcomesTable;
   classification_corrections: ClassificationCorrectionsTable;
   business_answers: BusinessAnswersTable;

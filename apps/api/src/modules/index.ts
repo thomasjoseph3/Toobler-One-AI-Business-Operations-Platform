@@ -24,6 +24,7 @@ import agents from './core/agents/module';
 import setup from './core/setup/module';
 import today from './core/today/module';
 import webchat from './channels/webchat/module';
+import whatsapp from './channels/whatsapp/module';
 import accountModules from './core/module-switches/module';
 
 // Every module in the product. Adding a module = one line here (see the plug-in-module skill).
@@ -54,4 +55,5 @@ export const modules: readonly ModuleManifest[] = [
   setup,
   today,
   webchat,
+  whatsapp,
 ];

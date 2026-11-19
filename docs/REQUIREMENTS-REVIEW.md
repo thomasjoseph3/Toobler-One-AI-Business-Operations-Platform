@@ -89,3 +89,7 @@ proposal for each. **Q** marks a decision the owner needs to make; the "Needed b
 ## Status
 
 F00 is unblocked (owner answers, 9 Nov 2026). Still open for later: R2 phone provider (F29), R4 Toobler WhatsApp number (F25), R10 own-leads role (F02), R13 pricing (F34), R14 hosting (before F20 ideally).
+
+## R81: Channels first, alerts and privacy later (owner, 19 Nov 2026)
+
+The owner wants a release for the testing team as soon as WhatsApp, email reading and the web call work. Order changed: F25 WhatsApp, F26 Email, F29 Phone/web call, then F23 (staff alerts, built on WhatsApp delivery instead of console delivery that would be rewired) and F24. F23 is `deferred`, not dropped: its migration 071, pure rules and brief stay on the branch. Testing is lighter: unit tests for pure helpers, API tests (works / 401 / 403 / 404 / 400) and an isolation entry per route, only the touched files while building, and one full `npm run verify` at the release point. Email first release is IMAP only (Gmail and Outlook through app passwords; OAuth later). Calls: the web call first; the Twilio phone code stays unconnected.

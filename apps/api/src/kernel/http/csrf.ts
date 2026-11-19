@@ -16,11 +16,14 @@ export const CSRF_HEADER_VALUE = 'toobler-web';
  * visitor token (no cookie is ever used, so there is nothing for another site to ride on).
  */
 const PUBLIC_WIDGET_PATH_START = '/api/v1/public/widget/';
+/** The provider webhooks (WhatsApp, and later others) are called by the provider's servers, not by a browser. The provider's signature on every call takes the place of the CSRF check. */
+const WEBHOOK_PATH_START = '/webhooks/';
 
 export function registerCsrfProtection(app: FastifyInstance, options: { allowedOrigins: readonly string[] }) {
   app.addHook('onRequest', async (request) => {
     if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') return;
     if (request.url.startsWith(PUBLIC_WIDGET_PATH_START)) return;
+    if (request.url.startsWith(WEBHOOK_PATH_START)) return;
     const hasOurOrigin = options.allowedOrigins.includes(request.headers.origin ?? '');
     const hasOurHeader = request.headers[CSRF_HEADER_NAME] === CSRF_HEADER_VALUE;
     if (!hasOurOrigin || !hasOurHeader) {

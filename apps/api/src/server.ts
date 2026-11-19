@@ -21,7 +21,14 @@ const contextFor = createContextFactory(database);
 // Both report to /health. The web server is built last so it can list them.
 const app = await buildApp({ config, database, registry, healthChecks: [] });
 const gate = app.kernel.gate; // is this module on for this business? (built from the module-switches module)
-const eventDispatcher = createEventDispatcher({ database, registry, gate, contextFor, logger: app.log });
+const eventDispatcher = createEventDispatcher({
+  database,
+  registry,
+  gate,
+  contextFor,
+  logger: app.log,
+  services: { config, database, whatsapp: app.kernel.whatsapp },
+});
 // A scheduled job has no business of its own, so it is given the list of business ids and queues one job per business
 const listAccountIds = async () => {
   const rows = await database.system.selectFrom('accounts').select('id').execute();

@@ -259,12 +259,13 @@ describe('POST /conversations/{id}/reply', () => {
     await owner.refused('POST', `/conversations/${conversationId}/reply`, { body: '   ' }, 400);
     await owner.refused('POST', `/conversations/${conversationId}/reply`, { body: 'x'.repeat(2001) }, 400);
     await owner.refused('POST', `/conversations/${conversationId}/reply`, { body: 'Hi', extra: 1 }, 400);
-    const whatsapp = await records.startConversation(owner.businessId, {
-      channel: 'whatsapp',
+    // Phone calls have no sender yet (WhatsApp has one since F25)
+    const phoneCall = await records.startConversation(owner.businessId, {
+      channel: 'phone',
       fromPhoneKey: '971501234567',
     });
-    await owner.ok('POST', `/conversations/${whatsapp}/takeover`);
-    expect(await owner.refused('POST', `/conversations/${whatsapp}/reply`, { body: 'Hi' }, 409)).toBe(
+    await owner.ok('POST', `/conversations/${phoneCall}/takeover`);
+    expect(await owner.refused('POST', `/conversations/${phoneCall}/reply`, { body: 'Hi' }, 409)).toBe(
       'CHANNEL_CANNOT_REPLY_YET',
     );
     await records.markEnded(owner.businessId, conversationId);

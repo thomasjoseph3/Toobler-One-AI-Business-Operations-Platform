@@ -40,6 +40,12 @@ export const ROUTE_LIMITS = {
   // Closing the bubble ends and sorts a chat
   widgetEnd: { max: 10, timeWindow: '1 minute' },
   widgetMessage: { max: 20, timeWindow: '1 minute' },
+  // Meta checks the webhook address once when it is set up
+  whatsappVerify: { max: 30, timeWindow: '1 minute' },
+  // Meta's servers deliver every customer's message (all businesses) from a few addresses, so this is generous; it only stops a flood
+  whatsappDelivery: { max: 1200, timeWindow: '1 minute' },
+  // Each check makes one real call to Meta
+  whatsappCheck: { max: 10, timeWindow: '1 minute' },
 } as const satisfies Record<string, RouteLimit>;
 
 /**

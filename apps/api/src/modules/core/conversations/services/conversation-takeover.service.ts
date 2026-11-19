@@ -130,8 +130,9 @@ export function createConversationTakeoverService({ database }: { database: Data
         if (!isHeldNow(conversation, now) || conversation.heldByUserId !== asker.userId) {
           throw conflict('NOT_THE_HOLDER', 'Take over this conversation first ("I\'ll handle this"), then reply.');
         }
-        // The web chat window shows saved replies itself; every other channel will add its own sender with its own feature
-        if (conversation.channel !== 'webchat') {
+        // The web chat window shows saved replies itself; WhatsApp sends the reply out (its module reacts to the saved message). The other
+        // channels will add their own sender with their own feature.
+        if (conversation.channel !== 'webchat' && conversation.channel !== 'whatsapp') {
           throw conflict('CHANNEL_CANNOT_REPLY_YET', 'Replying on this channel is not connected yet.');
         }
         const messageId = uuidv7();

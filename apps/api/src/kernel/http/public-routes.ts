@@ -137,6 +137,23 @@ export const PUBLIC_ROUTES: readonly PublicRoute[] = [
   },
   {
     method: 'GET',
+    path: '/webhooks/whatsapp',
+    reason:
+      "Meta checks the webhook address once when it is set up, with no sign-in. It must bring the platform's verify token (compared without " +
+      'leaking how much matched); anything else is refused, and while the platform has no Meta app configured the route answers 404. It reveals ' +
+      'nothing but the challenge Meta sent. Each address is limited to 30 a minute.',
+  },
+  {
+    method: 'POST',
+    path: '/webhooks/whatsapp',
+    reason:
+      "Meta delivers customers' WhatsApp messages here, with no sign-in. Every call must carry a valid X-Hub-Signature-256 over the exact body, " +
+      "made with the platform's Meta app secret; an unsigned or wrongly signed call is refused (401) and nothing is read from it. The business is " +
+      'found only from the number the customer wrote to; a number no business uses is ignored; a repeated message id is answered once. ' +
+      'The CSRF check does not apply (the signature takes its place). Each address is limited to 1200 a minute.',
+  },
+  {
+    method: 'GET',
     path: '/widget/loader.js',
     reason:
       'The one line a business pastes into its website loads this script. It is the same file for every business, holds no data, and reads ' +

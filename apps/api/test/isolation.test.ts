@@ -1312,6 +1312,18 @@ const exemptRoutes: Record<string, string> = {
     'public: reads only the one chat the visitor token names, and a token made for another business, a test chat or another channel is refused with 401 (tested in webchat-chat-end)',
   'POST /api/v1/public/widget/{key}/end':
     "public: ends only the one chat the visitor token names; another business's token is refused with 401 and ends nothing (tested in webchat-chat-end)",
+  'GET /api/v1/channels/whatsapp':
+    "shows only the caller's own connection (the business comes from the session); never the token (tested in whatsapp-settings)",
+  'PUT /api/v1/channels/whatsapp':
+    "saves only the caller's own connection (the business comes from the session); a number another business uses answers 409 and changes nothing (tested in whatsapp-settings)",
+  'DELETE /api/v1/channels/whatsapp':
+    "removes only the caller's own connection (the business comes from the session; nothing in the request names one) (tested in whatsapp-settings)",
+  'POST /api/v1/channels/whatsapp/check':
+    "asks Meta about the caller's own saved number only (the business comes from the session) (tested in whatsapp-settings)",
+  'GET /webhooks/whatsapp':
+    "public: Meta's one-time check; needs the platform's verify token and reveals nothing but the challenge it sent (tested in whatsapp-webhook)",
+  'POST /webhooks/whatsapp':
+    'public: signed by Meta (401 otherwise); the business comes only from the number the customer wrote to, so a message can never reach another business, and a repeated message id is answered once (tested in whatsapp-webhook)',
   'GET /widget/loader.js': 'public file, the same for every business, holds no business data',
   'GET /widget/assets/{file}':
     'public built files, the same for every business, plain file names from one folder only (tested in webchat-widget-files)',
