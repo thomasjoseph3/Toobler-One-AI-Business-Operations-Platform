@@ -102,6 +102,8 @@ export function createJobRunner(dependencies: {
       listAccountIds,
       logger,
       services,
+      registry,
+      gate,
     });
   };
 

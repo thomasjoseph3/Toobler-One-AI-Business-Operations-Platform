@@ -27,7 +27,7 @@ const eventDispatcher = createEventDispatcher({
   gate,
   contextFor,
   logger: app.log,
-  services: { config, database, whatsapp: app.kernel.whatsapp },
+  services: { config, database, whatsapp: app.kernel.whatsapp, mailbox: app.kernel.mailbox },
 });
 // A scheduled job has no business of its own, so it is given the list of business ids and queues one job per business
 const listAccountIds = async () => {
@@ -40,7 +40,7 @@ const jobRunner = createJobRunner({
   gate,
   contextFor,
   listAccountIds,
-  services: { config, database, mail: app.kernel.mail, llm: app.kernel.llm },
+  services: { config, database, mail: app.kernel.mail, llm: app.kernel.llm, mailbox: app.kernel.mailbox },
   logger: app.log,
 });
 app.kernel.healthChecks.push(eventDispatcher.healthCheck, jobRunner.healthCheck);

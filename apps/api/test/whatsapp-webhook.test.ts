@@ -13,6 +13,7 @@ import { createScriptedLlmProvider, type LlmScript } from '../src/providers/llm'
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
 import { createSignedInPerson, makeBusinessLive, type SignedInPerson } from './support/auth';
 import { openTestDatabase, waitFor } from './support/harness';
+import { unusedMailboxProvider } from './support/mailbox';
 import { createRecordingWhatsappProvider, switchOnWhatsapp } from './support/whatsapp';
 
 let database: Database;
@@ -339,7 +340,7 @@ describe('a customer writes on WhatsApp', () => {
       gate: { isActive: async () => true },
       contextFor: createContextFactory(database),
       logger: pino({ level: 'silent' }),
-      services: { config, database, whatsapp: whatsappRecorder.provider },
+      services: { config, database, whatsapp: whatsappRecorder.provider, mailbox: unusedMailboxProvider },
     });
     await waitFor(async () => {
       await dispatcher.dispatchPendingEventsOnce();
@@ -373,7 +374,7 @@ describe('a customer writes on WhatsApp', () => {
       gate: { isActive: async () => true },
       contextFor: createContextFactory(database),
       logger: pino({ level: 'silent' }),
-      services: { config, database, whatsapp: whatsappRecorder.provider },
+      services: { config, database, whatsapp: whatsappRecorder.provider, mailbox: unusedMailboxProvider },
     });
     await waitFor(async () => {
       await dispatcher.dispatchPendingEventsOnce();

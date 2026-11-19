@@ -26,6 +26,7 @@
     "csv-parse": "7.0.3",
     "fastify": "5.12.7",
     "fastify-type-provider-zod": "7.0.0",
+    "imapflow": "2.10.2",
     "jose": "6.2.13",
     "kysely": "0.29.7",
     "libphonenumber-js": "1.13.15",

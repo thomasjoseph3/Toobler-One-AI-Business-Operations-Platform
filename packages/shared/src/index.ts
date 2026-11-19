@@ -24,6 +24,7 @@ export * from './ai-models-admin';
 export * from './agent-test-chat';
 export * from './webchat';
 export * from './whatsapp';
+export * from './email';
 export * from './setup';
 export * from './setup-chat';
 export * from './activities';

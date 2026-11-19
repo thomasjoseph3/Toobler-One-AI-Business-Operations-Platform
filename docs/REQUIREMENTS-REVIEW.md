@@ -93,3 +93,7 @@ F00 is unblocked (owner answers, 9 Nov 2026). Still open for later: R2 phone pro
 ## R81: Channels first, alerts and privacy later (owner, 19 Nov 2026)
 
 The owner wants a release for the testing team as soon as WhatsApp, email reading and the web call work. Order changed: F25 WhatsApp, F26 Email, F29 Phone/web call, then F23 (staff alerts, built on WhatsApp delivery instead of console delivery that would be rewired) and F24. F23 is `deferred`, not dropped: its migration 071, pure rules and brief stay on the branch. Testing is lighter: unit tests for pure helpers, API tests (works / 401 / 403 / 404 / 400) and an isolation entry per route, only the touched files while building, and one full `npm run verify` at the release point. Email first release is IMAP only (Gmail and Outlook through app passwords; OAuth later). Calls: the web call first; the Twilio phone code stays unconnected.
+
+## R82: Email first release (owner, 19 Nov 2026)
+
+IMAP only (Gmail and Outlook through an app password; OAuth later). One reply mode for the whole mailbox ("AI sends" or "AI drafts, staff approve"), not one per kind of email: the requirement says per kind; the sorting into kinds happens after the conversation, so the first release chooses once. Default is draft. Own tables per channel (`whatsapp_connections`, `email_connections`) instead of one generic `connections` table: each channel's settings differ and nothing needs to read them together.

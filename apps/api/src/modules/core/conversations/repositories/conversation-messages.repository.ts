@@ -11,6 +11,8 @@ export interface ConversationMessageRow {
   body: string;
   /** The person who wrote a staff message. */
   byUserId: string | null;
+  /** The channel's own id of the message (an email's Message-ID), when it has one. */
+  channelMessageId: string | null;
   createdAt: Date;
 }
 
@@ -58,7 +60,7 @@ export async function listMessagesOfConversation(
 ): Promise<ConversationMessageRow[]> {
   const rows = await db
     .selectFrom('conversation_messages')
-    .select(['id', 'sender', 'body', 'by_user_id', 'created_at'])
+    .select(['id', 'sender', 'body', 'by_user_id', 'channel_message_id', 'created_at'])
     .where('account_id', '=', accountId)
     .where('conversation_id', '=', conversationId)
     .orderBy('created_at')
@@ -69,6 +71,7 @@ export async function listMessagesOfConversation(
     sender: row.sender,
     body: row.body,
     byUserId: row.by_user_id,
+    channelMessageId: row.channel_message_id,
     createdAt: row.created_at,
   }));
 }
@@ -106,4 +109,32 @@ export async function findFirstCustomerWords(
     .orderBy('id')
     .execute();
   return new Map(rows.map((row) => [row.conversation_id, row.body.trim().slice(0, options.maxCharacters)]));
+}
+
+/**
+ * The open conversation (not ended, not a test chat) of a channel that already holds one of these channel message ids: an email thread is
+ * found through the ids in a reply's In-Reply-To and References headers. The newest conversation wins. Undefined when none matches.
+ */
+export async function findOpenConversationHoldingMessageId(
+  db: Db,
+  options: { accountId: string; channel: 'webchat' | 'whatsapp' | 'email' | 'phone'; channelMessageIds: string[] },
+): Promise<string | undefined> {
+  if (options.channelMessageIds.length === 0) return undefined;
+  const row = await db
+    .selectFrom('conversation_messages')
+    .innerJoin('conversations', (join) =>
+      join
+        .onRef('conversations.id', '=', 'conversation_messages.conversation_id')
+        .onRef('conversations.account_id', '=', 'conversation_messages.account_id'),
+    )
+    .select('conversations.id')
+    .where('conversation_messages.account_id', '=', options.accountId)
+    .where('conversation_messages.channel_message_id', 'in', options.channelMessageIds)
+    .where('conversations.channel', '=', options.channel)
+    .where('conversations.is_test', '=', false)
+    .where('conversations.ended_at', 'is', null)
+    .orderBy('conversations.created_at', 'desc')
+    .limit(1)
+    .executeTakeFirst();
+  return row?.id;
 }

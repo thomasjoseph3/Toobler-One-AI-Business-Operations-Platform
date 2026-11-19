@@ -10,6 +10,7 @@ import { modules } from '../../src/modules';
 import type { ModuleManifest } from '../../src/kernel/module-system/define';
 import { testDatabaseConfig } from './database';
 import { createRecordingMailSender } from './mail';
+import { unusedMailboxProvider } from './mailbox';
 import { unusedWhatsappProvider } from './whatsapp';
 
 /** The web address the app accepts changes from (the CSRF check), the same as the app's default setting. */
@@ -58,6 +59,7 @@ export async function buildTestApp(
   const mailSender = overrides.mailSender ?? createRecordingMailSender();
   // No test calls Meta: unless a test brings its own recorder, any use of the WhatsApp provider is a mistake and fails loudly.
   const whatsappProvider = overrides.whatsappProvider ?? unusedWhatsappProvider;
+  const mailboxProvider = overrides.mailboxProvider ?? unusedMailboxProvider;
   // Per-route limits are off unless a test asks for them: most tests create many people from one address.
   return buildApp({
     config: testConfig(),
@@ -70,6 +72,7 @@ export async function buildTestApp(
     ...overrides,
     mailSender,
     whatsappProvider,
+    mailboxProvider,
     publicRoutes,
   });
 }

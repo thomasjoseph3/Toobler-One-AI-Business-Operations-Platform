@@ -191,6 +191,21 @@ export function createConversationRecordsService({ database }: { database: Datab
       );
     },
 
+    /** The id of the open conversation that holds one of these channel message ids (an email thread, found from a reply's headers), or undefined. */
+    async findOpenChatByMessageIds(
+      accountId: string,
+      channel: ConversationChannel,
+      channelMessageIds: string[],
+    ): Promise<string | undefined> {
+      return database.runInAccountTransaction(accountId, (transaction) =>
+        conversationMessagesRepository.findOpenConversationHoldingMessageId(transaction, {
+          accountId,
+          channel,
+          channelMessageIds,
+        }),
+      );
+    },
+
     /**
      * What a channel needs to send a staff member's reply to the customer: where the conversation is, who is on the other end, the words,
      * and when the customer last wrote (WhatsApp allows free text only for 24 hours after that). Undefined when the message is unknown,
@@ -207,6 +222,10 @@ export function createConversationRecordsService({ database }: { database: Datab
           fromEmail: string | null;
           body: string;
           lastCustomerMessageAt: Date | null;
+          /** The channel's own id of the customer's last message (an email's Message-ID), so a reply stays in the customer's thread. */
+          lastCustomerChannelMessageId: string | null;
+          /** The words of the customer's first message (an email's first line holds its subject). */
+          firstCustomerBody: string | null;
         }
       | undefined
     > {
@@ -228,6 +247,8 @@ export function createConversationRecordsService({ database }: { database: Datab
           fromEmail: conversation.fromEmail,
           body: staffMessage.body,
           lastCustomerMessageAt: lastCustomerMessage ? lastCustomerMessage.createdAt : null,
+          lastCustomerChannelMessageId: lastCustomerMessage ? lastCustomerMessage.channelMessageId : null,
+          firstCustomerBody: customerMessages[0] ? customerMessages[0].body : null,
         };
       });
     },
@@ -293,7 +314,7 @@ export function createConversationRecordsService({ database }: { database: Datab
     async saveCustomerMessageAndAgentReply(
       accountId: string,
       conversationId: string,
-      input: { customerBody: string; agentBody: string },
+      input: { customerBody: string; agentBody: string; customerChannelMessageId?: string | undefined },
     ): Promise<{ agentReplySaved: boolean }> {
       return database.runInAccountTransaction(accountId, async (transaction) => {
         const conversation = await conversationsRepository.lockConversationById(transaction, accountId, conversationId);
@@ -304,7 +325,7 @@ export function createConversationRecordsService({ database }: { database: Datab
           accountId,
           sender: 'customer',
           body: input.customerBody,
-          channelMessageId: null,
+          channelMessageId: input.customerChannelMessageId ?? null,
           createdAt: customerWrittenAt,
         });
         if (conversationsRepository.isHeldNow(conversation, new Date())) return { agentReplySaved: false };

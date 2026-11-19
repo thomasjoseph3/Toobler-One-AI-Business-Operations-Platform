@@ -15,6 +15,7 @@ import { registerGuard, rejectEveryone, type Authenticator } from './kernel/http
 import { PUBLIC_ROUTES, type PublicRoute } from './kernel/http/public-routes';
 import { loggerOptions } from './kernel/logger';
 import { createLangChainProvider, type LlmProvider } from './providers/llm';
+import { createImapMailboxProvider, type MailboxProvider } from './providers/mailbox';
 import { createMetaWhatsappProvider, type WhatsappProvider } from './providers/whatsapp';
 import { createMailSender, type MailSender } from './providers/mail';
 import type { ModuleGate, Registry } from './kernel/module-system/registry';
@@ -37,6 +38,8 @@ export interface Kernel {
   llm: LlmProvider;
   /** Talks to WhatsApp. Channel modules use it through `app.kernel.whatsapp`, never by importing the provider. */
   whatsapp: WhatsappProvider;
+  /** Reads and answers a business's own mailbox. Channel modules use it through `app.kernel.mailbox`. */
+  mailbox: MailboxProvider;
   /** Whether the per-route limits (login, sign-up, ...) apply. On unless a test turns it off. */
   strictRouteLimits: boolean;
   /**
@@ -69,6 +72,8 @@ export interface AppDeps {
   llmProvider?: LlmProvider;
   /** Replaces the real WhatsApp provider. Tests pass a recording one so Meta is never called. */
   whatsappProvider?: WhatsappProvider;
+  /** Replaces the real mailbox provider. Tests pass a scripted one so no mail server is ever reached. */
+  mailboxProvider?: MailboxProvider;
   /** Turn the per-route limits off (default on). Tests that create many people from one address use this. */
   strictRouteLimits?: boolean;
   /** Requests per window per address; public routes get their own tighter limits. */
@@ -119,6 +124,7 @@ export async function buildApp(dependencies: AppDeps): Promise<FastifyInstance> 
     mail: dependencies.mailSender ?? createMailSender(config, (line) => app.log.info(line)),
     llm: dependencies.llmProvider ?? createLangChainProvider(),
     whatsapp: dependencies.whatsappProvider ?? createMetaWhatsappProvider(),
+    mailbox: dependencies.mailboxProvider ?? createImapMailboxProvider(),
   });
 
   // The authenticator comes from the module that provides one (core.auth). With none, every signed-in route answers 401.

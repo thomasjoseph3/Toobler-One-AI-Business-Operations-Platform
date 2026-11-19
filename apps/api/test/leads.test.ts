@@ -8,6 +8,7 @@ import { createEventDispatcher } from '../src/kernel/events/dispatcher';
 import { createRegistry } from '../src/kernel/module-system/registry';
 import { modules } from '../src/modules';
 import { buildTestApp, testConfig, unsafeRequestHeaders } from './support/app';
+import { unusedMailboxProvider } from './support/mailbox';
 import { unusedWhatsappProvider } from './support/whatsapp';
 import { createSignedInPerson, type SignedInPerson } from './support/auth';
 import { openTestDatabase, waitFor } from './support/harness';
@@ -1255,7 +1256,7 @@ describe('taking the "not a fit" mark off a contact that has leads', () => {
       gate: { isActive: async () => true },
       contextFor: createContextFactory(database),
       logger: pino({ level: 'silent' }),
-      services: { config: testConfig(), database, whatsapp: unusedWhatsappProvider },
+      services: { config: testConfig(), database, whatsapp: unusedWhatsappProvider, mailbox: unusedMailboxProvider },
     });
     await waitFor(async () => {
       await dispatcher.dispatchPendingEventsOnce();

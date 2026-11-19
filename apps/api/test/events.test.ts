@@ -9,6 +9,7 @@ import { publishEvent } from '../src/kernel/events/publish';
 import { defineModule } from '../src/kernel/module-system/define';
 import { createRegistry, type ModuleGate } from '../src/kernel/module-system/registry';
 import { testConfig } from './support/app';
+import { unusedMailboxProvider } from './support/mailbox';
 import { unusedWhatsappProvider } from './support/whatsapp';
 import { newAccountId, openTestDatabase, waitFor } from './support/harness';
 
@@ -44,7 +45,7 @@ function dispatcherFor(
     gate,
     contextFor: contextFor(),
     logger: silentLogger,
-    services: { config: testConfig(), database, whatsapp: unusedWhatsappProvider },
+    services: { config: testConfig(), database, whatsapp: unusedWhatsappProvider, mailbox: unusedMailboxProvider },
     options: { secondsBeforeRetry: () => 0, ...options },
   });
 }

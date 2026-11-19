@@ -6,6 +6,7 @@ import { useSession } from '../../auth/session';
 import { useKeptData } from '../knowledge/use-kept-resource';
 import { WebchatInstallCard } from './WebchatInstallCard';
 import { WebchatLookCard } from './WebchatLookCard';
+import { EmailCard } from './EmailCard';
 import { WhatsappCard } from './WhatsappCard';
 
 /**
@@ -81,18 +82,22 @@ export function ChannelsPage() {
       {canEdit ? null : <p className="text-body-md text-text-secondary">{t('channels.managersOnly')}</p>}
       {webchat}
       {canEdit ? (
-        <WhatsappCard timeZone={timeZone} />
+        <>
+          <WhatsappCard timeZone={timeZone} />
+          <EmailCard timeZone={timeZone} />
+        </>
       ) : (
         <Card>
           <h2 className="text-heading-sm text-text-primary">{t('channels.whatsapp.title')}</h2>
           <p className="text-body-md text-text-secondary">{t('channels.whatsapp.staffNote')}</p>
+          <p className="text-body-md mt-2 text-text-secondary">{t('channels.email.staffNote')}</p>
         </Card>
       )}
       <Card>
         <h2 className="text-heading-sm text-text-primary">{t('channels.others.title')}</h2>
         <p className="text-body-md mb-2 text-text-secondary">{t('channels.others.description')}</p>
         <ul className="text-body-md flex flex-col gap-2 text-text-secondary">
-          {(['email', 'phone'] as const).map((channel) => (
+          {(['phone'] as const).map((channel) => (
             <li key={channel}>
               {t(`channels.others.${channel}`)} <span className="text-label-sm">({t('channels.others.soon')})</span>
             </li>

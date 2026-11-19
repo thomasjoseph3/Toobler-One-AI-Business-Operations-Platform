@@ -1,3 +1,4 @@
+import type { MailboxProvider } from '../../providers/mailbox';
 import type { WhatsappProvider } from '../../providers/whatsapp';
 import type { Config } from '../config';
 import type { AccountContext } from '../context';
@@ -18,6 +19,7 @@ export interface EventServices {
   config: Config;
   database: Database;
   whatsapp: WhatsappProvider;
+  mailbox: MailboxProvider;
 }
 
 /**

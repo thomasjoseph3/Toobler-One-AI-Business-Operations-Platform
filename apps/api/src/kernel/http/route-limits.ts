@@ -46,6 +46,8 @@ export const ROUTE_LIMITS = {
   whatsappDelivery: { max: 1200, timeWindow: '1 minute' },
   // Each check makes one real call to Meta
   whatsappCheck: { max: 10, timeWindow: '1 minute' },
+  // Each check signs in to a mail server, and each approved draft sends a real email
+  emailCheck: { max: 10, timeWindow: '1 minute' },
 } as const satisfies Record<string, RouteLimit>;
 
 /**

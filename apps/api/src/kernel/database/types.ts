@@ -714,6 +714,47 @@ export interface ChannelMessageReceiptsTable {
   received_at: Generated<Date>;
 }
 
+/** A business's email connection: one row per business. The mailbox password is stored encrypted and never leaves the server. Fenced by account_id. */
+export interface EmailConnectionsTable {
+  account_id: string;
+  address: string;
+  username: string;
+  encrypted_password: string;
+  password_last_four: string;
+  imap_host: string;
+  imap_port: Generated<number>;
+  smtp_host: string;
+  smtp_port: Generated<number>;
+  reply_mode: Generated<'send' | 'draft'>;
+  read_emails: Generated<boolean>;
+  checked_up_to: Generated<Date>;
+  status: Generated<'unchecked' | 'working' | 'failed'>;
+  status_note: Generated<string | null>;
+  status_checked_at: Generated<Date | null>;
+  last_email_at: Generated<Date | null>;
+  created_by: Json | null;
+  updated_by: Json | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** A reply the AI wrote that waits for a team member to approve it. Fenced by account_id. */
+export interface EmailDraftsTable {
+  id: string;
+  account_id: string;
+  conversation_id: string;
+  to_email: string;
+  subject: string;
+  body: string;
+  in_reply_to: string | null;
+  /** A list of message ids. Written as JSON text, read back as a list. */
+  thread_references: ColumnType<string[], string | undefined, string>;
+  status: Generated<'waiting' | 'sent' | 'discarded'>;
+  decided_at: Generated<Date | null>;
+  decided_by: Generated<Json | null>;
+  created_at: Generated<Date>;
+}
+
 /** What the AI agent learned in one conversation: the details, the one promise. One row per conversation. Fenced by account_id. */
 export interface ConversationFactsTable {
   conversation_id: string;
@@ -1065,6 +1106,8 @@ export interface DB {
   conversation_facts: ConversationFactsTable;
   webchat_settings: WebchatSettingsTable;
   whatsapp_connections: WhatsappConnectionsTable;
+  email_connections: EmailConnectionsTable;
+  email_drafts: EmailDraftsTable;
   channel_message_receipts: ChannelMessageReceiptsTable;
   conversation_outcomes: ConversationOutcomesTable;
   classification_corrections: ClassificationCorrectionsTable;
