@@ -198,7 +198,10 @@ export function loadConfig(environmentVariables: Record<string, string | undefin
       appSecret: validEnvironment.WHATSAPP_APP_SECRET.trim() || null,
       verifyToken: validEnvironment.WHATSAPP_VERIFY_TOKEN.trim() || null,
     },
-    channelIdleMinutes: { whatsapp: validEnvironment.WHATSAPP_IDLE_MINUTES, email: validEnvironment.EMAIL_IDLE_MINUTES },
+    channelIdleMinutes: {
+      whatsapp: validEnvironment.WHATSAPP_IDLE_MINUTES,
+      email: validEnvironment.EMAIL_IDLE_MINUTES,
+    },
   };
   if (config.mail.provider === 'smtp' && (!config.mail.smtp.host || !config.mail.from)) {
     throw new ConfigError('Bad configuration:\n  MAIL_PROVIDER=smtp needs SMTP_HOST and EMAIL_FROM to be set');
