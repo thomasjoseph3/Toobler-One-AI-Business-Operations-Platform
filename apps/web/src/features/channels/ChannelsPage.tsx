@@ -6,6 +6,7 @@ import { useSession } from '../../auth/session';
 import { useKeptData } from '../knowledge/use-kept-resource';
 import { WebchatInstallCard } from './WebchatInstallCard';
 import { WebchatLookCard } from './WebchatLookCard';
+import { WhatsappCard } from './WhatsappCard';
 
 /**
  * Channels: how customers reach the AI agent. The website chat is set up here (put it on your website, how it looks, its buttons); the other
@@ -79,11 +80,19 @@ export function ChannelsPage() {
       <p className="text-body-md text-text-secondary">{t('channels.intro')}</p>
       {canEdit ? null : <p className="text-body-md text-text-secondary">{t('channels.managersOnly')}</p>}
       {webchat}
+      {canEdit ? (
+        <WhatsappCard timeZone={timeZone} />
+      ) : (
+        <Card>
+          <h2 className="text-heading-sm text-text-primary">{t('channels.whatsapp.title')}</h2>
+          <p className="text-body-md text-text-secondary">{t('channels.whatsapp.staffNote')}</p>
+        </Card>
+      )}
       <Card>
         <h2 className="text-heading-sm text-text-primary">{t('channels.others.title')}</h2>
         <p className="text-body-md mb-2 text-text-secondary">{t('channels.others.description')}</p>
         <ul className="text-body-md flex flex-col gap-2 text-text-secondary">
-          {(['whatsapp', 'email', 'phone'] as const).map((channel) => (
+          {(['email', 'phone'] as const).map((channel) => (
             <li key={channel}>
               {t(`channels.others.${channel}`)} <span className="text-label-sm">({t('channels.others.soon')})</span>
             </li>
